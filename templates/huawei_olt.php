@@ -6948,395 +6948,325 @@ try {
             <?php endif; ?>
             
             <?php if ($view === 'dashboard'): ?>
-            <?php
-            // Calculate additional statistics
-            $totalOnus = $stats['online_onus'] + $stats['offline_onus'] + $stats['los_onus'];
-            $uptimePercent = $totalOnus > 0 ? round(($stats['online_onus'] / $totalOnus) * 100, 1) : 0;
-            $onusByOltDashboard = $huaweiOLT->getONUsByOLT();
-            ?>
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h4 class="page-title mb-1"><i class="bi bi-speedometer2"></i> Network Dashboard</h4>
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="text-muted small">Last updated: <?= date('M j, Y H:i:s') ?></span>
-                        <span class="live-indicator"><span class="live-dot"></span> Live</span>
+            <!-- Modern Network Dashboard -->
+            <style>
+                .dashboard-header {
+                    background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%);
+                    border-radius: 16px;
+                    padding: 24px 32px;
+                    margin-bottom: 24px;
+                    color: white;
+                    position: relative;
+                    overflow: hidden;
+                }
+                .dashboard-header::before {
+                    content: '';
+                    position: absolute;
+                    top: -50%;
+                    right: -20%;
+                    width: 400px;
+                    height: 400px;
+                    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+                    border-radius: 50%;
+                }
+                .dashboard-header .live-pulse {
+                    width: 10px;
+                    height: 10px;
+                    background: #10b981;
+                    border-radius: 50%;
+                    animation: pulse 2s infinite;
+                    display: inline-block;
+                    margin-right: 6px;
+                }
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.6; transform: scale(1.2); }
+                }
+                .mega-stat {
+                    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+                    border-radius: 16px;
+                    padding: 24px;
+                    border: 1px solid rgba(0,0,0,0.05);
+                    transition: all 0.3s ease;
+                    position: relative;
+                    overflow: hidden;
+                }
+                .mega-stat:hover {
+                    transform: translateY(-4px);
+                    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+                }
+                .mega-stat .stat-icon-lg {
+                    width: 56px;
+                    height: 56px;
+                    border-radius: 14px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.5rem;
+                }
+                .mega-stat .stat-number {
+                    font-size: 2.5rem;
+                    font-weight: 700;
+                    line-height: 1;
+                    margin: 12px 0 4px;
+                }
+                .mega-stat .stat-trend {
+                    font-size: 0.75rem;
+                    padding: 2px 8px;
+                    border-radius: 20px;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                }
+                .olt-card {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 16px;
+                    border: 1px solid #e2e8f0;
+                    transition: all 0.2s ease;
+                }
+                .olt-card:hover {
+                    border-color: #3b82f6;
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+                }
+                .olt-card .health-ring {
+                    width: 48px;
+                    height: 48px;
+                    position: relative;
+                }
+                .olt-card .health-ring svg {
+                    transform: rotate(-90deg);
+                }
+                .olt-card .health-value {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                }
+                .quick-action-btn {
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 16px;
+                    text-align: center;
+                    transition: all 0.2s ease;
+                    text-decoration: none;
+                    color: #334155;
+                    display: block;
+                }
+                .quick-action-btn:hover {
+                    border-color: #3b82f6;
+                    color: #3b82f6;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+                }
+                .quick-action-btn i {
+                    font-size: 1.5rem;
+                    margin-bottom: 8px;
+                    display: block;
+                }
+                .alert-item {
+                    padding: 12px 16px;
+                    border-left: 3px solid;
+                    background: #f8fafc;
+                    border-radius: 0 8px 8px 0;
+                    margin-bottom: 8px;
+                }
+                .alert-item.critical { border-left-color: #ef4444; background: #fef2f2; }
+                .alert-item.warning { border-left-color: #f59e0b; background: #fffbeb; }
+                .alert-item.info { border-left-color: #3b82f6; background: #eff6ff; }
+                .uptime-gauge {
+                    width: 180px;
+                    height: 180px;
+                    position: relative;
+                    margin: 0 auto;
+                }
+                .uptime-gauge .gauge-bg {
+                    stroke: #e2e8f0;
+                }
+                .uptime-gauge .gauge-fill {
+                    stroke: url(#gaugeGradient);
+                    stroke-linecap: round;
+                    transition: stroke-dasharray 1s ease;
+                }
+                .uptime-gauge .gauge-center {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    text-align: center;
+                }
+                .uptime-gauge .gauge-value {
+                    font-size: 2.5rem;
+                    font-weight: 700;
+                    color: #10b981;
+                }
+                .issue-badge {
+                    font-size: 0.7rem;
+                    padding: 4px 8px;
+                    border-radius: 6px;
+                    font-weight: 600;
+                }
+            </style>
+            
+            <!-- Dashboard Header -->
+            <div class="dashboard-header">
+                <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 1;">
+                    <div>
+                        <h3 class="mb-1 fw-bold"><i class="bi bi-speedometer2 me-2"></i>Network Dashboard</h3>
+                        <div class="d-flex align-items-center gap-3 opacity-75">
+                            <span><span class="live-pulse"></span> Live Monitoring</span>
+                            <span><i class="bi bi-clock me-1"></i><?= date('M j, Y H:i:s') ?></span>
+                            <span id="autoRefreshTimer" class="small"></span>
+                        </div>
                     </div>
-                </div>
-                <div class="d-flex gap-2">
-                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-warning">
-                        <i class="bi bi-hourglass-split me-1"></i> Pending (<?= $stats['unconfigured_onus'] ?>)
-                    </a>
-                    <button class="btn btn-outline-primary" onclick="location.reload()">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                    </button>
+                    <div class="d-flex gap-2">
+                        <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-warning">
+                            <i class="bi bi-hourglass-split me-1"></i> <?= $stats['unconfigured_onus'] ?> Pending
+                        </a>
+                        <button class="btn btn-light" onclick="location.reload()" title="Refresh">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             
             <!-- Primary Stats Row -->
             <div class="row g-4 mb-4">
-                <div class="col-md-3">
-                    <div class="card stat-card shadow-sm h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
-                                    <i class="bi bi-hdd-rack fs-4"></i>
-                                </div>
-                                <span class="badge bg-primary"><?= $stats['active_olts'] ?> Active</span>
+                <div class="col-lg-3 col-md-6">
+                    <div class="mega-stat h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="stat-icon-lg bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-hdd-rack"></i>
                             </div>
-                            <div class="stat-value"><?= $stats['total_olts'] ?></div>
-                            <div class="stat-label">Total OLT Devices</div>
-                            <div class="progress mt-3" style="height: 6px;">
-                                <div class="progress-bar bg-primary" style="width: <?= $stats['total_olts'] > 0 ? ($stats['active_olts'] / $stats['total_olts'] * 100) : 0 ?>%"></div>
-                            </div>
-                            <small class="text-muted"><?= $stats['total_olts'] - $stats['active_olts'] ?> inactive</small>
+                            <span class="stat-trend bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-circle-fill" style="font-size: 6px;"></i> <?= $stats['active_olts'] ?> Active
+                            </span>
+                        </div>
+                        <div class="stat-number text-primary"><?= $stats['total_olts'] ?></div>
+                        <div class="text-muted mb-2">OLT Devices</div>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-primary" style="width: <?= $stats['total_olts'] > 0 ? ($stats['active_olts'] / $stats['total_olts'] * 100) : 0 ?>%; border-radius: 3px;"></div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card stat-card stat-success shadow-sm h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-success bg-opacity-10 text-success">
-                                    <i class="bi bi-wifi fs-4"></i>
-                                </div>
-                                <span class="badge bg-success"><?= $uptimePercent ?>% Uptime</span>
+                <div class="col-lg-3 col-md-6">
+                    <div class="mega-stat h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="stat-icon-lg bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-wifi"></i>
                             </div>
-                            <div class="stat-value text-success"><?= number_format($stats['online_onus']) ?></div>
-                            <div class="stat-label">Online ONUs</div>
-                            <div class="progress mt-3" style="height: 6px;">
-                                <div class="progress-bar bg-success" style="width: <?= $uptimePercent ?>%"></div>
-                            </div>
-                            <small class="text-muted">of <?= number_format($totalOnus) ?> total authorized</small>
+                            <span class="stat-trend bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-arrow-up"></i> <?= $uptimePercent ?>%
+                            </span>
+                        </div>
+                        <div class="stat-number text-success"><?= number_format($stats['online_onus']) ?></div>
+                        <div class="text-muted mb-2">Online ONUs</div>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-success" style="width: <?= $uptimePercent ?>%; border-radius: 3px;"></div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card stat-card stat-danger shadow-sm h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-danger bg-opacity-10 text-danger">
-                                    <i class="bi bi-exclamation-triangle fs-4"></i>
-                                </div>
-                                <?php if ($stats['los_onus'] > 0): ?>
-                                <span class="badge bg-danger badge-pulse"><?= $stats['los_onus'] ?> LOS</span>
-                                <?php endif; ?>
+                <div class="col-lg-3 col-md-6">
+                    <div class="mega-stat h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="stat-icon-lg bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-exclamation-triangle"></i>
                             </div>
-                            <div class="stat-value text-danger"><?= $stats['offline_onus'] + $stats['los_onus'] ?></div>
-                            <div class="stat-label">Problem ONUs</div>
-                            <div class="d-flex gap-3 mt-3">
-                                <div>
-                                    <span class="text-danger fw-bold"><?= $stats['los_onus'] ?></span>
-                                    <small class="text-muted d-block">LOS</small>
-                                </div>
-                                <div>
-                                    <span class="text-secondary fw-bold"><?= $stats['offline_onus'] ?></span>
-                                    <small class="text-muted d-block">Offline</small>
-                                </div>
-                            </div>
+                            <?php $offlineTotal = $stats['offline_onus'] + $stats['los_onus']; ?>
+                            <span class="stat-trend <?= $offlineTotal > 0 ? 'bg-danger bg-opacity-10 text-danger' : 'bg-success bg-opacity-10 text-success' ?>">
+                                <?= $offlineTotal > 0 ? '<i class="bi bi-exclamation-circle"></i> Issues' : '<i class="bi bi-check-circle"></i> OK' ?>
+                            </span>
+                        </div>
+                        <div class="stat-number text-danger"><?= $offlineTotal ?></div>
+                        <div class="text-muted mb-2">Offline / LOS</div>
+                        <div class="d-flex gap-2 small">
+                            <span class="text-muted"><i class="bi bi-x-circle me-1"></i><?= $stats['offline_onus'] ?> Offline</span>
+                            <span class="text-muted"><i class="bi bi-exclamation-diamond me-1"></i><?= $stats['los_onus'] ?> LOS</span>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <?php $totalPendingDash = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
-                    <div class="card stat-card stat-warning shadow-sm h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-                                    <i class="bi bi-hourglass-split fs-4"></i>
-                                </div>
-                                <?php if ($totalPendingDash > 0): ?>
-                                <span class="badge bg-warning text-dark badge-pulse">New!</span>
-                                <?php endif; ?>
+                <div class="col-lg-3 col-md-6">
+                    <div class="mega-stat h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="stat-icon-lg bg-warning bg-opacity-10 text-warning">
+                                <i class="bi bi-hourglass-split"></i>
                             </div>
-                            <div class="stat-value text-warning" id="dashPendingCount"><?= $totalPendingDash ?></div>
-                            <div class="stat-label">Pending Authorization</div>
-                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-sm btn-warning w-100 mt-3">
-                                <i class="bi bi-arrow-right me-1"></i> Authorize Now
+                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="stat-trend bg-warning bg-opacity-10 text-warning text-decoration-none">
+                                View All <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
+                        <div class="stat-number text-warning"><?= $stats['unconfigured_onus'] ?></div>
+                        <div class="text-muted mb-2">Pending Authorization</div>
+                        <div class="small text-muted">
+                            <i class="bi bi-router me-1"></i><?= number_format($totalOnus) ?> Total Authorized
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Secondary Stats Row -->
+            <!-- Main Content Row -->
             <div class="row g-4 mb-4">
-                <div class="col-md-8">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>ONU Distribution by OLT</h6>
-                            <small class="text-muted">Real-time status</small>
-                        </div>
-                        <div class="card-body">
-                            <?php if (empty($onusByOltDashboard)): ?>
-                            <div class="text-center text-muted py-4">
-                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                No OLT data available
-                            </div>
-                            <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>OLT</th>
-                                            <th class="text-center">Total</th>
-                                            <th class="text-center">Online</th>
-                                            <th class="text-center">Offline</th>
-                                            <th>Distribution</th>
-                                            <th class="text-end">Health</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($onusByOltDashboard as $oltData): 
-                                            $oltTotal = $oltData['onu_count'] ?? 0;
-                                            $oltOnline = $oltData['online'] ?? 0;
-                                            $oltOffline = $oltData['offline'] ?? 0;
-                                            $oltHealth = $oltTotal > 0 ? round(($oltOnline / $oltTotal) * 100) : 0;
-                                            $healthClass = $oltHealth >= 90 ? 'success' : ($oltHealth >= 70 ? 'warning' : 'danger');
-                                        ?>
-                                        <tr>
-                                            <td>
-                                                <i class="bi bi-hdd-rack text-primary me-2"></i>
-                                                <strong><?= htmlspecialchars($oltData['name'] ?? 'Unknown') ?></strong>
-                                            </td>
-                                            <td class="text-center fw-bold"><?= $oltTotal ?></td>
-                                            <td class="text-center"><span class="text-success fw-bold"><?= $oltOnline ?></span></td>
-                                            <td class="text-center"><span class="text-danger fw-bold"><?= $oltOffline ?></span></td>
-                                            <td style="min-width: 150px;">
-                                                <div class="progress" style="height: 8px;">
-                                                    <div class="progress-bar bg-success" style="width: <?= $oltTotal > 0 ? ($oltOnline / $oltTotal * 100) : 0 ?>%"></div>
-                                                    <div class="progress-bar bg-danger" style="width: <?= $oltTotal > 0 ? ($oltOffline / $oltTotal * 100) : 0 ?>%"></div>
-                                                </div>
-                                            </td>
-                                            <td class="text-end">
-                                                <span class="badge bg-<?= $healthClass ?>"><?= $oltHealth ?>%</span>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Network Overview</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-flex justify-content-center mb-4">
-                                <div class="position-relative" style="width: 140px; height: 140px;">
-                                    <svg viewBox="0 0 36 36" class="w-100 h-100" style="transform: rotate(-90deg);">
-                                        <circle cx="18" cy="18" r="16" fill="none" stroke="#e2e8f0" stroke-width="3"></circle>
-                                        <circle cx="18" cy="18" r="16" fill="none" stroke="var(--oms-success)" stroke-width="3" 
-                                                stroke-dasharray="<?= $uptimePercent ?> <?= 100 - $uptimePercent ?>" stroke-linecap="round"></circle>
-                                    </svg>
-                                    <div class="position-absolute top-50 start-50 translate-middle text-center">
-                                        <div class="fs-4 fw-bold text-success"><?= $uptimePercent ?>%</div>
-                                        <small class="text-muted">Uptime</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row text-center g-2">
-                                <div class="col-6">
-                                    <div class="p-2 rounded" style="background: rgba(16, 185, 129, 0.1);">
-                                        <div class="fs-5 fw-bold text-success"><?= number_format($stats['online_onus']) ?></div>
-                                        <small class="text-muted">Online</small>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="p-2 rounded" style="background: rgba(239, 68, 68, 0.1);">
-                                        <div class="fs-5 fw-bold text-danger"><?= $stats['offline_onus'] + $stats['los_onus'] ?></div>
-                                        <small class="text-muted">Offline/LOS</small>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
-                                        <div class="fs-5 fw-bold text-primary"><?= number_format($totalOnus) ?></div>
-                                        <small class="text-muted">Authorized</small>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="p-2 rounded" style="background: rgba(245, 158, 11, 0.1);">
-                                        <div class="fs-5 fw-bold text-warning"><?= $stats['unconfigured_onus'] ?></div>
-                                        <small class="text-muted">Pending</small>
-                                    </div>
-                                </div>
+                <!-- OLT Status Cards -->
+                <div class="col-lg-8">
+                    <div class="card shadow-sm border-0" style="border-radius: 16px;">
+                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fw-bold"><i class="bi bi-hdd-rack me-2 text-primary"></i>OLT Status</h5>
+                                <a href="?page=huawei-olt&view=olts" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                    <i class="bi bi-gear me-1"></i> Manage
+                                </a>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="row g-4">
-                <div class="col-md-8">
-                    <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-hdd-rack me-2"></i>OLT Status</h6>
-                            <a href="?page=huawei-olt&view=olts" class="btn btn-sm btn-outline-primary">Manage OLTs</a>
-                        </div>
-                        <div class="card-body p-0">
+                        <div class="card-body px-4 pb-4">
                             <?php if (empty($olts)): ?>
-                            <div class="p-4 text-center text-muted">
-                                <i class="bi bi-inbox fs-1 mb-2 d-block"></i>
-                                No OLTs configured. <a href="?page=huawei-olt&view=olts">Add your first OLT</a>
+                            <div class="text-center py-5">
+                                <div class="mb-3"><i class="bi bi-inbox display-4 text-muted"></i></div>
+                                <p class="text-muted mb-3">No OLTs configured yet</p>
+                                <a href="?page=huawei-olt&view=olts" class="btn btn-primary rounded-pill px-4">
+                                    <i class="bi bi-plus-circle me-1"></i> Add First OLT
+                                </a>
                             </div>
                             <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>OLT Name</th>
-                                            <th>IP Address</th>
-                                            <th>ONUs</th>
-                                            <th>Status</th>
-                                            <th>Last Sync</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php 
-                                        $onusByOlt = $huaweiOLT->getONUsByOLT();
-                                        $onuCountMap = array_column($onusByOlt, null, 'id');
-                                        foreach ($olts as $olt): 
-                                            $oltStats = $onuCountMap[$olt['id']] ?? ['onu_count' => 0, 'online' => 0, 'offline' => 0];
-                                        ?>
-                                        <tr>
-                                            <td>
-                                                <i class="bi bi-hdd-rack text-primary me-2"></i>
-                                                <strong><?= htmlspecialchars($olt['name']) ?></strong>
-                                            </td>
-                                            <td><code><?= htmlspecialchars($olt['ip_address']) ?></code></td>
-                                            <td>
-                                                <span class="badge bg-success"><?= $oltStats['online'] ?></span>
-                                                <span class="badge bg-secondary"><?= $oltStats['offline'] ?></span>
-                                            </td>
-                                            <td>
-                                                <?php if ($olt['is_active']): ?>
-                                                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Active</span>
-                                                <?php else: ?>
-                                                <span class="badge bg-secondary"><i class="bi bi-pause-circle me-1"></i>Inactive</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td class="text-muted small">
-                                                <?= $olt['last_sync_at'] ? date('M j, H:i', strtotime($olt['last_sync_at'])) : 'Never' ?>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-                <?php 
-                // Get selected OLT from query param for signal health filtering
-                $signalHealthOltId = isset($_GET['signal_olt']) ? (int)$_GET['signal_olt'] : null;
-                $signalStats = $huaweiOLT->getONUSignalStats($signalHealthOltId);
-                $issueONUs = $huaweiOLT->getONUsWithIssues($signalHealthOltId, 5);
-                ?>
-                <div class="col-md-4">
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="bi bi-reception-4 me-2"></i>Signal Health</h6>
-                        </div>
-                        <div class="card-body pb-2">
-                            <form method="get" class="mb-2" id="signalOltForm">
-                                <input type="hidden" name="page" value="huawei-olt">
-                                <div class="input-group input-group-sm">
-                                    <select name="signal_olt" id="signalOltSelect" class="form-select form-select-sm" onchange="this.form.submit()">
-                                        <option value="">All OLTs</option>
-                                        <?php foreach ($olts as $olt): ?>
-                                        <option value="<?= $olt['id'] ?>" <?= $signalHealthOltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            </form>
-                            <form method="post" class="d-inline">
-                                <input type="hidden" name="action" value="check_signal_health">
-                                <input type="hidden" name="olt_id" value="<?= $signalHealthOltId ?? '' ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-primary w-100" title="Run signal health check on selected OLT">
-                                    <i class="bi bi-arrow-repeat me-1"></i>Run Health Check<?= $signalHealthOltId ? ' (' . htmlspecialchars($olts[array_search($signalHealthOltId, array_column($olts, 'id'))]['name'] ?? 'Selected') . ')' : ' (All)' ?>
-                                </button>
-                            </form>
-                        </div>
-                        <div class="card-body pt-0">
-                            <div class="row text-center">
-                                <div class="col-4">
-                                    <div class="text-muted small">Good</div>
-                                    <div class="fs-5 fw-bold text-success"><?= $signalStats['good_signal'] ?? 0 ?></div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="text-muted small">Warning</div>
-                                    <div class="fs-5 fw-bold text-warning"><?= $signalStats['warning_signal'] ?? 0 ?></div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="text-muted small">Critical</div>
-                                    <div class="fs-5 fw-bold text-danger"><?= $signalStats['critical_signal'] ?? 0 ?></div>
-                                </div>
-                            </div>
-                            <div class="row text-center mt-2">
-                                <div class="col-4">
-                                    <div class="text-muted small">LOS</div>
-                                    <div class="fs-6 fw-bold text-danger"><?= $signalStats['los'] ?? 0 ?></div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="text-muted small">Offline</div>
-                                    <div class="fs-6 fw-bold text-secondary"><?= $signalStats['offline'] ?? 0 ?></div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="text-muted small">Total</div>
-                                    <div class="fs-6 fw-bold"><?= $signalStats['total'] ?? 0 ?></div>
-                                </div>
-                            </div>
-                            <?php if (!empty($signalStats['avg_rx_power'])): ?>
-                            <div class="text-center mt-2">
-                                <small class="text-muted">Avg RX: <?= number_format((float)$signalStats['avg_rx_power'], 1) ?> dBm</small>
-                            </div>
-                            <?php endif; ?>
-                            <?php if (!empty($issueONUs)): ?>
-                            <hr class="my-2">
-                            <div class="small">
-                                <strong>Issues:</strong>
-                                <?php foreach ($issueONUs as $issue): ?>
-                                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                    <span class="text-truncate" style="max-width: 140px;" title="<?= htmlspecialchars($issue['sn']) ?>">
-                                        <?= htmlspecialchars($issue['description'] ?: $issue['sn']) ?>
-                                    </span>
-                                    <span class="badge bg-<?= strtolower($issue['status']) === 'los' ? 'danger' : ((floatval($issue['rx_power'] ?? 0)) <= -28 ? 'danger' : 'warning') ?>">
-                                        <?= strtolower($issue['status']) === 'los' ? 'LOS' : (isset($issue['rx_power']) ? number_format((float)$issue['rx_power'], 1) . ' dBm' : 'N/A') ?>
-                                    </span>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-bell me-2"></i>Recent Alerts</h6>
-                            <a href="?page=huawei-olt&view=alerts" class="btn btn-sm btn-outline-primary">View All</a>
-                        </div>
-                        <div class="card-body p-0">
-                            <?php if (empty($alerts)): ?>
-                            <div class="p-4 text-center text-muted">
-                                <i class="bi bi-check-circle fs-1 mb-2 d-block text-success"></i>
-                                No alerts
-                            </div>
-                            <?php else: ?>
-                            <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
-                                <?php foreach (array_slice($alerts, 0, 10) as $alert): ?>
-                                <div class="list-group-item <?= !$alert['is_read'] ? 'bg-light' : '' ?>">
-                                    <div class="d-flex align-items-center">
-                                        <?php
-                                        $severityIcon = ['info' => 'info-circle text-info', 'warning' => 'exclamation-triangle text-warning', 'critical' => 'exclamation-circle text-danger'];
-                                        ?>
-                                        <i class="bi bi-<?= $severityIcon[$alert['severity']] ?? 'info-circle text-info' ?> me-2"></i>
-                                        <div class="flex-grow-1">
-                                            <div class="small fw-bold"><?= htmlspecialchars($alert['title']) ?></div>
-                                            <div class="small text-muted"><?= date('M j, H:i', strtotime($alert['created_at'])) ?></div>
+                            <div class="row g-3">
+                                <?php 
+                                $onusByOlt = $huaweiOLT->getONUsByOLT();
+                                $onuCountMap = array_column($onusByOlt, null, 'id');
+                                foreach ($olts as $olt): 
+                                    $oltId = $olt['id'];
+                                    $oltOnline = $onuCountMap[$oltId]['online_count'] ?? 0;
+                                    $oltTotal = $onuCountMap[$oltId]['total_count'] ?? 0;
+                                    $oltOffline = $oltTotal - $oltOnline;
+                                    $oltHealth = $oltTotal > 0 ? round($oltOnline / $oltTotal * 100) : 100;
+                                    $healthColor = $oltHealth >= 95 ? '#10b981' : ($oltHealth >= 80 ? '#f59e0b' : '#ef4444');
+                                ?>
+                                <div class="col-md-6">
+                                    <div class="olt-card">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="health-ring">
+                                                <svg viewBox="0 0 36 36" width="48" height="48">
+                                                    <circle cx="18" cy="18" r="15" fill="none" stroke="#e2e8f0" stroke-width="3"></circle>
+                                                    <circle cx="18" cy="18" r="15" fill="none" stroke="<?= $healthColor ?>" stroke-width="3" 
+                                                            stroke-dasharray="<?= $oltHealth * 0.94 ?> 100" stroke-linecap="round" 
+                                                            style="transform: rotate(-90deg); transform-origin: center;"></circle>
+                                                </svg>
+                                                <span class="health-value" style="color: <?= $healthColor ?>"><?= $oltHealth ?>%</span>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <div class="fw-bold"><?= htmlspecialchars($olt['name']) ?></div>
+                                                <div class="small text-muted"><?= htmlspecialchars($olt['ip_address']) ?></div>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="d-flex gap-2 justify-content-end mb-1">
+                                                    <span class="badge bg-success bg-opacity-10 text-success"><?= $oltOnline ?> <i class="bi bi-wifi"></i></span>
+                                                    <?php if ($oltOffline > 0): ?>
+                                                    <span class="badge bg-danger bg-opacity-10 text-danger"><?= $oltOffline ?> <i class="bi bi-wifi-off"></i></span>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <small class="text-muted"><?= $oltTotal ?> total</small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -7346,99 +7276,198 @@ try {
                         </div>
                     </div>
                 </div>
+                
+                <!-- Network Uptime Gauge -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
+                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-pie-chart me-2 text-success"></i>Network Health</h5>
+                        </div>
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                            <div class="uptime-gauge">
+                                <svg viewBox="0 0 36 36" width="180" height="180">
+                                    <defs>
+                                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="#10b981"/>
+                                            <stop offset="100%" stop-color="#059669"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="gauge-bg" cx="18" cy="18" r="15" fill="none" stroke-width="3"></circle>
+                                    <circle class="gauge-fill" cx="18" cy="18" r="15" fill="none" stroke-width="3" 
+                                            stroke-dasharray="<?= $uptimePercent * 0.94 ?> 100"
+                                            style="transform: rotate(-90deg); transform-origin: center;"></circle>
+                                </svg>
+                                <div class="gauge-center">
+                                    <div class="gauge-value"><?= $uptimePercent ?>%</div>
+                                    <div class="text-muted small">Uptime</div>
+                                </div>
+                            </div>
+                            <div class="row w-100 text-center mt-4 g-2">
+                                <div class="col-4">
+                                    <div class="p-2 rounded-3" style="background: rgba(16, 185, 129, 0.1);">
+                                        <div class="fw-bold text-success"><?= number_format($stats['online_onus']) ?></div>
+                                        <small class="text-muted">Online</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-2 rounded-3" style="background: rgba(239, 68, 68, 0.1);">
+                                        <div class="fw-bold text-danger"><?= $offlineTotal ?></div>
+                                        <small class="text-muted">Down</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-2 rounded-3" style="background: rgba(59, 130, 246, 0.1);">
+                                        <div class="fw-bold text-primary"><?= number_format($totalOnus) ?></div>
+                                        <small class="text-muted">Total</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
-            <!-- Realtime Dashboard Updates -->
+            <!-- Quick Actions & Alerts Row -->
+            <div class="row g-4 mb-4">
+                <!-- Quick Actions -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
+                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-lightning me-2 text-warning"></i>Quick Actions</h5>
+                        </div>
+                        <div class="card-body px-4 pb-4">
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="quick-action-btn">
+                                        <i class="bi bi-plus-circle text-success"></i>
+                                        <div class="fw-medium">Authorize ONUs</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=live_monitor" class="quick-action-btn">
+                                        <i class="bi bi-broadcast text-primary"></i>
+                                        <div class="fw-medium">Live Monitor</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=tr069" class="quick-action-btn">
+                                        <i class="bi bi-router text-info"></i>
+                                        <div class="fw-medium">TR-069</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=terminal" class="quick-action-btn">
+                                        <i class="bi bi-terminal text-dark"></i>
+                                        <div class="fw-medium">CLI Terminal</div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Alerts -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
+                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-bell me-2 text-danger"></i>Recent Alerts</h5>
+                            <a href="?page=huawei-olt&view=alerts" class="btn btn-sm btn-link text-primary p-0">View All</a>
+                        </div>
+                        <div class="card-body px-4 pb-4" style="max-height: 280px; overflow-y: auto;">
+                            <?php if (empty($alerts)): ?>
+                            <div class="text-center py-4">
+                                <i class="bi bi-check-circle display-4 text-success mb-2"></i>
+                                <p class="text-muted mb-0">All systems operational</p>
+                            </div>
+                            <?php else: ?>
+                            <?php foreach (array_slice($alerts, 0, 5) as $alert): ?>
+                            <div class="alert-item <?= $alert['severity'] ?>">
+                                <div class="d-flex align-items-center gap-2">
+                                    <?php
+                                    $severityIcon = ['info' => 'info-circle', 'warning' => 'exclamation-triangle', 'critical' => 'exclamation-circle'];
+                                    ?>
+                                    <i class="bi bi-<?= $severityIcon[$alert['severity']] ?? 'info-circle' ?>"></i>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-medium small"><?= htmlspecialchars($alert['title']) ?></div>
+                                        <div class="text-muted" style="font-size: 0.7rem;"><?= date('M j, H:i', strtotime($alert['created_at'])) ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Problem ONUs -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
+                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-diamond me-2 text-warning"></i>Problem ONUs</h5>
+                            <a href="?page=huawei-olt&view=onus&status=offline" class="btn btn-sm btn-link text-primary p-0">View All</a>
+                        </div>
+                        <div class="card-body px-4 pb-4" style="max-height: 280px; overflow-y: auto;">
+                            <?php
+                            $issueONUs = $db->query("
+                                SELECT o.id, o.sn, o.name as description, o.status, o.rx_power 
+                                FROM huawei_onus o 
+                                WHERE o.is_authorized = true 
+                                  AND (LOWER(o.status) IN ('offline', 'los') OR CAST(o.rx_power AS DECIMAL) <= -28)
+                                ORDER BY 
+                                    CASE WHEN LOWER(o.status) = 'los' THEN 0 ELSE 1 END,
+                                    o.rx_power ASC NULLS LAST
+                                LIMIT 8
+                            ")->fetchAll(PDO::FETCH_ASSOC);
+                            ?>
+                            <?php if (empty($issueONUs)): ?>
+                            <div class="text-center py-4">
+                                <i class="bi bi-check-circle display-4 text-success mb-2"></i>
+                                <p class="text-muted mb-0">No issues detected</p>
+                            </div>
+                            <?php else: ?>
+                            <?php foreach ($issueONUs as $issue): ?>
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div>
+                                    <div class="fw-medium small text-truncate" style="max-width: 150px;" title="<?= htmlspecialchars($issue['sn']) ?>">
+                                        <?= htmlspecialchars($issue['description'] ?: $issue['sn']) ?>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars($issue['sn']) ?></div>
+                                </div>
+                                <?php 
+                                $isLos = strtolower($issue['status']) === 'los';
+                                $rxPower = floatval($issue['rx_power'] ?? 0);
+                                $badgeClass = $isLos ? 'bg-danger' : ($rxPower <= -28 ? 'bg-warning' : 'bg-secondary');
+                                $badgeText = $isLos ? 'LOS' : (isset($issue['rx_power']) ? number_format($rxPower, 1) . ' dBm' : 'Offline');
+                                ?>
+                                <span class="issue-badge <?= $badgeClass ?> text-white"><?= $badgeText ?></span>
+                            </div>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto-refresh script -->
             <script>
             (function() {
-                let realtimeInterval = null;
-                const REFRESH_INTERVAL = 30000; // 30 seconds (reduced polling to prevent hangs)
-                
-                function updateStats(data) {
-                    if (!data.success) return;
-                    
-                    const stats = data.stats;
-                    const totalOnus = stats.online_onus + stats.offline_onus + stats.los_onus;
-                    const uptimePercent = totalOnus > 0 ? ((stats.online_onus / totalOnus) * 100).toFixed(1) : 0;
-                    
-                    // Update stat values with animation
-                    const totalPending = (stats.unconfigured_onus || 0) + (stats.discovered_onus || 0);
-                    updateElement('.stat-card.stat-success .stat-value', stats.online_onus.toLocaleString());
-                    updateElement('.stat-card.stat-danger .stat-value', (stats.offline_onus + stats.los_onus).toString());
-                    updateElement('.stat-card.stat-warning .stat-value', totalPending.toString());
-                    
-                    // Update pending button
-                    const pendingBtn = document.querySelector('a[href*="unconfigured=1"].btn-warning');
-                    if (pendingBtn) {
-                        pendingBtn.innerHTML = `<i class="bi bi-hourglass-split me-1"></i> Pending (${totalPending})`;
+                let countdown = 60;
+                const timerEl = document.getElementById('autoRefreshTimer');
+                function updateTimer() {
+                    if (timerEl) {
+                        timerEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-refresh in ' + countdown + 's';
                     }
-                    
-                    // Update timestamp
-                    const timestampEl = document.querySelector('.text-muted.small');
-                    if (timestampEl && timestampEl.textContent.includes('Last updated')) {
-                        timestampEl.textContent = 'Last updated: ' + new Date().toLocaleString('en-US', {
-                            month: 'short', day: 'numeric', year: 'numeric', 
-                            hour: '2-digit', minute: '2-digit', second: '2-digit'
-                        });
-                    }
-                    
-                    // Pulse the live indicator
-                    const liveIndicator = document.querySelector('.live-indicator');
-                    if (liveIndicator) {
-                        liveIndicator.classList.add('pulse-once');
-                        setTimeout(() => liveIndicator.classList.remove('pulse-once'), 500);
+                    countdown--;
+                    if (countdown < 0) {
+                        location.reload();
                     }
                 }
-                
-                function updateElement(selector, value) {
-                    const el = document.querySelector(selector);
-                    if (el && el.textContent !== value) {
-                        el.classList.add('value-updated');
-                        el.textContent = value;
-                        setTimeout(() => el.classList.remove('value-updated'), 1000);
-                    }
-                }
-                
-                async function fetchRealtimeStats() {
-                    if (document.hidden || window._fetchingStats) return;
-                    window._fetchingStats = true;
-                    try {
-                        const resp = await fetch('?page=huawei-olt&ajax=realtime_stats');
-                        const data = await resp.json();
-                        updateStats(data);
-                    } catch (e) {
-                        console.error('Realtime stats error:', e);
-                    } finally {
-                        window._fetchingStats = false;
-                    }
-                }
-                
-                // Start polling
-                realtimeInterval = setInterval(fetchRealtimeStats, REFRESH_INTERVAL);
-                
-                // Cleanup on page unload
-                window.addEventListener('beforeunload', () => {
-                    if (realtimeInterval) clearInterval(realtimeInterval);
-                });
+                updateTimer();
+                setInterval(updateTimer, 1000);
             })();
             </script>
-            <style>
-            .value-updated {
-                animation: valueFlash 0.5s ease-out;
-            }
-            @keyframes valueFlash {
-                0% { background-color: rgba(25, 135, 84, 0.3); }
-                100% { background-color: transparent; }
-            }
-            .pulse-once {
-                animation: pulseLive 0.5s ease-out;
-            }
-            @keyframes pulseLive {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.5; }
-            }
-            </style>
-            
+
+
             <?php elseif ($view === 'live_monitor'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-activity me-2"></i>Live ONU Monitor</h4>
