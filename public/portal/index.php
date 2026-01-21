@@ -83,6 +83,8 @@ if (!isset($_SESSION['portal_subscription_id'])) {
     }
 }
 
+require_once __DIR__ . '/../../src/SMSGateway.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
@@ -103,19 +105,154 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sub = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($sub) {
-                    if ($sub['password'] === $password) {
+                    if (!empty($sub['portal_password']) && password_verify($password, $sub['portal_password'])) {
                         $_SESSION['portal_subscription_id'] = $sub['id'];
                         $_SESSION['portal_username'] = $sub['username'];
                         header('Location: ?');
                         exit;
+                    } elseif (empty($sub['portal_password'])) {
+                        $_SESSION['pending_login_subscription'] = $sub['id'];
+                        $_SESSION['pending_login_phone'] = $sub['customer_phone'];
+                        $message = 'No password set. Please use SMS verification or set a password.';
+                        $messageType = 'warning';
                     } else {
-                        $message = 'Invalid password. Please try again.';
+                        $message = 'Invalid password. Please try again or use SMS verification.';
                         $messageType = 'danger';
                     }
                 } else {
                     $message = 'No account found with this phone number. Please contact support.';
                     $messageType = 'danger';
                 }
+                break;
+                
+            case 'send_otp':
+                $phone = trim($_POST['phone'] ?? '');
+                $normalizedPhone = normalizePhone($phone);
+                
+                $stmt = $db->prepare("
+                    SELECT rs.id, c.phone as customer_phone FROM radius_subscriptions rs
+                    JOIN customers c ON c.id = rs.customer_id
+                    WHERE REPLACE(REPLACE(REPLACE(c.phone, '+', ''), ' ', ''), '-', '') = ?
+                       OR REPLACE(REPLACE(REPLACE(c.phone, '+', ''), ' ', ''), '-', '') LIKE ?
+                    ORDER BY rs.created_at DESC LIMIT 1
+                ");
+                $phonePattern = '%' . substr($normalizedPhone, -9);
+                $stmt->execute([$normalizedPhone, $phonePattern]);
+                $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($sub) {
+                    $db->prepare("DELETE FROM portal_otp WHERE phone = ? AND (used = TRUE OR expires_at < NOW())")->execute([$normalizedPhone]);
+                    
+                    $recentOtp = $db->prepare("SELECT id FROM portal_otp WHERE phone = ? AND expires_at > NOW() AND used = FALSE");
+                    $recentOtp->execute([$normalizedPhone]);
+                    if ($recentOtp->fetch()) {
+                        $message = 'An OTP was already sent. Please check your phone or wait 5 minutes.';
+                        $messageType = 'warning';
+                        $_SESSION['pending_otp_phone'] = $normalizedPhone;
+                        $_SESSION['pending_otp_subscription'] = $sub['id'];
+                        break;
+                    }
+                    
+                    $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                    $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
+                    
+                    try {
+                        $sms = new \App\SMSGateway();
+                        if ($sms->isEnabled()) {
+                            $smsPhone = $sub['customer_phone'];
+                            $sms->send($smsPhone, "Your ISP Portal verification code is: $otp. Valid for 5 minutes.");
+                            
+                            $stmt = $db->prepare("INSERT INTO portal_otp (phone, code, expires_at) VALUES (?, ?, ?)");
+                            $stmt->execute([$normalizedPhone, $otp, $expiresAt]);
+                            
+                            $_SESSION['pending_otp_phone'] = $normalizedPhone;
+                            $_SESSION['pending_otp_subscription'] = $sub['id'];
+                            $message = 'Verification code sent to your phone. Enter it below.';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'SMS service not configured. Please contact support or use password login.';
+                            $messageType = 'danger';
+                        }
+                    } catch (Exception $e) {
+                        $message = 'Failed to send SMS: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                } else {
+                    $message = 'No account found with this phone number.';
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'verify_otp':
+                $otp = trim($_POST['otp'] ?? '');
+                $phone = $_SESSION['pending_otp_phone'] ?? '';
+                $subscriptionId = $_SESSION['pending_otp_subscription'] ?? null;
+                
+                if (!$phone || !$subscriptionId) {
+                    $message = 'Session expired. Please request a new code.';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $stmt = $db->prepare("
+                    SELECT id FROM portal_otp 
+                    WHERE phone = ? AND code = ? AND expires_at > NOW() AND used = FALSE
+                    ORDER BY created_at DESC LIMIT 1
+                ");
+                $stmt->execute([$phone, $otp]);
+                $validOtp = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($validOtp) {
+                    $db->prepare("UPDATE portal_otp SET used = TRUE WHERE id = ?")->execute([$validOtp['id']]);
+                    
+                    $_SESSION['portal_subscription_id'] = $subscriptionId;
+                    unset($_SESSION['pending_otp_phone'], $_SESSION['pending_otp_subscription']);
+                    
+                    $sub = $radiusBilling->getSubscription($subscriptionId);
+                    $_SESSION['portal_username'] = $sub['username'] ?? '';
+                    
+                    header('Location: ?');
+                    exit;
+                } else {
+                    $message = 'Invalid or expired code. Please try again.';
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'set_password':
+                if (!isset($_SESSION['portal_subscription_id'])) {
+                    $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
+                    $message = 'Invalid request. Please try again.';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $newPassword = trim($_POST['new_password'] ?? '');
+                $confirmPassword = trim($_POST['confirm_password'] ?? '');
+                
+                if (strlen($newPassword) < 6) {
+                    $message = 'Password must be at least 6 characters.';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                if ($newPassword !== $confirmPassword) {
+                    $message = 'Passwords do not match.';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET portal_password = ? WHERE id = ?");
+                $stmt->execute([$hashedPassword, $_SESSION['portal_subscription_id']]);
+                
+                $message = 'Password updated successfully! You can now use it to login.';
+                $messageType = 'success';
                 break;
                 
             case 'logout':
@@ -479,41 +616,104 @@ if (isset($_SESSION['portal_subscription_id'])) {
         <?php endif; ?>
         
         <?php if (!$subscription): ?>
+        <?php $showOtpForm = isset($_SESSION['pending_otp_phone']); ?>
         <div class="login-box">
             <div class="portal-card p-5">
                 <div class="text-center mb-4">
                     <i class="bi bi-person-circle" style="font-size: 64px; color: #667eea;"></i>
                     <h4 class="mt-3">Customer Portal</h4>
-                    <p class="text-muted">Login with your phone number and PPPoE password</p>
+                    <p class="text-muted">Login with password or SMS verification</p>
                 </div>
-                <form method="post">
-                    <input type="hidden" name="action" value="login">
+                
+                <?php if ($showOtpForm): ?>
+                <form method="post" id="otpForm">
+                    <input type="hidden" name="action" value="verify_otp">
                     <div class="mb-3">
-                        <label class="form-label">Phone Number</label>
+                        <label class="form-label">Enter Verification Code</label>
                         <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-telephone"></i></span>
-                            <input type="tel" name="phone" class="form-control" 
-                                   placeholder="0712 345 678" required
-                                   pattern="[0-9+\s\-]{9,15}">
+                            <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+                            <input type="text" name="otp" class="form-control form-control-lg text-center" 
+                                   placeholder="123456" required maxlength="6" pattern="[0-9]{6}"
+                                   style="letter-spacing: 8px; font-size: 24px;">
                         </div>
-                        <small class="text-muted">Use the phone number registered with your account</small>
+                        <small class="text-muted">Enter the 6-digit code sent to your phone</small>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label">Password</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-key"></i></span>
-                            <input type="password" name="password" id="loginPassword" class="form-control" 
-                                   placeholder="Your PPPoE password" required>
-                            <button type="button" class="btn btn-outline-secondary" onclick="toggleLoginPassword()">
-                                <i class="bi bi-eye" id="loginPasswordIcon"></i>
-                            </button>
-                        </div>
-                        <small class="text-muted">Your internet connection password</small>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg w-100">
-                        <i class="bi bi-box-arrow-in-right me-2"></i>Login
+                    <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                        <i class="bi bi-check-circle me-2"></i>Verify Code
                     </button>
+                    <div class="text-center">
+                        <a href="?" class="text-muted">Cancel and try again</a>
+                    </div>
                 </form>
+                <?php else: ?>
+                
+                <ul class="nav nav-pills nav-fill mb-4" id="loginTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="password-tab" data-bs-toggle="pill" 
+                                data-bs-target="#password-login" type="button" role="tab">
+                            <i class="bi bi-key me-1"></i>Password
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="sms-tab" data-bs-toggle="pill" 
+                                data-bs-target="#sms-login" type="button" role="tab">
+                            <i class="bi bi-phone me-1"></i>SMS Code
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="loginTabContent">
+                    <div class="tab-pane fade show active" id="password-login" role="tabpanel">
+                        <form method="post">
+                            <input type="hidden" name="action" value="login">
+                            <div class="mb-3">
+                                <label class="form-label">Phone Number</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                    <input type="tel" name="phone" class="form-control" 
+                                           placeholder="0712 345 678" required
+                                           pattern="[0-9+\s\-]{9,15}">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Portal Password</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                    <input type="password" name="password" id="loginPassword" class="form-control" 
+                                           placeholder="Your portal password" required>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="toggleLoginPassword()">
+                                        <i class="bi bi-eye" id="loginPasswordIcon"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted">Password you set for the portal (not PPPoE password)</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg w-100">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>Login
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="sms-login" role="tabpanel">
+                        <form method="post">
+                            <input type="hidden" name="action" value="send_otp">
+                            <div class="mb-4">
+                                <label class="form-label">Phone Number</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                    <input type="tel" name="phone" class="form-control" 
+                                           placeholder="0712 345 678" required
+                                           pattern="[0-9+\s\-]{9,15}">
+                                </div>
+                                <small class="text-muted">We'll send a verification code to this number</small>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-lg w-100">
+                                <i class="bi bi-send me-2"></i>Send Verification Code
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
                 <hr class="my-4">
                 <div class="text-center">
                     <small class="text-muted">
@@ -630,6 +830,7 @@ if (isset($_SESSION['portal_subscription_id'])) {
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#router"><i class="bi bi-router me-1"></i>Router Settings</a></li>
             <?php endif; ?>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#payment">Make Payment</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#settings"><i class="bi bi-gear me-1"></i>Settings</a></li>
         </ul>
         
         <div class="tab-content">
@@ -1175,12 +1376,84 @@ if (isset($_SESSION['portal_subscription_id'])) {
                     </div>
                 </div>
             </div>
+            
+            <div class="tab-pane fade" id="settings">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-key me-2"></i>Change Portal Password</h6>
+                            <p class="text-muted small">Set or update your portal login password</p>
+                            <form method="post">
+                                <input type="hidden" name="action" value="set_password">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                <div class="mb-3">
+                                    <label class="form-label">New Password</label>
+                                    <div class="input-group">
+                                        <input type="password" name="new_password" id="newPassword" 
+                                               class="form-control" placeholder="Enter new password" 
+                                               required minlength="6">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="toggleNewPassword()">
+                                            <i class="bi bi-eye" id="newPasswordIcon"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Minimum 6 characters</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Confirm Password</label>
+                                    <input type="password" name="confirm_password" class="form-control" 
+                                           placeholder="Confirm new password" required minlength="6">
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i>Update Password
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-shield-check me-2"></i>Account Security</h6>
+                            <ul class="list-unstyled mb-0">
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <strong>Password Status:</strong> 
+                                    <?php if (!empty($subscription['portal_password'])): ?>
+                                    <span class="text-success">Set</span>
+                                    <?php else: ?>
+                                    <span class="text-warning">Not set - using SMS only</span>
+                                    <?php endif; ?>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-phone text-primary me-2"></i>
+                                    <strong>SMS Verification:</strong> Available
+                                </li>
+                                <li>
+                                    <i class="bi bi-wifi text-info me-2"></i>
+                                    <strong>Auto-Login:</strong> Enabled when on network
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <?php endif; ?>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function toggleNewPassword() {
+        const input = document.getElementById('newPassword');
+        const icon = document.getElementById('newPasswordIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+    </script>
     <script>
     function toggleWifiPassword() {
         const input = document.getElementById('wifi_password');
