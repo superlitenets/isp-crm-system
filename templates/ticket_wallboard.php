@@ -54,7 +54,7 @@ $customerStats = $db->query("
 // Today's Attendance
 $todayAttendance = $db->query("
     SELECT 
-        e.id, e.name, e.department,
+        e.id, e.name, e.position,
         a.clock_in, a.clock_out, a.status,
         CASE 
             WHEN a.clock_in IS NOT NULL AND a.clock_out IS NULL THEN 'present'
@@ -505,13 +505,7 @@ $losOnus = $db->query("
                     <div class="att-info">
                         <div class="att-name"><?= htmlspecialchars($att['name']) ?></div>
                         <div class="att-time">
-                            <?php if ($att['attendance_status'] === 'present'): ?>
-                                In: <?= date('H:i', strtotime($att['clock_in'])) ?>
-                            <?php elseif ($att['attendance_status'] === 'left'): ?>
-                                <?= date('H:i', strtotime($att['clock_in'])) ?> - <?= date('H:i', strtotime($att['clock_out'])) ?>
-                            <?php else: ?>
-                                Not checked in
-                            <?php endif; ?>
+                            <?= htmlspecialchars($att['position'] ?? '') ?>
                         </div>
                     </div>
                 </div>

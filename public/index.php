@@ -121,6 +121,12 @@ $page = $_GET['page'] ?? 'dashboard';
 $action = $_GET['action'] ?? 'list';
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
 
+// Ticket Wallboard - renders standalone without main layout
+if ($page === 'ticket-wallboard') {
+    include __DIR__ . '/../templates/ticket_wallboard.php';
+    exit;
+}
+
 if ($page === 'logout') {
     \App\Auth::logout();
     header('Location: ?page=login');
