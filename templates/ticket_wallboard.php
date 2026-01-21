@@ -1,53 +1,44 @@
 <?php
-// Operations Wallboard - Statistics display optimized for TV screens
-// Opens in fullscreen mode without header/sidebar
-
 require_once __DIR__ . '/../config/database.php';
-session_start();
-
-if (!isset($_SESSION['user_id'])) {
-    header('Location: /login.php');
-    exit;
-}
 
 $db = Database::getConnection();
 
-// Ticket Statistics
+// Ticket Stats
 $ticketStats = $db->query("
     SELECT 
-        COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
+        COUNT(*) FILTER (WHERE status = 'open') as open_count,
         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
-        COUNT(*) FILTER (WHERE status = 'pending') as pending,
-        COUNT(*) FILTER (WHERE status = 'resolved') as resolved,
-        COUNT(*) FILTER (WHERE status = 'closed' AND updated_at > NOW() - INTERVAL '24 hours') as closed_today,
-        COUNT(*) FILTER (WHERE priority = 'critical' AND status NOT IN ('closed', 'resolved')) as critical,
-        COUNT(*) FILTER (WHERE priority = 'high' AND status NOT IN ('closed', 'resolved')) as high_priority
+        COUNT(*) FILTER (WHERE priority = 'critical' AND status NOT IN ('closed', 'resolved')) as critical_count,
+        COUNT(*) FILTER (WHERE status = 'closed' AND DATE(updated_at) = CURRENT_DATE) as closed_today
     FROM tickets
 ")->fetch(PDO::FETCH_ASSOC);
 
-// ONU Statistics
+// ONU Stats
 $onuStats = $db->query("
     SELECT 
-        COUNT(*) as total_onus,
-        COUNT(*) FILTER (WHERE status = 'online') as online,
-        COUNT(*) FILTER (WHERE status = 'offline') as offline,
-        COUNT(*) FILTER (WHERE status = 'los') as los
+        COUNT(*) FILTER (WHERE status = 'online') as online_count,
+        COUNT(*) FILTER (WHERE status = 'los') as los_count,
+        COUNT(*) FILTER (WHERE status = 'offline' OR status IS NULL) as offline_count
     FROM huawei_onus
-    WHERE is_authorized = true
 ")->fetch(PDO::FETCH_ASSOC);
 
-// New ONU discoveries (last 24h)
-$newOnuCount = $db->query("
-    SELECT COUNT(*) as cnt FROM onu_discovery_log 
-    WHERE last_seen_at > NOW() - INTERVAL '24 hours'
-")->fetch(PDO::FETCH_ASSOC)['cnt'] ?? 0;
+// New/Unconfigured ONUs - check if table exists
+$newOnuCount = 0;
+try {
+    $tableCheck = $db->query("SELECT to_regclass('public.huawei_unconfigured_onus')")->fetchColumn();
+    if ($tableCheck) {
+        $newOnuCount = $db->query("SELECT COUNT(*) as cnt FROM huawei_unconfigured_onus WHERE status = 'new'")->fetch(PDO::FETCH_ASSOC)['cnt'] ?? 0;
+    }
+} catch (Exception $e) {
+    $newOnuCount = 0;
+}
 
-// Customer Statistics
+// Customer Stats
 $customerStats = $db->query("
     SELECT 
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE connection_status = 'active') as active,
-        COUNT(*) FILTER (WHERE connection_status = 'suspended') as suspended
+        COUNT(*) FILTER (WHERE connection_status = 'active') as active_count,
+        COUNT(*) FILTER (WHERE connection_status = 'suspended') as suspended_count
     FROM customers
 ")->fetch(PDO::FETCH_ASSOC);
 
@@ -95,7 +86,7 @@ $urgentTickets = $db->query("
     ORDER BY 
         CASE t.priority WHEN 'critical' THEN 1 ELSE 2 END,
         t.created_at DESC
-    LIMIT 8
+    LIMIT 6
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // LOS ONUs
@@ -106,7 +97,7 @@ $losOnus = $db->query("
     LEFT JOIN customers c ON o.customer_id = c.id
     WHERE o.status = 'los'
     ORDER BY o.updated_at DESC
-    LIMIT 10
+    LIMIT 6
 ")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -128,26 +119,25 @@ $losOnus = $db->query("
         }
         
         .wallboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            grid-template-rows: auto 1fr 1fr;
-            gap: 15px;
+            display: flex;
+            flex-direction: column;
             height: 100vh;
             padding: 15px;
+            gap: 15px;
         }
         
         .header {
-            grid-column: 1 / -1;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 20px;
+            padding: 8px 20px;
             background: rgba(255,255,255,0.05);
-            border-radius: 12px;
+            border-radius: 10px;
+            flex-shrink: 0;
         }
         
         .header h1 {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: 600;
         }
         
@@ -157,13 +147,13 @@ $losOnus = $db->query("
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #8b949e;
         }
         
         .live-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             background: #3fb950;
             border-radius: 50%;
             animation: pulse 2s infinite;
@@ -174,49 +164,51 @@ $losOnus = $db->query("
             50% { opacity: 0.4; }
         }
         
-        .stat-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 20px;
+        .stats-row {
             display: flex;
-            flex-direction: column;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+        
+        .stat-card {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 15px 20px;
             border: 1px solid rgba(255,255,255,0.1);
         }
         
         .stat-card h3 {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: #8b949e;
             text-transform: uppercase;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
         
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            flex: 1;
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
         }
         
         .stat-item {
             text-align: center;
-            padding: 15px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 10px;
+            flex: 1;
         }
         
         .stat-value {
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: 700;
             line-height: 1;
         }
         
         .stat-label {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: #8b949e;
-            margin-top: 5px;
+            margin-top: 4px;
             text-transform: uppercase;
         }
         
@@ -226,102 +218,113 @@ $losOnus = $db->query("
         .color-info { color: #58a6ff; }
         .color-muted { color: #8b949e; }
         
-        .list-card {
+        .panels-row {
+            display: flex;
+            gap: 15px;
+            flex: 1;
+            min-height: 0;
+        }
+        
+        .panel {
+            flex: 1;
             background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 15px;
+            border-radius: 10px;
+            padding: 12px 15px;
+            border: 1px solid rgba(255,255,255,0.1);
             display: flex;
             flex-direction: column;
-            border: 1px solid rgba(255,255,255,0.1);
             overflow: hidden;
         }
         
-        .list-card h3 {
-            font-size: 0.85rem;
+        .panel.wide {
+            flex: 1.5;
+        }
+        
+        .panel h3 {
+            font-size: 0.75rem;
             color: #8b949e;
             text-transform: uppercase;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-shrink: 0;
         }
         
-        .list-card h3 .count {
+        .panel h3 .count {
             background: rgba(255,255,255,0.1);
-            padding: 2px 10px;
-            border-radius: 10px;
-            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 0.7rem;
         }
         
-        .list-scroll {
+        .panel-scroll {
             flex: 1;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
         
         .list-item {
-            padding: 10px 12px;
-            margin-bottom: 6px;
+            padding: 8px 10px;
             background: rgba(0,0,0,0.2);
-            border-radius: 8px;
+            border-radius: 6px;
             border-left: 3px solid;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
         
         .list-item.critical { border-color: #f85149; }
         .list-item.high { border-color: #d29922; }
         .list-item.los { border-color: #f85149; }
-        .list-item.present { border-color: #3fb950; }
-        .list-item.left { border-color: #58a6ff; }
-        .list-item.absent { border-color: #8b949e; }
         
         .list-item-title {
             font-weight: 600;
-            margin-bottom: 3px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         
         .list-item-meta {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: #8b949e;
-        }
-        
-        .attendance-panel {
-            grid-column: span 2;
+            margin-top: 2px;
         }
         
         .attendance-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
             flex: 1;
             overflow-y: auto;
+            align-content: flex-start;
         }
         
         .att-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
+            gap: 8px;
+            padding: 6px 10px;
             background: rgba(0,0,0,0.2);
-            border-radius: 8px;
+            border-radius: 6px;
             border-left: 3px solid;
+            width: calc(50% - 3px);
         }
         
         .att-item.present { border-color: #3fb950; }
         .att-item.left { border-color: #58a6ff; }
-        .att-item.absent { border-color: #6e7681; opacity: 0.7; }
+        .att-item.absent { border-color: #6e7681; opacity: 0.6; }
         
         .att-avatar {
-            width: 36px;
-            height: 36px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.7rem;
+            flex-shrink: 0;
         }
         
         .att-avatar.present { background: rgba(63, 185, 80, 0.3); color: #3fb950; }
@@ -335,20 +338,23 @@ $losOnus = $db->query("
         
         .att-name {
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         
-        .att-time {
-            font-size: 0.7rem;
+        .att-role {
+            font-size: 0.65rem;
             color: #8b949e;
         }
         
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        .empty-state {
+            color: #6e7681;
+            text-align: center;
+            padding: 20px;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -357,159 +363,155 @@ $losOnus = $db->query("
             <h1><i class="bi bi-grid-3x3-gap-fill"></i> Operations Wallboard</h1>
             <div class="live-badge">
                 <div class="live-dot"></div>
-                <span>Live</span>
+                Live
             </div>
         </div>
         
-        <div class="stat-card">
-            <h3><i class="bi bi-ticket"></i> Tickets</h3>
-            <div class="stat-grid">
-                <div class="stat-item">
-                    <div class="stat-value color-info"><?= $ticketStats['open_tickets'] ?? 0 ?></div>
-                    <div class="stat-label">Open</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-warning"><?= $ticketStats['in_progress'] ?? 0 ?></div>
-                    <div class="stat-label">In Progress</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-danger"><?= $ticketStats['critical'] ?? 0 ?></div>
-                    <div class="stat-label">Critical</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-success"><?= $ticketStats['closed_today'] ?? 0 ?></div>
-                    <div class="stat-label">Closed Today</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="stat-card">
-            <h3><i class="bi bi-router"></i> Network</h3>
-            <div class="stat-grid">
-                <div class="stat-item">
-                    <div class="stat-value color-success"><?= $onuStats['online'] ?? 0 ?></div>
-                    <div class="stat-label">Online</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-danger"><?= $onuStats['los'] ?? 0 ?></div>
-                    <div class="stat-label">LOS</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-muted"><?= $onuStats['offline'] ?? 0 ?></div>
-                    <div class="stat-label">Offline</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-info"><?= $newOnuCount ?></div>
-                    <div class="stat-label">New (24h)</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="stat-card">
-            <h3><i class="bi bi-people"></i> Customers</h3>
-            <div class="stat-grid">
-                <div class="stat-item">
-                    <div class="stat-value color-info"><?= $customerStats['total'] ?? 0 ?></div>
-                    <div class="stat-label">Total</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-success"><?= $customerStats['active'] ?? 0 ?></div>
-                    <div class="stat-label">Active</div>
-                </div>
-                <div class="stat-item" style="grid-column: span 2;">
-                    <div class="stat-value color-warning"><?= $customerStats['suspended'] ?? 0 ?></div>
-                    <div class="stat-label">Suspended</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="stat-card">
-            <h3><i class="bi bi-person-check"></i> Attendance</h3>
-            <div class="stat-grid">
-                <div class="stat-item">
-                    <div class="stat-value color-success"><?= $presentCount ?></div>
-                    <div class="stat-label">Present</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value color-muted"><?= $absentCount ?></div>
-                    <div class="stat-label">Absent</div>
-                </div>
-                <div class="stat-item" style="grid-column: span 2;">
-                    <div class="stat-value color-info"><?= count($todayAttendance) ?></div>
-                    <div class="stat-label">Total Staff</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="list-card">
-            <h3>
-                <span><i class="bi bi-exclamation-triangle"></i> Urgent Tickets</span>
-                <span class="count"><?= count($urgentTickets) ?></span>
-            </h3>
-            <div class="list-scroll">
-                <?php if (empty($urgentTickets)): ?>
-                <div style="text-align: center; padding: 30px; color: #8b949e;">
-                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                    <div>No urgent tickets</div>
-                </div>
-                <?php else: ?>
-                <?php foreach ($urgentTickets as $t): ?>
-                <div class="list-item <?= $t['priority'] ?>">
-                    <div class="list-item-title">#<?= $t['id'] ?> <?= htmlspecialchars($t['subject']) ?></div>
-                    <div class="list-item-meta">
-                        <?= htmlspecialchars($t['customer_name'] ?? 'No customer') ?>
-                        <?php if ($t['assigned_name']): ?> - <?= htmlspecialchars($t['assigned_name']) ?><?php endif; ?>
+        <div class="stats-row">
+            <div class="stat-card">
+                <h3><i class="bi bi-ticket"></i> Tickets</h3>
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="stat-value color-info"><?= $ticketStats['open_count'] ?? 0 ?></div>
+                        <div class="stat-label">Open</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-warning"><?= $ticketStats['in_progress'] ?? 0 ?></div>
+                        <div class="stat-label">In Progress</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-danger"><?= $ticketStats['critical_count'] ?? 0 ?></div>
+                        <div class="stat-label">Critical</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-success"><?= $ticketStats['closed_today'] ?? 0 ?></div>
+                        <div class="stat-label">Closed</div>
                     </div>
                 </div>
-                <?php endforeach; ?>
-                <?php endif; ?>
+            </div>
+            
+            <div class="stat-card">
+                <h3><i class="bi bi-router"></i> Network</h3>
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="stat-value color-success"><?= $onuStats['online_count'] ?? 0 ?></div>
+                        <div class="stat-label">Online</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-danger"><?= $onuStats['los_count'] ?? 0 ?></div>
+                        <div class="stat-label">LOS</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-muted"><?= $onuStats['offline_count'] ?? 0 ?></div>
+                        <div class="stat-label">Offline</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-info"><?= $newOnuCount ?></div>
+                        <div class="stat-label">New</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <h3><i class="bi bi-people"></i> Customers</h3>
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="stat-value color-info"><?= $customerStats['total'] ?? 0 ?></div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-success"><?= $customerStats['active_count'] ?? 0 ?></div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-warning"><?= $customerStats['suspended_count'] ?? 0 ?></div>
+                        <div class="stat-label">Suspended</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <h3><i class="bi bi-person-check"></i> Attendance</h3>
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="stat-value color-success"><?= $presentCount ?></div>
+                        <div class="stat-label">Present</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-muted"><?= $absentCount ?></div>
+                        <div class="stat-label">Absent</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value color-info"><?= count($todayAttendance) ?></div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div class="list-card">
-            <h3>
-                <span><i class="bi bi-exclamation-octagon"></i> LOS Alerts</span>
-                <span class="count"><?= count($losOnus) ?></span>
-            </h3>
-            <div class="list-scroll">
-                <?php if (empty($losOnus)): ?>
-                <div style="text-align: center; padding: 30px; color: #8b949e;">
-                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                    <div>No LOS alerts</div>
+        <div class="panels-row">
+            <div class="panel">
+                <h3>
+                    <span><i class="bi bi-exclamation-triangle"></i> Urgent Tickets</span>
+                    <span class="count"><?= count($urgentTickets) ?></span>
+                </h3>
+                <div class="panel-scroll">
+                    <?php if (empty($urgentTickets)): ?>
+                        <div class="empty-state"><i class="bi bi-check-circle"></i> No urgent tickets</div>
+                    <?php else: ?>
+                        <?php foreach ($urgentTickets as $ticket): ?>
+                        <div class="list-item <?= $ticket['priority'] ?>">
+                            <div class="list-item-title">#<?= $ticket['id'] ?> <?= htmlspecialchars($ticket['subject']) ?></div>
+                            <div class="list-item-meta">
+                                <?= htmlspecialchars($ticket['customer_name'] ?? 'Unknown') ?>
+                                <?php if ($ticket['assigned_name']): ?> &bull; <?= htmlspecialchars($ticket['assigned_name']) ?><?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
-                <?php else: ?>
-                <?php foreach ($losOnus as $o): ?>
-                <div class="list-item los">
-                    <div class="list-item-title"><?= htmlspecialchars($o['name'] ?: $o['sn']) ?></div>
-                    <div class="list-item-meta">
-                        <?= htmlspecialchars($o['olt_name'] ?? '') ?>
-                        <?php if ($o['customer_name']): ?> - <?= htmlspecialchars($o['customer_name']) ?><?php endif; ?>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-                <?php endif; ?>
             </div>
-        </div>
-        
-        <div class="list-card attendance-panel">
-            <h3>
-                <span><i class="bi bi-calendar-check"></i> Today's Attendance</span>
-                <span class="count"><?= $presentCount ?>/<?= count($todayAttendance) ?></span>
-            </h3>
-            <div class="attendance-grid">
-                <?php foreach ($todayAttendance as $att): ?>
-                <div class="att-item <?= $att['attendance_status'] ?>">
-                    <div class="att-avatar <?= $att['attendance_status'] ?>">
-                        <?= strtoupper(substr($att['name'], 0, 2)) ?>
-                    </div>
-                    <div class="att-info">
-                        <div class="att-name"><?= htmlspecialchars($att['name']) ?></div>
-                        <div class="att-time">
-                            <?= htmlspecialchars($att['position'] ?? '') ?>
+            
+            <div class="panel">
+                <h3>
+                    <span><i class="bi bi-wifi-off"></i> LOS Alerts</span>
+                    <span class="count"><?= count($losOnus) ?></span>
+                </h3>
+                <div class="panel-scroll">
+                    <?php if (empty($losOnus)): ?>
+                        <div class="empty-state"><i class="bi bi-check-circle"></i> No LOS alerts</div>
+                    <?php else: ?>
+                        <?php foreach ($losOnus as $onu): ?>
+                        <div class="list-item los">
+                            <div class="list-item-title"><?= htmlspecialchars($onu['name'] ?: $onu['sn']) ?></div>
+                            <div class="list-item-meta">
+                                <?= htmlspecialchars($onu['customer_name'] ?? 'Unassigned') ?>
+                                &bull; <?= htmlspecialchars($onu['olt_name'] ?? '') ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <div class="panel wide">
+                <h3>
+                    <span><i class="bi bi-people"></i> Team</span>
+                    <span class="count"><?= $presentCount ?>/<?= count($todayAttendance) ?></span>
+                </h3>
+                <div class="attendance-grid">
+                    <?php foreach ($todayAttendance as $att): ?>
+                    <div class="att-item <?= $att['attendance_status'] ?>">
+                        <div class="att-avatar <?= $att['attendance_status'] ?>">
+                            <?= strtoupper(substr($att['name'], 0, 2)) ?>
+                        </div>
+                        <div class="att-info">
+                            <div class="att-name"><?= htmlspecialchars($att['name']) ?></div>
+                            <div class="att-role"><?= htmlspecialchars($att['position'] ?? '') ?></div>
                         </div>
                     </div>
+                    <?php endforeach; ?>
                 </div>
-                <?php endforeach; ?>
             </div>
         </div>
     </div>
