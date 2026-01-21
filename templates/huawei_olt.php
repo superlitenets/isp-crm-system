@@ -7257,6 +7257,9 @@ try {
                                             <div class="flex-grow-1">
                                                 <div class="fw-bold"><?= htmlspecialchars($olt['name']) ?></div>
                                                 <div class="small text-muted"><?= htmlspecialchars($olt['ip_address']) ?></div>
+                                                <?php $oltUptime = $olt['uptime'] ?: ($olt['snmp_sys_uptime'] ?? null); if ($oltUptime): ?>
+                                                <div class="small text-success"><i class="bi bi-clock-history me-1"></i><?= htmlspecialchars($oltUptime) ?></div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="text-end">
                                                 <div class="d-flex gap-2 justify-content-end mb-1">
