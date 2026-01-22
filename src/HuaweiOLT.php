@@ -6668,6 +6668,28 @@ class HuaweiOLT {
         }
         // Note: "Failure: Service virtual port has existed already" is SUCCESS (already configured)
         
+        // Step 4: For BRIDGE mode, set native VLAN on ALL ETH ports (1-4)
+        // Bridge mode passes traffic transparently through all ports
+        $onuMode = $onu['onu_mode'] ?? 'router';
+        $serviceVlan = $options['service_vlan'] ?? $onu['vlan_id'] ?? null;
+        
+        if (strtolower($onuMode) === 'bridge' && $serviceVlan) {
+            $output .= "[Bridge Mode: Native VLAN on all ETH ports]\n";
+            $bridgeCmd = "interface gpon {$frame}/{$slot}\r\n";
+            for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
+                $bridgeCmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$serviceVlan} priority 0\r\n";
+            }
+            $bridgeCmd .= "quit";
+            $resultBridge = $this->executeCommand($oltId, $bridgeCmd);
+            $output .= ($resultBridge['output'] ?? '') . "\n";
+            
+            // Only log warning if there's a real error, not "already exists"
+            $bridgeOutput = $resultBridge['output'] ?? '';
+            if ($hasRealError($bridgeOutput)) {
+                $errors[] = "Bridge mode native VLAN config had issues";
+            }
+        }
+        
         $success = empty($errors);
         
         if ($success) {
@@ -6686,12 +6708,15 @@ class HuaweiOLT {
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
+        $bridgeInfo = (strtolower($onuMode) === 'bridge' && $serviceVlan) ? " + Bridge mode (VLAN {$serviceVlan} on all ports)" : '';
+        
         return [
             'success' => $success,
             'stage' => 2,
-            'message' => $success ? "Stage 2 complete: TR-069 configured (VLAN {$tr069Vlan})" : 'Stage 2 failed: ' . implode(', ', $errors),
+            'message' => $success ? "Stage 2 complete: TR-069 configured (VLAN {$tr069Vlan}){$bridgeInfo}" : 'Stage 2 failed: ' . implode(', ', $errors),
             'tr069_vlan' => $tr069Vlan,
             'acs_url' => $acsUrl,
+            'onu_mode' => $onuMode,
             'errors' => $errors,
             'output' => $output,
             'next_stage' => $success ? 3 : null
