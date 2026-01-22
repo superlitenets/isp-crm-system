@@ -6670,12 +6670,15 @@ class HuaweiOLT {
         
         // Step 4: For BRIDGE mode, set native VLAN on ALL ETH ports (1-4)
         // Bridge mode passes traffic transparently through all ports
+        // Check both ip_mode (UI selection) and onu_mode (legacy) for bridge mode
+        $ipMode = $onu['ip_mode'] ?? '';
         $onuMode = $onu['onu_mode'] ?? 'router';
+        $isBridgeMode = (strtolower($ipMode) === 'bridge' || strtolower($onuMode) === 'bridge');
         $serviceVlan = $options['service_vlan'] ?? $onu['vlan_id'] ?? null;
         
-        $output .= "[Bridge Mode Check] onu_mode='{$onuMode}', service_vlan='{$serviceVlan}'\n";
+        $output .= "[Bridge Mode Check] ip_mode='{$ipMode}', onu_mode='{$onuMode}', service_vlan='{$serviceVlan}'\n";
         
-        if (strtolower($onuMode) === 'bridge' && $serviceVlan) {
+        if ($isBridgeMode && $serviceVlan) {
             $output .= "[Bridge Mode: Native VLAN on all ETH ports]\n";
             $bridgeCmd = "interface gpon {$frame}/{$slot}\r\n";
             for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
@@ -6710,7 +6713,7 @@ class HuaweiOLT {
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        $bridgeInfo = (strtolower($onuMode) === 'bridge' && $serviceVlan) ? " + Bridge mode (VLAN {$serviceVlan} on all ports)" : '';
+        $bridgeInfo = ($isBridgeMode && $serviceVlan) ? " + Bridge mode (VLAN {$serviceVlan} on all ports)" : '';
         
         return [
             'success' => $success,
@@ -6718,7 +6721,9 @@ class HuaweiOLT {
             'message' => $success ? "Stage 2 complete: TR-069 configured (VLAN {$tr069Vlan}){$bridgeInfo}" : 'Stage 2 failed: ' . implode(', ', $errors),
             'tr069_vlan' => $tr069Vlan,
             'acs_url' => $acsUrl,
+            'ip_mode' => $ipMode,
             'onu_mode' => $onuMode,
+            'is_bridge_mode' => $isBridgeMode,
             'errors' => $errors,
             'output' => $output,
             'next_stage' => $success ? 3 : null
