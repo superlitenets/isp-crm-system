@@ -6577,13 +6577,18 @@ class HuaweiOLT {
         $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
-        // Helper to check for real errors
+        // Helper to check for real errors - more lenient to avoid false positives
         $hasRealError = function($output) {
             if (empty($output)) return false;
-            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
+            // These are success patterns - return false (no error)
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist|service-port\s+\d+|Success/i', $output)) {
                 return false;
             }
-            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
+            // Check for actual failure patterns, but be more specific
+            if (preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $output)) {
+                return true;
+            }
+            return false;
         };
         
         // Step 1: Configure IPHOST/WAN with DHCP on TR-069 VLAN
@@ -6619,7 +6624,9 @@ class HuaweiOLT {
         $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
         $result3 = $this->executeCommand($oltId, $cmd3);
         $output .= "[TR-069 Service-Port]\n" . ($result3['output'] ?? '') . "\n";
-        if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
+        $spOutput = $result3['output'] ?? '';
+        // Only fail if there's an actual error in output - service-port number in output means success
+        if ($hasRealError($spOutput) && !preg_match('/service-port\s+\d+/i', $spOutput)) {
             $errors[] = "TR-069 service-port failed";
         }
         
