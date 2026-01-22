@@ -6596,7 +6596,9 @@ class HuaweiOLT {
         $hasRealError = function($output) {
             if (empty($output)) return false;
             // These are success patterns - return false (no error)
-            if (preg_match('/Make configuration repeatedly|already exists|The data already exist|service-port\s+\d+|Success/i', $output)) {
+            // "has existed already" = service-port already configured (success)
+            // "already exists" / "The data already exist" = config already applied (success)
+            if (preg_match('/Make configuration repeatedly|already exist|has existed already|The data already exist|service-port\s+\d+|Conflicted service virtual port|Success/i', $output)) {
                 return false;
             }
             // Check for actual failure patterns, but be more specific
