@@ -249,23 +249,34 @@ class SSHSession {
             
             console.log(`[OLT ${this.oltId}] SSH sending: "${command}"`);
             
-            // Send command character by character with small delays
+            // Send command character by character with delays - await completion
             // This fixes the VTY space-stripping issue on Huawei OLTs
-            this.sendCharByChar(command + '\r');
+            this.sendCharByChar(command + '\r').catch(e => {
+                console.log(`[OLT ${this.oltId}] SSH sendCharByChar error: ${e.message}`);
+            });
         });
     }
 
     sendCharByChar(text) {
-        // Send each character with 5ms delay to prevent VTY space stripping
-        let i = 0;
-        const sendNext = () => {
-            if (i < text.length && this.stream) {
-                this.stream.write(text[i]);
-                i++;
-                setTimeout(sendNext, 5);
-            }
-        };
-        sendNext();
+        // Send each character with delays to prevent VTY space stripping
+        // Spaces need extra delay to avoid being stripped by Huawei terminal handling
+        // Returns a Promise that resolves when all characters are sent
+        return new Promise((resolve) => {
+            let i = 0;
+            const sendNext = () => {
+                if (i < text.length && this.stream) {
+                    const char = text[i];
+                    this.stream.write(char);
+                    i++;
+                    // Extra delay before/after spaces (the most commonly stripped char)
+                    const delay = (char === ' ' || (text[i] === ' ')) ? 50 : 15;
+                    setTimeout(sendNext, delay);
+                } else {
+                    resolve();
+                }
+            };
+            sendNext();
+        });
     }
 
     addDataListener(handler) {
