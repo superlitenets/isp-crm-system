@@ -8666,6 +8666,44 @@ try {
                                 <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
                             </div>
                         </div>
+                        <!-- ONU Mode (Bridge/Router) -->
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">Mode</small>
+                            <div class="fw-medium">
+                                <?php $ipMode = $currentOnu['ip_mode'] ?? 'Router'; ?>
+                                <span id="onuModeDisplay" class="badge bg-<?= strtolower($ipMode) === 'bridge' ? 'secondary' : 'info' ?>"><?= htmlspecialchars($ipMode ?: 'Router') ?></span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="toggleOnuModeEdit()" title="Change Mode">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                            </div>
+                            <div id="onuModeEditSection" style="display:none;">
+                                <div class="d-flex gap-1 mt-1">
+                                    <select id="onuModeSelect" class="form-select form-select-sm" style="width:auto;" onchange="onModeChange()">
+                                        <option value="Bridge" <?= strtolower($ipMode) === 'bridge' ? 'selected' : '' ?>>Bridge</option>
+                                        <option value="Router" <?= strtolower($ipMode) !== 'bridge' ? 'selected' : '' ?>>Router</option>
+                                    </select>
+                                    <button type="button" class="btn btn-success btn-sm" onclick="saveOnuMode()"><i class="bi bi-check"></i></button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOnuModeEdit()"><i class="bi bi-x"></i></button>
+                                </div>
+                                <div id="routerWanOptions" style="display:none;margin-top:5px;">
+                                    <small class="text-muted">WAN Type:</small>
+                                    <select id="routerWanType" class="form-select form-select-sm mt-1" onchange="onWanTypeChange()">
+                                        <option value="dhcp">DHCP</option>
+                                        <option value="pppoe">PPPoE</option>
+                                        <option value="static">Static IP</option>
+                                    </select>
+                                    <input type="number" id="routerServiceVlan" class="form-control form-control-sm mt-1" placeholder="Service VLAN" value="<?= htmlspecialchars($currentOnu['vlan_id'] ?? '') ?>">
+                                    <div id="pppoeFields2" style="display:none;">
+                                        <input type="text" id="pppoeUser" class="form-control form-control-sm mt-1" placeholder="PPPoE Username">
+                                        <input type="password" id="pppoePass" class="form-control form-control-sm mt-1" placeholder="PPPoE Password">
+                                    </div>
+                                    <div id="staticFields2" style="display:none;">
+                                        <input type="text" id="staticIp" class="form-control form-control-sm mt-1" placeholder="Static IP">
+                                        <input type="text" id="staticGw" class="form-control form-control-sm mt-1" placeholder="Gateway">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <!-- Auth Date -->
                         <div class="col-auto border-start ps-2">
                             <small class="text-muted">Authorized</small>
