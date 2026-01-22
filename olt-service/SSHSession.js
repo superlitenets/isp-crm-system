@@ -13,25 +13,6 @@ class SSHSession {
         this.initStarted = false;
         this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\]|[A-Z0-9_-]+(?:\([^)]+\))?[#>])\s*$/i;
         this.dataListeners = [];
-        // Command lock to prevent concurrent command execution
-        this.commandLock = false;
-        this.commandQueue = [];
-    }
-
-    // Acquire lock for command execution
-    async acquireLock(timeout = 30000) {
-        const start = Date.now();
-        while (this.commandLock) {
-            if (Date.now() - start > timeout) {
-                throw new Error('Command lock timeout');
-            }
-            await new Promise(r => setTimeout(r, 100));
-        }
-        this.commandLock = true;
-    }
-
-    releaseLock() {
-        this.commandLock = false;
     }
 
     async connect() {
@@ -197,28 +178,18 @@ class SSHSession {
     }
 
     async sendCommand(command, timeout = 60000) {
-        // Acquire lock to prevent concurrent command execution
-        await this.acquireLock(timeout);
-        try {
-            const lines = command.split(/\r?\n/).filter(l => l.trim());
-            if (lines.length > 1) {
-                console.log(`[OLT ${this.oltId}] SSH multi-line command (${lines.length} lines)`);
-                let fullResponse = '';
-                for (let i = 0; i < lines.length; i++) {
-                    // Add delay between commands to prevent OLT SSH buffer corruption
-                    if (i > 0) {
-                        await new Promise(r => setTimeout(r, 200));
-                    }
-                    const response = await this.sendSingleCommand(lines[i], timeout);
-                    fullResponse += response;
-                }
-                return fullResponse;
+        const lines = command.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length > 1) {
+            console.log(`[OLT ${this.oltId}] SSH multi-line command (${lines.length} lines)`);
+            let fullResponse = '';
+            for (const line of lines) {
+                const response = await this.sendSingleCommand(line, timeout);
+                fullResponse += response;
             }
-            
-            return await this.sendSingleCommand(command, timeout);
-        } finally {
-            this.releaseLock();
+            return fullResponse;
         }
+        
+        return this.sendSingleCommand(command, timeout);
     }
 
     async sendSingleCommand(command, timeout = 60000) {
@@ -259,14 +230,11 @@ class SSHSession {
 
             this.addDataListener(dataHandler);
 
-            timeoutId = setTimeout(async () => {
+            timeoutId = setTimeout(() => {
                 if (!resolved) {
                     resolved = true;
                     this.removeDataListener(dataHandler);
                     console.log(`[OLT ${this.oltId}] SSH command timeout, got ${response.length} bytes`);
-                    // Wait a bit for stream to settle after timeout
-                    await new Promise(r => setTimeout(r, 300));
-                    this.buffer = '';
                     if (response.length > 50) {
                         resolve(response);
                     } else {
@@ -275,14 +243,15 @@ class SSHSession {
                 }
             }, timeout);
 
-            // Wait for any pending data to flush before sending command
-            await new Promise(r => setTimeout(r, 50));
+            // Clear buffer and send command
             this.buffer = '';
             response = '';
             
             console.log(`[OLT ${this.oltId}] SSH sending: "${command}"`);
             
-            // Send command as single write - simpler and more reliable
+            // Send command as single write - simpler approach
+            // Note: Some Huawei OLT VTY configurations strip spaces between numeric args
+            // This is a VTY limitation, not SSH - commands like "ont internet-config 0 1" may fail
             this.stream.write(command + '\r');
         });
     }
