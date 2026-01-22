@@ -6474,9 +6474,10 @@ class HuaweiOLT {
             $servicePortOutput = $spResult['output'] ?? '';
             $output .= "\n[Service-Port]\n" . $servicePortOutput;
             
-            // Success: service-port ID returned, or already exists
-            $servicePortSuccess = preg_match('/service-port\s+\d+|already|repeatedly/i', $servicePortOutput)
-                || ($spResult['success'] && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid)/i', $servicePortOutput));
+            // Success: service-port ID returned, already exists, or command executed with output
+            // "Failure: Service virtual port has existed already" = SUCCESS
+            $servicePortSuccess = preg_match('/service-port\s+\d+|already|existed|repeatedly|Conflicted/i', $servicePortOutput)
+                || ($spResult['success'] && !empty($servicePortOutput) && !preg_match('/does not exist|is not valid|Unrecognized command/i', $servicePortOutput));
             
             if ($servicePortSuccess) {
                 $this->updateONU($onuId, ['vlan_id' => $vlanId]);
@@ -6643,14 +6644,15 @@ class HuaweiOLT {
         $output .= "[TR-069 Service-Port]\n" . ($result3['output'] ?? '') . "\n";
         $spOutput = $result3['output'] ?? '';
         
-        // Check for command execution failure first
-        if (!$result3['success']) {
-            // Command failed to execute (timeout, network error, etc)
-            $errors[] = "TR-069 service-port command failed: " . ($result3['error'] ?? 'execution error');
-        } elseif ($hasRealError($spOutput) && !preg_match('/service-port\s+\d+/i', $spOutput)) {
-            // Only fail if there's an actual error in output - service-port number in output means success
+        // Check service-port result - be lenient, "already exists" is success
+        if (!$result3['success'] && empty($spOutput)) {
+            // Only fail if command truly failed with no output
+            $errors[] = "TR-069 service-port command failed: " . ($result3['error'] ?? 'no response');
+        } elseif (preg_match('/does not exist|is not valid|Unrecognized command/i', $spOutput) && !preg_match('/already|existed|Conflicted|service-port\s+\d+/i', $spOutput)) {
+            // Only fail for actual errors, not "already exists" type messages
             $errors[] = "TR-069 service-port failed";
         }
+        // Note: "Failure: Service virtual port has existed already" is SUCCESS (already configured)
         
         $success = empty($errors);
         
