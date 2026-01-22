@@ -6640,8 +6640,13 @@ class HuaweiOLT {
         $result3 = $this->executeCommand($oltId, $cmd3);
         $output .= "[TR-069 Service-Port]\n" . ($result3['output'] ?? '') . "\n";
         $spOutput = $result3['output'] ?? '';
-        // Only fail if there's an actual error in output - service-port number in output means success
-        if ($hasRealError($spOutput) && !preg_match('/service-port\s+\d+/i', $spOutput)) {
+        
+        // Check for command execution failure first
+        if (!$result3['success']) {
+            // Command failed to execute (timeout, network error, etc)
+            $errors[] = "TR-069 service-port command failed: " . ($result3['error'] ?? 'execution error');
+        } elseif ($hasRealError($spOutput) && !preg_match('/service-port\s+\d+/i', $spOutput)) {
+            // Only fail if there's an actual error in output - service-port number in output means success
             $errors[] = "TR-069 service-port failed";
         }
         
