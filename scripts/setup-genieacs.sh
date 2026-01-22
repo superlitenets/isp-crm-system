@@ -437,6 +437,28 @@ echo " Done"
 echo ""
 echo "Creating presets..."
 
+# =====================================================
+# PROVISION: clear-conn-auth - Clear connection request authentication
+# Enables instant push from GenieACS without 401 errors
+# Runs automatically on bootstrap
+# =====================================================
+echo "Creating provision: clear-conn-auth..."
+curl -s -X PUT "$GENIEACS_NBI_URL/provisions/clear-conn-auth" \
+  -H "Content-Type: application/javascript" \
+  -d '
+const now = Date.now();
+
+log("Clearing connection request authentication for instant push...");
+
+// Clear connection request credentials to enable instant push
+// This allows GenieACS to send connection requests without authentication
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now}, {value: ""});
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now}, {value: ""});
+
+log("Connection request auth cleared - instant push enabled");
+'
+echo " Done"
+
 # Preset: bootstrap - Full refresh on first connect
 echo "Creating preset: bootstrap..."
 curl -s -X PUT "$GENIEACS_NBI_URL/presets/bootstrap" \
@@ -447,7 +469,8 @@ curl -s -X PUT "$GENIEACS_NBI_URL/presets/bootstrap" \
   "events": {"0 BOOTSTRAP": true},
   "configurations": [
     {"type": "provision", "name": "full-refresh"},
-    {"type": "provision", "name": "ntp-config"}
+    {"type": "provision", "name": "ntp-config"},
+    {"type": "provision", "name": "clear-conn-auth"}
   ]
 }'
 echo " Done"
@@ -552,7 +575,7 @@ echo "  - periodic-wan-check: Check WAN status periodically"
 echo "  - huawei-wan-pppoe: Complete Huawei PPPoE setup"
 echo ""
 echo "Created Presets:"
-echo "  - bootstrap: Full refresh + NTP on first connect"
+echo "  - bootstrap: Full refresh + NTP + clear auth on first connect"
 echo "  - periodic-refresh: Refresh on periodic inform (5 min)"
 echo "  - boot-refresh: Refresh WiFi/WAN on device reboot"
 echo "  - set-periodic-inform: Enable 5-min periodic inform"
