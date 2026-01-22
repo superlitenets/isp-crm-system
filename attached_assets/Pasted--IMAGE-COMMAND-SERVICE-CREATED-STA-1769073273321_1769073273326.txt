@@ -1,0 +1,24 @@
+                     IMAGE                           COMMAND
+  SERVICE          CREATED          STATUS                    PORTS
+isp_crm_db               postgres:15-alpine              "docker-entrypoint.s…"
+  db               16 hours ago     Up 16 hours               127.0.0.1:5433->5432/tcp
+isp_crm_freepbx          tiredofit/freepbx:latest        "/init"
+  freepbx          16 hours ago     Up 16 hours               80/tcp, 443/tcp, 4445/tcp, 0.0.0.0:5038->5038/tcp, [::]:5038->5038/tcp, 0.0.0.0:5060-5061->5060-5061/tcp, 0.0.0.0:5060-5061->5060-5061/udp, [::]:5060-5061->5060-5061/tcp, [::]:5060-5061->5060-5061/udp, 4569/tcp, 5161/tcp, 8001/tcp, 8003/tcp, 8008-8009/tcp, 0.0.0.0:5160->5160/tcp, [::]:5160->5160/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 8025/tcp, 0.0.0.0:5160->5160/udp, [::]:5160->5160/udp, 10050/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp, 0.0.0.0:18000-18100->18000-18100/udp, [::]:18000-18100->18000-18100/udp, 18101-20000/udp
+isp_crm_freepbx_db       mariadb:10.6                    "docker-entrypoint.s…"
+  freepbx-db       16 hours ago     Up 16 hours               3306/tcp
+isp_crm_freeradius       isp-freeradius                  "/docker-entrypoint.…"
+  freeradius       43 minutes ago   Up 42 minutes             0.0.0.0:1812-1813->1812-1813/udp, [::]:1812-1813->1812-1813/udp, 0.0.0.0:3799->3799/udp, [::]:3799->3799/udp
+isp_crm_genieacs         drumsergio/genieacs:1.2.13.2    "/usr/bin/supervisor…"
+  genieacs         16 hours ago     Up 16 hours (unhealthy)   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp, 0.0.0.0:7547->7547/tcp, [::]:7547->7547/tcp, 0.0.0.0:7557->7557/tcp, [::]:7557->7557/tcp, 0.0.0.0:7567->7567/tcp, [::]:7567->7567/tcpisp_crm_genieacs_mongo   mongo:8.0                       "docker-entrypoint.s…"
+  genieacs-mongo   16 hours ago     Up 16 hours (healthy)     27017/tcp
+isp_crm_nginx            nginx:stable-alpine             "/docker-entrypoint.…"
+  nginx            16 hours ago     Up 16 hours               0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+isp_crm_olt_service      isp-olt-service                 "docker-entrypoint.s…"
+  olt-service      43 minutes ago   Up 42 minutes
+isp_crm_php              isp-php                         "docker-php-entrypoi…"
+  php              43 minutes ago   Up 42 minutes
+isp_crm_whatsapp         isp-whatsapp                    "docker-entrypoint.s…"
+  whatsapp         43 minutes ago   Up 42 minutes             0.0.0.0:3001->3001/tcp, [::]:3001->3001/tcp
+isp_crm_wireguard        lscr.io/linuxserver/wireguard   "/init"
+  wireguard        16 hours ago     Up 16 hours
+root@superlitecrm:~/isp#
