@@ -6673,6 +6673,8 @@ class HuaweiOLT {
         $onuMode = $onu['onu_mode'] ?? 'router';
         $serviceVlan = $options['service_vlan'] ?? $onu['vlan_id'] ?? null;
         
+        $output .= "[Bridge Mode Check] onu_mode='{$onuMode}', service_vlan='{$serviceVlan}'\n";
+        
         if (strtolower($onuMode) === 'bridge' && $serviceVlan) {
             $output .= "[Bridge Mode: Native VLAN on all ETH ports]\n";
             $bridgeCmd = "interface gpon {$frame}/{$slot}\r\n";
