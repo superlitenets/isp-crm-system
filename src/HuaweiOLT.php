@@ -3996,11 +3996,23 @@ class HuaweiOLT {
      * SmartOLT uses ONU model names (HG8546M, HG8145V5) as service profile names
      */
     public function getOltSrvProfileByOnuType(int $oltId, string $onuType): ?array {
-        // Query the OLT for its service profiles
-        $result = $this->executeCommand($oltId, 'display ont-srvprofile gpon all');
-        if (!$result['success']) return null;
+        // Query the OLT for its service profiles with retry
+        $maxRetries = 3;
+        $output = '';
         
-        $output = $result['output'] ?? '';
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $result = $this->executeCommand($oltId, 'display ont-srvprofile gpon all');
+            if ($result['success'] && !empty($result['output']) && strpos($result['output'], 'Profile-ID') !== false) {
+                $output = $result['output'];
+                break;
+            }
+            if ($attempt < $maxRetries) {
+                usleep(500000); // Wait 500ms between retries
+            }
+        }
+        
+        if (empty($output)) return null;
+        
         $lines = explode("\n", $output);
         
         // Parse profiles looking for matching ONU type
@@ -5924,8 +5936,9 @@ class HuaweiOLT {
         $output = $result['output'] ?? '';
         
         if ($result['success'] && !empty($output)) {
-            // Format 1: "0/1/0  1  HWTC..." (F/S/P  ONU_ID  SN) - table format
-            preg_match_all('/^\s*\d+\/\d+\/\d+\s+(\d+)\s+/m', $output, $matches);
+            // Format 1: "0/ 1/0  1  HWTC..." (F/S/P with spaces  ONU_ID  SN) - table format
+            // Note: OLT output may have spaces around slashes like "0/ 1/0"
+            preg_match_all('/^\s*\d+\s*\/\s*\d+\s*\/\s*\d+\s+(\d+)\s+/m', $output, $matches);
             if (!empty($matches[1])) {
                 foreach ($matches[1] as $id) {
                     $usedIds[] = (int)$id;
@@ -6400,6 +6413,7 @@ class HuaweiOLT {
                 $alreadyAuthorized = true;
                 $assignedOnuId = $existingOnuId;
                 $output = "[ONU Already Authorized] Found existing ONT-ID {$existingOnuId} on {$frame}/{$slot}/{$port}\n";
+                $cliScript = "(already authorized - no command sent)";
             }
         }
         
