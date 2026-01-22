@@ -182,8 +182,12 @@ class SSHSession {
         if (lines.length > 1) {
             console.log(`[OLT ${this.oltId}] SSH multi-line command (${lines.length} lines)`);
             let fullResponse = '';
-            for (const line of lines) {
-                const response = await this.sendSingleCommand(line, timeout);
+            for (let i = 0; i < lines.length; i++) {
+                // Add delay between commands to prevent OLT SSH buffer corruption
+                if (i > 0) {
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                const response = await this.sendSingleCommand(lines[i], timeout);
                 fullResponse += response;
             }
             return fullResponse;

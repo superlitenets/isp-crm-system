@@ -76,7 +76,7 @@ app.post('/execute', async (req, res) => {
         console.log(`[Execute] OLT ${oltId} result (${(result || '').length} chars): ${(result || '').substring(0, 200)}`);
         res.json({ success: true, output: result });
     } catch (error) {
-        console.log(`[Execute] OLT ${oltId} error: ${error.message}`);
+        console.log(`[Execute] Error: ${error.message}`);
         res.status(500).json({ success: false, error: error.message });
     }
 });
