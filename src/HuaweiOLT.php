@@ -6139,10 +6139,18 @@ class HuaweiOLT {
             $assignedOnuId = (int)$m[1];
         }
         
-        // Check for errors in response
-        $hasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $output);
+        // Check for errors in response - be more lenient to avoid false positives
+        // Success patterns: "Number:X" or "ONTID:X" or "ont add" echoed back
+        $hasSuccess = preg_match('/(?:Number|ONTID|ONT-ID)\s*[:\=]\s*\d+|ont add/i', $output);
+        // Only fail on actual error patterns, not informational messages
+        $hasRealError = preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command|Wrong parameter|already exist)/i', $output);
+        // "already exist" means ONU is already authorized - that's not a failure for us
+        if (preg_match('/already exist/i', $output)) {
+            $hasRealError = false;
+            $hasSuccess = true;
+        }
         
-        if (!$result['success'] || $hasError) {
+        if (!$hasSuccess && ($hasRealError || !$result['success'])) {
             $this->addLog([
                 'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize',
                 'status' => 'failed', 'message' => "Authorization failed for {$onu['sn']}",
@@ -6231,8 +6239,11 @@ class HuaweiOLT {
             $batchOutput = $batchResult['output'] ?? '';
             $output .= "\n[Provisioning]\n" . $batchOutput;
             
-            // Check for TR-069 specific errors
-            if ($tr069Status['attempted'] && preg_match('/(?:Failure|Error:|failed|Invalid)/i', $batchOutput)) {
+            // Check for TR-069 specific errors - only fail on actual errors
+            // Success patterns: service-port ID returned, or commands echoed
+            $spSuccess = preg_match('/service-port\s+\d+/i', $batchOutput) || preg_match('/ont ipconfig|already/i', $batchOutput);
+            $spError = preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $batchOutput);
+            if ($tr069Status['attempted'] && $spError && !$spSuccess) {
                 $tr069Status['success'] = false;
                 $tr069Status['error'] = $batchOutput;
             }
@@ -6419,11 +6430,13 @@ class HuaweiOLT {
                 }
             }
             
-            // Check for real errors (not "already exist")
-            $hasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $output) 
+            // Check for real errors (not "already exist" or informational messages)
+            // Success: ONU ID assigned or already exists
+            $hasSuccess = preg_match('/(?:Number|ONTID|ONT-ID)\s*[:\=]\s*\d+|ont add|already exist/i', $output);
+            $hasRealError = preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command|Wrong parameter)/i', $output)
                         && !preg_match('/already exist/i', $output);
             
-            if (!$alreadyAuthorized && (!$result['success'] || $hasError)) {
+            if (!$alreadyAuthorized && !$hasSuccess && ($hasRealError || !$result['success'])) {
                 $this->addLog([
                     'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
                     'status' => 'failed', 'message' => "Stage 1 failed for {$onu['sn']}",
@@ -6461,7 +6474,9 @@ class HuaweiOLT {
             $servicePortOutput = $spResult['output'] ?? '';
             $output .= "\n[Service-Port]\n" . $servicePortOutput;
             
-            $servicePortSuccess = $spResult['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid)/i', $servicePortOutput);
+            // Success: service-port ID returned, or already exists
+            $servicePortSuccess = preg_match('/service-port\s+\d+|already|repeatedly/i', $servicePortOutput)
+                || ($spResult['success'] && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid)/i', $servicePortOutput));
             
             if ($servicePortSuccess) {
                 $this->updateONU($onuId, ['vlan_id' => $vlanId]);
@@ -6799,13 +6814,19 @@ class HuaweiOLT {
         $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
-        // Helper to check for real errors
+        // Helper to check for real errors - more lenient to avoid false positives
         $hasRealError = function($output) {
             if (empty($output)) return false;
-            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist|service-port\s+\d+|Success/i', $output)) {
                 return false;
             }
-            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
+            if (preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $output)) {
+                if (preg_match('/Error\s*(count|0|:?\s*0)/i', $output)) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
         };
         
         // Step 1: Enter interface mode
@@ -6889,13 +6910,19 @@ class HuaweiOLT {
         $output = '';
         $errors = [];
         
-        // Helper to check for real errors
+        // Helper to check for real errors - more lenient to avoid false positives
         $hasRealError = function($cmdOutput) {
             if (empty($cmdOutput)) return false;
-            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $cmdOutput)) {
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist|service-port\s+\d+|Success/i', $cmdOutput)) {
                 return false;
             }
-            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $cmdOutput);
+            if (preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $cmdOutput)) {
+                if (preg_match('/Error\s*(count|0|:?\s*0)/i', $cmdOutput)) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
         };
         
         // Step 1: Enter interface mode
@@ -6978,13 +7005,19 @@ class HuaweiOLT {
         $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
-        // Helper to check for real errors
+        // Helper to check for real errors - more lenient to avoid false positives
         $hasRealError = function($output) {
             if (empty($output)) return false;
-            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist|service-port\s+\d+|Success/i', $output)) {
                 return false;
             }
-            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
+            if (preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $output)) {
+                if (preg_match('/Error\s*(count|0|:?\s*0)/i', $output)) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
         };
         
         // Step 1: Configure DHCP WAN via OMCI
