@@ -1,0 +1,416 @@
+root@superlitecrm:~/isp# # View OLT service logs
+docker logs isp_crm_olt_service --tail 100
+
+# Watch logs in real-time
+docker logs -f isp_crm_olt_service
+
+# Check if telnet commands are being sent
+docker logs isp_crm_olt_service 2>&1 | grep -i "typing\|sending\|command"
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 84ms - Success: 2, Failed: 0
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Already running, skipping...
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 81ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 2] Socket closed
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 82ms - Success: 2, Failed: 0
+[OLT 1] Socket closed
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Already running, skipping...
+[Discovery] Discovery cycle complete
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 84ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 88ms - Success: 2, Failed: 0
+[OLT 1] Socket closed
+[OLT 2] Socket closed
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 93ms - Success: 2, Failed: 0
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Already running, skipping...
+[Discovery] Discovery cycle complete
+[OLT 1] Socket closed
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 81ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
+OLT Session Manager running on port 3002
+[Discovery] Starting scheduled discovery worker (*/30 * * * * *)
+[SNMP] Starting polling worker (every 30s)
+[Discovery] CLI autofind started (every 60s - for new unconfigured ONUs)
+[SNMP] Background polling started (every 30s - for status updates)
+[Discovery] Starting discovery cycle...
+[Discovery] SmartOLT cache refresh skipped: connect ECONNREFUSED 127.0.0.1:80
+[SNMP] Polling 2 active OLTs...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Completed in 217ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 97ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 100ms - Success: 2, Failed: 0
+[OLT 1] Socket closed
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 90ms - Success: 2, Failed: 0
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Discovery cycle complete
+[Discovery] Starting discovery cycle...
+[Discovery] Cached 0 SmartOLT serial numbers
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[OLT 2] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 87ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 89ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Discovery cycle complete
+[OLT 2] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 94ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 87ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 84ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Discovery cycle complete
+[OLT 2] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 94ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 83ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 80ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 83ms - Success: 2, Failed: 0
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Already running, skipping...
+[Discovery] Discovery cycle complete
+[OLT 2] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 94ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
+[Discovery] Cached 0 SmartOLT serial numbers
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 83ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 82ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Discovery cycle complete
+[OLT 2] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 95ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 84ms - Success: 2, Failed: 0
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Already running, skipping...
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 81ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 2] Socket closed
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 82ms - Success: 2, Failed: 0
+[OLT 1] Socket closed
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Already running, skipping...
+[Discovery] Discovery cycle complete
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] Using Telnet protocol
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 84ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Error discovering OLT HRM_OLT: Login timeout
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 88ms - Success: 2, Failed: 0
+[OLT 1] Socket closed
+[OLT 2] Socket closed
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 93ms - Success: 2, Failed: 0
+[OLT 1] Using Telnet protocol
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+[Discovery] Error discovering OLT G45_OLT: Login timeout
+[Discovery] Already running, skipping...
+[Discovery] Discovery cycle complete
+[OLT 1] Socket closed
+[OLT 1] Socket closed
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 81ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
