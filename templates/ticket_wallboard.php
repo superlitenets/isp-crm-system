@@ -232,48 +232,50 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding: 20px;
-            gap: 16px;
+            padding: 1vh 1.5vw;
+            gap: 1vh;
         }
         
         .header {
             text-align: center;
-            padding: 10px 0;
+            padding: 0.5vh 0;
+            flex-shrink: 0;
         }
         
         .header h1 {
-            font-size: 2rem;
+            font-size: clamp(1rem, 2vw, 1.8rem);
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             color: #fff;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
         
         .status-cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr) 120px;
-            gap: 12px;
+            grid-template-columns: repeat(4, 1fr) 100px;
+            gap: 0.8vw;
+            flex-shrink: 0;
         }
         
         .status-card {
-            border-radius: 8px;
-            padding: 16px;
+            border-radius: 6px;
+            padding: 1vh 0.5vw;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         
         .status-card .label {
-            font-size: 0.7rem;
+            font-size: clamp(0.5rem, 0.7vw, 0.7rem);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 8px;
+            margin-bottom: 0.5vh;
             opacity: 0.9;
         }
         
         .status-card .value {
-            font-size: 3rem;
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
             font-weight: 800;
             line-height: 1;
         }
@@ -322,27 +324,28 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .metrics-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
+            gap: 1vw;
+            flex-shrink: 0;
         }
         
         .metric-card {
             background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 16px 24px;
+            border-radius: 6px;
+            padding: 1vh 1vw;
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 1vw;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
         
         .metric-icon {
-            width: 50px;
-            height: 50px;
+            width: clamp(30px, 3vw, 45px);
+            height: clamp(30px, 3vw, 45px);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: clamp(0.9rem, 1.2vw, 1.3rem);
         }
         
         .metric-icon.clock { background: rgba(52, 152, 219, 0.2); color: #3498db; }
@@ -350,14 +353,14 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .metric-icon.check { background: rgba(39, 174, 96, 0.2); color: #27ae60; }
         
         .metric-info .label {
-            font-size: 0.75rem;
+            font-size: clamp(0.55rem, 0.7vw, 0.75rem);
             color: #95a5a6;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         
         .metric-info .value {
-            font-size: 1.8rem;
+            font-size: clamp(1rem, 1.5vw, 1.6rem);
             font-weight: 700;
         }
         
@@ -365,14 +368,14 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             flex: 1;
             display: grid;
             grid-template-columns: 1fr 1.5fr 1fr;
-            gap: 16px;
+            gap: 1vw;
             min-height: 0;
         }
         
         .panel {
             background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            padding: 16px;
+            border-radius: 6px;
+            padding: 1vh 1vw;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -380,55 +383,55 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .panel-title {
-            font-size: 0.8rem;
+            font-size: clamp(0.6rem, 0.8vw, 0.8rem);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 12px;
+            margin-bottom: 0.8vh;
             color: #ecf0f1;
             border-bottom: 2px solid rgba(255,255,255,0.1);
-            padding-bottom: 8px;
+            padding-bottom: 0.5vh;
         }
         
         .category-chart {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px 0;
+            padding: 1vh 0;
         }
         
         .donut-chart {
-            width: 120px;
-            height: 120px;
+            width: clamp(80px, 8vw, 110px);
+            height: clamp(80px, 8vw, 110px);
             border-radius: 50%;
             position: relative;
         }
         
         .donut-hole {
-            width: 60px;
-            height: 60px;
+            width: 50%;
+            height: 50%;
             border-radius: 50%;
             background: #1a1f2e;
             position: absolute;
-            top: 30px;
-            left: 30px;
+            top: 25%;
+            left: 25%;
         }
         
         .category-legend {
-            margin-top: 16px;
+            margin-top: 1vh;
         }
         
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 4px 0;
-            font-size: 0.8rem;
+            gap: 0.5vw;
+            padding: 2px 0;
+            font-size: clamp(0.55rem, 0.7vw, 0.75rem);
         }
         
         .legend-color {
-            width: 12px;
-            height: 12px;
+            width: clamp(8px, 0.8vw, 12px);
+            height: clamp(8px, 0.8vw, 12px);
             border-radius: 2px;
         }
         
@@ -549,9 +552,9 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .tech-name {
-            font-size: 0.65rem;
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
             color: #bdc3c7;
-            max-width: 50px;
+            max-width: clamp(40px, 4vw, 50px);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -568,16 +571,16 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
         }
         
         .att-row {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px 10px;
+            gap: 0.5vw;
+            padding: 0.4vh 0.5vw;
             background: rgba(0,0,0,0.2);
-            border-radius: 6px;
+            border-radius: 4px;
             border-left: 3px solid;
         }
         
@@ -585,14 +588,14 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .att-row.left { border-color: #3498db; }
         
         .att-avatar {
-            width: 32px;
-            height: 32px;
+            width: clamp(24px, 2.5vw, 32px);
+            height: clamp(24px, 2.5vw, 32px);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            font-size: 0.7rem;
+            font-size: clamp(0.5rem, 0.6vw, 0.7rem);
             flex-shrink: 0;
         }
         
@@ -605,7 +608,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .att-name {
-            font-size: 0.8rem;
+            font-size: clamp(0.55rem, 0.7vw, 0.75rem);
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
@@ -613,44 +616,44 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .att-position {
-            font-size: 0.65rem;
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
             color: #95a5a6;
         }
         
         .att-time {
-            font-size: 0.7rem;
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
             color: #95a5a6;
             display: flex;
-            gap: 6px;
+            gap: 4px;
             align-items: center;
         }
         
         .att-time i {
-            font-size: 0.75rem;
+            font-size: clamp(0.5rem, 0.6vw, 0.7rem);
         }
         
         .los-section {
             border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 8px;
-            margin-top: 8px;
+            padding-top: 0.5vh;
+            margin-top: 0.5vh;
         }
         
         .los-list {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            max-height: 150px;
+            gap: 4px;
+            max-height: 12vh;
             overflow-y: auto;
         }
         
         .los-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px 10px;
+            gap: 0.5vw;
+            padding: 0.4vh 0.5vw;
             background: rgba(231,76,60,0.1);
             border-left: 3px solid #e74c3c;
-            border-radius: 6px;
+            border-radius: 4px;
         }
         
         .los-info {
@@ -659,7 +662,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .los-name {
-            font-size: 0.8rem;
+            font-size: clamp(0.55rem, 0.7vw, 0.75rem);
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
@@ -667,7 +670,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .los-meta {
-            font-size: 0.65rem;
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
             color: #95a5a6;
             font-family: monospace;
         }
@@ -675,34 +678,35 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .assignment-row {
             display: grid;
             grid-template-columns: 1fr 1fr auto;
-            gap: 12px;
+            gap: 1vw;
+            flex-shrink: 0;
         }
         
         .assignment-card {
             background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            padding: 12px 16px;
+            border-radius: 6px;
+            padding: 0.8vh 1vw;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
         
         .assignment-card.unassigned-card {
             background: rgba(231,76,60,0.1);
             border: 1px solid rgba(231,76,60,0.3);
-            min-width: 180px;
+            min-width: 140px;
         }
         
         .assignment-header {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            font-size: 0.8rem;
+            gap: 0.5vw;
+            margin-bottom: 0.6vh;
+            font-size: clamp(0.6rem, 0.75vw, 0.8rem);
             font-weight: 600;
             color: #ecf0f1;
         }
         
         .assignment-header i {
-            font-size: 1rem;
+            font-size: clamp(0.7rem, 0.9vw, 1rem);
             color: #3498db;
         }
         
@@ -714,9 +718,9 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             margin-left: auto;
             background: rgba(52,152,219,0.2);
             color: #3498db;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 0.85rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: clamp(0.65rem, 0.8vw, 0.85rem);
             font-weight: 700;
         }
         
@@ -728,17 +732,17 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .assignment-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 4px;
         }
         
         .assignment-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             background: rgba(0,0,0,0.2);
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: clamp(0.55rem, 0.65vw, 0.7rem);
         }
         
         .assign-name {
@@ -747,79 +751,79 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         
         .assign-count {
             background: rgba(255,255,255,0.1);
-            padding: 1px 6px;
+            padding: 1px 5px;
             border-radius: 3px;
             font-weight: 600;
             color: #fff;
         }
         
         .unassigned-note {
-            font-size: 0.7rem;
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
             color: #95a5a6;
         }
         
         .empty-state-sm {
-            font-size: 0.7rem;
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
             color: #7f8c8d;
         }
         
         .branch-stats-row {
-            margin-bottom: 12px;
+            flex-shrink: 0;
         }
         
         .branch-stats-row .panel {
             background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            padding: 12px 16px;
+            border-radius: 6px;
+            padding: 0.8vh 1vw;
         }
         
         .branch-stats-row .panel-title {
-            font-size: 0.85rem;
+            font-size: clamp(0.6rem, 0.75vw, 0.8rem);
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 0.8vh;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 0.5vw;
         }
         
         .branch-stats-grid {
             display: flex;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 1vw;
         }
         
         .branch-stat-card {
             background: rgba(0,0,0,0.2);
-            border-radius: 6px;
-            padding: 10px 14px;
-            min-width: 160px;
+            border-radius: 5px;
+            padding: 0.8vh 1vw;
+            min-width: 120px;
             flex: 1;
         }
         
         .branch-name {
-            font-size: 0.8rem;
+            font-size: clamp(0.6rem, 0.7vw, 0.75rem);
             font-weight: 600;
             color: #ecf0f1;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
         
         .branch-total {
-            font-size: 1.4rem;
+            font-size: clamp(1rem, 1.3vw, 1.4rem);
             font-weight: 700;
             color: #3498db;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
         
         .branch-breakdown {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 4px;
         }
         
         .branch-status {
-            font-size: 0.65rem;
-            padding: 2px 6px;
-            border-radius: 3px;
+            font-size: clamp(0.5rem, 0.55vw, 0.6rem);
+            padding: 1px 5px;
+            border-radius: 2px;
             font-weight: 500;
         }
         
@@ -840,7 +844,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         
         .data-table {
             width: 100%;
-            font-size: 0.75rem;
+            font-size: clamp(0.55rem, 0.7vw, 0.75rem);
             border-collapse: collapse;
         }
         
