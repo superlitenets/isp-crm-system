@@ -117,6 +117,47 @@ try {
             exit;
         }
         
+        // Create tickets for each fault with a linked customer
+        $ticketsCreated = 0;
+        require_once __DIR__ . '/../../src/Ticket.php';
+        $ticketClass = new \App\Ticket();
+        
+        foreach ($faults as $f) {
+            // Only create ticket if customer is linked
+            if (!empty($f['customer_id'])) {
+                $statusLabel = $f['new_status'] === 'los' ? 'LOS (Loss of Signal)' : 
+                    ($f['new_status'] === 'dying-gasp' ? 'Dying Gasp (Power Failure)' : 'Offline');
+                
+                $ticketSubject = "ONU {$statusLabel}: " . ($f['name'] ?: $f['sn']);
+                $ticketDescription = "Automatic fault detection:\n\n" .
+                    "ONU: " . ($f['name'] ?: $f['sn']) . "\n" .
+                    "Serial: {$f['sn']}\n" .
+                    "Location: 0/{$f['slot']}/{$f['port']}/{$f['onu_id']}\n" .
+                    "OLT: {$oltName} ({$oltIp})\n" .
+                    "Branch: {$branchName}\n" .
+                    "Previous Status: {$f['prev_status']}\n" .
+                    "New Status: {$f['new_status']}\n" .
+                    "Detected: " . date('Y-m-d H:i:s');
+                
+                try {
+                    $ticketResult = $ticketClass->create([
+                        'customer_id' => $f['customer_id'],
+                        'subject' => $ticketSubject,
+                        'description' => $ticketDescription,
+                        'priority' => ($f['new_status'] === 'los' || $f['new_status'] === 'dying-gasp') ? 'high' : 'medium',
+                        'category' => 'Fiber/ONU',
+                        'source' => 'system'
+                    ]);
+                    if ($ticketResult['success'] ?? false) {
+                        $ticketsCreated++;
+                    }
+                } catch (Exception $e) {
+                    error_log("Failed to create fault ticket: " . $e->getMessage());
+                }
+            }
+        }
+        
+        // Send WhatsApp notification
         $template = $settings->get('wa_template_oms_fault', 
             "*⚠️ ONU Fault Alert*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\n{fault_count} ONU(s) went offline:\n{fault_list}\n\nDetected at: {detection_time}"
         );
@@ -146,22 +187,15 @@ try {
         
         $result = $whatsapp->sendToGroup($groupId, $message);
         
-        if ($result['success']) {
-            echo json_encode([
-                'success' => true, 
-                'message' => 'Fault notification sent',
-                'group_id' => $groupId,
-                'fault_count' => count($faults),
-                'messageId' => $result['messageId'] ?? null
-            ]);
-        } else {
-            http_response_code(500);
-            echo json_encode([
-                'success' => false, 
-                'error' => $result['error'] ?? 'Failed to send WhatsApp message',
-                'group_id' => $groupId
-            ]);
-        }
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Fault notification processed',
+            'group_id' => $groupId,
+            'fault_count' => count($faults),
+            'tickets_created' => $ticketsCreated,
+            'whatsapp_sent' => $result['success'] ?? false,
+            'messageId' => $result['messageId'] ?? null
+        ]);
     } else {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Unknown notification type']);
