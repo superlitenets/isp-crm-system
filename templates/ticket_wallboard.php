@@ -918,7 +918,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             <div class="assignment-card">
                 <div class="assignment-header">
                     <i class="bi bi-people-fill"></i>
-                    <span>Assigned to Groups</span>
+                    <span>Assigned to Teams</span>
                     <span class="assignment-total"><?= $ticketStats['assigned_group'] ?? 0 ?></span>
                 </div>
                 <div class="assignment-list">
@@ -929,7 +929,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                     </div>
                     <?php endforeach; ?>
                     <?php if (empty($teamAssignments)): ?>
-                    <div class="empty-state-sm">No group assignments</div>
+                    <div class="empty-state-sm">No team assignments</div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -939,7 +939,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                     <span>Unassigned</span>
                     <span class="assignment-total"><?= $ticketStats['unassigned'] ?? 0 ?></span>
                 </div>
-                <div class="unassigned-note">Tickets not assigned to any person or group</div>
+                <div class="unassigned-note">Tickets not assigned to any person or team</div>
             </div>
         </div>
         
