@@ -105,16 +105,26 @@ $categoryStats = $db->query("
 
 $totalCategoryTickets = array_sum(array_column($categoryStats, 'count'));
 
-// Top 5 Pending Tickets (longest pending)
+// Recent Tickets (for live table display)
 $topOpenTickets = $db->query("
-    SELECT t.id, t.subject, t.priority, t.created_at,
-           c.name as customer_name, tm.name as team_name
+    SELECT t.id, t.subject, t.priority, t.status, t.category, t.created_at,
+           c.name as customer_name, tm.name as team_name,
+           u.name as assigned_name, b.name as branch_name
     FROM tickets t
     LEFT JOIN customers c ON t.customer_id = c.id
     LEFT JOIN teams tm ON t.team_id = tm.id
+    LEFT JOIN users u ON t.assigned_to = u.id
+    LEFT JOIN branches b ON t.branch_id = b.id
     WHERE t.status NOT IN ('closed', 'resolved')
-    ORDER BY t.created_at ASC
-    LIMIT 5
+    ORDER BY 
+        CASE t.priority 
+            WHEN 'critical' THEN 1 
+            WHEN 'high' THEN 2 
+            WHEN 'medium' THEN 3 
+            ELSE 4 
+        END,
+        t.created_at ASC
+    LIMIT 10
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // Critical Alert (most urgent issue)
@@ -582,30 +592,54 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .status-badge.status-waiting { background: rgba(230,126,34,0.2); color: #e67e22; }
         .status-badge.status-resolved { background: rgba(46,204,113,0.2); color: #2ecc71; }
         
+        .priority-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
+            font-weight: 600;
+        }
+        
+        .priority-badge.priority-critical { background: rgba(231,76,60,0.3); color: #e74c3c; }
+        .priority-badge.priority-high { background: rgba(230,126,34,0.3); color: #e67e22; }
+        .priority-badge.priority-medium { background: rgba(241,196,15,0.2); color: #f1c40f; }
+        .priority-badge.priority-low { background: rgba(46,204,113,0.2); color: #2ecc71; }
+        
+        .priority-row-critical { background: rgba(231,76,60,0.05); }
+        .priority-row-high { background: rgba(230,126,34,0.03); }
+        
+        .ticket-id {
+            font-weight: 600;
+            color: #3498db;
+            white-space: nowrap;
+        }
+        
+        .subject-text {
+            font-weight: 500;
+        }
+        
+        .customer-text {
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
+            color: #7f8c8d;
+        }
+        
+        .assigned-cell .unassigned {
+            color: #e74c3c;
+            font-style: italic;
+        }
+        
         .ticket-age {
             color: #95a5a6;
             white-space: nowrap;
         }
         
-        .los-section {
-            margin-top: 8px;
+        .los-alert {
+            background: rgba(231,76,60,0.1);
+            border-left-color: #e74c3c;
         }
         
-        .los-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-        
-        .los-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
-        }
-        
-        .los-name {
-            color: #ecf0f1;
+        .tech-panel {
+            flex: 0 0 220px;
+            min-width: 180px;
         }
         
         .technician-avatars {
@@ -1150,58 +1184,60 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         
         <div class="bottom-section">
             <div class="panel ticket-table-panel">
-                <div class="panel-title">Recent Tickets</div>
+                <div class="panel-title"><i class="bi bi-list-task"></i> Recent Tickets (Live)</div>
                 <table class="ticket-table">
                     <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Subject</th>
+                            <th>ID</th>
+                            <th>Priority</th>
+                            <th>Subject / Customer</th>
                             <th>Category</th>
                             <th>Status</th>
+                            <th>Assigned To</th>
                             <th>Team</th>
+                            <th>Branch</th>
                             <th>Age</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($topOpenTickets as $i => $ticket): ?>
-                        <tr>
-                            <td class="ticket-rank rank-<?= $i + 1 ?>"><?= $i + 1 ?></td>
-                            <td class="ticket-subject-cell"><?= htmlspecialchars($ticket['subject']) ?><?= $ticket['customer_name'] ? ' - ' . htmlspecialchars($ticket['customer_name']) : '' ?></td>
-                            <td><span class="cat-badge"><?= htmlspecialchars($ticket['category'] ?? 'N/A') ?></span></td>
+                        <?php foreach ($topOpenTickets as $ticket): ?>
+                        <tr class="priority-row-<?= strtolower($ticket['priority'] ?? 'medium') ?>">
+                            <td class="ticket-id">#<?= $ticket['id'] ?></td>
+                            <td><span class="priority-badge priority-<?= strtolower($ticket['priority'] ?? 'medium') ?>"><?= htmlspecialchars($ticket['priority'] ?? 'Medium') ?></span></td>
+                            <td class="ticket-subject-cell">
+                                <div class="subject-text"><?= htmlspecialchars($ticket['subject']) ?></div>
+                                <?php if ($ticket['customer_name']): ?><div class="customer-text"><?= htmlspecialchars($ticket['customer_name']) ?></div><?php endif; ?>
+                            </td>
+                            <td><span class="cat-badge"><?= htmlspecialchars($ticket['category'] ?? '-') ?></span></td>
                             <td><span class="status-badge status-<?= strtolower(str_replace(' ', '-', $ticket['status'])) ?>"><?= htmlspecialchars($ticket['status']) ?></span></td>
+                            <td class="assigned-cell"><?= $ticket['assigned_name'] ? htmlspecialchars($ticket['assigned_name']) : '<span class="unassigned">Unassigned</span>' ?></td>
                             <td><?= $ticket['team_name'] ? htmlspecialchars($ticket['team_name']) : '-' ?></td>
+                            <td><?= $ticket['branch_name'] ? htmlspecialchars($ticket['branch_name']) : '-' ?></td>
                             <td class="ticket-age"><?= timeOpen($ticket['created_at']) ?></td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if (empty($topOpenTickets)): ?>
-                        <tr><td colspan="6" class="empty-state">No open tickets</td></tr>
+                        <tr><td colspan="9" class="empty-state">No open tickets</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
                 
                 <?php if ($criticalAlert): ?>
                 <div class="alert-box">
-                    <div class="alert-label">Alert</div>
-                    <div class="alert-text"><?= htmlspecialchars($criticalAlert['subject']) ?></div>
+                    <div class="alert-label"><i class="bi bi-exclamation-triangle-fill"></i> Critical</div>
+                    <div class="alert-text"><?= htmlspecialchars($criticalAlert['subject']) ?> - Open <?= timeOpen($criticalAlert['created_at']) ?></div>
                 </div>
                 <?php endif; ?>
                 
                 <?php if (!empty($losOnus)): ?>
-                <div class="los-section">
-                    <div class="panel-title" style="margin-top:8px;"><i class="bi bi-wifi-off"></i> LOS Alerts <span style="color:#e74c3c;">(<?= count($losOnus) ?>)</span></div>
-                    <div class="los-list">
-                        <?php foreach ($losOnus as $onu): ?>
-                        <div class="los-item">
-                            <i class="bi bi-exclamation-triangle-fill" style="color:#e74c3c;"></i>
-                            <span class="los-name"><?= htmlspecialchars($onu['customer_name'] ?: $onu['name'] ?: 'Unknown') ?></span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
+                <div class="alert-box los-alert">
+                    <div class="alert-label"><i class="bi bi-wifi-off"></i> LOS (<?= count($losOnus) ?>)</div>
+                    <div class="alert-text"><?= implode(', ', array_map(fn($o) => htmlspecialchars($o['customer_name'] ?: $o['name'] ?: $o['sn']), array_slice($losOnus, 0, 5))) ?><?= count($losOnus) > 5 ? '...' : '' ?></div>
                 </div>
                 <?php endif; ?>
             </div>
             
-            <div class="panel">
+            <div class="panel tech-panel">
                 <div class="panel-title">Technicians in the Field <span style="color:#27ae60;">(<?= $presentCount ?> present)</span></div>
                 <div class="att-list">
                     <?php foreach ($todayAttendance as $att): ?>
