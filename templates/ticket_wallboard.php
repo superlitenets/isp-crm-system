@@ -49,9 +49,9 @@ $teamsWorkingPending = $db->query("
 $teamMembers = [];
 foreach ($teamsWorkingPending as $team) {
     $members = $db->prepare("
-        SELECT u.name 
+        SELECT e.name 
         FROM team_members tmem
-        INNER JOIN users u ON tmem.user_id = u.id
+        INNER JOIN employees e ON tmem.employee_id = e.id
         WHERE tmem.team_id = ?
         LIMIT 4
     ");
