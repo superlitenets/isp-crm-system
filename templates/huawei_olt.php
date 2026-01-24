@@ -5539,10 +5539,14 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         exit;
     }
     
-    // Status detection priority: SNMP > Optical Power > TR-069
-    // SNMP is most reliable for detecting ONU online status from OLT
-    $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'offline', 'power_fail'];
-    if (!in_array($currentOnu['status'], $snmpFaultStatuses) && $currentOnu['status'] !== 'online') {
+    // Status detection: Prefer snmp_status for fault statuses (LOS, dying-gasp)
+    $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'power_fail'];
+    $snmpStatus = strtolower($currentOnu['snmp_status'] ?? '');
+    
+    // If snmp_status indicates a fault, use that as authoritative
+    if (in_array($snmpStatus, $snmpFaultStatuses)) {
+        $currentOnu['status'] = $snmpStatus;
+    } elseif (!in_array($currentOnu['status'], $snmpFaultStatuses) && $currentOnu['status'] !== 'online') {
         $isOnline = false;
         // 1. SNMP status is primary (from OLT polling)
         if (!empty($currentOnu['snmp_status']) && $currentOnu['snmp_status'] === 'online') {
@@ -8048,12 +8052,18 @@ try {
                                             'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Power Fail'],
                                             'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Dying Gasp'],
                                         ];
-                                        $status = strtolower($onu['status'] ?? 'offline');
-                                        // Apply same status override logic as config page
-                                        $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'offline', 'power_fail'];
-                                        if (!in_array($status, $snmpFaultStatuses) && $status !== 'online') {
+                                        // Prefer snmp_status for fault detection (LOS, dying-gasp)
+                                        $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'power_fail'];
+                                        $snmpStatus = strtolower($onu['snmp_status'] ?? '');
+                                        $dbStatus = strtolower($onu['status'] ?? 'offline');
+                                        
+                                        // Use snmp_status if it's a fault status, otherwise use db status
+                                        $status = in_array($snmpStatus, $snmpFaultStatuses) ? $snmpStatus : $dbStatus;
+                                        
+                                        // Only apply online override if status is not a known fault
+                                        if (!in_array($status, $snmpFaultStatuses) && $status !== 'online' && $status !== 'offline') {
                                             $isOnline = false;
-                                            if (!empty($onu['snmp_status']) && $onu['snmp_status'] === 'online') $isOnline = true;
+                                            if ($snmpStatus === 'online') $isOnline = true;
                                             elseif (!empty($onu['rx_power']) && $onu['rx_power'] > -40) $isOnline = true;
                                             elseif (!empty($onu['tr069_last_inform']) && strtotime($onu['tr069_last_inform']) >= time() - 300) $isOnline = true;
                                             if ($isOnline) $status = 'online';

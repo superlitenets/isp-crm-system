@@ -3042,16 +3042,16 @@ class HuaweiOLT {
         // Track online_since for uptime calculation
         if ($status === 'online' && $previousStatus !== 'online') {
             // ONU just came online - set online_since timestamp
-            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $updateStmt->execute([$status, $onuId]);
+            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, snmp_status = ?, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $updateStmt->execute([$status, $status, $onuId]);
         } elseif ($status !== 'online' && $previousStatus === 'online') {
             // ONU went offline - clear online_since
-            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, online_since = NULL, uptime = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $updateStmt->execute([$status, $onuId]);
+            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, snmp_status = ?, online_since = NULL, uptime = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $updateStmt->execute([$status, $status, $onuId]);
         } else {
             // Regular status update
-            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $updateStmt->execute([$status, $onuId]);
+            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, snmp_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $updateStmt->execute([$status, $status, $onuId]);
         }
         
         // Send LOS notification if status changed to 'los' from a non-los state
