@@ -30,6 +30,35 @@ $teamAssignments = $db->query("
     LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
 
+// Teams working on pending tickets (status = pending or open)
+$teamsWorkingPending = $db->query("
+    SELECT 
+        tm.id as team_id,
+        tm.name as team_name,
+        COUNT(t.id) as pending_count,
+        COUNT(*) FILTER (WHERE t.priority = 'critical') as critical_count,
+        COUNT(*) FILTER (WHERE t.priority = 'high') as high_count
+    FROM teams tm
+    INNER JOIN tickets t ON t.team_id = tm.id
+    WHERE t.status IN ('open', 'pending')
+    GROUP BY tm.id, tm.name
+    ORDER BY pending_count DESC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// Get team members for each team with pending tickets
+$teamMembers = [];
+foreach ($teamsWorkingPending as $team) {
+    $members = $db->prepare("
+        SELECT u.name 
+        FROM team_members tmem
+        INNER JOIN users u ON tmem.user_id = u.id
+        WHERE tmem.team_id = ?
+        LIMIT 4
+    ");
+    $members->execute([$team['team_id']]);
+    $teamMembers[$team['team_id']] = $members->fetchAll(PDO::FETCH_COLUMN);
+}
+
 // Assignment breakdown by individual
 $individualAssignments = $db->query("
     SELECT u.name as user_name, COUNT(t.id) as ticket_count
@@ -767,6 +796,99 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             color: #7f8c8d;
         }
         
+        .teams-pending-row {
+            flex-shrink: 0;
+        }
+        
+        .teams-pending-row .panel {
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+            padding: 0.8vh 1vw;
+        }
+        
+        .teams-pending-row .panel-title {
+            font-size: clamp(0.6rem, 0.75vw, 0.8rem);
+            font-weight: 600;
+            margin-bottom: 0.8vh;
+            display: flex;
+            align-items: center;
+            gap: 0.5vw;
+        }
+        
+        .teams-pending-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1vw;
+        }
+        
+        .team-pending-card {
+            background: rgba(241,196,15,0.1);
+            border: 1px solid rgba(241,196,15,0.3);
+            border-radius: 5px;
+            padding: 0.8vh 1vw;
+            min-width: 140px;
+            flex: 1;
+        }
+        
+        .team-pending-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.4vh;
+        }
+        
+        .team-pending-name {
+            font-size: clamp(0.65rem, 0.8vw, 0.85rem);
+            font-weight: 600;
+            color: #f1c40f;
+        }
+        
+        .team-pending-count {
+            background: rgba(241,196,15,0.3);
+            color: #f1c40f;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: clamp(0.7rem, 0.85vw, 0.9rem);
+            font-weight: 700;
+        }
+        
+        .team-priority-badges {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 0.4vh;
+        }
+        
+        .priority-badge {
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+        
+        .priority-badge.critical {
+            background: rgba(231,76,60,0.3);
+            color: #e74c3c;
+        }
+        
+        .priority-badge.high {
+            background: rgba(230,126,34,0.3);
+            color: #e67e22;
+        }
+        
+        .team-members-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+        
+        .team-member-tag {
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
+            background: rgba(255,255,255,0.1);
+            color: #bdc3c7;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        
         .branch-stats-row {
             flex-shrink: 0;
         }
@@ -1035,6 +1157,41 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                 <div class="unassigned-note">Tickets not assigned to any person or team</div>
             </div>
         </div>
+        
+        <?php if (!empty($teamsWorkingPending)): ?>
+        <div class="teams-pending-row">
+            <div class="panel">
+                <div class="panel-title"><i class="bi bi-people-fill"></i> Teams Working on Pending Tickets</div>
+                <div class="teams-pending-grid">
+                    <?php foreach ($teamsWorkingPending as $team): ?>
+                    <div class="team-pending-card">
+                        <div class="team-pending-header">
+                            <span class="team-pending-name"><?= htmlspecialchars($team['team_name']) ?></span>
+                            <span class="team-pending-count"><?= $team['pending_count'] ?></span>
+                        </div>
+                        <?php if ($team['critical_count'] > 0 || $team['high_count'] > 0): ?>
+                        <div class="team-priority-badges">
+                            <?php if ($team['critical_count'] > 0): ?>
+                            <span class="priority-badge critical"><?= $team['critical_count'] ?> Critical</span>
+                            <?php endif; ?>
+                            <?php if ($team['high_count'] > 0): ?>
+                            <span class="priority-badge high"><?= $team['high_count'] ?> High</span>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($teamMembers[$team['team_id']])): ?>
+                        <div class="team-members-list">
+                            <?php foreach ($teamMembers[$team['team_id']] as $member): ?>
+                            <span class="team-member-tag"><?= htmlspecialchars($member) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <div class="branch-stats-row">
             <div class="panel">
