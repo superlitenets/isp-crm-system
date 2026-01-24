@@ -78,20 +78,38 @@ $criticalAlert = $db->query("
     LIMIT 1
 ")->fetch(PDO::FETCH_ASSOC);
 
-// Technicians in the field (employees who checked in today)
+// Technicians in the field (employees who checked in today - for avatars)
 $technicians = $db->query("
     SELECT e.id, e.name,
-           (SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = u.id AND t.status NOT IN ('closed', 'resolved')) as ticket_count,
+           (SELECT COUNT(*) FROM tickets t LEFT JOIN users u2 ON t.assigned_to = u2.id WHERE LOWER(u2.name) = LOWER(e.name) AND t.status NOT IN ('closed', 'resolved')) as ticket_count,
            TO_CHAR(a.clock_in, 'HH24:MI') as clock_in
     FROM employees e
     INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE
-    LEFT JOIN users u ON LOWER(e.name) = LOWER(u.name)
     WHERE e.employment_status = 'active' 
     AND a.clock_in IS NOT NULL
     AND a.clock_out IS NULL
     ORDER BY a.clock_in ASC
     LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
+
+// Today's Attendance - full list with clock in/out times
+$todayAttendance = $db->query("
+    SELECT 
+        e.id, e.name, e.position,
+        TO_CHAR(a.clock_in, 'HH24:MI') as clock_in,
+        TO_CHAR(a.clock_out, 'HH24:MI') as clock_out,
+        CASE 
+            WHEN a.clock_out IS NOT NULL THEN 'left'
+            ELSE 'present'
+        END as attendance_status
+    FROM employees e
+    INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE
+    WHERE e.employment_status = 'active' AND a.clock_in IS NOT NULL
+    ORDER BY 
+        CASE WHEN a.clock_out IS NULL THEN 1 ELSE 2 END,
+        a.clock_in DESC
+")->fetchAll(PDO::FETCH_ASSOC);
+$presentCount = count(array_filter($todayAttendance, fn($a) => $a['attendance_status'] === 'present'));
 
 // Tickets assigned to checked-in technicians (for the table)
 $technicianTickets = $db->query("
@@ -495,6 +513,72 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             overflow-y: auto;
         }
         
+        .att-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .att-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            border-left: 3px solid;
+        }
+        
+        .att-row.present { border-color: #27ae60; }
+        .att-row.left { border-color: #3498db; }
+        
+        .att-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.7rem;
+            flex-shrink: 0;
+        }
+        
+        .att-avatar.present { background: rgba(39,174,96,0.3); color: #27ae60; }
+        .att-avatar.left { background: rgba(52,152,219,0.3); color: #3498db; }
+        
+        .att-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .att-name {
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .att-position {
+            font-size: 0.65rem;
+            color: #95a5a6;
+        }
+        
+        .att-time {
+            font-size: 0.7rem;
+            color: #95a5a6;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        
+        .att-time i {
+            font-size: 0.75rem;
+        }
+        
         .data-table {
             width: 100%;
             font-size: 0.75rem;
@@ -709,7 +793,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             </div>
             
             <div class="panel">
-                <div class="panel-title">Technicians in the Field</div>
+                <div class="panel-title">Technicians in the Field <span style="color:#27ae60;">(<?= $presentCount ?> present)</span></div>
                 <div class="technician-avatars">
                     <?php foreach ($technicians as $tech): ?>
                     <div class="tech-avatar">
@@ -720,34 +804,31 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                     </div>
                     <?php endforeach; ?>
                     <?php if (empty($technicians)): ?>
-                    <div class="empty-state">No technicians assigned</div>
+                    <div class="empty-state">No one checked in</div>
                     <?php endif; ?>
                 </div>
                 
-                <div class="tech-table">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Ticket #</th>
-                                <th>Priority</th>
-                                <th>Status</th>
-                                <th>Assigned To</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($technicianTickets as $ticket): ?>
-                            <tr>
-                                <td>#<?= $ticket['id'] ?></td>
-                                <td><span class="priority-badge priority-<?= strtolower($ticket['priority']) ?>"><?= ucfirst($ticket['priority']) ?></span></td>
-                                <td><span class="status-badge status-<?= $ticket['status'] ?>"><?= ucwords(str_replace('_', ' ', $ticket['status'])) ?></span></td>
-                                <td><?= htmlspecialchars(explode(' ', $ticket['assigned_name'])[0]) ?> <?= isset(explode(' ', $ticket['assigned_name'])[1]) ? strtoupper(substr(explode(' ', $ticket['assigned_name'])[1], 0, 1)) . '.' : '' ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                            <?php if (empty($technicianTickets)): ?>
-                            <tr><td colspan="4" class="empty-state">No active tickets</td></tr>
+                <div class="att-list">
+                    <?php foreach ($todayAttendance as $att): ?>
+                    <div class="att-row <?= $att['attendance_status'] ?>">
+                        <div class="att-avatar <?= $att['attendance_status'] ?>">
+                            <?= strtoupper(substr($att['name'], 0, 2)) ?>
+                        </div>
+                        <div class="att-info">
+                            <div class="att-name"><?= htmlspecialchars($att['name']) ?></div>
+                            <div class="att-position"><?= htmlspecialchars($att['position'] ?? '') ?></div>
+                        </div>
+                        <div class="att-time">
+                            <i class="bi bi-box-arrow-in-right"></i> <?= $att['clock_in'] ?>
+                            <?php if ($att['clock_out']): ?>
+                                <i class="bi bi-box-arrow-right"></i> <?= $att['clock_out'] ?>
                             <?php endif; ?>
-                        </tbody>
-                    </table>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($todayAttendance)): ?>
+                    <div class="empty-state">No attendance records</div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
