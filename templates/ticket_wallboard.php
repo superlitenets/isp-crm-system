@@ -10,12 +10,36 @@ $ticketStats = $db->query("
         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
         COUNT(*) FILTER (WHERE status = 'waiting_customer') as waiting_customer,
         COUNT(*) FILTER (WHERE priority = 'critical' AND status NOT IN ('closed', 'resolved')) as critical_count,
-        COUNT(*) FILTER (WHERE assigned_to IS NULL AND status NOT IN ('closed', 'resolved')) as unassigned,
+        COUNT(*) FILTER (WHERE assigned_to IS NULL AND team_id IS NULL AND status NOT IN ('closed', 'resolved')) as unassigned,
         COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as created_today,
         COUNT(*) FILTER (WHERE status = 'closed' AND DATE(updated_at) = CURRENT_DATE) as closed_today,
-        COUNT(*) FILTER (WHERE status NOT IN ('closed', 'resolved')) as total_open
+        COUNT(*) FILTER (WHERE status NOT IN ('closed', 'resolved')) as total_open,
+        COUNT(*) FILTER (WHERE assigned_to IS NOT NULL AND status NOT IN ('closed', 'resolved')) as assigned_individual,
+        COUNT(*) FILTER (WHERE team_id IS NOT NULL AND assigned_to IS NULL AND status NOT IN ('closed', 'resolved')) as assigned_group
     FROM tickets
 ")->fetch(PDO::FETCH_ASSOC);
+
+// Assignment breakdown by team/group
+$teamAssignments = $db->query("
+    SELECT tm.name as team_name, COUNT(t.id) as ticket_count
+    FROM tickets t
+    INNER JOIN teams tm ON t.team_id = tm.id
+    WHERE t.status NOT IN ('closed', 'resolved')
+    GROUP BY tm.id, tm.name
+    ORDER BY ticket_count DESC
+    LIMIT 5
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// Assignment breakdown by individual
+$individualAssignments = $db->query("
+    SELECT u.name as user_name, COUNT(t.id) as ticket_count
+    FROM tickets t
+    INNER JOIN users u ON t.assigned_to = u.id
+    WHERE t.status NOT IN ('closed', 'resolved')
+    GROUP BY u.id, u.name
+    ORDER BY ticket_count DESC
+    LIMIT 5
+")->fetchAll(PDO::FETCH_ASSOC);
 
 // Average Response Time (time from created to first response/update)
 $avgResponse = $db->query("
@@ -634,6 +658,97 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             font-family: monospace;
         }
         
+        .assignment-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 12px;
+        }
+        
+        .assignment-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .assignment-card.unassigned-card {
+            background: rgba(231,76,60,0.1);
+            border: 1px solid rgba(231,76,60,0.3);
+            min-width: 180px;
+        }
+        
+        .assignment-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #ecf0f1;
+        }
+        
+        .assignment-header i {
+            font-size: 1rem;
+            color: #3498db;
+        }
+        
+        .unassigned-card .assignment-header i {
+            color: #e74c3c;
+        }
+        
+        .assignment-total {
+            margin-left: auto;
+            background: rgba(52,152,219,0.2);
+            color: #3498db;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        
+        .unassigned-card .assignment-total {
+            background: rgba(231,76,60,0.2);
+            color: #e74c3c;
+        }
+        
+        .assignment-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .assignment-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0,0,0,0.2);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        
+        .assign-name {
+            color: #bdc3c7;
+        }
+        
+        .assign-count {
+            background: rgba(255,255,255,0.1);
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .unassigned-note {
+            font-size: 0.7rem;
+            color: #95a5a6;
+        }
+        
+        .empty-state-sm {
+            font-size: 0.7rem;
+            color: #7f8c8d;
+        }
+        
         .data-table {
             width: 100%;
             font-size: 0.75rem;
@@ -778,6 +893,53 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                     <div class="label">SLA Compliance</div>
                     <div class="value"><?= $slaCompliance ?>%</div>
                 </div>
+            </div>
+        </div>
+        
+        <div class="assignment-row">
+            <div class="assignment-card">
+                <div class="assignment-header">
+                    <i class="bi bi-person-fill"></i>
+                    <span>Assigned to Individuals</span>
+                    <span class="assignment-total"><?= $ticketStats['assigned_individual'] ?? 0 ?></span>
+                </div>
+                <div class="assignment-list">
+                    <?php foreach ($individualAssignments as $assign): ?>
+                    <div class="assignment-item">
+                        <span class="assign-name"><?= htmlspecialchars($assign['user_name']) ?></span>
+                        <span class="assign-count"><?= $assign['ticket_count'] ?></span>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($individualAssignments)): ?>
+                    <div class="empty-state-sm">No assignments</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="assignment-card">
+                <div class="assignment-header">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Assigned to Groups</span>
+                    <span class="assignment-total"><?= $ticketStats['assigned_group'] ?? 0 ?></span>
+                </div>
+                <div class="assignment-list">
+                    <?php foreach ($teamAssignments as $assign): ?>
+                    <div class="assignment-item">
+                        <span class="assign-name"><?= htmlspecialchars($assign['team_name']) ?></span>
+                        <span class="assign-count"><?= $assign['ticket_count'] ?></span>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($teamAssignments)): ?>
+                    <div class="empty-state-sm">No group assignments</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="assignment-card unassigned-card">
+                <div class="assignment-header">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <span>Unassigned</span>
+                    <span class="assignment-total"><?= $ticketStats['unassigned'] ?? 0 ?></span>
+                </div>
+                <div class="unassigned-note">Tickets not assigned to any person or group</div>
             </div>
         </div>
         
