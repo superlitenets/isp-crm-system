@@ -120,6 +120,67 @@ if ($action === 'get_online_subscribers') {
     exit;
 }
 
+// Real-time CoA AJAX endpoints
+if ($action === 'ajax_disconnect') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $result = $radiusBilling->disconnectUser($id);
+        echo json_encode($result);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription ID']);
+    }
+    exit;
+}
+
+if ($action === 'ajax_activate') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $result = $radiusBilling->activateSubscription($id);
+        echo json_encode($result);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription ID']);
+    }
+    exit;
+}
+
+if ($action === 'ajax_suspend') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $result = $radiusBilling->suspendSubscription($id);
+        echo json_encode($result);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription ID']);
+    }
+    exit;
+}
+
+if ($action === 'ajax_renew') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $result = $radiusBilling->renewSubscription($id);
+        echo json_encode($result);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription ID']);
+    }
+    exit;
+}
+
+if ($action === 'ajax_speed_update') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $result = $radiusBilling->sendSpeedUpdateCoA($id);
+        echo json_encode($result);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription ID']);
+    }
+    exit;
+}
+
 $view = $_GET['view'] ?? 'dashboard';
 $message = '';
 $messageType = 'info';
@@ -1477,6 +1538,7 @@ try {
             $totalSubs = $totalCount;
             $onlineCount = count(array_filter($subscriptions, fn($s) => isset($onlineSubscribers[$s['id']])));
             $activeCount = count(array_filter($subscriptions, fn($s) => $s['status'] === 'active'));
+            $inactiveCount = count(array_filter($subscriptions, fn($s) => $s['status'] === 'inactive'));
             $expiringSoonCount = count(array_filter($subscriptions, fn($s) => $s['expiry_date'] && strtotime($s['expiry_date']) < strtotime('+7 days') && strtotime($s['expiry_date']) > time()));
             ?>
             
@@ -1488,6 +1550,9 @@ try {
                         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2" id="onlineCountBadge"><i class="bi bi-wifi me-1"></i><span id="onlineCountNum"><?= count($onlineSubscribers) ?></span> online</span>
                         <span class="badge bg-secondary-subtle text-secondary border px-2 py-2 ms-2" id="realTimeIndicator" title="Connecting to real-time updates..."><i class="bi bi-broadcast me-1"></i>Live</span>
                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2"><i class="bi bi-check-circle me-1"></i><?= $activeCount ?> active</span>
+                        <?php if ($inactiveCount > 0): ?>
+                        <a href="?page=isp&view=subscriptions&status=inactive" class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-2 text-decoration-none"><i class="bi bi-hourglass me-1"></i><?= $inactiveCount ?> inactive</a>
+                        <?php endif; ?>
                         <?php if ($expiringSoonCount > 0): ?>
                         <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2"><i class="bi bi-exclamation-triangle me-1"></i><?= $expiringSoonCount ?> expiring soon</span>
                         <?php endif; ?>
@@ -1615,11 +1680,20 @@ try {
                                     'active' => 'success',
                                     'suspended' => 'warning',
                                     'expired' => 'danger',
+                                    'inactive' => 'secondary',
                                     default => 'secondary'
+                                };
+                                $statusLabel = match($sub['status']) {
+                                    'active' => 'Active',
+                                    'suspended' => 'Suspended',
+                                    'expired' => 'Expired',
+                                    'inactive' => 'Inactive',
+                                    default => ucfirst($sub['status'])
                                 };
                                 $isExpiringSoon = $sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days') && strtotime($sub['expiry_date']) > time();
                                 $isExpired = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
                                 $daysLeft = $sub['expiry_date'] ? ceil((strtotime($sub['expiry_date']) - time()) / 86400) : null;
+                                $needsActivation = ($sub['status'] === 'inactive');
                                 ?>
                                 <tr class="sub-row" data-sub-id="<?= $sub['id'] ?>">
                                     <td>
@@ -1666,7 +1740,12 @@ try {
                                         <div class="small text-muted">KES <?= number_format($sub['package_price'] ?? 0) ?></div>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-<?= $statusClass ?> px-3"><?= ucfirst($sub['status']) ?></span>
+                                        <span class="badge bg-<?= $statusClass ?> px-3 status-badge"><?= $statusLabel ?></span>
+                                        <?php if ($needsActivation): ?>
+                                        <div class="mt-1">
+                                            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Awaiting Payment</span>
+                                        </div>
+                                        <?php endif; ?>
                                         <div class="mt-1">
                                             <span class="badge bg-light text-dark border"><?= strtoupper($sub['access_type']) ?></span>
                                         </div>
@@ -1675,8 +1754,10 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <?php if ($sub['expiry_date']): ?>
-                                            <div class="<?= $isExpired ? 'text-danger' : ($isExpiringSoon ? 'text-warning' : '') ?>">
+                                        <?php if ($needsActivation): ?>
+                                            <span class="text-muted">Not activated</span>
+                                        <?php elseif ($sub['expiry_date']): ?>
+                                            <div class="<?= $isExpired ? 'text-danger' : ($isExpiringSoon ? 'text-warning' : '') ?> expiry-date">
                                                 <?= date('M j, Y', strtotime($sub['expiry_date'])) ?>
                                             </div>
                                             <?php if ($isExpired): ?>
@@ -1731,6 +1812,10 @@ try {
                                                     <li><hr class="dropdown-divider"></li>
                                                     <?php endif; ?>
                                                     <li><a class="dropdown-item" href="#" onclick="initiateMpesa(<?= $sub['id'] ?>, '<?= htmlspecialchars($sub['customer_phone'] ?? '') ?>', <?= (int)($sub['package_price'] ?? 0) ?>)"><i class="bi bi-phone me-2"></i>M-Pesa Payment</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li class="dropdown-header text-muted small">Real-time CoA</li>
+                                                    <li><a class="dropdown-item" href="#" onclick="quickAction('disconnect', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')"><i class="bi bi-x-circle me-2 text-warning"></i>Disconnect Sessions</a></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="quickAction('speed_update', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')"><i class="bi bi-speedometer2 me-2 text-info"></i>Push Speed Update</a></li>
                                                     <li><hr class="dropdown-divider"></li>
                                                     <li><a class="dropdown-item text-danger" href="#" onclick="quickAction('delete', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')"><i class="bi bi-trash me-2"></i>Delete</a></li>
                                                 </ul>
@@ -4732,15 +4817,21 @@ try {
             'suspend': `Suspend subscriber ${username}?`,
             'activate': `Activate subscriber ${username}?`,
             'renew': `Renew subscription for ${username}?`,
+            'disconnect': `Disconnect active sessions for ${username}?`,
+            'speed_update': `Push speed update (CoA) to ${username}?`,
             'delete': `DELETE subscriber ${username}? This cannot be undone!`
         };
         
         if (!confirm(messages[action] || `Perform ${action} on ${username}?`)) return;
         
+        // Use AJAX for real-time actions
+        const ajaxActions = ['activate', 'suspend', 'renew', 'disconnect', 'speed_update'];
+        if (ajaxActions.includes(action)) {
+            performCoAAction(action, subId, username);
+            return;
+        }
+        
         const actionMap = {
-            'suspend': 'suspend_subscription',
-            'activate': 'activate_subscription',
-            'renew': 'renew_subscription',
             'delete': 'delete_subscription'
         };
         
@@ -4749,6 +4840,69 @@ try {
         form.innerHTML = `<input type="hidden" name="action" value="${actionMap[action]}"><input type="hidden" name="id" value="${subId}">`;
         document.body.appendChild(form);
         form.submit();
+    }
+    
+    async function performCoAAction(action, subId, username) {
+        const btn = event?.target;
+        const originalHtml = btn?.innerHTML;
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
+        
+        try {
+            const actionMap = {
+                'activate': 'ajax_activate',
+                'suspend': 'ajax_suspend',
+                'renew': 'ajax_renew',
+                'disconnect': 'ajax_disconnect',
+                'speed_update': 'ajax_speed_update'
+            };
+            
+            const response = await fetch(`?page=isp&action=${actionMap[action]}&id=${subId}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(`${action.charAt(0).toUpperCase() + action.slice(1)} successful for ${username}`, 'success');
+                
+                // Update UI based on action
+                const row = document.querySelector(`tr[data-sub-id="${subId}"]`);
+                if (row) {
+                    const statusBadge = row.querySelector('.status-badge');
+                    if (statusBadge) {
+                        if (action === 'activate' || action === 'renew') {
+                            statusBadge.className = 'badge bg-success status-badge';
+                            statusBadge.textContent = 'Active';
+                        } else if (action === 'suspend') {
+                            statusBadge.className = 'badge bg-warning status-badge';
+                            statusBadge.textContent = 'Suspended';
+                        }
+                    }
+                    if (result.expiry_date) {
+                        const expiryCell = row.querySelector('.expiry-date');
+                        if (expiryCell) expiryCell.textContent = result.expiry_date;
+                    }
+                }
+                
+                // Show CoA result if available
+                if (result.coa_result) {
+                    const coaStatus = result.coa_result.success ? 'CoA sent' : 'CoA failed';
+                    showToast(`${coaStatus}: ${result.coa_result.output || result.coa_result.error || ''}`, result.coa_result.success ? 'info' : 'warning');
+                }
+                if (result.disconnected !== undefined) {
+                    showToast(`Disconnected ${result.disconnected} session(s)`, 'info');
+                }
+            } else {
+                showToast(`Error: ${result.error || 'Unknown error'}`, 'danger');
+            }
+        } catch (err) {
+            showToast(`Network error: ${err.message}`, 'danger');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
     }
     
     function initiateMpesa(subId, phone, amount) {
