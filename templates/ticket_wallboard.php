@@ -503,30 +503,109 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .alert-box {
-            margin-top: auto;
+            margin-top: 8px;
             background: rgba(231, 76, 60, 0.15);
-            border-left: 4px solid #e74c3c;
-            border-radius: 6px;
-            padding: 12px;
+            border-left: 3px solid #e74c3c;
+            border-radius: 4px;
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .alert-label {
-            font-size: 0.7rem;
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
             font-weight: 700;
             color: #e74c3c;
             text-transform: uppercase;
-            margin-bottom: 4px;
         }
         
         .alert-text {
-            font-size: 0.8rem;
-            line-height: 1.4;
+            font-size: clamp(0.55rem, 0.65vw, 0.7rem);
         }
         
-        .alert-meta {
-            font-size: 0.7rem;
+        .ticket-table-panel {
+            flex: 2;
+        }
+        
+        .ticket-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: clamp(0.55rem, 0.65vw, 0.7rem);
+        }
+        
+        .ticket-table th {
+            text-align: left;
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            color: #7f8c8d;
+            font-weight: 600;
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
+        }
+        
+        .ticket-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .ticket-table .ticket-rank {
+            font-weight: 700;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .ticket-subject-cell {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .cat-badge {
+            background: rgba(52,152,219,0.2);
+            color: #3498db;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
+        }
+        
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
+            font-weight: 500;
+        }
+        
+        .status-badge.status-open { background: rgba(52,152,219,0.2); color: #3498db; }
+        .status-badge.status-pending { background: rgba(241,196,15,0.2); color: #f1c40f; }
+        .status-badge.status-in-progress { background: rgba(155,89,182,0.2); color: #9b59b6; }
+        .status-badge.status-waiting { background: rgba(230,126,34,0.2); color: #e67e22; }
+        .status-badge.status-resolved { background: rgba(46,204,113,0.2); color: #2ecc71; }
+        
+        .ticket-age {
             color: #95a5a6;
-            margin-top: 4px;
+            white-space: nowrap;
+        }
+        
+        .los-section {
+            margin-top: 8px;
+        }
+        
+        .los-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .los-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
+        }
+        
+        .los-name {
+            color: #ecf0f1;
         }
         
         .technician-avatars {
@@ -1070,86 +1149,53 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         </div>
         
         <div class="bottom-section">
-            <div class="panel">
-                <div class="panel-title">Tickets by Category</div>
-                <div class="category-chart">
-                    <?php 
-                    $gradientParts = [];
-                    $currentDeg = 0;
-                    foreach ($categoryStats as $i => $cat) {
-                        $percent = ($totalCategoryTickets > 0) ? ($cat['count'] / $totalCategoryTickets) * 360 : 0;
-                        $color = $categoryColors[$i] ?? '#6c757d';
-                        $gradientParts[] = "$color {$currentDeg}deg " . ($currentDeg + $percent) . "deg";
-                        $currentDeg += $percent;
-                    }
-                    $gradient = implode(', ', $gradientParts);
-                    ?>
-                    <div class="donut-chart" style="background: conic-gradient(<?= $gradient ?: '#333 0deg 360deg' ?>);">
-                        <div class="donut-hole"></div>
-                    </div>
-                </div>
-                <div class="category-legend">
-                    <?php foreach ($categoryStats as $i => $cat): 
-                        $percent = ($totalCategoryTickets > 0) ? round(($cat['count'] / $totalCategoryTickets) * 100) : 0;
-                    ?>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: <?= $categoryColors[$i] ?? '#6c757d' ?>"></div>
-                        <div class="legend-text"><?= htmlspecialchars($cat['category']) ?></div>
-                        <div class="legend-percent"><?= $percent ?>%</div>
-                    </div>
-                    <?php endforeach; ?>
-                    <?php if (empty($categoryStats)): ?>
-                    <div class="empty-state">No categories</div>
-                    <?php endif; ?>
-                </div>
-                
-                <?php if (!empty($losOnus)): ?>
-                <div class="los-section">
-                    <div class="panel-title" style="margin-top:12px;"><i class="bi bi-wifi-off"></i> LOS Alerts <span style="color:#e74c3c;">(<?= count($losOnus) ?>)</span></div>
-                    <div class="los-list">
-                        <?php foreach ($losOnus as $onu): ?>
-                        <div class="los-item">
-                            <i class="bi bi-exclamation-triangle-fill" style="color:#e74c3c;"></i>
-                            <div class="los-info">
-                                <div class="los-name"><?= htmlspecialchars($onu['customer_name'] ?: $onu['name'] ?: 'Unknown') ?></div>
-                                <div class="los-meta"><?= htmlspecialchars($onu['sn']) ?> &bull; <?= htmlspecialchars($onu['olt_name'] ?? '') ?></div>
-                            </div>
-                        </div>
+            <div class="panel ticket-table-panel">
+                <div class="panel-title">Recent Tickets</div>
+                <table class="ticket-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Subject</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Team</th>
+                            <th>Age</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($topOpenTickets as $i => $ticket): ?>
+                        <tr>
+                            <td class="ticket-rank rank-<?= $i + 1 ?>"><?= $i + 1 ?></td>
+                            <td class="ticket-subject-cell"><?= htmlspecialchars($ticket['subject']) ?><?= $ticket['customer_name'] ? ' - ' . htmlspecialchars($ticket['customer_name']) : '' ?></td>
+                            <td><span class="cat-badge"><?= htmlspecialchars($ticket['category'] ?? 'N/A') ?></span></td>
+                            <td><span class="status-badge status-<?= strtolower(str_replace(' ', '-', $ticket['status'])) ?>"><?= htmlspecialchars($ticket['status']) ?></span></td>
+                            <td><?= $ticket['team_name'] ? htmlspecialchars($ticket['team_name']) : '-' ?></td>
+                            <td class="ticket-age"><?= timeOpen($ticket['created_at']) ?></td>
+                        </tr>
                         <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-            </div>
-            
-            <div class="panel">
-                <div class="panel-title">Top 5 Pending Tickets</div>
-                <div class="ticket-list">
-                    <?php foreach ($topOpenTickets as $i => $ticket): ?>
-                    <div class="ticket-item">
-                        <div class="ticket-rank rank-<?= $i + 1 ?>"><?= $i + 1 ?></div>
-                        <div class="ticket-info">
-                            <div class="ticket-subject"><?= htmlspecialchars($ticket['subject']) ?><?= $ticket['customer_name'] ? ' - ' . htmlspecialchars($ticket['customer_name']) : '' ?></div>
-                            <?php if ($ticket['team_name']): ?>
-                            <div class="ticket-team"><i class="bi bi-people-fill"></i> <?= htmlspecialchars($ticket['team_name']) ?></div>
-                            <?php endif; ?>
-                        </div>
-                        <div class="ticket-time"><?= timeOpen($ticket['created_at']) ?></div>
-                    </div>
-                    <?php endforeach; ?>
-                    <?php if (empty($topOpenTickets)): ?>
-                    <div class="empty-state">No open tickets</div>
-                    <?php endif; ?>
-                </div>
+                        <?php if (empty($topOpenTickets)): ?>
+                        <tr><td colspan="6" class="empty-state">No open tickets</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
                 
                 <?php if ($criticalAlert): ?>
                 <div class="alert-box">
                     <div class="alert-label">Alert</div>
-                    <div class="alert-text"><?= htmlspecialchars($criticalAlert['subject']) ?><?= $criticalAlert['customer_name'] ? ' - ' . htmlspecialchars($criticalAlert['customer_name']) : '' ?></div>
-                    <div class="alert-meta">
-                        <?php if ($criticalAlert['assigned_name']): ?>
-                        Assigned to <?= htmlspecialchars($criticalAlert['assigned_name']) ?>. 
-                        <?php endif; ?>
-                        Open for <?= timeOpen($criticalAlert['created_at']) ?>
+                    <div class="alert-text"><?= htmlspecialchars($criticalAlert['subject']) ?></div>
+                </div>
+                <?php endif; ?>
+                
+                <?php if (!empty($losOnus)): ?>
+                <div class="los-section">
+                    <div class="panel-title" style="margin-top:8px;"><i class="bi bi-wifi-off"></i> LOS Alerts <span style="color:#e74c3c;">(<?= count($losOnus) ?>)</span></div>
+                    <div class="los-list">
+                        <?php foreach ($losOnus as $onu): ?>
+                        <div class="los-item">
+                            <i class="bi bi-exclamation-triangle-fill" style="color:#e74c3c;"></i>
+                            <span class="los-name"><?= htmlspecialchars($onu['customer_name'] ?: $onu['name'] ?: 'Unknown') ?></span>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
                 <?php endif; ?>
