@@ -638,26 +638,6 @@ class RadiusBilling {
         }
     }
     
-    public function activateSubscription(int $id): array {
-        try {
-            $stmt = $this->db->prepare("
-                UPDATE radius_subscriptions SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-            ");
-            $stmt->execute([$id]);
-            
-            // Send CoA to update speed limit (in case user is still connected with expired/suspended limits)
-            $coaResult = $this->sendSpeedUpdateCoA($id);
-            
-            return [
-                'success' => true,
-                'coa_sent' => $coaResult['success'] ?? false,
-                'new_speed' => $coaResult['rate_limit'] ?? null
-            ];
-        } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-    
     // ==================== Session Management ====================
     
     public function getActiveSessions(): array {
