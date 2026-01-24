@@ -41,6 +41,20 @@ $individualAssignments = $db->query("
     LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
 
+// Branch ticket statistics
+$branchStats = $db->query("
+    SELECT 
+        b.name as branch_name,
+        COUNT(t.id) as total_tickets,
+        COUNT(*) FILTER (WHERE t.status = 'open') as open_count,
+        COUNT(*) FILTER (WHERE t.status = 'pending') as pending_count,
+        COUNT(*) FILTER (WHERE t.status = 'in_progress') as in_progress_count
+    FROM branches b
+    LEFT JOIN tickets t ON t.branch_id = b.id AND t.status NOT IN ('closed', 'resolved')
+    GROUP BY b.id, b.name
+    ORDER BY total_tickets DESC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 // Average Response Time (time from created to first response/update)
 $avgResponse = $db->query("
     SELECT AVG(EXTRACT(EPOCH FROM (first_response_at - created_at))/60) as avg_minutes
@@ -749,6 +763,81 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             color: #7f8c8d;
         }
         
+        .branch-stats-row {
+            margin-bottom: 12px;
+        }
+        
+        .branch-stats-row .panel {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px 16px;
+        }
+        
+        .branch-stats-row .panel-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .branch-stats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .branch-stat-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            padding: 10px 14px;
+            min-width: 160px;
+            flex: 1;
+        }
+        
+        .branch-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #ecf0f1;
+            margin-bottom: 4px;
+        }
+        
+        .branch-total {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #3498db;
+            margin-bottom: 6px;
+        }
+        
+        .branch-breakdown {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .branch-status {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+        
+        .branch-status.open {
+            background: rgba(231,76,60,0.2);
+            color: #e74c3c;
+        }
+        
+        .branch-status.pending {
+            background: rgba(241,196,15,0.2);
+            color: #f1c40f;
+        }
+        
+        .branch-status.progress {
+            background: rgba(52,152,219,0.2);
+            color: #3498db;
+        }
+        
         .data-table {
             width: 100%;
             font-size: 0.75rem;
@@ -940,6 +1029,28 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                     <span class="assignment-total"><?= $ticketStats['unassigned'] ?? 0 ?></span>
                 </div>
                 <div class="unassigned-note">Tickets not assigned to any person or team</div>
+            </div>
+        </div>
+        
+        <div class="branch-stats-row">
+            <div class="panel">
+                <div class="panel-title"><i class="bi bi-building"></i> Tickets by Branch</div>
+                <div class="branch-stats-grid">
+                    <?php foreach ($branchStats as $branch): ?>
+                    <div class="branch-stat-card">
+                        <div class="branch-name"><?= htmlspecialchars($branch['branch_name']) ?></div>
+                        <div class="branch-total"><?= $branch['total_tickets'] ?></div>
+                        <div class="branch-breakdown">
+                            <span class="branch-status open"><?= $branch['open_count'] ?> Open</span>
+                            <span class="branch-status pending"><?= $branch['pending_count'] ?> Pending</span>
+                            <span class="branch-status progress"><?= $branch['in_progress_count'] ?> In Progress</span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($branchStats)): ?>
+                    <div class="empty-state-sm">No branches configured</div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
         
