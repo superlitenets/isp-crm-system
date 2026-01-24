@@ -5538,8 +5538,7 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
     
     // Status detection priority: SNMP > Optical Power > TR-069
     // SNMP is most reliable for detecting ONU online status from OLT
-    $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'offline', 'power_fail'];
-    if (!in_array($currentOnu['status'], $snmpFaultStatuses) && $currentOnu['status'] !== 'online') {
+    if ($currentOnu['status'] !== 'online') {
         $isOnline = false;
         // 1. SNMP status is primary (from OLT polling)
         if (!empty($currentOnu['snmp_status']) && $currentOnu['snmp_status'] === 'online') {
@@ -8047,8 +8046,7 @@ try {
                                         ];
                                         $status = strtolower($onu['status'] ?? 'offline');
                                         // Apply same status override logic as config page
-                                        $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'offline', 'power_fail'];
-                                        if (!in_array($status, $snmpFaultStatuses) && $status !== 'online') {
+                                        if ($status !== 'online') {
                                             $isOnline = false;
                                             if (!empty($onu['snmp_status']) && $onu['snmp_status'] === 'online') $isOnline = true;
                                             elseif (!empty($onu['rx_power']) && $onu['rx_power'] > -40) $isOnline = true;
@@ -8850,7 +8848,7 @@ try {
             
             function toggleOnuModeEdit() {
                 const display = document.getElementById('onuModeDisplay');
-                const edit = document.getElementById('onuModeEditSection');
+                const edit = document.getElementById('onuModeEdit');
                 if (edit.style.display === 'none') {
                     display.style.display = 'none';
                     edit.style.display = 'block';
