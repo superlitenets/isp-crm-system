@@ -8850,7 +8850,7 @@ try {
             
             function toggleOnuModeEdit() {
                 const display = document.getElementById('onuModeDisplay');
-                const edit = document.getElementById('onuModeEdit');
+                const edit = document.getElementById('onuModeEditSection');
                 if (edit.style.display === 'none') {
                     display.style.display = 'none';
                     edit.style.display = 'block';
