@@ -41,6 +41,18 @@ $slaStats = $db->query("
 ")->fetch(PDO::FETCH_ASSOC);
 $slaCompliance = ($slaStats['total'] > 0) ? round(($slaStats['met'] / $slaStats['total']) * 100) : 100;
 
+// LOS ONUs from OMS
+$losOnus = $db->query("
+    SELECT o.name, o.sn, CONCAT(o.frame, '/', o.slot, '/', o.port) as fsp, 
+           olt.name as olt_name, c.name as customer_name, o.updated_at
+    FROM huawei_onus o
+    LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+    LEFT JOIN customers c ON o.customer_id = c.id
+    WHERE o.status = 'los'
+    ORDER BY o.updated_at DESC
+    LIMIT 8
+")->fetchAll(PDO::FETCH_ASSOC);
+
 // Tickets by Category
 $categoryStats = $db->query("
     SELECT 
@@ -579,6 +591,49 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             font-size: 0.75rem;
         }
         
+        .los-section {
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+        
+        .los-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .los-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: rgba(231,76,60,0.1);
+            border-left: 3px solid #e74c3c;
+            border-radius: 6px;
+        }
+        
+        .los-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .los-name {
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .los-meta {
+            font-size: 0.65rem;
+            color: #95a5a6;
+            font-family: monospace;
+        }
+        
         .data-table {
             width: 100%;
             font-size: 0.75rem;
@@ -759,6 +814,23 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                     <div class="empty-state">No categories</div>
                     <?php endif; ?>
                 </div>
+                
+                <?php if (!empty($losOnus)): ?>
+                <div class="los-section">
+                    <div class="panel-title" style="margin-top:12px;"><i class="bi bi-wifi-off"></i> LOS Alerts <span style="color:#e74c3c;">(<?= count($losOnus) ?>)</span></div>
+                    <div class="los-list">
+                        <?php foreach ($losOnus as $onu): ?>
+                        <div class="los-item">
+                            <i class="bi bi-exclamation-triangle-fill" style="color:#e74c3c;"></i>
+                            <div class="los-info">
+                                <div class="los-name"><?= htmlspecialchars($onu['customer_name'] ?: $onu['name'] ?: 'Unknown') ?></div>
+                                <div class="los-meta"><?= htmlspecialchars($onu['sn']) ?> &bull; <?= htmlspecialchars($onu['olt_name'] ?? '') ?></div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
             
             <div class="panel">
