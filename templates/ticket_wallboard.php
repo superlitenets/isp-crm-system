@@ -377,10 +377,20 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         
         .bottom-section {
             flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 1.5fr 1fr;
+            display: flex;
             gap: 1vw;
             min-height: 0;
+        }
+        
+        .ticket-table-panel {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+        
+        .tech-panel {
+            flex: 0 0 250px;
+            min-width: 200px;
         }
         
         .panel {
@@ -534,10 +544,6 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             font-size: clamp(0.55rem, 0.65vw, 0.7rem);
         }
         
-        .ticket-table-panel {
-            flex: 2;
-        }
-        
         .ticket-table {
             width: 100%;
             border-collapse: collapse;
@@ -643,11 +649,6 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .los-alert {
             background: rgba(231,76,60,0.1);
             border-left-color: #e74c3c;
-        }
-        
-        .tech-panel {
-            flex: 0 0 220px;
-            min-width: 180px;
         }
         
         .technician-avatars {
