@@ -4,13 +4,11 @@ require_once __DIR__ . '/../src/Branch.php';
 $huaweiOLT = new \App\HuaweiOLT($db);
 $branchService = new \App\Branch($db);
 $allBranches = $branchService->getAll();
-
 $view = $_GET['view'] ?? 'dashboard';
 $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
 $action = $_POST['action'] ?? null;
 $message = '';
 $messageType = '';
-
 // Handle AJAX GET requests for VPN configs
 if (isset($_GET['action']) && $view === 'vpn') {
     require_once __DIR__ . '/../src/WireGuardService.php';
@@ -71,7 +69,6 @@ if (isset($_GET['action']) && $view === 'vpn') {
             exit;
     }
 }
-
 // Handle AJAX requests for ONU discovery (async background discovery)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'discover_onus') {
     header('Content-Type: application/json');
@@ -131,7 +128,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'discover_onus') {
     }
     exit;
 }
-
 // AJAX endpoint to get current unconfigured ONU count (fast, no discovery)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_unconfigured_count') {
     header('Content-Type: application/json');
@@ -151,7 +147,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_unconfigured_count') {
     }
     exit;
 }
-
 // AJAX endpoint to get customers for authorization modal
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_customers_for_auth') {
     header('Content-Type: application/json');
@@ -164,7 +159,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_customers_for_auth') {
     }
     exit;
 }
-
 // AJAX endpoint to search billing customers
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
     header('Content-Type: application/json');
@@ -191,7 +185,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
     }
     exit;
 }
-
 // AJAX endpoint for staged authorization (with progress)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
     header('Content-Type: application/json');
@@ -403,7 +396,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
     echo json_encode($response);
     exit;
 }
-
 // AJAX endpoint for realtime OMS stats (dashboard refresh)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_stats') {
     header('Content-Type: application/json');
@@ -446,7 +438,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_stats') {
     }
     exit;
 }
-
 // AJAX endpoint for realtime ONU list (with pagination)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
     header('Content-Type: application/json');
@@ -540,7 +531,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
     }
     exit;
 }
-
 // AJAX endpoint for signal history
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'signal_history') {
     header('Content-Type: application/json');
@@ -561,7 +551,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'signal_history') {
     }
     exit;
 }
-
 // AJAX endpoint for WiFi status via TR-069
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
     header('Content-Type: application/json');
@@ -692,7 +681,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
     }
     exit;
 }
-
 // AJAX endpoint for ONU service VLANs
 if (isset($_GET['action']) && $_GET['action'] === 'get_onu_service_vlans') {
     header('Content-Type: application/json');
@@ -713,7 +701,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_onu_service_vlans') {
     }
     exit;
 }
-
 // AJAX endpoint for getting OLT VLANs (for dropdown)
 if (isset($_GET['action']) && $_GET['action'] === 'get_olt_vlans') {
     header('Content-Type: application/json');
@@ -734,7 +721,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_olt_vlans') {
     }
     exit;
 }
-
 // AJAX endpoint for getting VLANs by OLT with PON default
 if (isset($_GET['action']) && $_GET['action'] === 'get_auth_vlans') {
     header('Content-Type: application/json');
@@ -770,7 +756,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_auth_vlans') {
     }
     exit;
 }
-
 // AJAX endpoint for setting PON port default VLAN
 if (isset($_GET['action']) && $_GET['action'] === 'set_pon_default_vlan') {
     header('Content-Type: application/json');
@@ -793,7 +778,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'set_pon_default_vlan') {
     }
     exit;
 }
-
 // AJAX endpoint for updating PON port description
 if (isset($_GET['action']) && $_GET['action'] === 'update_port_description') {
     header('Content-Type: application/json');
@@ -816,7 +800,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_port_description') {
     }
     exit;
 }
-
 // AJAX endpoint to add service VLAN to ONU
 if (isset($_GET['action']) && $_GET['action'] === 'add_onu_service_vlan') {
     header('Content-Type: application/json');
@@ -850,7 +833,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'add_onu_service_vlan') {
     }
     exit;
 }
-
 // AJAX endpoint to remove service VLAN from ONU
 if (isset($_GET['action']) && $_GET['action'] === 'remove_onu_service_vlan') {
     header('Content-Type: application/json');
@@ -871,7 +853,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'remove_onu_service_vlan') {
     }
     exit;
 }
-
 // Verify WAN provisioning status
 if (isset($_GET['action']) && $_GET['action'] === 'verify_wan_provisioning') {
     header('Content-Type: application/json');
@@ -891,7 +872,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'verify_wan_provisioning') {
     }
     exit;
 }
-
 // AJAX endpoint for port capacity
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'port_capacity') {
     header('Content-Type: application/json');
@@ -906,7 +886,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'port_capacity') {
     echo json_encode(['success' => true, 'capacity' => $capacity]);
     exit;
 }
-
 // AJAX endpoint for uptime stats
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'uptime_stats') {
     header('Content-Type: application/json');
@@ -922,7 +901,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'uptime_stats') {
     echo json_encode(['success' => true, 'stats' => $stats]);
     exit;
 }
-
 // AJAX endpoint for CSV export
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'export_csv') {
     $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
@@ -941,7 +919,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'export_csv') {
     fclose($output);
     exit;
 }
-
 // AJAX endpoint for bulk reboot
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'bulk_reboot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -957,7 +934,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'bulk_reboot' && $_SERVER['REQUEST
     echo json_encode(['success' => true, 'result' => $result]);
     exit;
 }
-
 // AJAX endpoint for bulk delete
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'bulk_delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -973,7 +949,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'bulk_delete' && $_SERVER['REQUEST
     echo json_encode(['success' => true, 'result' => $result]);
     exit;
 }
-
 // AJAX endpoint for customer search (for ONU linking)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_customers') {
     header('Content-Type: application/json');
@@ -988,7 +963,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_customers') {
     echo json_encode(['success' => true, 'customers' => $customers]);
     exit;
 }
-
 // AJAX endpoint for linking ONU to customer
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'link_customer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -1005,7 +979,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'link_customer' && $_SERVER['REQUE
     echo json_encode(['success' => $result]);
     exit;
 }
-
 // AJAX endpoint for creating LOS ticket
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'create_los_ticket' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -1021,7 +994,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'create_los_ticket' && $_SERVER['R
     echo json_encode(['success' => $ticketId !== null, 'ticket_id' => $ticketId]);
     exit;
 }
-
 // TR-069 Device Info (GET)
 if (isset($_GET['action']) && $_GET['action'] === 'get_tr069_device_info') {
     header('Content-Type: application/json');
@@ -1062,7 +1034,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_tr069_device_info') {
     }
     exit;
 }
-
 // TR-069 Connection Request (POST)
 if (isset($_GET['action']) && $_GET['action'] === 'tr069_connection_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -1090,7 +1061,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'tr069_connection_request' && 
     }
     exit;
 }
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     try {
         switch ($action) {
@@ -1997,7 +1967,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     // Default router mode
                     $db->prepare("UPDATE huawei_onus SET onu_mode = ? WHERE id = ?")->execute(['router', $onuId]);
                 }
-
                 // Queue TR-069 configuration if PPPoE settings provided and auth succeeded
                 $tr069Queued = false;
                 if ($messageType === 'success' && !empty($_POST['pppoe_username'])) {
@@ -4194,7 +4163,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
-
             
             case 'get_tr069_device_by_serial':
                 header('Content-Type: application/json');
@@ -4244,7 +4212,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
-
             
             case 'tr069_connection_request_by_serial':
                 header('Content-Type: application/json');
@@ -4312,7 +4279,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 exit;
             
-
             case 'queue_clear_auth':
                 header('Content-Type: application/json');
                 try {
@@ -4330,7 +4296,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
-
             case 'save_tr069_wifi':
                 header('Content-Type: application/json');
                 try {
@@ -5469,7 +5434,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
         $messageType = 'danger';
     }
 }
-
 $stats = $huaweiOLT->getDashboardStats();
 $totalOnus = $stats['total_authorized_onus'] ?? $stats['total_onus'] ?? 0;
 $uptimePercent = $totalOnus > 0 ? round(($stats['online_onus'] / $totalOnus) * 100, 1) : 0;
@@ -5479,7 +5443,6 @@ $onus = [];
 $profiles = $huaweiOLT->getServiceProfiles(false);
 $logs = [];
 $alerts = [];
-
 $discoveredOnus = [];
 if ($view === 'onus' || $view === 'dashboard') {
     $onuFilters = [];
@@ -5498,18 +5461,15 @@ if ($view === 'onus' || $view === 'dashboard') {
     // These are pending ONUs waiting to be authorized
     $discoveredOnus = $huaweiOLT->getDiscoveredONUs($oltId, true);
 }
-
 if ($view === 'logs') {
     $logFilters = [];
     if ($oltId) $logFilters['olt_id'] = $oltId;
     if (!empty($_GET['log_action'])) $logFilters['action'] = $_GET['log_action'];
     $logs = $huaweiOLT->getLogs($logFilters, 200);
 }
-
 if ($view === 'alerts' || $view === 'dashboard') {
     $alerts = $huaweiOLT->getAlerts(false, 100);
 }
-
 // Load location data only when needed (lazy load for performance)
 $zones = [];
 $subzones = [];
@@ -5521,14 +5481,12 @@ $subzones = $huaweiOLT->getSubzones();
 $apartments = $huaweiOLT->getApartments();
 $odbs = $huaweiOLT->getODBs();
 }
-
 // Load ONU types for authorization modal
 $onuTypes = [];
 try {
     $stmt = $db->query("SELECT * FROM huawei_onu_types WHERE is_active = true ORDER BY model");
     $onuTypes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 } catch (Exception $e) {}
-
 $currentOnu = null;
 $onuRefreshResult = null;
 if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
@@ -5539,30 +5497,20 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         exit;
     }
     
-    // Status detection: Prefer snmp_status for fault statuses (LOS, dying-gasp)
+    
+    // Status detection: SNMP status is authoritative
     $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'power_fail'];
     $snmpStatus = strtolower($currentOnu['snmp_status'] ?? '');
     
-    // If snmp_status indicates a fault, use that as authoritative
+    // SNMP status is authoritative when available
     if (in_array($snmpStatus, $snmpFaultStatuses)) {
         $currentOnu['status'] = $snmpStatus;
-    } elseif (!in_array($currentOnu['status'], $snmpFaultStatuses) && $currentOnu['status'] !== 'online') {
-        $isOnline = false;
-        // 1. SNMP status is primary (from OLT polling)
-        if (!empty($currentOnu['snmp_status']) && $currentOnu['snmp_status'] === 'online') {
-            $isOnline = true;
-        }
-        // 2. Valid optical power means ONU is definitely online
-        elseif (!empty($currentOnu['rx_power']) && $currentOnu['rx_power'] > -40) {
-            $isOnline = true;
-        }
-        // 3. TR-069 last inform as fallback (device talking to ACS)
-        elseif (!empty($currentOnu['tr069_last_inform'])) {
-            $lastInformTime = strtotime($currentOnu['tr069_last_inform']);
-            if ($lastInformTime >= time() - 300) $isOnline = true;
-        }
-        if ($isOnline) $currentOnu['status'] = 'online';
+    } elseif ($snmpStatus === 'offline') {
+        $currentOnu['status'] = 'offline';
+    } elseif ($snmpStatus === 'online') {
+        $currentOnu['status'] = 'online';
     }
+    // If no SNMP status, keep the DB status as-is
     
     // Show cached optical data - refresh is now manual via AJAX button
     // This makes the config page load instantly instead of waiting for OLT query
@@ -5605,7 +5553,6 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         // TR-069 tables may not exist yet
     }
 }
-
 $customers = [];
 try {
     $stmt = $db->query("SELECT id, name, phone FROM customers ORDER BY name LIMIT 1000");
@@ -7458,7 +7405,6 @@ try {
                     </div>
                 </div>
             </div>
-
             <!-- Auto-refresh script -->
             <script>
             (function() {
@@ -7477,8 +7423,6 @@ try {
                 setInterval(updateTimer, 1000);
             })();
             </script>
-
-
             <?php elseif ($view === 'live_monitor'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-activity me-2"></i>Live ONU Monitor</h4>
@@ -8052,21 +7996,20 @@ try {
                                             'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Power Fail'],
                                             'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Dying Gasp'],
                                         ];
-                                        // Prefer snmp_status for fault detection (LOS, dying-gasp)
+                                        // Prefer snmp_status as authoritative source for ONU status
                                         $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'power_fail'];
                                         $snmpStatus = strtolower($onu['snmp_status'] ?? '');
                                         $dbStatus = strtolower($onu['status'] ?? 'offline');
                                         
-                                        // Use snmp_status if it's a fault status, otherwise use db status
-                                        $status = in_array($snmpStatus, $snmpFaultStatuses) ? $snmpStatus : $dbStatus;
-                                        
-                                        // Only apply online override if status is not a known fault
-                                        if (!in_array($status, $snmpFaultStatuses) && $status !== 'online' && $status !== 'offline') {
-                                            $isOnline = false;
-                                            if ($snmpStatus === 'online') $isOnline = true;
-                                            elseif (!empty($onu['rx_power']) && $onu['rx_power'] > -40) $isOnline = true;
-                                            elseif (!empty($onu['tr069_last_inform']) && strtotime($onu['tr069_last_inform']) >= time() - 300) $isOnline = true;
-                                            if ($isOnline) $status = 'online';
+                                        // SNMP status is authoritative when available
+                                        if (in_array($snmpStatus, $snmpFaultStatuses)) {
+                                            $status = $snmpStatus;
+                                        } elseif ($snmpStatus === 'offline') {
+                                            $status = 'offline';
+                                        } elseif ($snmpStatus === 'online') {
+                                            $status = 'online';
+                                        } else {
+                                            $status = $dbStatus;
                                         }
                                         $cfg = $statusConfig[$status] ?? ['class' => 'secondary', 'icon' => 'question-circle', 'label' => ucfirst($status)];
                                         ?>
@@ -9318,7 +9261,6 @@ try {
                 }
                 return data;
             }
-
             // Save individual WiFi setting via TR-069
             function saveWiFiSetting(wlanIndex, param, value) {
                 const path = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + wlanIndex + '.' + param;
@@ -11642,7 +11584,6 @@ try {
                     </div>
                 </div>
             </div>
-
             <div class="modal fade" id="addServerModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -11693,7 +11634,6 @@ try {
                     </div>
                 </div>
             </div>
-
             <div class="modal fade" id="addPeerModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -11774,7 +11714,6 @@ try {
                     </div>
                 </div>
             </div>
-
             <!-- Edit Peer Modal -->
             <div class="modal fade" id="editPeerModal" tabindex="-1">
                 <div class="modal-dialog">
@@ -11839,7 +11778,6 @@ try {
                     </div>
                 </div>
             </div>
-
             <div class="modal fade" id="configModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -11897,7 +11835,6 @@ try {
                     });
                 }
             })();
-
             function viewServerConfig(serverId) {
                 fetch(`?page=huawei-olt&view=vpn&action=get_server_config&server_id=${serverId}`)
                     .then(r => r.json())
@@ -11912,7 +11849,6 @@ try {
                         }
                     });
             }
-
             function viewPeerConfig(peerId) {
                 fetch(`?page=huawei-olt&view=vpn&action=get_peer_config&peer_id=${peerId}`)
                     .then(r => r.json())
@@ -11927,7 +11863,6 @@ try {
                         }
                     });
             }
-
             function viewMikroTikScript(peerId) {
                 fetch(`?page=huawei-olt&view=vpn&action=get_mikrotik_script&peer_id=${peerId}`)
                     .then(r => r.json())
@@ -11942,7 +11877,6 @@ try {
                         }
                     });
             }
-
             function testPeerConnectivity(peerId, peerName) {
                 document.getElementById('connectivityModalTitle').textContent = `Testing Connectivity: ${peerName}`;
                 document.getElementById('connectivityResults').innerHTML = `
@@ -12058,7 +11992,6 @@ try {
                         `;
                     });
             }
-
             function editPeer(peerId) {
                 fetch(`?page=huawei-olt&view=vpn&action=get_peer_data&peer_id=${peerId}`)
                     .then(r => r.json())
@@ -12085,7 +12018,6 @@ try {
             document.getElementById('editIsOltSite').addEventListener('change', function() {
                 document.getElementById('editOltSelectDiv').style.display = this.checked ? 'block' : 'none';
             });
-
             function deletePeer(peerId) {
                 if (confirm('Delete this VPN peer?')) {
                     const form = document.createElement('form');
@@ -12100,7 +12032,6 @@ try {
                     form.submit();
                 }
             }
-
             function deleteServer(serverId) {
                 if (confirm('Delete this VPN server? All peers will be removed.')) {
                     const form = document.createElement('form');
@@ -12115,14 +12046,12 @@ try {
                     form.submit();
                 }
             }
-
             function copyConfig() {
                 const config = document.getElementById('configContent').textContent;
                 navigator.clipboard.writeText(config).then(() => {
                     alert('Configuration copied to clipboard');
                 });
             }
-
             function downloadConfig() {
                 const config = document.getElementById('configContent').textContent;
                 const blob = new Blob([config], { type: 'text/plain' });
@@ -13313,7 +13242,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 
                 document.getElementById('oltSetupScript').textContent = script;
             }
-
             function copyOLTSetupScript() {
                 const script = document.getElementById('oltSetupScript').textContent;
                 navigator.clipboard.writeText(script).then(() => {
@@ -13329,7 +13257,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 });
             }
             </script>
-
             <div class="row">
                 <div class="col-lg-5">
                     <div class="card shadow-sm mb-4">
@@ -15371,7 +15298,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <small class="text-muted">Bridge mode configures all LAN ports as bridged. Can be changed later under Ethernet Ports.</small>
                         </div>
                         
-
                         <div class="alert alert-secondary small mb-0">
                             <i class="bi bi-gear me-2"></i>
                             <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured. Installation date will be set to today.
@@ -16197,7 +16123,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         }
     });
     </script>
-
     <!-- Admin Password Change Modal -->
     <div class="modal fade" id="adminPasswordModal" tabindex="-1">
         <div class="modal-dialog">
@@ -16838,7 +16763,6 @@ echo "# Huawei OLT Configuration Script\n";
 echo "# Generated: " . date('Y-m-d H:i:s') . "\n";
 echo "# ================================================\n\n";
 echo "enable\nconfig\n\n";
-
 echo "# ========== DBA Profiles ==========\n";
 $speeds = [];
 $dbaId = 1;
@@ -16851,7 +16775,6 @@ foreach ($profiles as $p) {
     }
 }
 echo "\n";
-
 echo "# ========== Line Profiles ==========\n";
 foreach ($profiles as $p) {
     if (empty($p['line_profile'])) continue;
@@ -16866,7 +16789,6 @@ foreach ($profiles as $p) {
     echo "  commit\n";
     echo "  quit\n\n";
 }
-
 echo "# ========== Service Profiles ==========\n";
 foreach ($profiles as $p) {
     if (empty($p['srv_profile'])) continue;
@@ -16879,7 +16801,6 @@ foreach ($profiles as $p) {
     echo "  commit\n";
     echo "  quit\n\n";
 }
-
 echo "# ========== Traffic Tables ==========\n";
 foreach ($profiles as $p) {
     if (empty($p['speed_profile_down']) || empty($p['line_profile'])) continue;
@@ -16887,7 +16808,6 @@ foreach ($profiles as $p) {
     echo "traffic table ip index {$p['line_profile']} cir {$downKbps} priority 0 priority-policy local-setting\n";
 }
 echo "\n";
-
 echo "# ========== Service Ports (per VLAN) ==========\n";
 $vlans = array_unique(array_filter(array_column($profiles, 'vlan_id')));
 foreach ($vlans as $vlan) {
@@ -16895,7 +16815,6 @@ foreach ($vlans as $vlan) {
     echo "vlan {$vlan} smart\n";
     echo "port vlan {$vlan} 0/0 0\n\n";
 }
-
 echo "quit\nquit\n";
 echo "\n# ================================================\n";
 echo "# Script Complete\n";
@@ -17111,7 +17030,6 @@ echo "# ================================================\n";
             </div>
         </div>
     </div>
-
 <?php endif; ?>
 <style>
 .device-status-modal .modal-content {
@@ -17284,8 +17202,6 @@ echo "# ================================================\n";
     background: #f8fafc;
     color: #64748b;
 }
-
-
 .param-item .form-check-input {
     width: 2.25rem;
     height: 1.125rem;
@@ -17399,7 +17315,6 @@ echo "# ================================================\n";
     background: #ef4444;
 }
 </style>
-
 <div class="modal fade device-status-modal" id="deviceStatusModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
@@ -17450,7 +17365,6 @@ let currentDeviceStatusSerial = '';
 let originalDeviceParams = {};
 let inlineStatusSerial = null;
 let inlineOriginalParams = {};
-
 // Inline Status Section Functions
 async function toggleInlineStatus(serial = null) {
     const section = document.getElementById('inlineStatusSection');
@@ -17472,13 +17386,11 @@ async function toggleInlineStatus(serial = null) {
         btn.classList.add('btn-outline-info');
     }
 }
-
 async function refreshInlineStatus() {
     if (inlineStatusSerial) {
         await loadInlineStatus(inlineStatusSerial, true);
     }
 }
-
 async function loadInlineStatus(serial, forceRefresh = false) {
     const container = document.getElementById('inlineStatusContent');
     container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-info" role="status"></div><div class="mt-2 text-muted">Loading device parameters...</div></div>';
@@ -17506,7 +17418,6 @@ async function loadInlineStatus(serial, forceRefresh = false) {
         container.innerHTML = '<div class="alert alert-danger mb-0"><i class="bi bi-x-circle me-2"></i>Error loading status: ' + error.message + '</div>';
     }
 }
-
 function renderInlineStatus(categories) {
     const container = document.getElementById('inlineStatusContent');
     
@@ -17864,7 +17775,6 @@ function renderInlineStatus(categories) {
         });
     });
 }
-
 async function saveInlineStatus() {
     const container = document.getElementById('inlineStatusContent');
     const saveBtn = document.getElementById('inlineStatusSaveBtn');
@@ -17943,8 +17853,6 @@ async function saveInlineStatus() {
         showToast('Error saving: ' + error.message, 'danger');
     }
 }
-
-
 // Toggle LAN port parameter (Enable/L3Enable)
 async function toggleLanPortParam(btn, path, newValue) {
     btn.disabled = true;
@@ -17979,7 +17887,6 @@ async function toggleLanPortParam(btn, path, newValue) {
     }
     btn.disabled = false;
 }
-
 // Tab definitions - Only show these specific sections
 const tabConfig = {
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1, editable: true },
@@ -17997,8 +17904,6 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 13, editable: false },
     'file_firmware': { label: 'File & Firmware', icon: 'bi-hdd', order: 14, editable: true }
 };
-
-
 // Dynamic tab label resolver for backend keys like ppp_interface_1_1
 function getTabConfig(key) {
     // Check for PPP interface patterns like ppp_interface_1_1
@@ -18063,7 +17968,6 @@ function getTabConfig(key) {
     // Fallback - but hide unknown tabs
     return tabConfig[key] || null;
 }
-
 // Enable instant provisioning (clear connection request auth)
 async function enableInstantProvisioning(serial) {
     if (!confirm('Enable instant provisioning for ' + serial + '?\n\nThis will clear Connection Request authentication, allowing GenieACS to push commands instantly without 401 errors.')) {
@@ -18089,8 +17993,6 @@ async function enableInstantProvisioning(serial) {
         showToast('Error: ' + err.message, 'danger');
     }
 }
-
-
 function openDeviceStatus(serial, doRefresh = false) {
     currentDeviceStatusSerial = serial;
     document.getElementById('deviceStatusSerial').textContent = serial;
@@ -18144,7 +18046,6 @@ function openDeviceStatus(serial, doRefresh = false) {
         document.getElementById('deviceStatusError').style.display = 'block';
     });
 }
-
 function renderDeviceStatusTabs(categories) {
     const tabList = document.getElementById('deviceStatusTabs');
     const tabContent = document.getElementById('deviceStatusTabContent');
@@ -18286,7 +18187,6 @@ function renderDeviceStatusTabs(categories) {
         });
     });
 }
-
 function renderTabContent(key, category) {
     let html = '';
     
@@ -18453,7 +18353,6 @@ function renderTabContent(key, category) {
     
     return html;
 }
-
 function renderParamInput(param, editable) {
     const isReadonly = param.type === 'readonly' || !editable;
     
@@ -18561,7 +18460,6 @@ function saveDeviceStatus() {
     });
 }
 </script>
-
 <script>
     // Loading overlay for OLT sync operations
     const loadingMessages = {
@@ -21309,7 +21207,6 @@ function saveDeviceStatus() {
             vlanInput.required = false;
         }
     }
-
     // Save WiFi port configuration via TR-069
     async function saveWifiPortConfig() {
         const serial = document.getElementById('wifiPortSerial').value;
@@ -21666,7 +21563,6 @@ function saveDeviceStatus() {
             </div>
         </div>
     </div>
-
     <script>
     // Global showToast function
     if (typeof window.showToast !== 'function') {
