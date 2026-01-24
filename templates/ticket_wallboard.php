@@ -1157,20 +1157,6 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             
             <div class="panel">
                 <div class="panel-title">Technicians in the Field <span style="color:#27ae60;">(<?= $presentCount ?> present)</span></div>
-                <div class="technician-avatars">
-                    <?php foreach ($technicians as $tech): ?>
-                    <div class="tech-avatar">
-                        <div class="avatar-circle">
-                            <?= getInitials($tech['name']) ?>
-                        </div>
-                        <div class="tech-name"><?= htmlspecialchars(explode(' ', $tech['name'])[0]) ?></div>
-                    </div>
-                    <?php endforeach; ?>
-                    <?php if (empty($technicians)): ?>
-                    <div class="empty-state">No one checked in</div>
-                    <?php endif; ?>
-                </div>
-                
                 <div class="att-list">
                     <?php foreach ($todayAttendance as $att): ?>
                     <div class="att-row <?= $att['attendance_status'] ?>">
