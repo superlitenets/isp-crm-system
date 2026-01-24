@@ -474,19 +474,26 @@ class Mpesa {
             $stmt->execute([$accountRef, $phoneSearch]);
             $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
             
-            if ($subscription) {
+            $packagePrice = $subscription['price'] ?? 0;
+            if ($subscription && $amount >= $packagePrice && $packagePrice > 0) {
                 require_once __DIR__ . '/RadiusBilling.php';
                 $radiusBilling = new RadiusBilling($this->db);
+                
+                // Check if subscription was expired/inactive before renewal
+                $wasExpired = $subscription['status'] === 'expired' || $subscription['status'] === 'inactive' ||
+                              ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
                 
                 $renewResult = $radiusBilling->renewSubscription($subscription['id']);
                 
                 if ($renewResult['success']) {
                     error_log("RADIUS subscription renewed for {$subscription['username']} via M-Pesa {$receiptNumber}");
                     
-                    // Disconnect active sessions so subscriber can redial with new speed/session
-                    $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
-                    if ($disconnectResult['success']) {
-                        error_log("Disconnected {$subscription['username']} after STK payment for session refresh");
+                    // Only disconnect if subscription was expired - allows subscriber to redial with new session
+                    if ($wasExpired) {
+                        $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
+                        if ($disconnectResult['success']) {
+                            error_log("Disconnected expired {$subscription['username']} after STK payment for session refresh");
+                        }
                     }
                     
                     if (!empty($subscription['phone'])) {
@@ -620,19 +627,26 @@ class Mpesa {
             $stmt->execute([$accountRef, $accountRefSearch, $phoneSearch]);
             $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
             
-            if ($subscription && $amount >= ($subscription['price'] ?? 0)) {
+            $packagePrice = $subscription['price'] ?? 0;
+            if ($subscription && $amount >= $packagePrice && $packagePrice > 0) {
                 require_once __DIR__ . '/RadiusBilling.php';
                 $radiusBilling = new RadiusBilling($this->db);
+                
+                // Check if subscription was expired/inactive before renewal
+                $wasExpired = $subscription['status'] === 'expired' || $subscription['status'] === 'inactive' ||
+                              ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
                 
                 $renewResult = $radiusBilling->renewSubscription($subscription['id']);
                 
                 if ($renewResult['success']) {
                     error_log("RADIUS subscription renewed for {$subscription['username']} via C2B {$transId}");
                     
-                    // Disconnect active sessions so subscriber can redial with new speed/session
-                    $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
-                    if ($disconnectResult['success']) {
-                        error_log("Disconnected {$subscription['username']} after C2B payment for session refresh");
+                    // Only disconnect if subscription was expired - allows subscriber to redial with new session
+                    if ($wasExpired) {
+                        $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
+                        if ($disconnectResult['success']) {
+                            error_log("Disconnected expired {$subscription['username']} after C2B payment for session refresh");
+                        }
                     }
                     
                     if (!empty($subscription['phone'])) {
