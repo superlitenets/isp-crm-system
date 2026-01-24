@@ -483,6 +483,12 @@ class Mpesa {
                 if ($renewResult['success']) {
                     error_log("RADIUS subscription renewed for {$subscription['username']} via M-Pesa {$receiptNumber}");
                     
+                    // Disconnect active sessions so subscriber can redial with new speed/session
+                    $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
+                    if ($disconnectResult['success']) {
+                        error_log("Disconnected {$subscription['username']} after STK payment for session refresh");
+                    }
+                    
                     if (!empty($subscription['phone'])) {
                         try {
                             require_once __DIR__ . '/SMSGateway.php';
@@ -622,6 +628,12 @@ class Mpesa {
                 
                 if ($renewResult['success']) {
                     error_log("RADIUS subscription renewed for {$subscription['username']} via C2B {$transId}");
+                    
+                    // Disconnect active sessions so subscriber can redial with new speed/session
+                    $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
+                    if ($disconnectResult['success']) {
+                        error_log("Disconnected {$subscription['username']} after C2B payment for session refresh");
+                    }
                     
                     if (!empty($subscription['phone'])) {
                         try {

@@ -216,7 +216,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
         case 'update_package':
             $result = $radiusBilling->updatePackage((int)$_POST['id'], $_POST);
-            $message = $result['success'] ? 'Package updated' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            if ($result['success']) {
+                $coaMsg = ($result['coa_updated'] ?? 0) > 0 ? " Speed updated for {$result['coa_updated']} active subscriber(s)." : '';
+                $message = 'Package updated.' . $coaMsg;
+            } else {
+                $message = 'Error: ' . ($result['error'] ?? 'Unknown error');
+            }
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
@@ -295,6 +300,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'update_subscription':
             $id = (int)$_POST['id'];
             try {
+                // Get current package to detect changes
+                $currentSub = $radiusBilling->getSubscription($id);
+                $oldPackageId = $currentSub['package_id'] ?? null;
+                $newPackageId = (int)$_POST['package_id'];
+                
                 $stmt = $db->prepare("
                     UPDATE radius_subscriptions SET 
                         package_id = ?,
@@ -308,7 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     WHERE id = ?
                 ");
                 $stmt->execute([
-                    (int)$_POST['package_id'],
+                    $newPackageId,
                     $_POST['password'],
                     $radiusBilling->encryptPassword($_POST['password']),
                     $_POST['expiry_date'] ?: null,
@@ -317,7 +327,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     isset($_POST['auto_renew']) ? 'true' : 'false',
                     $id
                 ]);
-                $message = 'Subscription updated successfully';
+                
+                // Auto-send CoA if package changed (speed update)
+                $coaMessage = '';
+                if ($oldPackageId != $newPackageId) {
+                    $coaResult = $radiusBilling->sendSpeedUpdateCoA($id);
+                    if ($coaResult['success']) {
+                        $coaMessage = ' Speed updated via CoA.';
+                    }
+                }
+                
+                $message = 'Subscription updated successfully.' . $coaMessage;
                 $messageType = 'success';
             } catch (Exception $e) {
                 $message = 'Error updating subscription: ' . $e->getMessage();

@@ -284,6 +284,11 @@ class RadiusBilling {
     
     public function updatePackage(int $id, array $data): array {
         try {
+            // Get old package speeds to detect changes
+            $oldPackage = $this->getPackage($id);
+            $oldDownload = $oldPackage['download_speed'] ?? '';
+            $oldUpload = $oldPackage['upload_speed'] ?? '';
+            
             $stmt = $this->db->prepare("
                 UPDATE radius_packages SET
                     name = ?, description = ?, package_type = ?, billing_type = ?, price = ?,
@@ -319,7 +324,28 @@ class RadiusBilling {
                 $this->castBoolean($data['is_active'] ?? true, true),
                 $id
             ]);
-            return ['success' => true];
+            
+            // If speeds changed, send CoA to all active subscribers using this package
+            $coaCount = 0;
+            $newDownload = $data['download_speed'] ?? '';
+            $newUpload = $data['upload_speed'] ?? '';
+            
+            if ($oldDownload !== $newDownload || $oldUpload !== $newUpload) {
+                $affectedSubs = $this->db->prepare("
+                    SELECT id FROM radius_subscriptions 
+                    WHERE package_id = ? AND status = 'active'
+                ");
+                $affectedSubs->execute([$id]);
+                
+                while ($sub = $affectedSubs->fetch(\PDO::FETCH_ASSOC)) {
+                    $coaResult = $this->sendSpeedUpdateCoA($sub['id']);
+                    if ($coaResult['success']) {
+                        $coaCount++;
+                    }
+                }
+            }
+            
+            return ['success' => true, 'coa_updated' => $coaCount];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
