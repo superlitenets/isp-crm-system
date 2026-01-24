@@ -24,7 +24,7 @@ $teamAssignments = $db->query("
     SELECT tm.name as team_name, COUNT(t.id) as ticket_count
     FROM tickets t
     INNER JOIN teams tm ON t.team_id = tm.id
-    WHERE t.status NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
     GROUP BY tm.id, tm.name
     ORDER BY ticket_count DESC
     LIMIT 5
@@ -35,7 +35,7 @@ $individualAssignments = $db->query("
     SELECT u.name as user_name, COUNT(t.id) as ticket_count
     FROM tickets t
     INNER JOIN users u ON t.assigned_to = u.id
-    WHERE t.status NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
     GROUP BY u.id, u.name
     ORDER BY ticket_count DESC
     LIMIT 5
@@ -115,7 +115,7 @@ $topOpenTickets = $db->query("
     LEFT JOIN teams tm ON t.team_id = tm.id
     LEFT JOIN users u ON t.assigned_to = u.id
     LEFT JOIN branches b ON t.branch_id = b.id
-    WHERE t.status NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
     ORDER BY 
         CASE t.priority 
             WHEN 'critical' THEN 1 
@@ -179,7 +179,7 @@ $technicianTickets = $db->query("
     INNER JOIN users u ON t.assigned_to = u.id
     INNER JOIN employees e ON LOWER(e.name) = LOWER(u.name)
     INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE AND a.clock_out IS NULL
-    WHERE t.status NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
     ORDER BY 
         CASE t.priority 
             WHEN 'critical' THEN 1 
