@@ -5471,6 +5471,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
 }
 
 $stats = $huaweiOLT->getDashboardStats();
+$totalOnus = $stats['total_authorized_onus'] ?? $stats['total_onus'] ?? 0;
+$uptimePercent = $totalOnus > 0 ? round(($stats['online_onus'] / $totalOnus) * 100, 1) : 0;
+$offlineTotal = ($totalOnus - ($stats['online_onus'] ?? 0));
 $olts = $huaweiOLT->getOLTs(false);
 $onus = [];
 $profiles = $huaweiOLT->getServiceProfiles(false);
