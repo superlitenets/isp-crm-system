@@ -234,8 +234,8 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         html, body {
             height: 100vh;
             overflow: hidden;
-            background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
-            color: #fff;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            color: #212529;
             font-family: 'Segoe UI', system-ui, sans-serif;
         }
         
@@ -243,8 +243,8 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding: 1vh 1.5vw;
-            gap: 1vh;
+            padding: 1.2vh 1.5vw;
+            gap: 1.2vh;
         }
         
         .header {
@@ -254,47 +254,47 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .header h1 {
-            font-size: clamp(1.5rem, 3vw, 2.7rem);
+            font-size: clamp(1.4rem, 2.5vw, 2rem);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 2px;
-            color: #fff;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            color: #2c3e50;
         }
         
         .status-cards {
             display: grid;
             grid-template-columns: repeat(4, 1fr) 100px;
-            gap: 0.8vw;
+            gap: 1vw;
             flex-shrink: 0;
         }
         
         .status-card {
-            border-radius: 6px;
-            padding: 1vh 0.5vw;
+            border-radius: 10px;
+            padding: 1.2vh 0.8vw;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            color: #fff;
         }
         
         .status-card .label {
-            font-size: clamp(0.75rem, 1.05vw, 1.05rem);
+            font-size: clamp(0.7rem, 0.9vw, 0.85rem);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 0.5vh;
-            opacity: 0.9;
+            opacity: 0.95;
         }
         
         .status-card .value {
-            font-size: clamp(2.25rem, 4.5vw, 3.75rem);
+            font-size: clamp(2rem, 3.5vw, 2.8rem);
             font-weight: 800;
             line-height: 1;
         }
         
-        .card-pending { background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%); }
-        .card-progress { background: linear-gradient(135deg, #d68910 0%, #f39c12 100%); }
-        .card-waiting { background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%); }
-        .card-critical { background: linear-gradient(135deg, #1c2833 0%, #2c3e50 100%); border: 2px solid #e74c3c; }
+        .card-pending { background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%); }
+        .card-progress { background: linear-gradient(135deg, #fd7e14 0%, #f39c12 100%); }
+        .card-waiting { background: linear-gradient(135deg, #0d6efd 0%, #3498db 100%); }
+        .card-critical { background: linear-gradient(135deg, #343a40 0%, #495057 100%); border: 2px solid #dc3545; }
         
         .gauge-container {
             display: flex;
@@ -326,7 +326,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             width: 60px;
             height: 60px;
             border-radius: 50%;
-            background: #1a1f2e;
+            background: #f8f9fa;
             position: absolute;
             top: 20px;
             left: 20px;
@@ -340,39 +340,41 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .metric-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 6px;
+            background: #fff;
+            border-radius: 10px;
             padding: 1vh 1vw;
             display: flex;
             align-items: center;
             gap: 1vw;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
         }
         
         .metric-icon {
-            width: clamp(30px, 3vw, 45px);
-            height: clamp(30px, 3vw, 45px);
+            width: clamp(36px, 3vw, 48px);
+            height: clamp(36px, 3vw, 48px);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(1.35rem, 1.8vw, 1.95rem);
+            font-size: clamp(1rem, 1.3vw, 1.3rem);
         }
         
-        .metric-icon.clock { background: rgba(52, 152, 219, 0.2); color: #3498db; }
-        .metric-icon.wrench { background: rgba(155, 89, 182, 0.2); color: #9b59b6; }
-        .metric-icon.check { background: rgba(39, 174, 96, 0.2); color: #27ae60; }
+        .metric-icon.clock { background: #e3f2fd; color: #1976d2; }
+        .metric-icon.wrench { background: #f3e5f5; color: #7b1fa2; }
+        .metric-icon.check { background: #e8f5e9; color: #388e3c; }
         
         .metric-info .label {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
-            color: #95a5a6;
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+            color: #6c757d;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         
         .metric-info .value {
-            font-size: clamp(1.5rem, 2.25vw, 2.4rem);
+            font-size: clamp(1.2rem, 1.6vw, 1.5rem);
             font-weight: 700;
+            color: #212529;
         }
         
         .bottom-section {
@@ -389,28 +391,29 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .tech-panel {
-            flex: 0 0 250px;
-            min-width: 200px;
+            flex: 0 0 280px;
+            min-width: 240px;
         }
         
         .panel {
-            background: rgba(255,255,255,0.03);
-            border-radius: 6px;
+            background: #fff;
+            border-radius: 10px;
             padding: 1vh 1vw;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
         }
         
         .panel-title {
-            font-size: clamp(0.9rem, 1.2vw, 1.2rem);
+            font-size: clamp(0.75rem, 0.95vw, 0.9rem);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 0.8vh;
-            color: #ecf0f1;
-            border-bottom: 2px solid rgba(255,255,255,0.1);
+            color: #495057;
+            border-bottom: 2px solid #e9ecef;
             padding-bottom: 0.5vh;
         }
         
@@ -432,7 +435,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             width: 50%;
             height: 50%;
             border-radius: 50%;
-            background: #1a1f2e;
+            background: #fff;
             position: absolute;
             top: 25%;
             left: 25%;
@@ -447,7 +450,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             align-items: center;
             gap: 0.5vw;
             padding: 2px 0;
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.7rem, 0.85vw, 0.8rem);
         }
         
         .legend-color {
@@ -469,9 +472,10 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             align-items: center;
             gap: 12px;
             padding: 10px 12px;
-            background: rgba(0,0,0,0.2);
+            background: #f8f9fa;
             border-radius: 6px;
             margin-bottom: 8px;
+            border: 1px solid #e9ecef;
         }
         
         .ticket-rank {
@@ -482,14 +486,15 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            font-size: 1.125rem;
+            font-size: 0.75rem;
+            color: #fff;
         }
         
-        .rank-1 { background: #c0392b; }
-        .rank-2 { background: #d35400; }
-        .rank-3 { background: #f39c12; }
-        .rank-4 { background: #27ae60; }
-        .rank-5 { background: #2980b9; }
+        .rank-1 { background: #dc3545; }
+        .rank-2 { background: #fd7e14; }
+        .rank-3 { background: #ffc107; color: #212529; }
+        .rank-4 { background: #28a745; }
+        .rank-5 { background: #0d6efd; }
         
         .ticket-info {
             flex: 1;
@@ -497,76 +502,80 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .ticket-subject {
-            font-size: clamp(1.35rem, 1.65vw, 1.8rem);
+            font-size: clamp(0.8rem, 1vw, 0.95rem);
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: #212529;
         }
         
         .ticket-team {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
-            color: #3498db;
+            font-size: clamp(0.7rem, 0.85vw, 0.8rem);
+            color: #0d6efd;
             display: flex;
             align-items: center;
             gap: 4px;
         }
         
         .ticket-team i {
-            font-size: clamp(0.75rem, 0.825vw, 0.9rem);
+            font-size: clamp(0.6rem, 0.7vw, 0.7rem);
         }
         
         .ticket-time {
-            font-size: 1.125rem;
-            color: #95a5a6;
+            font-size: 0.75rem;
+            color: #6c757d;
             font-weight: 500;
         }
         
         .alert-box {
             margin-top: 8px;
-            background: rgba(231, 76, 60, 0.15);
-            border-left: 3px solid #e74c3c;
+            background: #fff5f5;
+            border-left: 4px solid #dc3545;
             border-radius: 4px;
-            padding: 6px 10px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
         
         .alert-label {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.7rem, 0.85vw, 0.8rem);
             font-weight: 700;
-            color: #e74c3c;
+            color: #dc3545;
             text-transform: uppercase;
         }
         
         .alert-text {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.75rem, 0.9vw, 0.85rem);
+            color: #495057;
         }
         
         .ticket-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.75rem, 0.9vw, 0.85rem);
             table-layout: fixed;
         }
         
         .ticket-table th {
             text-align: left;
-            padding: 3px 4px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            color: #7f8c8d;
+            padding: 6px 8px;
+            border-bottom: 2px solid #e9ecef;
+            color: #6c757d;
             font-weight: 600;
-            font-size: clamp(1.125rem, 1.35vw, 1.5rem);
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
             white-space: nowrap;
+            text-transform: uppercase;
         }
         
         .ticket-table td {
-            padding: 3px 4px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f3f4;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: #212529;
         }
         
         .ticket-table th:nth-child(1) { width: 5%; }
@@ -586,75 +595,76 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .cat-badge {
-            background: rgba(52,152,219,0.2);
-            color: #3498db;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: clamp(1.125rem, 1.35vw, 1.5rem);
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
         }
         
         .status-badge {
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: clamp(1.125rem, 1.35vw, 1.5rem);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
             font-weight: 500;
         }
         
-        .status-badge.status-open { background: rgba(52,152,219,0.2); color: #3498db; }
-        .status-badge.status-pending { background: rgba(241,196,15,0.2); color: #f1c40f; }
-        .status-badge.status-in-progress { background: rgba(155,89,182,0.2); color: #9b59b6; }
-        .status-badge.status-waiting { background: rgba(230,126,34,0.2); color: #e67e22; }
-        .status-badge.status-resolved { background: rgba(46,204,113,0.2); color: #2ecc71; }
+        .status-badge.status-open { background: #e3f2fd; color: #1976d2; }
+        .status-badge.status-pending { background: #fff3e0; color: #f57c00; }
+        .status-badge.status-in-progress { background: #f3e5f5; color: #7b1fa2; }
+        .status-badge.status-waiting { background: #fff8e1; color: #ff8f00; }
+        .status-badge.status-resolved { background: #e8f5e9; color: #388e3c; }
         
         .priority-badge {
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: clamp(1.125rem, 1.35vw, 1.5rem);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
             font-weight: 600;
         }
         
-        .priority-badge.priority-critical { background: rgba(231,76,60,0.3); color: #e74c3c; }
-        .priority-badge.priority-high { background: rgba(230,126,34,0.3); color: #e67e22; }
-        .priority-badge.priority-medium { background: rgba(241,196,15,0.2); color: #f1c40f; }
-        .priority-badge.priority-low { background: rgba(46,204,113,0.2); color: #2ecc71; }
+        .priority-badge.priority-critical { background: #ffebee; color: #c62828; }
+        .priority-badge.priority-high { background: #fff3e0; color: #ef6c00; }
+        .priority-badge.priority-medium { background: #fff8e1; color: #f9a825; }
+        .priority-badge.priority-low { background: #e8f5e9; color: #388e3c; }
         
-        .priority-row-critical { background: rgba(231,76,60,0.05); }
-        .priority-row-high { background: rgba(230,126,34,0.03); }
+        .priority-row-critical { background: #fff5f5; }
+        .priority-row-high { background: #fffbf0; }
         
         .ticket-id {
             font-weight: 600;
-            color: #3498db;
+            color: #0d6efd;
             white-space: nowrap;
         }
         
         .subject-text {
             font-weight: 500;
+            color: #212529;
         }
         
         .customer-text {
-            font-size: clamp(1.125rem, 1.35vw, 1.5rem);
-            color: #7f8c8d;
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
+            color: #6c757d;
         }
         
         .assigned-cell .unassigned {
-            color: #e74c3c;
+            color: #dc3545;
             font-style: italic;
         }
         
         .ticket-age {
-            color: #95a5a6;
+            color: #6c757d;
             white-space: nowrap;
         }
         
         .los-alert {
-            background: rgba(231,76,60,0.1);
-            border-left-color: #e74c3c;
+            background: #fff5f5;
+            border-left-color: #dc3545;
         }
         
         .technician-avatars {
             display: flex;
             justify-content: center;
-            gap: 8px;
+            gap: 10px;
             margin-bottom: 16px;
             flex-wrap: wrap;
         }
@@ -667,16 +677,18 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .avatar-circle {
-            width: 45px;
-            height: 45px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #3498db, #2c3e50);
+            background: linear-gradient(135deg, #0d6efd, #6610f2);
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            font-size: 1.35rem;
+            font-size: 0.85rem;
+            color: #fff;
             border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
             overflow: hidden;
         }
         
@@ -687,9 +699,9 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .tech-name {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
-            color: #bdc3c7;
-            max-width: clamp(40px, 4vw, 50px);
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+            color: #495057;
+            max-width: 50px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -712,30 +724,31 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .att-row {
             display: flex;
             align-items: center;
-            gap: 0.5vw;
-            padding: 0.4vh 0.5vw;
-            background: rgba(0,0,0,0.2);
-            border-radius: 4px;
-            border-left: 3px solid;
+            gap: 0.6vw;
+            padding: 0.5vh 0.6vw;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid;
         }
         
-        .att-row.present { border-color: #27ae60; }
-        .att-row.left { border-color: #3498db; }
+        .att-row.present { border-color: #28a745; background: #f0fff4; }
+        .att-row.left { border-color: #6c757d; background: #f8f9fa; }
         
         .att-avatar {
-            width: clamp(24px, 2.5vw, 32px);
-            height: clamp(24px, 2.5vw, 32px);
+            width: clamp(28px, 2.5vw, 36px);
+            height: clamp(28px, 2.5vw, 36px);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            font-size: clamp(0.75rem, 0.9vw, 1.05rem);
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
             flex-shrink: 0;
+            color: #fff;
         }
         
-        .att-avatar.present { background: rgba(39,174,96,0.3); color: #27ae60; }
-        .att-avatar.left { background: rgba(52,152,219,0.3); color: #3498db; }
+        .att-avatar.present { background: #28a745; }
+        .att-avatar.left { background: #6c757d; }
         
         .att-info {
             flex: 1;
@@ -743,32 +756,33 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .att-name {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
-            font-weight: 500;
+            font-size: clamp(0.75rem, 0.9vw, 0.85rem);
+            font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: #212529;
         }
         
         .att-position {
-            font-size: clamp(1.125rem, 1.35vw, 1.5rem);
-            color: #95a5a6;
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
+            color: #6c757d;
         }
         
         .att-time {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
-            color: #95a5a6;
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+            color: #6c757d;
             display: flex;
             gap: 4px;
             align-items: center;
         }
         
         .att-time i {
-            font-size: clamp(0.75rem, 0.9vw, 1.05rem);
+            font-size: clamp(0.55rem, 0.7vw, 0.65rem);
         }
         
         .los-section {
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid #e9ecef;
             padding-top: 0.5vh;
             margin-top: 0.5vh;
         }
@@ -785,9 +799,9 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             display: flex;
             align-items: center;
             gap: 0.5vw;
-            padding: 0.4vh 0.5vw;
-            background: rgba(231,76,60,0.1);
-            border-left: 3px solid #e74c3c;
+            padding: 0.5vh 0.6vw;
+            background: #fff5f5;
+            border-left: 4px solid #dc3545;
             border-radius: 4px;
         }
         
@@ -797,16 +811,17 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .los-name {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.7rem, 0.85vw, 0.8rem);
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: #212529;
         }
         
         .los-meta {
-            font-size: clamp(1.125rem, 1.35vw, 1.5rem);
-            color: #95a5a6;
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
+            color: #6c757d;
             font-family: monospace;
         }
         
@@ -818,15 +833,16 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .assignment-card {
-            background: rgba(255,255,255,0.03);
-            border-radius: 6px;
-            padding: 0.8vh 1vw;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            background: #fff;
+            border-radius: 10px;
+            padding: 1vh 1vw;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
         }
         
         .assignment-card.unassigned-card {
-            background: rgba(231,76,60,0.1);
-            border: 1px solid rgba(231,76,60,0.3);
+            background: #fff5f5;
+            border: 1px solid #f8d7da;
             min-width: 140px;
         }
         
@@ -835,71 +851,73 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             align-items: center;
             gap: 0.5vw;
             margin-bottom: 0.6vh;
-            font-size: clamp(1.35rem, 1.65vw, 1.8rem);
+            font-size: clamp(0.7rem, 0.85vw, 0.8rem);
             font-weight: 600;
-            color: #ecf0f1;
+            color: #495057;
         }
         
         .assignment-header i {
-            font-size: clamp(0.75rem, 1.05vw, 1.05rem);
-            color: #3498db;
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+            color: #0d6efd;
         }
         
         .unassigned-card .assignment-header i {
-            color: #e74c3c;
+            color: #dc3545;
         }
         
         .assignment-total {
             margin-left: auto;
-            background: rgba(52,152,219,0.2);
-            color: #3498db;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: clamp(0.65rem, 0.8vw, 0.85rem);
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
             font-weight: 700;
         }
         
         .unassigned-card .assignment-total {
-            background: rgba(231,76,60,0.2);
-            color: #e74c3c;
+            background: #ffebee;
+            color: #c62828;
         }
         
         .assignment-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
+            gap: 6px;
         }
         
         .assignment-item {
             display: flex;
             align-items: center;
             gap: 4px;
-            background: rgba(0,0,0,0.2);
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            background: #f8f9fa;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+            border: 1px solid #e9ecef;
         }
         
         .assign-name {
-            color: #bdc3c7;
+            color: #495057;
         }
         
         .assign-count {
-            background: rgba(255,255,255,0.1);
-            padding: 1px 5px;
-            border-radius: 3px;
+            background: #0d6efd;
+            padding: 1px 6px;
+            border-radius: 4px;
             font-weight: 600;
             color: #fff;
+            font-size: clamp(0.55rem, 0.7vw, 0.65rem);
         }
         
         .unassigned-note {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
-            color: #95a5a6;
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+            color: #6c757d;
         }
         
         .empty-state-sm {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
-            color: #7f8c8d;
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+            color: #6c757d;
         }
         
         .branch-stats-row {
@@ -907,45 +925,48 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .branch-stats-row .panel {
-            background: rgba(255,255,255,0.03);
-            border-radius: 6px;
-            padding: 0.5vh 1vw;
+            background: #fff;
+            border-radius: 10px;
+            padding: 0.8vh 1vw;
+            border: 1px solid #e9ecef;
         }
         
         .branch-stats-row .panel-title {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.7rem, 0.85vw, 0.8rem);
             font-weight: 600;
             margin-bottom: 0.5vh;
             display: flex;
             align-items: center;
             gap: 0.5vw;
+            color: #495057;
         }
         
         .branch-stats-grid {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.5vw;
+            gap: 0.6vw;
         }
         
         .branch-stat-card {
-            background: rgba(0,0,0,0.2);
-            border-radius: 4px;
-            padding: 0.3vh 0.6vw;
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 0.4vh 0.8vw;
             display: flex;
             align-items: center;
             gap: 0.5vw;
+            border: 1px solid #e9ecef;
         }
         
         .branch-name {
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.65rem, 0.8vw, 0.75rem);
             font-weight: 600;
-            color: #ecf0f1;
+            color: #212529;
         }
         
         .branch-total {
-            font-size: clamp(0.7rem, 0.85vw, 0.9rem);
+            font-size: clamp(0.6rem, 0.75vw, 0.7rem);
             font-weight: 700;
-            color: #3498db;
+            color: #0d6efd;
         }
         
         .branch-breakdown {
@@ -954,91 +975,69 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         }
         
         .branch-status {
-            font-size: clamp(0.75rem, 0.825vw, 0.9rem);
-            padding: 1px 5px;
-            border-radius: 2px;
+            font-size: clamp(0.55rem, 0.7vw, 0.65rem);
+            padding: 2px 6px;
+            border-radius: 3px;
             font-weight: 500;
         }
         
         .branch-status.open {
-            background: rgba(231,76,60,0.2);
-            color: #e74c3c;
+            background: #ffebee;
+            color: #c62828;
         }
         
         .branch-status.pending {
-            background: rgba(241,196,15,0.2);
-            color: #f1c40f;
+            background: #fff8e1;
+            color: #f9a825;
         }
         
         .branch-status.progress {
-            background: rgba(52,152,219,0.2);
-            color: #3498db;
+            background: #e3f2fd;
+            color: #1976d2;
         }
         
         .data-table {
             width: 100%;
-            font-size: clamp(1.2rem, 1.5vw, 1.65rem);
+            font-size: clamp(0.7rem, 0.85vw, 0.8rem);
             border-collapse: collapse;
         }
         
         .data-table th {
             text-align: left;
-            color: #95a5a6;
+            color: #6c757d;
             font-weight: 600;
             padding: 8px;
-            border-bottom: 2px solid rgba(255,255,255,0.1);
-            font-size: 0.7rem;
+            border-bottom: 2px solid #e9ecef;
+            font-size: 0.65rem;
             text-transform: uppercase;
         }
         
         .data-table td {
             padding: 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid #f1f3f4;
+            color: #212529;
         }
-        
-        .priority-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 600;
-        }
-        
-        .priority-critical { background: rgba(231,76,60,0.3); color: #e74c3c; }
-        .priority-high { background: rgba(241,196,15,0.3); color: #f1c40f; }
-        .priority-medium { background: rgba(52,152,219,0.3); color: #3498db; }
-        .priority-low { background: rgba(149,165,166,0.3); color: #95a5a6; }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 500;
-        }
-        
-        .status-open { background: rgba(231,76,60,0.2); color: #e74c3c; }
-        .status-in_progress { background: rgba(241,196,15,0.2); color: #f1c40f; }
-        .status-pending { background: rgba(52,152,219,0.2); color: #3498db; }
         
         .live-indicator {
             position: fixed;
-            top: 20px;
-            right: 20px;
+            top: 12px;
+            right: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
-            background: rgba(0,0,0,0.5);
+            background: #fff;
             padding: 8px 16px;
             border-radius: 20px;
-            font-size: 1.125rem;
-            color: #95a5a6;
+            font-size: 0.75rem;
+            color: #6c757d;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
         }
         
         .live-dot {
             width: 8px;
             height: 8px;
-            background: #27ae60;
+            background: #28a745;
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
@@ -1050,9 +1049,9 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         
         .empty-state {
             text-align: center;
-            color: #7f8c8d;
+            color: #6c757d;
             padding: 20px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
     </style>
 </head>
