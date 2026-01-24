@@ -78,24 +78,28 @@ $criticalAlert = $db->query("
     LIMIT 1
 ")->fetch(PDO::FETCH_ASSOC);
 
-// Technicians in the field (employees with open tickets assigned)
+// Technicians in the field (employees who checked in today)
 $technicians = $db->query("
-    SELECT u.id, u.name,
-           COUNT(t.id) as ticket_count
-    FROM users u
-    INNER JOIN tickets t ON t.assigned_to = u.id
-    WHERE t.status NOT IN ('closed', 'resolved')
-    AND u.role IN ('technician', 'support', 'admin')
-    GROUP BY u.id, u.name
-    ORDER BY ticket_count DESC
+    SELECT e.id, e.name,
+           (SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = u.id AND t.status NOT IN ('closed', 'resolved')) as ticket_count,
+           TO_CHAR(a.clock_in, 'HH24:MI') as clock_in
+    FROM employees e
+    INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE
+    LEFT JOIN users u ON LOWER(e.name) = LOWER(u.name)
+    WHERE e.employment_status = 'active' 
+    AND a.clock_in IS NOT NULL
+    AND a.clock_out IS NULL
+    ORDER BY a.clock_in ASC
     LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Tickets assigned to technicians (for the table)
+// Tickets assigned to checked-in technicians (for the table)
 $technicianTickets = $db->query("
     SELECT t.id, t.priority, t.status, u.name as assigned_name
     FROM tickets t
     INNER JOIN users u ON t.assigned_to = u.id
+    INNER JOIN employees e ON LOWER(e.name) = LOWER(u.name)
+    INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE AND a.clock_out IS NULL
     WHERE t.status NOT IN ('closed', 'resolved')
     ORDER BY 
         CASE t.priority 
