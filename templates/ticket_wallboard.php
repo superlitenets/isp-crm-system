@@ -787,13 +787,13 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .branch-stats-row .panel {
             background: rgba(255,255,255,0.03);
             border-radius: 6px;
-            padding: 0.8vh 1vw;
+            padding: 0.5vh 1vw;
         }
         
         .branch-stats-row .panel-title {
-            font-size: clamp(0.6rem, 0.75vw, 0.8rem);
+            font-size: clamp(0.55rem, 0.65vw, 0.7rem);
             font-weight: 600;
-            margin-bottom: 0.8vh;
+            margin-bottom: 0.5vh;
             display: flex;
             align-items: center;
             gap: 0.5vw;
@@ -802,34 +802,32 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .branch-stats-grid {
             display: flex;
             flex-wrap: wrap;
-            gap: 1vw;
+            gap: 0.5vw;
         }
         
         .branch-stat-card {
             background: rgba(0,0,0,0.2);
-            border-radius: 5px;
-            padding: 0.8vh 1vw;
-            min-width: 120px;
-            flex: 1;
+            border-radius: 4px;
+            padding: 0.3vh 0.6vw;
+            display: flex;
+            align-items: center;
+            gap: 0.5vw;
         }
         
         .branch-name {
-            font-size: clamp(0.6rem, 0.7vw, 0.75rem);
+            font-size: clamp(0.55rem, 0.65vw, 0.7rem);
             font-weight: 600;
             color: #ecf0f1;
-            margin-bottom: 2px;
         }
         
         .branch-total {
-            font-size: clamp(1rem, 1.3vw, 1.4rem);
+            font-size: clamp(0.7rem, 0.85vw, 0.9rem);
             font-weight: 700;
             color: #3498db;
-            margin-bottom: 4px;
         }
         
         .branch-breakdown {
             display: flex;
-            flex-wrap: wrap;
             gap: 4px;
         }
         
@@ -1055,17 +1053,17 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
                 <div class="branch-stats-grid">
                     <?php foreach ($branchStats as $branch): ?>
                     <div class="branch-stat-card">
-                        <div class="branch-name"><?= htmlspecialchars($branch['branch_name']) ?></div>
-                        <div class="branch-total"><?= $branch['total_tickets'] ?></div>
-                        <div class="branch-breakdown">
-                            <span class="branch-status open"><?= $branch['open_count'] ?> Open</span>
-                            <span class="branch-status pending"><?= $branch['pending_count'] ?> Pending</span>
-                            <span class="branch-status progress"><?= $branch['in_progress_count'] ?> In Progress</span>
-                        </div>
+                        <span class="branch-name"><?= htmlspecialchars($branch['branch_name']) ?>:</span>
+                        <span class="branch-total"><?= $branch['total_tickets'] ?></span>
+                        <span class="branch-breakdown">
+                            <span class="branch-status open"><?= $branch['open_count'] ?>O</span>
+                            <span class="branch-status pending"><?= $branch['pending_count'] ?>P</span>
+                            <span class="branch-status progress"><?= $branch['in_progress_count'] ?>IP</span>
+                        </span>
                     </div>
                     <?php endforeach; ?>
                     <?php if (empty($branchStats)): ?>
-                    <div class="empty-state-sm">No branches configured</div>
+                    <div class="empty-state-sm">No branches</div>
                     <?php endif; ?>
                 </div>
             </div>
