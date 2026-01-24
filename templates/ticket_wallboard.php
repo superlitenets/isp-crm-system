@@ -541,32 +541,40 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         .ticket-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: clamp(0.55rem, 0.65vw, 0.7rem);
+            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
+            table-layout: fixed;
         }
         
         .ticket-table th {
             text-align: left;
-            padding: 4px 6px;
+            padding: 3px 4px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             color: #7f8c8d;
             font-weight: 600;
-            font-size: clamp(0.5rem, 0.6vw, 0.65rem);
+            font-size: clamp(0.45rem, 0.55vw, 0.6rem);
+            white-space: nowrap;
         }
         
         .ticket-table td {
-            padding: 4px 6px;
+            padding: 3px 4px;
             border-bottom: 1px solid rgba(255,255,255,0.05);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
-        .ticket-table .ticket-rank {
-            font-weight: 700;
-            width: 20px;
-            text-align: center;
-        }
+        .ticket-table th:nth-child(1) { width: 5%; }
+        .ticket-table th:nth-child(2) { width: 8%; }
+        .ticket-table th:nth-child(3) { width: 25%; }
+        .ticket-table th:nth-child(4) { width: 10%; }
+        .ticket-table th:nth-child(5) { width: 10%; }
+        .ticket-table th:nth-child(6) { width: 12%; }
+        .ticket-table th:nth-child(7) { width: 10%; }
+        .ticket-table th:nth-child(8) { width: 10%; }
+        .ticket-table th:nth-child(9) { width: 10%; }
         
         .ticket-subject-cell {
-            max-width: 200px;
-            white-space: nowrap;
+            max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
         }
