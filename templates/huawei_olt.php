@@ -5536,11 +5536,13 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         exit;
     }
     
-    // Status detection priority: SNMP > Optical Power > TR-069
-    // SNMP is most reliable for detecting ONU online status from OLT
-    if ($currentOnu['status'] !== 'online') {
+    // Status detection: Trust SNMP polling status from OLT Session Manager
+    // SNMP fault statuses (los, dying-gasp, offline) are authoritative - never override
+    $snmpFaultStatuses = ['los', 'dying-gasp', 'offline'];
+    if (!in_array($currentOnu['status'], $snmpFaultStatuses) && $currentOnu['status'] !== 'online') {
+        // Only use fallbacks for unknown/empty status - not for faults
         $isOnline = false;
-        // 1. SNMP status is primary (from OLT polling)
+        // 1. SNMP status from SmartOLT sync
         if (!empty($currentOnu['snmp_status']) && $currentOnu['snmp_status'] === 'online') {
             $isOnline = true;
         }
