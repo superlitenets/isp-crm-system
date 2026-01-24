@@ -3,12 +3,12 @@ require_once __DIR__ . '/../config/database.php';
 
 $db = Database::getConnection();
 
-// Ticket Stats
+// Ticket Stats - "open" is now shown as "Pending", pending means waiting on customer
 $ticketStats = $db->query("
     SELECT 
-        COUNT(*) FILTER (WHERE status = 'open') as open_count,
+        COUNT(*) FILTER (WHERE status IN ('open', 'pending')) as pending_count,
         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
-        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'waiting_customer') as waiting_customer,
         COUNT(*) FILTER (WHERE priority = 'critical' AND status NOT IN ('closed', 'resolved')) as critical_count,
         COUNT(*) FILTER (WHERE assigned_to IS NULL AND status NOT IN ('closed', 'resolved')) as unassigned,
         COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as created_today,
@@ -67,7 +67,7 @@ $categoryStats = $db->query("
 
 $totalCategoryTickets = array_sum(array_column($categoryStats, 'count'));
 
-// Top 5 Open Tickets (longest open)
+// Top 5 Pending Tickets (longest pending)
 $topOpenTickets = $db->query("
     SELECT t.id, t.subject, t.priority, t.created_at,
            c.name as customer_name
@@ -240,7 +240,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             line-height: 1;
         }
         
-        .card-open { background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%); }
+        .card-pending { background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%); }
         .card-progress { background: linear-gradient(135deg, #d68910 0%, #f39c12 100%); }
         .card-waiting { background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%); }
         .card-critical { background: linear-gradient(135deg, #1c2833 0%, #2c3e50 100%); border: 2px solid #e74c3c; }
@@ -727,9 +727,9 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
         </div>
         
         <div class="status-cards">
-            <div class="status-card card-open">
-                <div class="label">Open Tickets</div>
-                <div class="value"><?= $ticketStats['open_count'] ?? 0 ?></div>
+            <div class="status-card card-pending">
+                <div class="label">Pending Tickets</div>
+                <div class="value"><?= $ticketStats['pending_count'] ?? 0 ?></div>
             </div>
             <div class="status-card card-progress">
                 <div class="label">In Progress</div>
@@ -737,7 +737,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             </div>
             <div class="status-card card-waiting">
                 <div class="label">Waiting on Customer</div>
-                <div class="value"><?= $ticketStats['pending'] ?? 0 ?></div>
+                <div class="value"><?= $ticketStats['waiting_customer'] ?? 0 ?></div>
             </div>
             <div class="status-card card-critical">
                 <div class="label">Critical Tickets</div>
@@ -834,7 +834,7 @@ $categoryColors = ['#dc3545', '#17a2b8', '#28a745', '#ffc107', '#6c757d'];
             </div>
             
             <div class="panel">
-                <div class="panel-title">Top 5 Open Tickets</div>
+                <div class="panel-title">Top 5 Pending Tickets</div>
                 <div class="ticket-list">
                     <?php foreach ($topOpenTickets as $i => $ticket): ?>
                     <div class="ticket-item">
