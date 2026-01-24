@@ -181,6 +181,15 @@ class Ticket {
             return false;
         }
 
+        // Auto-change status from 'open' to 'pending' when ticket is assigned
+        if ($ticket['status'] === 'open') {
+            $isBeingAssigned = (!empty($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to'])
+                            || (!empty($data['team_id']) && $data['team_id'] != $ticket['team_id']);
+            if ($isBeingAssigned && !isset($data['status'])) {
+                $data['status'] = 'pending';
+            }
+        }
+
         $fields = [];
         $values = [];
         
