@@ -474,8 +474,16 @@ class RadiusBilling {
                 return ['success' => false, 'error' => 'Package not found'];
             }
             
-            $startDate = date('Y-m-d');
-            $expiryDate = date('Y-m-d', strtotime("+{$package['validity_days']} days"));
+            // New subscribers start as 'inactive' - activated upon payment or manual activation
+            $initialStatus = $data['status'] ?? 'inactive';
+            $startDate = null;
+            $expiryDate = null;
+            
+            // Only set dates if activating immediately
+            if ($initialStatus === 'active') {
+                $startDate = date('Y-m-d');
+                $expiryDate = date('Y-m-d', strtotime("+{$package['validity_days']} days"));
+            }
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_subscriptions (customer_id, package_id, username, password, password_encrypted,
@@ -491,7 +499,7 @@ class RadiusBilling {
                 $data['access_type'] ?? $package['package_type'],
                 !empty($data['static_ip']) ? $data['static_ip'] : null,
                 !empty($data['mac_address']) ? $data['mac_address'] : null,
-                'active',
+                $initialStatus,
                 $startDate,
                 $expiryDate,
                 !empty($data['nas_id']) ? (int)$data['nas_id'] : null,
@@ -500,10 +508,57 @@ class RadiusBilling {
             
             $subscriptionId = $this->db->lastInsertId();
             
-            // Create billing record
-            $this->createBillingRecord($subscriptionId, $data['package_id'], $package['price'], 'renewal', $startDate, $expiryDate);
+            // Only create billing record if activated
+            if ($initialStatus === 'active') {
+                $this->createBillingRecord($subscriptionId, $data['package_id'], $package['price'], 'renewal', $startDate, $expiryDate);
+            }
             
-            return ['success' => true, 'id' => $subscriptionId];
+            return ['success' => true, 'id' => $subscriptionId, 'status' => $initialStatus];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function activateSubscription(int $id): array {
+        try {
+            $sub = $this->getSubscription($id);
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            if ($sub['status'] === 'active') {
+                return ['success' => false, 'error' => 'Subscription is already active'];
+            }
+            
+            $package = $this->getPackage($sub['package_id']);
+            if (!$package) {
+                return ['success' => false, 'error' => 'Package not found'];
+            }
+            
+            $startDate = date('Y-m-d');
+            $expiryDate = date('Y-m-d', strtotime("+{$package['validity_days']} days"));
+            
+            $stmt = $this->db->prepare("
+                UPDATE radius_subscriptions SET
+                    status = 'active', start_date = ?, expiry_date = ?,
+                    data_used_mb = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([$startDate, $expiryDate, $id]);
+            
+            // Create billing record for activation
+            $this->createBillingRecord($id, $sub['package_id'], $package['price'], 'activation', $startDate, $expiryDate);
+            
+            // Send CoA to update speed (in case device tried connecting before)
+            $coaResult = $this->sendSpeedUpdateCoA($id);
+            
+            return [
+                'success' => true, 
+                'message' => 'Subscription activated successfully',
+                'start_date' => $startDate,
+                'expiry_date' => $expiryDate,
+                'coa_result' => $coaResult
+            ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -516,6 +571,8 @@ class RadiusBilling {
                 return ['success' => false, 'error' => 'Subscription not found'];
             }
             
+            // Check if was inactive (never activated) or expired
+            $wasInactive = ($sub['status'] === 'inactive' || empty($sub['start_date']));
             $wasExpired = ($sub['status'] !== 'active' || (isset($sub['expiry_date']) && $sub['expiry_date'] < date('Y-m-d')));
             
             $packageId = $packageId ?? $sub['package_id'];
@@ -524,7 +581,13 @@ class RadiusBilling {
                 return ['success' => false, 'error' => 'Package not found'];
             }
             
-            $startDate = max(date('Y-m-d'), $sub['expiry_date'] ?? date('Y-m-d'));
+            // For inactive accounts, start fresh from today
+            // For active/expired accounts, extend from expiry date
+            if ($wasInactive || empty($sub['expiry_date'])) {
+                $startDate = date('Y-m-d');
+            } else {
+                $startDate = max(date('Y-m-d'), $sub['expiry_date']);
+            }
             $expiryDate = date('Y-m-d', strtotime($startDate . " +{$package['validity_days']} days"));
             
             $stmt = $this->db->prepare("
