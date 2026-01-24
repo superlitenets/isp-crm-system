@@ -124,7 +124,7 @@ $topOpenTickets = $db->query("
             ELSE 4 
         END,
         t.created_at ASC
-    LIMIT 10
+    LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // Critical Alert (most urgent issue)
