@@ -4930,7 +4930,7 @@ try {
                 </div>
             </form>
             
-            <?php else: ?>
+            <?php elseif ($settingsTab === 'radius'): ?>
             <form method="post">
                 <input type="hidden" name="action" value="save_isp_settings">
                 <input type="hidden" name="category" value="radius">
