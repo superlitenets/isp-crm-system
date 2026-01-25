@@ -2063,10 +2063,11 @@ try {
                 $stmt->execute([$subId]);
                 $billingHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                // Get session history
-                $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? ORDER BY session_start DESC LIMIT 50");
+                // Get session history (limit to 3 for display, but get more for stats)
+                $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? ORDER BY session_start DESC LIMIT 20");
                 $stmt->execute([$subId]);
-                $sessionHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $allSessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $sessionHistory = array_slice($allSessions, 0, 3); // Only show 3 in table
                 
                 // Get active session
                 $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? AND session_end IS NULL ORDER BY session_start DESC LIMIT 1");
@@ -2105,53 +2106,94 @@ try {
             ?>
             
             <?php
-            $totalSessions = count($sessionHistory);
-            $totalDownload = array_sum(array_column($sessionHistory, 'input_octets')) / 1073741824;
-            $totalUpload = array_sum(array_column($sessionHistory, 'output_octets')) / 1073741824;
-            $lastSession = !empty($sessionHistory) ? $sessionHistory[0] : null;
+            $totalSessions = count($allSessions);
+            $totalDownload = array_sum(array_column($allSessions, 'input_octets')) / 1073741824;
+            $totalUpload = array_sum(array_column($allSessions, 'output_octets')) / 1073741824;
+            $lastSession = !empty($allSessions) ? $allSessions[0] : null;
             $avgSessionDuration = $totalSessions > 0 ? array_sum(array_map(fn($s) => 
                 (($s['session_end'] ? strtotime($s['session_end']) : time()) - strtotime($s['session_start'])), 
-                $sessionHistory)) / $totalSessions / 3600 : 0;
+                $allSessions)) / $totalSessions / 3600 : 0;
             ?>
             
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <a href="?page=isp&view=subscriptions" class="btn btn-outline-secondary btn-sm mb-2">
-                        <i class="bi bi-arrow-left me-1"></i> Back to Subscribers
-                    </a>
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="position-relative">
-                            <?php if ($isOnline): ?>
-                            <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
-                                <i class="bi bi-wifi text-white fs-4"></i>
-                            </div>
-                            <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 16px; height: 16px;"></span>
-                            <?php else: ?>
-                            <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
-                                <i class="bi bi-wifi-off text-secondary fs-4"></i>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                        <div>
-                            <h4 class="page-title mb-0">
-                                <?= htmlspecialchars($subscriber['username']) ?>
-                                <button class="btn btn-link btn-sm p-0 text-muted" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
-                            </h4>
-                            <div class="d-flex gap-2 mt-1">
-                                <?php if ($isOnline): ?>
-                                <span class="badge bg-success"><i class="bi bi-wifi me-1"></i>Online</span>
-                                <?php else: ?>
-                                <span class="badge bg-secondary"><i class="bi bi-wifi-off me-1"></i>Offline</span>
+            <!-- Premium Subscriber Header Card -->
+            <div class="card border-0 shadow-lg mb-4 overflow-hidden">
+                <div class="card-body p-0">
+                    <div class="row g-0">
+                        <!-- Left: Profile Section with Gradient -->
+                        <div class="col-lg-4" style="background: linear-gradient(135deg, <?= $isOnline ? '#198754' : '#6c757d' ?> 0%, <?= $isOnline ? '#0d6efd' : '#495057' ?> 100%);">
+                            <div class="p-4 text-white text-center">
+                                <a href="?page=isp&view=subscriptions" class="btn btn-sm btn-light btn-outline-light mb-3 opacity-75">
+                                    <i class="bi bi-arrow-left me-1"></i> Back
+                                </a>
+                                <div class="position-relative d-inline-block mb-3">
+                                    <?php if ($isOnline): ?>
+                                    <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px;">
+                                        <i class="bi bi-wifi text-white" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    <span class="position-absolute bottom-0 end-0 bg-success border border-3 border-white rounded-circle" style="width: 24px; height: 24px;"></span>
+                                    <?php else: ?>
+                                    <div class="rounded-circle bg-white bg-opacity-10 d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px;">
+                                        <i class="bi bi-wifi-off text-white opacity-50" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <h4 class="fw-bold mb-1">
+                                    <?= htmlspecialchars($subscriber['username']) ?>
+                                    <button class="btn btn-link btn-sm p-0 text-white opacity-75" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                </h4>
+                                <?php if ($customer): ?>
+                                <p class="mb-2 opacity-75"><?= htmlspecialchars($customer['name']) ?></p>
                                 <?php endif; ?>
-                                <span class="badge bg-<?= $statusClass ?>"><?= $statusLabel ?></span>
-                                <span class="badge bg-light text-dark border"><?= strtoupper($subscriber['access_type']) ?></span>
+                                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                    <?php if ($isOnline): ?>
+                                    <span class="badge bg-white text-success"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-white bg-opacity-25 text-white"><i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline</span>
+                                    <?php endif; ?>
+                                    <span class="badge bg-<?= $statusClass === 'success' ? 'white text-success' : ($statusClass === 'danger' ? 'danger' : 'warning text-dark') ?>"><?= $statusLabel ?></span>
+                                    <span class="badge bg-white bg-opacity-25"><?= strtoupper($subscriber['access_type']) ?></span>
+                                </div>
                                 <?php if ($subscriber['mac_address']): ?>
-                                <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span>
+                                <div class="mt-2"><span class="badge bg-white bg-opacity-10"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span></div>
                                 <?php endif; ?>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        <!-- Right: Quick Stats -->
+                        <div class="col-lg-8">
+                            <div class="p-4">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 bg-primary bg-opacity-10">
+                                            <div class="fs-4 fw-bold text-primary"><?= $package['name'] ?? 'N/A' ?></div>
+                                            <small class="text-muted">Package</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 bg-success bg-opacity-10">
+                                            <div class="fs-4 fw-bold text-success"><?= number_format($totalDownload, 1) ?> GB</div>
+                                            <small class="text-muted">Downloaded</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 bg-info bg-opacity-10">
+                                            <div class="fs-4 fw-bold text-info"><?= $totalSessions ?></div>
+                                            <small class="text-muted">Sessions</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 <?= $isSubExpired ? 'bg-danger bg-opacity-10' : 'bg-warning bg-opacity-10' ?>">
+                                            <?php 
+                                            $daysRemaining = $subscriber['expiry_date'] ? ceil((strtotime($subscriber['expiry_date']) - time()) / 86400) : null;
+                                            ?>
+                                            <div class="fs-4 fw-bold <?= $isSubExpired ? 'text-danger' : 'text-warning' ?>">
+                                                <?= $daysRemaining !== null ? ($daysRemaining < 0 ? 'Expired' : $daysRemaining . 'd') : '∞' ?>
+                                            </div>
+                                            <small class="text-muted"><?= $isSubExpired ? 'Days Ago' : 'Days Left' ?></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Action Buttons -->
+                                <div class="d-flex flex-wrap gap-2">
                 <div class="btn-group">
                     <?php if ($subscriber['status'] === 'active'): ?>
                     <form method="post" class="d-inline">
@@ -2198,39 +2240,8 @@ try {
                         <input type="hidden" name="id" value="<?= $subId ?>">
                         <input type="hidden" name="return_to" value="subscriber">
                     </form>
-                </div>
-            </div>
-            
-            <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-primary-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-primary"><?= $totalSessions ?></div>
-                            <div class="small text-muted">Total Sessions</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-success-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-success"><?= number_format($totalDownload, 2) ?> GB</div>
-                            <div class="small text-muted">Total Download</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-info-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-info"><?= number_format($totalUpload, 2) ?> GB</div>
-                            <div class="small text-muted">Total Upload</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-warning-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-warning"><?= number_format($avgSessionDuration, 1) ?>h</div>
-                            <div class="small text-muted">Avg Session</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
