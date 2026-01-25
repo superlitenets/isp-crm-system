@@ -4543,9 +4543,15 @@ try {
                     radiusServer = data.radius_server || radiusServer || '<?= gethostbyname(gethostname()) ?>';
                     const secret = data.secret || radiusSecret;
                     
-                    radiusScript = `# RADIUS Configuration for ${nas.name}
+                    const expiredPoolName = '<?= $radiusBilling->getSetting('expired_ip_pool') ?: 'expired-pool' ?>';
+                    const expiredPageUrl = '<?= rtrim($_ENV['APP_URL'] ?? 'https://your-crm-domain.com', '/') ?>/expired.php';
+                    
+                    radiusScript = `# ============================================
+# RADIUS Configuration for ${nas.name}
 # Generated: ${new Date().toLocaleString()}
+# ============================================
 
+# ---- RADIUS SERVER SETUP ----
 # Add RADIUS server for authentication
 /radius add service=ppp address=${radiusServer} secret="${secret}" timeout=3000ms
 
@@ -4561,6 +4567,45 @@ try {
 
 # Optional: Set NAS identifier
 /system identity set name="${nas.name}"
+
+# ============================================
+# EXPIRED POOL REDIRECT CONFIGURATION
+# ============================================
+# Create IP pool for expired/unknown users
+/ip pool add name=${expiredPoolName} ranges=10.255.255.2-10.255.255.254
+
+# Create address list for expired users
+/ip firewall address-list remove [find list=expired-users]
+
+# NAT rule to redirect HTTP traffic from expired pool to payment page
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=80 protocol=tcp action=dst-nat to-addresses=${radiusServer.split(':')[0]} to-ports=5000 comment="Redirect expired users to payment page"
+
+# NAT rule to redirect HTTPS (falls back to HTTP redirect page)
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=443 protocol=tcp action=dst-nat to-addresses=${radiusServer.split(':')[0]} to-ports=5000 comment="Redirect expired users HTTPS"
+
+# Allow expired pool to access DNS (important!)
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=udp action=accept comment="Allow expired users DNS"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=tcp action=accept comment="Allow expired users DNS"
+
+# Allow expired pool to access CRM server only
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-address=${radiusServer} action=accept comment="Allow expired users to CRM"
+
+# Block all other traffic from expired pool
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 action=drop comment="Block expired users internet"
+
+# ============================================
+# PPP PROFILE (Create or update)
+# ============================================
+# Note: RADIUS will return Framed-Pool attribute to assign users to expired-pool
+# Your default PPP profile should NOT have a fixed remote-address if using RADIUS pools
+# /ppp profile set [find name=default] remote-address=""
+
+# ============================================
+# WALLED GARDEN (for Hotspot only)
+# ============================================
+# If using Hotspot, add walled garden entries:
+# /ip hotspot walled-garden add dst-host=*your-crm-domain.com* action=allow
+# /ip hotspot walled-garden ip add dst-address=${radiusServer} action=accept
 `;
                     document.getElementById('radiusScript').textContent = radiusScript;
                     document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
@@ -4585,6 +4630,16 @@ try {
 
 # IMPORTANT: Enable RADIUS Incoming for CoA/Disconnect
 /radius incoming set accept=yes port=3799
+
+# ============================================
+# EXPIRED POOL REDIRECT (Update IPs as needed)
+# ============================================
+/ip pool add name=expired-pool ranges=10.255.255.2-10.255.255.254
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=80 protocol=tcp action=dst-nat to-addresses=YOUR_CRM_IP to-ports=5000 comment="Redirect expired to payment"
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=443 protocol=tcp action=dst-nat to-addresses=YOUR_CRM_IP to-ports=5000 comment="Redirect expired HTTPS"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=udp action=accept comment="Allow DNS"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-address=YOUR_CRM_IP action=accept comment="Allow CRM"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 action=drop comment="Block expired internet"
 `;
                 document.getElementById('radiusScript').textContent = radiusScript;
                 document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
