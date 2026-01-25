@@ -651,7 +651,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (in_array($key, ['action', 'category'])) continue;
                 
                 // Handle checkboxes (unchecked checkboxes don't appear in POST)
-                if (strpos($key, 'enabled') !== false || $key === 'auto_suspend_expired' || $key === 'postpaid_enabled') {
+                if (strpos($key, 'enabled') !== false || $key === 'auto_suspend_expired' || $key === 'postpaid_enabled' || $key === 'use_expired_pool') {
                     $settingsToSave[$key] = $value === 'true' ? 'true' : 'false';
                 } else {
                     $settingsToSave[$key] = $value;
@@ -659,12 +659,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             // Handle unchecked checkboxes explicitly
-            $checkboxFields = ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled', 'postpaid_enabled', 'auto_suspend_expired'];
+            $checkboxFields = ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled', 'postpaid_enabled', 'auto_suspend_expired', 'use_expired_pool'];
             foreach ($checkboxFields as $field) {
                 if (!isset($_POST[$field]) && $category === 'notifications' && in_array($field, ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled'])) {
                     $settingsToSave[$field] = 'false';
                 }
                 if (!isset($_POST[$field]) && $category === 'billing' && in_array($field, ['postpaid_enabled', 'auto_suspend_expired'])) {
+                    $settingsToSave[$field] = 'false';
+                }
+                if (!isset($_POST[$field]) && $category === 'radius' && $field === 'use_expired_pool') {
                     $settingsToSave[$field] = 'false';
                 }
             }
