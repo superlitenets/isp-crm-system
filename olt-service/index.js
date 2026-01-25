@@ -419,6 +419,7 @@ const RADIUS_COA_NAK = 45;
 // RADIUS attributes
 const ATTR_USER_NAME = 1;
 const ATTR_ACCT_SESSION_ID = 44;
+const ATTR_MESSAGE_AUTHENTICATOR = 80;
 const ATTR_VENDOR_SPECIFIC = 26;
 const VENDOR_MIKROTIK = 14988;
 const MIKROTIK_RATE_LIMIT = 8;
@@ -460,27 +461,41 @@ function buildRadiusPacket(code, identifier, attributes, secret) {
         attrBuffers.push(encodeMikrotikRateLimit(attributes.rateLimit));
     }
     
+    // Add Message-Authenticator placeholder (16 zero bytes) - required by RFC 5176 for CoA/Disconnect
+    const msgAuthPlaceholder = Buffer.alloc(18);
+    msgAuthPlaceholder.writeUInt8(ATTR_MESSAGE_AUTHENTICATOR, 0);
+    msgAuthPlaceholder.writeUInt8(18, 1); // 2 header + 16 bytes HMAC
+    attrBuffers.push(msgAuthPlaceholder);
+    
     const attrData = Buffer.concat(attrBuffers);
     const length = 20 + attrData.length;
     
     // Build pre-packet with zero authenticator
-    const prePacket = Buffer.alloc(20 + attrData.length);
+    const prePacket = Buffer.alloc(length);
     prePacket.writeUInt8(code, 0);
     prePacket.writeUInt8(identifier, 1);
     prePacket.writeUInt16BE(length, 2);
-    // bytes 4-19 are zeros (authenticator placeholder)
+    // bytes 4-19 are zeros (Request Authenticator placeholder)
     attrData.copy(prePacket, 20);
     
-    // Calculate authenticator = MD5(Code + ID + Length + 16 zeros + Attributes + Secret)
-    const hash = crypto.createHash('md5');
-    hash.update(prePacket);
-    hash.update(secret);
-    const authenticator = hash.digest();
+    // Calculate Request Authenticator = MD5(Code + ID + Length + 16 zeros + Attributes + Secret)
+    const reqAuthHash = crypto.createHash('md5');
+    reqAuthHash.update(prePacket);
+    reqAuthHash.update(secret);
+    const requestAuthenticator = reqAuthHash.digest();
     
-    // Build final packet
+    // Build packet with Request Authenticator
     const packet = Buffer.alloc(length);
     prePacket.copy(packet);
-    authenticator.copy(packet, 4);
+    requestAuthenticator.copy(packet, 4);
+    
+    // Find Message-Authenticator position and calculate HMAC-MD5
+    // Message-Authenticator = HMAC-MD5(entire packet with zero Message-Authenticator, secret)
+    const msgAuthOffset = 20 + attrData.length - 18 + 2; // position of the 16-byte value
+    const hmac = crypto.createHmac('md5', secret);
+    hmac.update(packet);
+    const messageAuthenticator = hmac.digest();
+    messageAuthenticator.copy(packet, msgAuthOffset);
     
     return packet;
 }
