@@ -1534,6 +1534,8 @@ try {
             
             $packages = $radiusBilling->getPackages();
             $nasDevices = $radiusBilling->getNASDevices();
+            $ispLocations = $radiusBilling->getLocations();
+            $ispSubLocations = $radiusBilling->getAllSubLocations();
             $onlineSubscribers = $radiusBilling->getOnlineSubscribers();
             $onlineFilter = $_GET['online'] ?? '';
             
@@ -2023,6 +2025,26 @@ try {
                                             <option value="">Select NAS</option>
                                             <?php foreach ($nasDevices as $nas): ?>
                                             <option value="<?= $nas['id'] ?>"><?= htmlspecialchars($nas['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Location <span class="text-danger">*</span></label>
+                                        <select name="location_id" id="sub_location" class="form-select" required onchange="filterSubLocations(this, 'sub_sub_location')">
+                                            <option value="">-- Select Location --</option>
+                                            <?php foreach ($ispLocations as $loc): ?>
+                                            <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Sub-Location</label>
+                                        <select name="sub_location_id" id="sub_sub_location" class="form-select">
+                                            <option value="">-- Select Sub-Location --</option>
+                                            <?php foreach ($ispSubLocations as $sub): ?>
+                                            <option value="<?= $sub['id'] ?>" data-location="<?= $sub['location_id'] ?>"><?= htmlspecialchars($sub['location_name']) ?> - <?= htmlspecialchars($sub['name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
