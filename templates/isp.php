@@ -651,7 +651,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (in_array($key, ['action', 'category'])) continue;
                 
                 // Handle checkboxes (unchecked checkboxes don't appear in POST)
-                if (strpos($key, 'enabled') !== false || $key === 'auto_suspend_expired' || $key === 'postpaid_enabled' || $key === 'use_expired_pool') {
+                if (strpos($key, 'enabled') !== false || $key === 'auto_suspend_expired' || $key === 'postpaid_enabled' || $key === 'use_expired_pool' || $key === 'allow_unknown_expired_pool') {
                     $settingsToSave[$key] = $value === 'true' ? 'true' : 'false';
                 } else {
                     $settingsToSave[$key] = $value;
@@ -667,7 +667,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!isset($_POST[$field]) && $category === 'billing' && in_array($field, ['postpaid_enabled', 'auto_suspend_expired'])) {
                     $settingsToSave[$field] = 'false';
                 }
-                if (!isset($_POST[$field]) && $category === 'radius' && $field === 'use_expired_pool') {
+                if (!isset($_POST[$field]) && $category === 'radius' && in_array($field, ['use_expired_pool', 'allow_unknown_expired_pool'])) {
                     $settingsToSave[$field] = 'false';
                 }
             }
@@ -4270,6 +4270,20 @@ try {
                                         <label class="form-check-label" for="use_expired_pool"><strong>Enable Expired Pool</strong></label>
                                     </div>
                                     <small class="text-muted">Accept expired users but assign to restricted pool (instead of rejecting)</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="allow_unknown_expired_pool" id="allow_unknown_expired_pool" value="true" <?= $radiusBilling->getSetting('allow_unknown_expired_pool') === 'true' ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="allow_unknown_expired_pool"><strong>Allow Unknown Users</strong></label>
+                                    </div>
+                                    <small class="text-muted">Accept non-registered accounts and assign to expired pool (redirects to payment portal)</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">ISP Contact Phone</label>
+                                    <input type="text" class="form-control" name="isp_contact_phone" value="<?= htmlspecialchars($radiusBilling->getSetting('isp_contact_phone') ?: '') ?>" placeholder="+254712345678">
+                                    <small class="text-muted">Displayed on expired page for unknown users to contact support</small>
                                 </div>
                                 
                                 <div class="mb-3">

@@ -35,6 +35,13 @@ $messageType = 'info';
 $stkPushSent = false;
 $lookupMode = false;
 
+// Load ISP settings
+$radiusBilling = new \App\RadiusBilling($db);
+$ispName = $radiusBilling->getSetting('isp_name') ?: 'Your ISP';
+$ispPhone = $radiusBilling->getSetting('isp_contact_phone') ?: '';
+$ispPhoneFormatted = $ispPhone ? preg_replace('/[^0-9]/', '', $ispPhone) : '';
+$ispWhatsApp = $ispPhoneFormatted ? '254' . substr($ispPhoneFormatted, -9) : '';
+
 // Check if lookup by username/phone was submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'lookup') {
     $lookupValue = trim($_POST['lookup_value'] ?? '');
@@ -317,23 +324,27 @@ try {
             </form>
             <?php endif; ?>
             
+            <?php if ($ispPhone): ?>
             <div class="text-center mt-4">
-                <p class="text-muted small mb-2">Need help?</p>
+                <p class="text-muted small mb-2">Need help? Contact <?= htmlspecialchars($ispName) ?>:</p>
                 <div class="d-flex justify-content-center gap-3">
-                    <a href="tel:0700000000" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-telephone me-1"></i> Call Support
+                    <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-telephone me-1"></i> <?= htmlspecialchars($ispPhone) ?>
                     </a>
-                    <a href="https://wa.me/254700000000" class="btn btn-outline-success btn-sm">
+                    <?php if ($ispWhatsApp): ?>
+                    <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>" class="btn btn-outline-success btn-sm">
                         <i class="bi bi-whatsapp me-1"></i> WhatsApp
                     </a>
+                    <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
         <?php else: ?>
         <div class="not-found">
-            <div class="icon"><i class="bi bi-wifi-off"></i></div>
-            <h3 class="mb-3">Find Your Account</h3>
-            <p class="text-muted mb-4">Enter your username or phone number to view your subscription and renew.</p>
+            <div class="icon"><i class="bi bi-exclamation-circle text-warning"></i></div>
+            <h3 class="mb-3">Account Not Found</h3>
+            <p class="text-muted mb-4">We couldn't find your account in our system. Please contact <strong><?= htmlspecialchars($ispName) ?></strong> to register or get assistance.</p>
             
             <?php if ($message): ?>
             <div class="alert alert-<?= $messageType ?> text-start mb-4">
@@ -341,32 +352,43 @@ try {
             </div>
             <?php endif; ?>
             
-            <form method="post" class="text-start mb-4">
-                <input type="hidden" name="action" value="lookup">
-                <div class="mb-3">
-                    <label class="form-label">Username or Phone Number</label>
-                    <input type="text" name="lookup_value" class="form-control form-control-lg" 
-                           placeholder="e.g. john1234 or 0712345678" required
-                           value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
-                    <div class="form-text">Enter your PPPoE username or registered phone number</div>
+            <div class="card bg-light mb-4">
+                <div class="card-body text-center">
+                    <h5 class="card-title mb-3"><i class="bi bi-headset me-2"></i>Contact <?= htmlspecialchars($ispName) ?></h5>
+                    <?php if ($ispPhone): ?>
+                    <div class="d-flex justify-content-center gap-3 mb-3">
+                        <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="btn btn-primary">
+                            <i class="bi bi-telephone me-2"></i> Call <?= htmlspecialchars($ispPhone) ?>
+                        </a>
+                        <?php if ($ispWhatsApp): ?>
+                        <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account" class="btn btn-success">
+                            <i class="bi bi-whatsapp me-2"></i> WhatsApp
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                    <?php else: ?>
+                    <p class="text-muted">Please contact your ISP for assistance.</p>
+                    <?php endif; ?>
                 </div>
-                <button type="submit" class="btn btn-primary btn-lg w-100">
-                    <i class="bi bi-search me-2"></i> Find My Account
-                </button>
-            </form>
-            
-            <div class="ip-badge mb-4">
-                <i class="bi bi-geo-alt me-1"></i> Your IP: <?= htmlspecialchars($clientIP) ?>
             </div>
             
-            <p class="text-muted small mb-3">Need help? Contact support:</p>
-            <div class="d-flex justify-content-center gap-3">
-                <a href="tel:0700000000" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-telephone me-1"></i> Call
-                </a>
-                <a href="https://wa.me/254700000000" class="btn btn-outline-success btn-sm">
-                    <i class="bi bi-whatsapp me-1"></i> WhatsApp
-                </a>
+            <hr class="my-4">
+            
+            <p class="text-muted small mb-3">Already have an account? Search by username or phone:</p>
+            <form method="post" class="text-start mb-4">
+                <input type="hidden" name="action" value="lookup">
+                <div class="input-group">
+                    <input type="text" name="lookup_value" class="form-control" 
+                           placeholder="Username or phone number" required
+                           value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </form>
+            
+            <div class="ip-badge">
+                <i class="bi bi-geo-alt me-1"></i> Your IP: <?= htmlspecialchars($clientIP) ?>
             </div>
         </div>
         <?php endif; ?>

@@ -985,7 +985,28 @@ class RadiusBilling {
     public function authenticate(string $username, string $password, string $nasIp = '', string $callingStationId = ''): array {
         $sub = $this->getSubscriptionByUsername($username);
         
+        // Get expired pool settings upfront
+        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        $allowUnknownUsers = $this->getSetting('allow_unknown_expired_pool') === 'true';
+        $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
+        
         if (!$sub) {
+            // If unknown users should be allowed with expired pool
+            if ($useExpiredPool && $allowUnknownUsers) {
+                return [
+                    'success' => true,
+                    'reply' => 'Access-Accept',
+                    'unknown_user' => true,
+                    'attributes' => [
+                        'Framed-Pool' => $expiredPoolName,
+                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                        'Session-Timeout' => 300,
+                        'Acct-Interim-Interval' => 60
+                    ],
+                    'subscription' => null
+                ];
+            }
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'User not found'];
         }
         
