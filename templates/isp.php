@@ -61,7 +61,6 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         echo json_encode(['online' => false, 'error' => 'Invalid IP']);
         exit;
     }
-    // Use fsockopen to check common ports (same method as test_nas)
     $online = false;
     $portsToCheck = [22, 23, 80, 443, 8291, 8728];
     foreach ($portsToCheck as $port) {
@@ -73,6 +72,22 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         }
     }
     echo json_encode(['online' => $online, 'ip' => $ip]);
+    exit;
+}
+
+if ($action === 'preview_bulk_sms') {
+    header('Content-Type: application/json');
+    $filters = [
+        'status' => $_GET['status'] ?? '',
+        'location_id' => $_GET['location'] ?? '',
+        'package_id' => $_GET['package'] ?? ''
+    ];
+    $subscribers = $radiusBilling->getSubscribersByFilter($filters);
+    echo json_encode([
+        'success' => true,
+        'count' => count($subscribers),
+        'subscribers' => array_slice($subscribers, 0, 50)
+    ]);
     exit;
 }
 
@@ -206,6 +221,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $radiusBilling->deleteNAS((int)$_POST['id']);
             $message = $result['success'] ? 'NAS device deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+        
+        case 'create_location':
+            $result = $radiusBilling->createLocation($_POST);
+            $message = $result['success'] ? 'Location created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'update_location':
+            $result = $radiusBilling->updateLocation((int)$_POST['id'], $_POST);
+            $message = $result['success'] ? 'Location updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'delete_location':
+            $result = $radiusBilling->deleteLocation((int)$_POST['id']);
+            $message = $result['success'] ? 'Location deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'create_sub_location':
+            $result = $radiusBilling->createSubLocation($_POST);
+            $message = $result['success'] ? 'Sub-location created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'update_sub_location':
+            $result = $radiusBilling->updateSubLocation((int)$_POST['id'], $_POST);
+            $message = $result['success'] ? 'Sub-location updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'delete_sub_location':
+            $result = $radiusBilling->deleteSubLocation((int)$_POST['id']);
+            $message = $result['success'] ? 'Sub-location deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'send_bulk_sms':
+            $filters = [
+                'status' => $_POST['filter_status'] ?? '',
+                'location_id' => $_POST['filter_location'] ?? '',
+                'package_id' => $_POST['filter_package'] ?? ''
+            ];
+            $subscribers = $radiusBilling->getSubscribersByFilter($filters);
+            $smsService = new \App\SmsService();
+            $whatsappEnabled = class_exists('\App\WhatsAppService');
+            $sendVia = $_POST['send_via'] ?? 'sms';
+            $messageTemplate = $_POST['message'] ?? '';
+            
+            $sentCount = 0;
+            $failCount = 0;
+            
+            foreach ($subscribers as $sub) {
+                $phone = $sub['customer_phone'] ?? '';
+                if (empty($phone)) continue;
+                
+                $msg = str_replace(
+                    ['{customer_name}', '{username}', '{package_name}', '{expiry_date}', '{balance}'],
+                    [$sub['customer_name'] ?? '', $sub['username'] ?? '', $sub['package_name'] ?? '', $sub['expiry_date'] ?? '', '0'],
+                    $messageTemplate
+                );
+                
+                try {
+                    if ($sendVia === 'sms' || $sendVia === 'both') {
+                        $smsService->send($phone, $msg);
+                    }
+                    if (($sendVia === 'whatsapp' || $sendVia === 'both') && $whatsappEnabled) {
+                        $wa = new \App\WhatsAppService();
+                        $wa->sendMessage($phone, $msg);
+                    }
+                    $sentCount++;
+                } catch (\Exception $e) {
+                    $failCount++;
+                }
+            }
+            
+            $message = "Bulk message sent to $sentCount subscribers" . ($failCount > 0 ? " ($failCount failed)" : '');
+            $messageType = $failCount > 0 ? 'warning' : 'success';
             break;
             
         case 'create_package':
@@ -4159,6 +4253,16 @@ try {
                         <i class="bi bi-hdd-network me-1"></i> RADIUS
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'locations' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=locations">
+                        <i class="bi bi-geo-alt me-1"></i> Locations
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'bulk_sms' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=bulk_sms">
+                        <i class="bi bi-envelope-paper me-1"></i> Bulk SMS
+                    </a>
+                </li>
             </ul>
             
             <?php if ($settingsTab === 'notifications'): ?>
@@ -4499,6 +4603,379 @@ try {
                     </div>
                 </div>
             </div>
+            <?php elseif ($settingsTab === 'locations'): ?>
+            <?php
+            $ispLocations = $radiusBilling->getAllLocations();
+            $ispSubLocations = $radiusBilling->getAllSubLocations();
+            ?>
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-geo-alt me-2"></i>Locations</span>
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+                                <i class="bi bi-plus-lg"></i> Add Location
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($ispLocations)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-geo-alt fs-3 d-block mb-2"></i>
+                                No locations defined. Add your first location.
+                            </div>
+                            <?php else: ?>
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($ispLocations as $loc): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><?= htmlspecialchars($loc['name']) ?></strong>
+                                        <?php if ($loc['code']): ?>
+                                        <span class="badge bg-secondary ms-2"><?= htmlspecialchars($loc['code']) ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($loc['description']): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($loc['description']) ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary" onclick="editLocation(<?= htmlspecialchars(json_encode($loc)) ?>)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this location?')">
+                                            <input type="hidden" name="action" value="delete_location">
+                                            <input type="hidden" name="id" value="<?= $loc['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-geo me-2"></i>Sub-Locations</span>
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSubLocationModal">
+                                <i class="bi bi-plus-lg"></i> Add Sub-Location
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($ispSubLocations)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-geo fs-3 d-block mb-2"></i>
+                                No sub-locations defined. Create locations first.
+                            </div>
+                            <?php else: ?>
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($ispSubLocations as $sub): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-primary me-2"><?= htmlspecialchars($sub['location_name']) ?></span>
+                                        <strong><?= htmlspecialchars($sub['name']) ?></strong>
+                                        <?php if ($sub['code']): ?>
+                                        <span class="badge bg-secondary ms-2"><?= htmlspecialchars($sub['code']) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary" onclick="editSubLocation(<?= htmlspecialchars(json_encode($sub)) ?>)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this sub-location?')">
+                                            <input type="hidden" name="action" value="delete_sub_location">
+                                            <input type="hidden" name="id" value="<?= $sub['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="addLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="create_location">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add Location</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Location Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Nairobi">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" class="form-control" placeholder="e.g., NBI">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Add Location</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="editLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_location">
+                            <input type="hidden" name="id" id="edit_location_id">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Location</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Location Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" id="edit_location_name" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" id="edit_location_code" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="edit_location_desc" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="is_active" id="edit_location_active" value="1">
+                                    <label class="form-check-label" for="edit_location_active">Active</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="addSubLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="create_sub_location">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add Sub-Location</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Parent Location <span class="text-danger">*</span></label>
+                                    <select name="location_id" class="form-select" required>
+                                        <option value="">-- Select Location --</option>
+                                        <?php foreach ($ispLocations as $loc): ?>
+                                        <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Sub-Location Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Westlands">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" class="form-control" placeholder="e.g., WL">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Add Sub-Location</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="editSubLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_sub_location">
+                            <input type="hidden" name="id" id="edit_sub_location_id">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Sub-Location</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Parent Location <span class="text-danger">*</span></label>
+                                    <select name="location_id" id="edit_sub_location_parent" class="form-select" required>
+                                        <option value="">-- Select Location --</option>
+                                        <?php foreach ($ispLocations as $loc): ?>
+                                        <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Sub-Location Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" id="edit_sub_location_name" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" id="edit_sub_location_code" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="edit_sub_location_desc" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="is_active" id="edit_sub_location_active" value="1">
+                                    <label class="form-check-label" for="edit_sub_location_active">Active</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <?php elseif ($settingsTab === 'bulk_sms'): ?>
+            <?php
+            $ispLocations = $radiusBilling->getLocations();
+            $packages = $radiusBilling->getPackages();
+            ?>
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-envelope-paper me-2"></i>Bulk SMS to Subscribers
+                </div>
+                <div class="card-body">
+                    <form method="post" id="bulkSmsForm">
+                        <input type="hidden" name="action" value="send_bulk_sms">
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Status</label>
+                                <select name="filter_status" class="form-select" id="bulkFilterStatus">
+                                    <option value="">All Statuses</option>
+                                    <option value="active">Active</option>
+                                    <option value="expired">Expired</option>
+                                    <option value="suspended">Suspended</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Location</label>
+                                <select name="filter_location" class="form-select" id="bulkFilterLocation">
+                                    <option value="">All Locations</option>
+                                    <?php foreach ($ispLocations as $loc): ?>
+                                    <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Package</label>
+                                <select name="filter_package" class="form-select" id="bulkFilterPackage">
+                                    <option value="">All Packages</option>
+                                    <?php foreach ($packages as $p): ?>
+                                    <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary" onclick="previewRecipients()">
+                                <i class="bi bi-eye me-1"></i> Preview Recipients
+                            </button>
+                            <span id="recipientCount" class="ms-3 text-muted"></span>
+                        </div>
+                        
+                        <div id="recipientPreview" class="mb-3" style="display: none;">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>Selected Recipients:</h6>
+                                    <div id="recipientList" style="max-height: 200px; overflow-y: auto;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Message <span class="text-danger">*</span></label>
+                            <textarea name="message" class="form-control" rows="4" required placeholder="Type your message here..."></textarea>
+                            <div class="d-flex justify-content-between mt-2">
+                                <small class="text-muted">Variables: {customer_name}, {username}, {package_name}, {expiry_date}, {balance}</small>
+                                <small class="text-muted"><span id="charCount">0</span>/160 characters</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Send Via</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="send_via" id="sendSms" value="sms" checked>
+                                <label class="btn btn-outline-primary" for="sendSms"><i class="bi bi-chat-dots me-1"></i> SMS</label>
+                                <input type="radio" class="btn-check" name="send_via" id="sendWhatsapp" value="whatsapp">
+                                <label class="btn btn-outline-success" for="sendWhatsapp"><i class="bi bi-whatsapp me-1"></i> WhatsApp</label>
+                                <input type="radio" class="btn-check" name="send_via" id="sendBoth" value="both">
+                                <label class="btn btn-outline-info" for="sendBoth"><i class="bi bi-send me-1"></i> Both</label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('Send bulk message to selected subscribers?')">
+                            <i class="bi bi-send-fill me-1"></i> Send Bulk Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <script>
+            document.querySelector('textarea[name="message"]').addEventListener('input', function() {
+                document.getElementById('charCount').textContent = this.value.length;
+            });
+            
+            function previewRecipients() {
+                const status = document.getElementById('bulkFilterStatus').value;
+                const location = document.getElementById('bulkFilterLocation').value;
+                const pkg = document.getElementById('bulkFilterPackage').value;
+                
+                fetch(`/index.php?page=isp&action=preview_bulk_sms&status=${status}&location=${location}&package=${pkg}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('recipientCount').textContent = `${data.count} subscribers selected`;
+                        
+                        if (data.subscribers && data.subscribers.length > 0) {
+                            let html = '<table class="table table-sm table-striped mb-0"><thead><tr><th>Customer</th><th>Phone</th><th>Package</th><th>Status</th></tr></thead><tbody>';
+                            data.subscribers.slice(0, 50).forEach(s => {
+                                html += `<tr><td>${s.customer_name || 'N/A'}</td><td>${s.customer_phone || 'N/A'}</td><td>${s.package_name || 'N/A'}</td><td>${s.status}</td></tr>`;
+                            });
+                            if (data.count > 50) {
+                                html += `<tr><td colspan="4" class="text-center text-muted">...and ${data.count - 50} more</td></tr>`;
+                            }
+                            html += '</tbody></table>';
+                            document.getElementById('recipientList').innerHTML = html;
+                            document.getElementById('recipientPreview').style.display = 'block';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Preview error:', err);
+                        document.getElementById('recipientCount').textContent = 'Error loading preview';
+                    });
+            }
+            </script>
             <?php endif; ?>
             
             <?php endif; ?>
@@ -4589,6 +5066,25 @@ try {
         } else if (locationId) {
             subSelect.value = '';
         }
+    }
+    
+    function editLocation(loc) {
+        document.getElementById('edit_location_id').value = loc.id;
+        document.getElementById('edit_location_name').value = loc.name;
+        document.getElementById('edit_location_code').value = loc.code || '';
+        document.getElementById('edit_location_desc').value = loc.description || '';
+        document.getElementById('edit_location_active').checked = loc.is_active == true;
+        new bootstrap.Modal(document.getElementById('editLocationModal')).show();
+    }
+    
+    function editSubLocation(sub) {
+        document.getElementById('edit_sub_location_id').value = sub.id;
+        document.getElementById('edit_sub_location_parent').value = sub.location_id;
+        document.getElementById('edit_sub_location_name').value = sub.name;
+        document.getElementById('edit_sub_location_code').value = sub.code || '';
+        document.getElementById('edit_sub_location_desc').value = sub.description || '';
+        document.getElementById('edit_sub_location_active').checked = sub.is_active == true;
+        new bootstrap.Modal(document.getElementById('editSubLocationModal')).show();
     }
     
     function generateSecret(inputId) {
