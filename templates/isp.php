@@ -3260,6 +3260,8 @@ try {
             $nasDevices = $radiusBilling->getNASDevices();
             $wireguardService = new \App\WireGuardService($db);
             $vpnPeers = $wireguardService->getAllPeers();
+            $ispLocations = $radiusBilling->getLocations();
+            $ispSubLocations = $radiusBilling->getAllSubLocations();
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-hdd-network"></i> NAS Devices (MikroTik Routers)</h4>
@@ -3283,8 +3285,8 @@ try {
                                 <tr>
                                     <th>Name</th>
                                     <th>IP Address</th>
+                                    <th>Location</th>
                                     <th>Type</th>
-                                    <th>RADIUS Port</th>
                                     <th>API</th>
                                     <th>VPN</th>
                                     <th>Online</th>
@@ -3302,8 +3304,17 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td><code><?= htmlspecialchars($nas['ip_address']) ?></code></td>
+                                    <td>
+                                        <?php if ($nas['location_name']): ?>
+                                        <span class="badge bg-primary"><?= htmlspecialchars($nas['location_name']) ?></span>
+                                        <?php if ($nas['sub_location_name']): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($nas['sub_location_name']) ?></small>
+                                        <?php endif; ?>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= htmlspecialchars($nas['nas_type']) ?></td>
-                                    <td><?= $nas['ports'] ?></td>
                                     <td>
                                         <?php if ($nas['api_enabled']): ?>
                                         <span class="badge bg-success">Enabled (<?= $nas['api_port'] ?>)</span>
@@ -3401,6 +3412,28 @@ try {
                                     <textarea name="description" class="form-control" rows="2"></textarea>
                                 </div>
                                 <hr>
+                                <h6><i class="bi bi-geo-alt me-1"></i> Location</h6>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Location</label>
+                                        <select name="location_id" class="form-select" id="add_nas_location" onchange="filterSubLocations(this, 'add_nas_sub_location')">
+                                            <option value="">-- Select Location --</option>
+                                            <?php foreach ($ispLocations as $loc): ?>
+                                            <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Sub-Location</label>
+                                        <select name="sub_location_id" class="form-select" id="add_nas_sub_location">
+                                            <option value="">-- Select Sub-Location --</option>
+                                            <?php foreach ($ispSubLocations as $sub): ?>
+                                            <option value="<?= $sub['id'] ?>" data-location="<?= $sub['location_id'] ?>"><?= htmlspecialchars($sub['location_name']) ?> - <?= htmlspecialchars($sub['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <hr>
                                 <h6><i class="bi bi-shield-lock me-1"></i> WireGuard VPN (Optional)</h6>
                                 <div class="mb-3">
                                     <label class="form-label">VPN Peer</label>
@@ -3486,6 +3519,28 @@ try {
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" name="is_active" id="edit_nas_active" value="1">
                                     <label class="form-check-label" for="edit_nas_active">Active</label>
+                                </div>
+                                <hr>
+                                <h6><i class="bi bi-geo-alt me-1"></i> Location</h6>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Location</label>
+                                        <select name="location_id" class="form-select" id="edit_nas_location" onchange="filterSubLocations(this, 'edit_nas_sub_location')">
+                                            <option value="">-- Select Location --</option>
+                                            <?php foreach ($ispLocations as $loc): ?>
+                                            <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Sub-Location</label>
+                                        <select name="sub_location_id" class="form-select" id="edit_nas_sub_location">
+                                            <option value="">-- Select Sub-Location --</option>
+                                            <?php foreach ($ispSubLocations as $sub): ?>
+                                            <option value="<?= $sub['id'] ?>" data-location="<?= $sub['location_id'] ?>"><?= htmlspecialchars($sub['location_name']) ?> - <?= htmlspecialchars($sub['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 </div>
                                 <hr>
                                 <h6><i class="bi bi-shield-lock me-1"></i> WireGuard VPN</h6>
@@ -4486,7 +4541,32 @@ try {
         document.getElementById('edit_api_port').value = nas.api_port || 8728;
         document.getElementById('edit_api_username').value = nas.api_username || '';
         document.getElementById('edit_nas_vpn_peer').value = nas.wireguard_peer_id || '';
+        document.getElementById('edit_nas_location').value = nas.location_id || '';
+        document.getElementById('edit_nas_sub_location').value = nas.sub_location_id || '';
+        filterSubLocations(document.getElementById('edit_nas_location'), 'edit_nas_sub_location', nas.sub_location_id);
         new bootstrap.Modal(document.getElementById('editNASModal')).show();
+    }
+    
+    function filterSubLocations(locationSelect, subLocationSelectId, selectedValue = '') {
+        const locationId = locationSelect.value;
+        const subSelect = document.getElementById(subLocationSelectId);
+        const options = subSelect.querySelectorAll('option');
+        
+        options.forEach(opt => {
+            if (opt.value === '') {
+                opt.style.display = '';
+            } else if (!locationId || opt.dataset.location === locationId) {
+                opt.style.display = '';
+            } else {
+                opt.style.display = 'none';
+            }
+        });
+        
+        if (selectedValue) {
+            subSelect.value = selectedValue;
+        } else if (locationId) {
+            subSelect.value = '';
+        }
     }
     
     function generateSecret(inputId) {
