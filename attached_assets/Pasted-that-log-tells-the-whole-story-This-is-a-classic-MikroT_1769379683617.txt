@@ -1,0 +1,137 @@
+that log tells the whole story. This is a classic MikroTik CoA (Change of Authorization) secret mismatch.
+
+What the error means (from your log)
+Key line 👇
+received remote request from 10.200.0.1:42824 with bad signature (check your secret!), bad message auth, dropping
+
+And just above it:
+rx bad Disconnect-Request
+
+Translation (human version 😄)
+Your RADIUS server sent a CoA / Disconnect-Request, but MikroTik rejected it because the shared secret does not match (or CoA is not properly enabled).
+Authentication + Accounting are working ✅
+Only CoA is failing ❌
+
+Why this happens
+One (or more) of these is true:
+
+
+Wrong CoA secret
+
+
+The secret configured on MikroTik ≠ secret on RADIUS (FreeRADIUS / CRM / phpNuxBill)
+
+
+
+
+CoA not enabled on MikroTik
+
+
+Wrong source IP
+
+
+CoA sent from an IP MikroTik does not trust
+
+
+
+
+Using wrong RADIUS port
+
+
+CoA uses UDP 3799, not 1812/1813
+
+
+
+
+
+How to FIX it (step by step)
+1️⃣ Enable CoA on MikroTik
+Run this on the MikroTik:
+/radius incoming set accept=yes
+
+Verify:
+/radius incoming print
+
+Expected:
+accept: yes
+
+
+2️⃣ Check RADIUS server entry on MikroTik
+/radius print detail
+
+You should see something like:
+address=10.200.0.1
+secret=YOUR_SECRET
+service=ppp
+
+⚠️ That secret MUST match exactly what is on the RADIUS server (case-sensitive).
+
+3️⃣ Verify CoA client on FreeRADIUS (or CRM)
+On FreeRADIUS (clients.conf or clients.d/mikrotik.conf):
+client mikrotik-erp {
+    ipaddr = 10.200.0.10
+    secret = YOUR_SECRET
+    nas_type = mikrotik
+}
+
+🔑 The secret must match MikroTik’s /radius secret.
+Restart FreeRADIUS after changes:
+systemctl restart freeradius
+
+
+4️⃣ Make sure CoA is sent to the RIGHT IP
+From your log:
+received remote request from 10.200.0.1
+
+So MikroTik expects CoA from 10.200.0.1
+If your CRM / RADIUS server is using:
+
+
+Docker
+
+
+NAT
+
+
+Another interface
+
+
+👉 Ensure the source IP of CoA packets is 10.200.0.1
+Otherwise MikroTik will reject it.
+
+5️⃣ Confirm UDP 3799 is open
+On MikroTik:
+/ip firewall filter print
+
+Ensure UDP 3799 is allowed from the RADIUS server IP.
+Quick test rule:
+/ip firewall filter add chain=input protocol=udp dst-port=3799 src-address=10.200.0.1 action=accept comment="Allow RADIUS CoA"
+
+
+How to confirm it’s FIXED
+When working, you’ll see logs like:
+radius,info Disconnect-Request accepted
+ppp,info <user> disconnected by RADIUS
+
+❌ No more:
+bad signature
+bad message auth
+
+
+Common gotcha (VERY common in Docker setups)
+If your billing system / FreeRADIUS is in Docker:
+
+
+CoA may originate from container IP, not host IP
+
+
+MikroTik sees a different source → signature fails
+
+
+👉 Solution:
+
+
+Use --network host OR
+
+
+Add the container subnet as a RADIUS client with same secret
