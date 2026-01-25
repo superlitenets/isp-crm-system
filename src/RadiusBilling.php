@@ -106,10 +106,13 @@ class RadiusBilling {
         $stmt = $this->db->query("
             SELECT n.*, 
                    wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
-                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr
+                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr,
+                   l.name as location_name, sl.name as sub_location_name
             FROM radius_nas n
             LEFT JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
             LEFT JOIN wireguard_servers ws ON wp.server_id = ws.id
+            LEFT JOIN isp_locations l ON n.location_id = l.id
+            LEFT JOIN isp_sub_locations sl ON n.sub_location_id = sl.id
             ORDER BY n.name
         ");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -144,8 +147,9 @@ class RadiusBilling {
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_nas (name, ip_address, secret, nas_type, ports, description, 
-                                        api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?)
+                                        api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id,
+                                        location_id, sub_location_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['name'],
@@ -159,7 +163,9 @@ class RadiusBilling {
                 $data['api_username'] ?? '',
                 !empty($data['api_password']) ? $this->encrypt($data['api_password']) : '',
                 $isActive,
-                !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null
+                !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null,
+                !empty($data['location_id']) ? (int)$data['location_id'] : null,
+                !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -172,6 +178,7 @@ class RadiusBilling {
             $fields = ['name', 'ip_address', 'secret', 'nas_type', 'ports', 'description', 
                        'api_port', 'api_username'];
             $boolFields = ['api_enabled', 'is_active'];
+            $intFields = ['location_id', 'sub_location_id'];
             $updates = [];
             $params = [];
             
@@ -186,6 +193,13 @@ class RadiusBilling {
                 if (isset($data[$field])) {
                     $updates[] = "$field = ?::boolean";
                     $params[] = !empty($data[$field]) ? 'true' : 'false';
+                }
+            }
+            
+            foreach ($intFields as $field) {
+                if (array_key_exists($field, $data)) {
+                    $updates[] = "$field = ?";
+                    $params[] = !empty($data[$field]) ? (int)$data[$field] : null;
                 }
             }
             
@@ -218,6 +232,212 @@ class RadiusBilling {
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+    
+    // ==================== Location Management ====================
+    
+    public function getLocations(): array {
+        $stmt = $this->db->query("SELECT * FROM isp_locations WHERE is_active = true ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAllLocations(): array {
+        $stmt = $this->db->query("SELECT * FROM isp_locations ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getLocation(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM isp_locations WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function createLocation(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO isp_locations (name, code, description, is_active)
+                VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['code'] ?? null,
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function updateLocation(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE isp_locations 
+                SET name = ?, code = ?, description = ?, is_active = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['code'] ?? null,
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteLocation(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM isp_locations WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSubLocations(?int $locationId = null): array {
+        $sql = "SELECT sl.*, l.name as location_name 
+                FROM isp_sub_locations sl 
+                JOIN isp_locations l ON sl.location_id = l.id 
+                WHERE sl.is_active = true";
+        $params = [];
+        
+        if ($locationId) {
+            $sql .= " AND sl.location_id = ?";
+            $params[] = $locationId;
+        }
+        
+        $sql .= " ORDER BY l.name, sl.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAllSubLocations(): array {
+        $stmt = $this->db->query("
+            SELECT sl.*, l.name as location_name 
+            FROM isp_sub_locations sl 
+            JOIN isp_locations l ON sl.location_id = l.id 
+            ORDER BY l.name, sl.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSubLocation(int $id): ?array {
+        $stmt = $this->db->prepare("
+            SELECT sl.*, l.name as location_name 
+            FROM isp_sub_locations sl 
+            JOIN isp_locations l ON sl.location_id = l.id 
+            WHERE sl.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function createSubLocation(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO isp_sub_locations (location_id, name, code, description, is_active)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['location_id'],
+                $data['name'],
+                $data['code'] ?? null,
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function updateSubLocation(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE isp_sub_locations 
+                SET location_id = ?, name = ?, code = ?, description = ?, is_active = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['location_id'],
+                $data['name'],
+                $data['code'] ?? null,
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteSubLocation(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM isp_sub_locations WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSubscribersByFilter(array $filters): array {
+        $sql = "SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+                       p.name as package_name, p.price as package_price,
+                       n.name as nas_name, n.ip_address as nas_ip,
+                       l.name as location_name, sl.name as sub_location_name
+                FROM radius_subscriptions s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                LEFT JOIN radius_packages p ON s.package_id = p.id
+                LEFT JOIN radius_nas n ON s.nas_id = n.id
+                LEFT JOIN isp_locations l ON s.location_id = l.id
+                LEFT JOIN isp_sub_locations sl ON s.sub_location_id = sl.id
+                WHERE 1=1";
+        $params = [];
+        
+        if (!empty($filters['status'])) {
+            if ($filters['status'] === 'expired') {
+                $sql .= " AND s.expiry_date < CURRENT_DATE";
+            } elseif ($filters['status'] === 'active') {
+                $sql .= " AND s.status = 'active' AND s.expiry_date >= CURRENT_DATE";
+            } else {
+                $sql .= " AND s.status = ?";
+                $params[] = $filters['status'];
+            }
+        }
+        
+        if (!empty($filters['location_id'])) {
+            $sql .= " AND s.location_id = ?";
+            $params[] = $filters['location_id'];
+        }
+        
+        if (!empty($filters['sub_location_id'])) {
+            $sql .= " AND s.sub_location_id = ?";
+            $params[] = $filters['sub_location_id'];
+        }
+        
+        if (!empty($filters['package_id'])) {
+            $sql .= " AND s.package_id = ?";
+            $params[] = $filters['package_id'];
+        }
+        
+        if (!empty($filters['nas_id'])) {
+            $sql .= " AND s.nas_id = ?";
+            $params[] = $filters['nas_id'];
+        }
+        
+        $sql .= " ORDER BY c.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     // ==================== Package Management ====================
@@ -513,8 +733,8 @@ class RadiusBilling {
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_subscriptions (customer_id, package_id, username, password, password_encrypted,
-                    access_type, static_ip, mac_address, status, start_date, expiry_date, nas_id, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    access_type, static_ip, mac_address, status, start_date, expiry_date, nas_id, notes, location_id, sub_location_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['customer_id'],
@@ -529,7 +749,9 @@ class RadiusBilling {
                 $startDate,
                 $expiryDate,
                 !empty($data['nas_id']) ? (int)$data['nas_id'] : null,
-                $data['notes'] ?? ''
+                $data['notes'] ?? '',
+                !empty($data['location_id']) ? (int)$data['location_id'] : null,
+                !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null
             ]);
             
             $subscriptionId = $this->db->lastInsertId();
