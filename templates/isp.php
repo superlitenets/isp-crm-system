@@ -1699,23 +1699,31 @@ try {
                                 <?php 
                                 $isOnline = isset($onlineSubscribers[$sub['id']]);
                                 $onlineInfo = $isOnline ? $onlineSubscribers[$sub['id']] : null;
-                                $statusClass = match($sub['status']) {
+                                // Check if actually expired based on date (regardless of DB status)
+                                $isExpiringSoon = $sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days') && strtotime($sub['expiry_date']) > time();
+                                $isExpired = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
+                                $daysLeft = $sub['expiry_date'] ? ceil((strtotime($sub['expiry_date']) - time()) / 86400) : null;
+                                
+                                // Determine display status - override with Expired if date has passed
+                                $displayStatus = $sub['status'];
+                                if ($isExpired && $sub['status'] === 'active') {
+                                    $displayStatus = 'expired';
+                                }
+                                
+                                $statusClass = match($displayStatus) {
                                     'active' => 'success',
                                     'suspended' => 'warning',
                                     'expired' => 'danger',
                                     'inactive' => 'secondary',
                                     default => 'secondary'
                                 };
-                                $statusLabel = match($sub['status']) {
+                                $statusLabel = match($displayStatus) {
                                     'active' => 'Active',
                                     'suspended' => 'Suspended',
                                     'expired' => 'Expired',
                                     'inactive' => 'Inactive',
-                                    default => ucfirst($sub['status'])
+                                    default => ucfirst($displayStatus)
                                 };
-                                $isExpiringSoon = $sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days') && strtotime($sub['expiry_date']) > time();
-                                $isExpired = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
-                                $daysLeft = $sub['expiry_date'] ? ceil((strtotime($sub['expiry_date']) - time()) / 86400) : null;
                                 $needsActivation = ($sub['status'] === 'inactive');
                                 ?>
                                 <tr class="sub-row" data-sub-id="<?= $sub['id'] ?>">
@@ -2079,12 +2087,21 @@ try {
                 }
                 
                 $isOnline = !empty($activeSession);
-                $statusClass = match($subscriber['status']) {
+                
+                // Check if actually expired based on date
+                $isSubExpired = $subscriber['expiry_date'] && strtotime($subscriber['expiry_date']) < time();
+                $displayStatus = $subscriber['status'];
+                if ($isSubExpired && $subscriber['status'] === 'active') {
+                    $displayStatus = 'expired';
+                }
+                
+                $statusClass = match($displayStatus) {
                     'active' => 'success',
                     'suspended' => 'warning',
                     'expired' => 'danger',
                     default => 'secondary'
                 };
+                $statusLabel = ucfirst($displayStatus);
             ?>
             
             <?php
@@ -2126,7 +2143,7 @@ try {
                                 <?php else: ?>
                                 <span class="badge bg-secondary"><i class="bi bi-wifi-off me-1"></i>Offline</span>
                                 <?php endif; ?>
-                                <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($subscriber['status']) ?></span>
+                                <span class="badge bg-<?= $statusClass ?>"><?= $statusLabel ?></span>
                                 <span class="badge bg-light text-dark border"><?= strtoupper($subscriber['access_type']) ?></span>
                                 <?php if ($subscriber['mac_address']): ?>
                                 <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span>
