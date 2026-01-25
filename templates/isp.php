@@ -266,8 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'package_id' => $_POST['filter_package'] ?? ''
             ];
             $subscribers = $radiusBilling->getSubscribersByFilter($filters);
-            $smsService = new \App\SmsService();
-            $whatsappEnabled = class_exists('\App\WhatsAppService');
+            $sms = new \App\SMS();
             $sendVia = $_POST['send_via'] ?? 'sms';
             $messageTemplate = $_POST['message'] ?? '';
             
@@ -286,10 +285,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 try {
                     if ($sendVia === 'sms' || $sendVia === 'both') {
-                        $smsService->send($phone, $msg);
+                        $sms->send($phone, $msg);
                     }
-                    if (($sendVia === 'whatsapp' || $sendVia === 'both') && $whatsappEnabled) {
-                        $wa = new \App\WhatsAppService();
+                    if ($sendVia === 'whatsapp' || $sendVia === 'both') {
+                        $wa = new \App\WhatsApp();
                         $wa->sendMessage($phone, $msg);
                     }
                     $sentCount++;
