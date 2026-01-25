@@ -418,11 +418,33 @@ const RADIUS_COA_NAK = 45;
 
 // RADIUS attributes
 const ATTR_USER_NAME = 1;
+const ATTR_NAS_IP_ADDRESS = 4;
 const ATTR_ACCT_SESSION_ID = 44;
+const ATTR_EVENT_TIMESTAMP = 55;
 const ATTR_MESSAGE_AUTHENTICATOR = 80;
 const ATTR_VENDOR_SPECIFIC = 26;
 const VENDOR_MIKROTIK = 14988;
 const MIKROTIK_RATE_LIMIT = 8;
+
+function encodeNasIpAddress(ipAddress) {
+    const parts = ipAddress.split('.').map(p => parseInt(p, 10));
+    const attrBuf = Buffer.alloc(6);
+    attrBuf.writeUInt8(ATTR_NAS_IP_ADDRESS, 0);
+    attrBuf.writeUInt8(6, 1);
+    attrBuf.writeUInt8(parts[0], 2);
+    attrBuf.writeUInt8(parts[1], 3);
+    attrBuf.writeUInt8(parts[2], 4);
+    attrBuf.writeUInt8(parts[3], 5);
+    return attrBuf;
+}
+
+function encodeEventTimestamp() {
+    const attrBuf = Buffer.alloc(6);
+    attrBuf.writeUInt8(ATTR_EVENT_TIMESTAMP, 0);
+    attrBuf.writeUInt8(6, 1);
+    attrBuf.writeUInt32BE(Math.floor(Date.now() / 1000), 2);
+    return attrBuf;
+}
 
 function encodeRadiusAttribute(type, value) {
     const valBuf = Buffer.from(value, 'utf8');
@@ -451,6 +473,11 @@ function encodeMikrotikRateLimit(rateLimit) {
 function buildRadiusPacket(code, identifier, attributes, secret) {
     const attrBuffers = [];
     
+    // Add NAS-IP-Address if provided (helps identify target NAS)
+    if (attributes.nasIp) {
+        attrBuffers.push(encodeNasIpAddress(attributes.nasIp));
+    }
+    
     if (attributes.username) {
         attrBuffers.push(encodeRadiusAttribute(ATTR_USER_NAME, attributes.username));
     }
@@ -461,7 +488,11 @@ function buildRadiusPacket(code, identifier, attributes, secret) {
         attrBuffers.push(encodeMikrotikRateLimit(attributes.rateLimit));
     }
     
+    // Add Event-Timestamp (helps with replay protection)
+    attrBuffers.push(encodeEventTimestamp());
+    
     // Add Message-Authenticator placeholder (16 zero bytes) - required by RFC 5176 for CoA/Disconnect
+    // MUST be the last attribute before we calculate HMAC
     const msgAuthPlaceholder = Buffer.alloc(18);
     msgAuthPlaceholder.writeUInt8(ATTR_MESSAGE_AUTHENTICATOR, 0);
     msgAuthPlaceholder.writeUInt8(18, 1); // 2 header + 16 bytes HMAC
@@ -602,7 +633,12 @@ app.post('/radius/disconnect', async (req, res) => {
         }
         
         const identifier = Math.floor(Math.random() * 256);
-        const packet = buildRadiusPacket(RADIUS_DISCONNECT_REQUEST, identifier, { username, sessionId }, secret);
+        const secretTrimmed = String(secret).trim();
+        const packet = buildRadiusPacket(RADIUS_DISCONNECT_REQUEST, identifier, { username, sessionId, nasIp }, secretTrimmed);
+        
+        console.log(`[RADIUS] Disconnect request: user=${username}, session=${sessionId}, nas=${nasIp}:${nasPort}`);
+        console.log(`[RADIUS] Packet: ${packet.toString('hex').substring(0, 80)}... (${packet.length} bytes)`);
+        
         const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_DISCONNECT_ACK);
         
         console.log(`[RADIUS] Disconnect ${username || sessionId} @ ${nasIp}: ${result.success ? 'OK' : result.error}`);
@@ -637,7 +673,12 @@ app.post('/radius/coa', async (req, res) => {
         }
         
         const identifier = Math.floor(Math.random() * 256);
-        const packet = buildRadiusPacket(RADIUS_COA_REQUEST, identifier, { username, sessionId, rateLimit }, secret);
+        const secretTrimmed = String(secret).trim();
+        const packet = buildRadiusPacket(RADIUS_COA_REQUEST, identifier, { username, sessionId, rateLimit, nasIp }, secretTrimmed);
+        
+        console.log(`[RADIUS] CoA request: user=${username}, session=${sessionId}, rate=${rateLimit}, nas=${nasIp}:${nasPort}`);
+        console.log(`[RADIUS] Packet: ${packet.toString('hex').substring(0, 80)}... (${packet.length} bytes)`);
+        
         const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_COA_ACK);
         
         console.log(`[RADIUS] CoA ${username || sessionId} @ ${nasIp} rate=${rateLimit}: ${result.success ? 'OK' : result.error}`);
