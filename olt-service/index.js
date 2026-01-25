@@ -470,28 +470,22 @@ function buildRadiusPacket(code, identifier, attributes, secret) {
     const attrData = Buffer.concat(attrBuffers);
     const length = 20 + attrData.length;
     
-    // Build pre-packet with zero authenticator
-    const prePacket = Buffer.alloc(length);
-    prePacket.writeUInt8(code, 0);
-    prePacket.writeUInt8(identifier, 1);
-    prePacket.writeUInt16BE(length, 2);
-    // bytes 4-19 are zeros (Request Authenticator placeholder)
-    attrData.copy(prePacket, 20);
+    // RFC 5176: Request Authenticator for CoA/Disconnect is random 16 bytes
+    const requestAuthenticator = crypto.randomBytes(16);
     
-    // Calculate Request Authenticator = MD5(Code + ID + Length + 16 zeros + Attributes + Secret)
-    const reqAuthHash = crypto.createHash('md5');
-    reqAuthHash.update(prePacket);
-    reqAuthHash.update(secret);
-    const requestAuthenticator = reqAuthHash.digest();
-    
-    // Build packet with Request Authenticator
+    // Build packet with random Request Authenticator
     const packet = Buffer.alloc(length);
-    prePacket.copy(packet);
+    packet.writeUInt8(code, 0);
+    packet.writeUInt8(identifier, 1);
+    packet.writeUInt16BE(length, 2);
     requestAuthenticator.copy(packet, 4);
+    attrData.copy(packet, 20);
     
-    // Find Message-Authenticator position and calculate HMAC-MD5
-    // Message-Authenticator = HMAC-MD5(entire packet with zero Message-Authenticator, secret)
-    const msgAuthOffset = 20 + attrData.length - 18 + 2; // position of the 16-byte value
+    // Find Message-Authenticator position (it's the last attribute, value starts at offset+2)
+    const msgAuthOffset = 20 + attrData.length - 16; // position of the 16-byte HMAC value
+    
+    // Message-Authenticator = HMAC-MD5(entire packet with Message-Authenticator field = zeros, secret)
+    // The Message-Authenticator is already zeros from Buffer.alloc in msgAuthPlaceholder
     const hmac = crypto.createHmac('md5', secret);
     hmac.update(packet);
     const messageAuthenticator = hmac.digest();
