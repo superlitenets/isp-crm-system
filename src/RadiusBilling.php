@@ -1443,6 +1443,11 @@ class RadiusBilling {
     public function processExpiredSubscriptions(): array {
         $processed = 0;
         $ipsReleased = 0;
+        $coaSent = 0;
+        
+        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '64k/64k';
         
         // Get expired subscriptions past grace period
         $stmt = $this->db->query("
@@ -1452,8 +1457,16 @@ class RadiusBilling {
         ");
         
         while ($sub = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            // Disconnect active sessions
-            $this->disconnectUser($sub['id']);
+            if ($useExpiredPool) {
+                // Send CoA to move user to expired pool (don't disconnect, redirect to captive portal)
+                $coaResult = $this->sendExpiredPoolCoA($sub['id'], $expiredPoolName, $expiredRateLimit);
+                if ($coaResult['success']) {
+                    $coaSent++;
+                }
+            } else {
+                // Disconnect active sessions
+                $this->disconnectUser($sub['id']);
+            }
             
             // Release static IP back to pool if assigned
             $releaseIp = !empty($sub['static_ip']);
@@ -1473,7 +1486,81 @@ class RadiusBilling {
             $processed++;
         }
         
-        return ['success' => true, 'processed' => $processed, 'ips_released' => $ipsReleased];
+        return ['success' => true, 'processed' => $processed, 'ips_released' => $ipsReleased, 'coa_sent' => $coaSent];
+    }
+    
+    public function sendExpiredPoolCoA(int $subscriptionId, ?string $poolName = null, ?string $rateLimit = null): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        $poolName = $poolName ?: $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $rateLimit = $rateLimit ?: $this->getSetting('expired_rate_limit') ?: '64k/64k';
+        
+        // Get NAS info
+        $nas = null;
+        if (!empty($sub['nas_id'])) {
+            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+            $stmt->execute([$sub['nas_id']]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$nas) {
+            $stmt = $this->db->prepare("
+                SELECT rn.ip_address, rn.secret 
+                FROM radius_sessions rs
+                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
+                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+                ORDER BY rs.session_start DESC LIMIT 1
+            ");
+            $stmt->execute([$subscriptionId]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$nas) {
+            return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        // Send CoA via OLT service with Framed-Pool
+        $oltServiceUrl = 'http://localhost:3002/radius/coa';
+        
+        $payload = [
+            'nasIp' => $nas['ip_address'],
+            'nasPort' => 3799,
+            'secret' => $nas['secret'],
+            'username' => $sub['username'],
+            'rateLimit' => $rateLimit,
+            'framedPool' => $poolName
+        ];
+        
+        try {
+            $ch = curl_init($oltServiceUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
+            
+            $response = curl_exec($ch);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                return ['success' => false, 'error' => "cURL error: $curlError"];
+            }
+            
+            $result = json_decode($response, true);
+            if ($result && $result['success']) {
+                return ['success' => true, 'pool' => $poolName, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
     
     public function getSubscriberOnlineStatus(int $subscriptionId): bool {

@@ -732,7 +732,7 @@ app.post('/radius/disconnect', async (req, res) => {
 // RADIUS CoA (speed update) endpoint (via VPN) - using radius library
 app.post('/radius/coa', async (req, res) => {
     try {
-        const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit, subscriptionId } = req.body;
+        const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit, framedPool, subscriptionId } = req.body;
         
         if (!nasIp || !secret) {
             return res.status(400).json({ success: false, error: 'Missing nasIp or secret' });
@@ -750,8 +750,12 @@ app.post('/radius/coa', async (req, res) => {
             // MikroTik-Rate-Limit VSA (Vendor 14988, Type 8)
             attributes.push(['Vendor-Specific', 14988, [['Mikrotik-Rate-Limit', rateLimit]]]);
         }
+        if (framedPool) {
+            // Framed-Pool attribute (type 88) - assigns user to IP pool
+            attributes.push(['Framed-Pool', framedPool]);
+        }
         
-        console.log(`[RADIUS] CoA request: user=${username}, session=${sessionId}, rate=${rateLimit}, nas=${nasIp}:${nasPort}`);
+        console.log(`[RADIUS] CoA request: user=${username}, session=${sessionId}, rate=${rateLimit}, pool=${framedPool}, nas=${nasIp}:${nasPort}`);
         
         const result = await sendRadiusRequest(nasIp, nasPort, 'CoA-Request', attributes, secretTrimmed);
         
