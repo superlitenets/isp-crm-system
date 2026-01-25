@@ -2,6 +2,8 @@ const express = require('express');
 const OLTSessionManager = require('./OLTSessionManager');
 const DiscoveryWorker = require('./DiscoveryWorker');
 const SNMPPollingWorker = require('./SNMPPollingWorker');
+const radius = require('radius');
+const dgram = require('dgram');
 
 const app = express();
 app.use(express.json());
@@ -404,8 +406,7 @@ app.post('/wireguard/apply', async (req, res) => {
     }
 });
 
-// RADIUS CoA/Disconnect endpoint - sends packets via VPN tunnel
-const dgram = require('dgram');
+// RADIUS CoA/Disconnect endpoint - uses radius library for RFC-compliant packets
 const crypto = require('crypto');
 
 // RADIUS codes
@@ -620,7 +621,73 @@ function broadcastEvent(type, data) {
     });
 }
 
-// RADIUS Disconnect endpoint (via VPN)
+// Helper function to send RADIUS packet using the radius library
+function sendRadiusRequest(nasIp, nasPort, code, attributes, secret, timeout = 5000) {
+    return new Promise((resolve) => {
+        try {
+            const packet = radius.encode({
+                code: code,
+                secret: secret,
+                attributes: attributes
+            });
+            
+            console.log(`[RADIUS] Sending ${code}: ${packet.toString('hex').substring(0, 60)}... (${packet.length} bytes)`);
+            
+            const socket = dgram.createSocket('udp4');
+            let responded = false;
+            
+            const timer = setTimeout(() => {
+                if (!responded) {
+                    responded = true;
+                    socket.close();
+                    resolve({ success: false, error: 'Timeout - no response from NAS' });
+                }
+            }, timeout);
+            
+            socket.on('message', (msg) => {
+                if (responded) return;
+                responded = true;
+                clearTimeout(timer);
+                socket.close();
+                
+                try {
+                    const response = radius.decode({ packet: msg, secret: secret });
+                    console.log(`[RADIUS] Response: ${response.code}`);
+                    
+                    if (response.code === 'Disconnect-ACK' || response.code === 'CoA-ACK') {
+                        resolve({ success: true, response: response.code });
+                    } else {
+                        resolve({ success: false, error: `Received ${response.code}`, response: response.code });
+                    }
+                } catch (e) {
+                    resolve({ success: false, error: `Failed to decode response: ${e.message}` });
+                }
+            });
+            
+            socket.on('error', (err) => {
+                if (!responded) {
+                    responded = true;
+                    clearTimeout(timer);
+                    socket.close();
+                    resolve({ success: false, error: err.message });
+                }
+            });
+            
+            socket.send(packet, 0, packet.length, nasPort, nasIp, (err) => {
+                if (err && !responded) {
+                    responded = true;
+                    clearTimeout(timer);
+                    socket.close();
+                    resolve({ success: false, error: `Send failed: ${err.message}` });
+                }
+            });
+        } catch (e) {
+            resolve({ success: false, error: `Packet encode error: ${e.message}` });
+        }
+    });
+}
+
+// RADIUS Disconnect endpoint (via VPN) - using radius library
 app.post('/radius/disconnect', async (req, res) => {
     try {
         const { nasIp, nasPort = 3799, secret, username, sessionId, subscriptionId } = req.body;
@@ -632,14 +699,15 @@ app.post('/radius/disconnect', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Need username or sessionId' });
         }
         
-        const identifier = Math.floor(Math.random() * 256);
         const secretTrimmed = String(secret).trim();
-        const packet = buildRadiusPacket(RADIUS_DISCONNECT_REQUEST, identifier, { username, sessionId, nasIp }, secretTrimmed);
+        const attributes = [];
+        
+        if (username) attributes.push(['User-Name', username]);
+        if (sessionId) attributes.push(['Acct-Session-Id', sessionId]);
         
         console.log(`[RADIUS] Disconnect request: user=${username}, session=${sessionId}, nas=${nasIp}:${nasPort}`);
-        console.log(`[RADIUS] Packet: ${packet.toString('hex').substring(0, 80)}... (${packet.length} bytes)`);
         
-        const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_DISCONNECT_ACK);
+        const result = await sendRadiusRequest(nasIp, nasPort, 'Disconnect-Request', attributes, secretTrimmed);
         
         console.log(`[RADIUS] Disconnect ${username || sessionId} @ ${nasIp}: ${result.success ? 'OK' : result.error}`);
         
@@ -660,7 +728,7 @@ app.post('/radius/disconnect', async (req, res) => {
     }
 });
 
-// RADIUS CoA (speed update) endpoint (via VPN)
+// RADIUS CoA (speed update) endpoint (via VPN) - using radius library
 app.post('/radius/coa', async (req, res) => {
     try {
         const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit, subscriptionId } = req.body;
@@ -672,14 +740,19 @@ app.post('/radius/coa', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Need username or sessionId' });
         }
         
-        const identifier = Math.floor(Math.random() * 256);
         const secretTrimmed = String(secret).trim();
-        const packet = buildRadiusPacket(RADIUS_COA_REQUEST, identifier, { username, sessionId, rateLimit, nasIp }, secretTrimmed);
+        const attributes = [];
+        
+        if (username) attributes.push(['User-Name', username]);
+        if (sessionId) attributes.push(['Acct-Session-Id', sessionId]);
+        if (rateLimit) {
+            // MikroTik-Rate-Limit VSA (Vendor 14988, Type 8)
+            attributes.push(['Vendor-Specific', 14988, [['Mikrotik-Rate-Limit', rateLimit]]]);
+        }
         
         console.log(`[RADIUS] CoA request: user=${username}, session=${sessionId}, rate=${rateLimit}, nas=${nasIp}:${nasPort}`);
-        console.log(`[RADIUS] Packet: ${packet.toString('hex').substring(0, 80)}... (${packet.length} bytes)`);
         
-        const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_COA_ACK);
+        const result = await sendRadiusRequest(nasIp, nasPort, 'CoA-Request', attributes, secretTrimmed);
         
         console.log(`[RADIUS] CoA ${username || sessionId} @ ${nasIp} rate=${rateLimit}: ${result.success ? 'OK' : result.error}`);
         
