@@ -91,6 +91,239 @@ if ($action === 'preview_bulk_sms') {
     exit;
 }
 
+if ($action === 'stk_push') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $phone = preg_replace('/[^0-9]/', '', $input['phone'] ?? '');
+    $amount = (int)($input['amount'] ?? 0);
+    $subscriptionId = (int)($input['subscription_id'] ?? 0);
+    
+    if (!$phone || strlen($phone) < 9) {
+        echo json_encode(['success' => false, 'error' => 'Invalid phone number']);
+        exit;
+    }
+    if ($amount < 1 || $amount > 150000) {
+        echo json_encode(['success' => false, 'error' => 'Amount must be between 1 and 150,000']);
+        exit;
+    }
+    
+    $stmt = $db->prepare("SELECT id FROM radius_subscriptions WHERE id = ?");
+    $stmt->execute([$subscriptionId]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription']);
+        exit;
+    }
+    
+    try {
+        require_once __DIR__ . '/../src/Mpesa.php';
+        $mpesa = new \App\Mpesa();
+        $result = $mpesa->stkPush($phone, $amount, 'radius_' . $subscriptionId, 'Internet subscription');
+        echo json_encode(['success' => true, 'result' => $result]);
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($action === 'get_wifi_config') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $subscriptionId = (int)($_GET['subscription_id'] ?? 0);
+    
+    $stmt = $db->prepare("SELECT s.*, c.phone as customer_phone FROM radius_subscriptions s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?");
+    $stmt->execute([$subscriptionId]);
+    $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$sub) {
+        echo json_encode(['success' => false, 'error' => 'Subscription not found']);
+        exit;
+    }
+    
+    $deviceId = null;
+    $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
+    if ($phone && strlen($phone) >= 9) {
+        $phoneSearch = '%' . substr($phone, -9) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$phoneSearch, $phoneSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId && $sub['mac_address']) {
+        $macSearch = '%' . strtoupper(str_replace([':', '-'], '', $sub['mac_address'])) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$macSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'error' => 'No TR-069 device found for this subscriber. Device may not be registered in GenieACS.']);
+        exit;
+    }
+    
+    $genieUrl = getenv('GENIEACS_URL') ?: 'http://localhost:7557';
+    $encoded = rawurlencode($deviceId);
+    
+    $wifiParams = [
+        '2.4' => [
+            'ssid' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
+            'password' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey'
+        ],
+        '5' => [
+            'ssid' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID',
+            'password' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.PreSharedKey'
+        ]
+    ];
+    
+    $result = ['success' => true, 'device_id' => $deviceId];
+    
+    foreach (['2.4', '5'] as $band) {
+        $ssidPath = $wifiParams[$band]['ssid'];
+        $ch = curl_init("$genieUrl/devices/$encoded/tasks?timeout=5000");
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode(['name' => 'getParameterValues', 'parameterNames' => [$ssidPath]]),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10
+        ]);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        
+        if ($resp) {
+            $ch = curl_init("$genieUrl/devices/$encoded?projection=$ssidPath");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $deviceData = curl_exec($ch);
+            curl_close($ch);
+            
+            if ($deviceData) {
+                $data = json_decode($deviceData, true);
+                $ssidValue = $data[$ssidPath]['_value'] ?? null;
+                if ($ssidValue) {
+                    $result['wifi_' . str_replace('.', '', $band)] = [
+                        'ssid' => $ssidValue,
+                        'password' => ''
+                    ];
+                }
+            }
+        }
+    }
+    
+    if (empty($result['wifi_24']) && empty($result['wifi_5'])) {
+        $result['wifi_24'] = ['ssid' => '', 'password' => ''];
+    }
+    
+    echo json_encode($result);
+    exit;
+}
+
+if ($action === 'set_wifi_config') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $subscriptionId = (int)($input['subscription_id'] ?? 0);
+    $band = $input['band'] ?? '2.4';
+    $ssid = trim($input['ssid'] ?? '');
+    $password = $input['password'] ?? '';
+    
+    if (!$ssid || strlen($ssid) > 32) {
+        echo json_encode(['success' => false, 'error' => 'WiFi name is required (max 32 characters)']);
+        exit;
+    }
+    if ($password && (strlen($password) < 8 || strlen($password) > 63)) {
+        echo json_encode(['success' => false, 'error' => 'Password must be 8-63 characters']);
+        exit;
+    }
+    
+    $stmt = $db->prepare("SELECT s.*, c.phone as customer_phone FROM radius_subscriptions s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?");
+    $stmt->execute([$subscriptionId]);
+    $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$sub) {
+        echo json_encode(['success' => false, 'error' => 'Subscription not found']);
+        exit;
+    }
+    
+    $deviceId = null;
+    $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
+    if ($phone && strlen($phone) >= 9) {
+        $phoneSearch = '%' . substr($phone, -9) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$phoneSearch, $phoneSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId && $sub['mac_address']) {
+        $macSearch = '%' . strtoupper(str_replace([':', '-'], '', $sub['mac_address'])) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$macSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'error' => 'No TR-069 device found']);
+        exit;
+    }
+    
+    $genieUrl = getenv('GENIEACS_URL') ?: 'http://localhost:7557';
+    $encoded = rawurlencode($deviceId);
+    
+    $wlanIndex = $band === '5' ? '5' : '1';
+    $ssidPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.$wlanIndex.SSID";
+    $pskPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.$wlanIndex.PreSharedKey.1.PreSharedKey";
+    
+    $params = [[$ssidPath, $ssid, 'xsd:string']];
+    if ($password) {
+        $params[] = [$pskPath, $password, 'xsd:string'];
+    }
+    
+    $ch = curl_init("$genieUrl/devices/$encoded/tasks?timeout=30000");
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode(['name' => 'setParameterValues', 'parameterValues' => $params]),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 35
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode >= 200 && $httpCode < 300) {
+        echo json_encode(['success' => true, 'message' => "WiFi settings applied. Device will update shortly."]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to apply settings. Device may be offline.']);
+    }
+    exit;
+}
+
 if ($action === 'get_nas_vpn' && isset($_GET['id'])) {
     header('Content-Type: application/json');
     $nasData = $radiusBilling->getNASWithVPN((int)$_GET['id']);
@@ -2307,6 +2540,28 @@ try {
                                         </div>
                                     </div>
                                 </div>
+                                <!-- Wallet Card at Top -->
+                                <div class="d-flex align-items-center gap-3 mb-3 p-3 rounded-3 bg-gradient" style="background: linear-gradient(90deg, rgba(25,135,84,0.15) 0%, rgba(13,110,253,0.15) 100%); border: 1px solid rgba(25,135,84,0.2);">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                            <i class="bi bi-wallet2 fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-muted small">Wallet Balance</div>
+                                            <div class="fw-bold fs-5 text-success">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></div>
+                                        </div>
+                                    </div>
+                                    <div class="vr mx-2"></div>
+                                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addCreditModal">
+                                        <i class="bi bi-plus-lg me-1"></i> Top Up
+                                    </button>
+                                    <?php if ($customer && !empty($customer['phone'])): ?>
+                                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#stkPushModal">
+                                        <i class="bi bi-phone me-1"></i> M-Pesa STK
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
+                                
                                 <!-- Action Buttons -->
                                 <div class="d-flex flex-wrap gap-2">
                 <div class="btn-group">
@@ -2331,6 +2586,9 @@ try {
                     <button type="button" class="btn btn-info" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
                         <i class="bi bi-lightning me-1"></i> Ping
                     </button>
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
+                        <i class="bi bi-wifi me-1"></i> WiFi Config
+                    </button>
                     <div class="btn-group">
                         <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
                             <i class="bi bi-three-dots-vertical"></i>
@@ -2346,7 +2604,6 @@ try {
                             <li><a class="dropdown-item" href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank"><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <?php endif; ?>
-                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addCreditModal"><i class="bi bi-plus-circle me-2"></i>Add Credit</a></li>
                             <li><a class="dropdown-item text-danger" href="#" onclick="if(confirm('Reset data usage to 0?')) document.getElementById('resetDataForm').submit()"><i class="bi bi-arrow-counterclockwise me-2"></i>Reset Data Usage</a></li>
                         </ul>
                     </div>
@@ -2468,28 +2725,6 @@ try {
                         </div>
                     </div>
                     
-                    <!-- Credit/Balance Card -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="bi bi-wallet2 me-2"></i>Account Balance</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <h4 class="text-success mb-0">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></h4>
-                                    <small class="text-muted">Credit Balance</small>
-                                </div>
-                                <div class="col-6">
-                                    <h4 class="text-info mb-0">KES <?= number_format($subscriber['credit_limit'] ?? 0) ?></h4>
-                                    <small class="text-muted">Credit Limit</small>
-                                </div>
-                            </div>
-                            <hr>
-                            <button class="btn btn-outline-success btn-sm w-100" data-bs-toggle="modal" data-bs-target="#addCreditModal">
-                                <i class="bi bi-plus-circle me-1"></i> Add Credit
-                            </button>
-                        </div>
-                    </div>
                     
                     <!-- Data Usage Card -->
                     <?php if ($package && $package['data_quota_mb']): ?>
@@ -2523,29 +2758,6 @@ try {
                     </div>
                     <?php endif; ?>
                     
-                    <?php if ($customer && !empty($customer['phone'])): ?>
-                    <div class="card shadow-sm mb-4 border-success">
-                        <div class="card-header bg-success-subtle">
-                            <h6 class="mb-0"><i class="bi bi-phone me-2"></i>Quick M-Pesa Payment</h6>
-                        </div>
-                        <div class="card-body">
-                            <form id="mpesaQuickPayForm" onsubmit="return submitMpesaQuickPay(event)">
-                                <div class="mb-3">
-                                    <label class="form-label small text-muted">Phone Number</label>
-                                    <input type="text" class="form-control" id="mpesaPayPhone" value="<?= htmlspecialchars(preg_replace('/[^0-9]/', '', $customer['phone'])) ?>" readonly>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label small text-muted">Amount (KES)</label>
-                                    <input type="number" class="form-control" id="mpesaPayAmount" value="<?= (int)($package['price'] ?? 0) ?>" min="1">
-                                </div>
-                                <button type="submit" class="btn btn-success w-100" id="mpesaStkBtn">
-                                    <i class="bi bi-lightning-charge me-1"></i> Send STK Push
-                                </button>
-                            </form>
-                            <div id="mpesaPayResult" class="mt-2 text-center small"></div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
                     
                     <div class="card shadow-sm mb-4">
                         <div class="card-header">
@@ -3103,6 +3315,264 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- STK Push Modal -->
+            <?php if ($customer && !empty($customer['phone'])): ?>
+            <div class="modal fade" id="stkPushModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success-subtle">
+                            <h5 class="modal-title"><i class="bi bi-phone me-2"></i>M-Pesa STK Push</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="stkPushForm" onsubmit="return submitStkPush(event)">
+                                <div class="mb-3">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="text" class="form-control" id="stkPhone" value="<?= htmlspecialchars(preg_replace('/[^0-9]/', '', $customer['phone'])) ?>" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Amount (KES)</label>
+                                    <input type="number" class="form-control" id="stkAmount" value="<?= (int)($package['price'] ?? 0) ?>" min="1" required>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('stkAmount').value=<?= (int)($package['price'] ?? 0) ?>">Package Price</button>
+                                    <button type="button" class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('stkAmount').value=500">500</button>
+                                    <button type="button" class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('stkAmount').value=1000">1000</button>
+                                </div>
+                            </form>
+                            <div id="stkResult" class="mt-3 text-center"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-success" onclick="submitStkPush()" id="stkSubmitBtn">
+                                <i class="bi bi-lightning-charge me-1"></i> Send STK Push
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <!-- WiFi Config Modal -->
+            <div class="modal fade" id="wifiConfigModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-wifi me-2"></i>WiFi Configuration (TR-069)</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>Configure WiFi settings directly on the customer's device via TR-069/GenieACS.
+                            </div>
+                            
+                            <div id="wifiConfigLoading" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading device info...</p>
+                            </div>
+                            
+                            <div id="wifiConfigContent" style="display: none;">
+                                <ul class="nav nav-tabs" role="tablist">
+                                    <li class="nav-item">
+                                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#wifi24ghz">2.4 GHz</button>
+                                    </li>
+                                    <li class="nav-item" id="wifi5ghzTab" style="display: none;">
+                                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#wifi5ghz">5 GHz</button>
+                                    </li>
+                                </ul>
+                                
+                                <div class="tab-content pt-3">
+                                    <div class="tab-pane fade show active" id="wifi24ghz">
+                                        <form id="wifi24Form">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Name (SSID)</label>
+                                                        <input type="text" class="form-control" id="wifi24Ssid" placeholder="Enter WiFi name">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Password</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" id="wifi24Password" placeholder="Enter password" minlength="8">
+                                                            <button type="button" class="btn btn-outline-secondary" onclick="toggleWifiPwd('wifi24Password')"><i class="bi bi-eye"></i></button>
+                                                        </div>
+                                                        <small class="text-muted">Minimum 8 characters</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-primary" onclick="saveWifiConfig('2.4')">
+                                                <i class="bi bi-check-lg me-1"></i> Save 2.4 GHz Settings
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="tab-pane fade" id="wifi5ghz">
+                                        <form id="wifi5Form">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Name (SSID)</label>
+                                                        <input type="text" class="form-control" id="wifi5Ssid" placeholder="Enter WiFi name">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Password</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" id="wifi5Password" placeholder="Enter password" minlength="8">
+                                                            <button type="button" class="btn btn-outline-secondary" onclick="toggleWifiPwd('wifi5Password')"><i class="bi bi-eye"></i></button>
+                                                        </div>
+                                                        <small class="text-muted">Minimum 8 characters</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-primary" onclick="saveWifiConfig('5')">
+                                                <i class="bi bi-check-lg me-1"></i> Save 5 GHz Settings
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="wifiConfigError" class="alert alert-warning" style="display: none;">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <span id="wifiErrorMsg">No TR-069 device found for this subscriber.</span>
+                            </div>
+                            
+                            <div id="wifiConfigResult" class="mt-3" style="display: none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            // WiFi Config Modal initialization
+            document.getElementById('wifiConfigModal').addEventListener('show.bs.modal', function() {
+                loadWifiConfig();
+            });
+            
+            function loadWifiConfig() {
+                document.getElementById('wifiConfigLoading').style.display = 'block';
+                document.getElementById('wifiConfigContent').style.display = 'none';
+                document.getElementById('wifiConfigError').style.display = 'none';
+                
+                fetch('/index.php?page=isp&action=get_wifi_config&subscription_id=<?= $subId ?>')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('wifiConfigLoading').style.display = 'none';
+                        if (data.success) {
+                            document.getElementById('wifiConfigContent').style.display = 'block';
+                            if (data.wifi_24) {
+                                document.getElementById('wifi24Ssid').value = data.wifi_24.ssid || '';
+                                document.getElementById('wifi24Password').value = data.wifi_24.password || '';
+                            }
+                            if (data.wifi_5) {
+                                document.getElementById('wifi5ghzTab').style.display = 'block';
+                                document.getElementById('wifi5Ssid').value = data.wifi_5.ssid || '';
+                                document.getElementById('wifi5Password').value = data.wifi_5.password || '';
+                            }
+                        } else {
+                            document.getElementById('wifiConfigError').style.display = 'block';
+                            document.getElementById('wifiErrorMsg').textContent = data.error || 'No TR-069 device found';
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById('wifiConfigLoading').style.display = 'none';
+                        document.getElementById('wifiConfigError').style.display = 'block';
+                        document.getElementById('wifiErrorMsg').textContent = 'Failed to load WiFi configuration';
+                    });
+            }
+            
+            function toggleWifiPwd(id) {
+                const input = document.getElementById(id);
+                input.type = input.type === 'password' ? 'text' : 'password';
+            }
+            
+            function saveWifiConfig(band) {
+                const ssidId = band === '2.4' ? 'wifi24Ssid' : 'wifi5Ssid';
+                const pwdId = band === '2.4' ? 'wifi24Password' : 'wifi5Password';
+                const ssid = document.getElementById(ssidId).value;
+                const password = document.getElementById(pwdId).value;
+                
+                if (!ssid) {
+                    alert('Please enter a WiFi name');
+                    return;
+                }
+                if (password && password.length < 8) {
+                    alert('Password must be at least 8 characters');
+                    return;
+                }
+                
+                const resultDiv = document.getElementById('wifiConfigResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split me-2"></i>Applying WiFi settings...</div>';
+                
+                fetch('/index.php?page=isp&action=set_wifi_config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        subscription_id: <?= $subId ?>,
+                        band: band,
+                        ssid: ssid,
+                        password: password
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>' + (data.message || 'WiFi settings applied successfully!') + '</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>' + (data.error || 'Failed to apply settings') + '</div>';
+                    }
+                })
+                .catch(err => {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Request failed</div>';
+                });
+            }
+            
+            function submitStkPush() {
+                const phone = document.getElementById('stkPhone').value;
+                const amount = document.getElementById('stkAmount').value;
+                const btn = document.getElementById('stkSubmitBtn');
+                const result = document.getElementById('stkResult');
+                
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending...';
+                result.innerHTML = '';
+                
+                fetch('/index.php?page=isp&action=stk_push', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        phone: phone,
+                        amount: amount,
+                        subscription_id: <?= $subId ?>
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> Send STK Push';
+                    if (data.success) {
+                        result.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>STK Push sent! Check your phone.</div>';
+                    } else {
+                        result.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>' + (data.error || 'Failed to send STK Push') + '</div>';
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> Send STK Push';
+                    result.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Request failed</div>';
+                });
+                
+                return false;
+            }
+            </script>
             
             <!-- Add Speed Override Modal -->
             <div class="modal fade" id="addSpeedOverrideModal" tabindex="-1">
