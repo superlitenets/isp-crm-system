@@ -107,12 +107,11 @@ class RadiusBilling {
             SELECT n.*, 
                    wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
                    ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr,
-                   l.name as location_name, sl.name as sub_location_name
+                   l.name as location_name
             FROM radius_nas n
             LEFT JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
             LEFT JOIN wireguard_servers ws ON wp.server_id = ws.id
             LEFT JOIN isp_locations l ON n.location_id = l.id
-            LEFT JOIN isp_sub_locations sl ON n.sub_location_id = sl.id
             ORDER BY n.name
         ");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
