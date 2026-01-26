@@ -1,0 +1,120 @@
+[admin@ERP] > /tool fetch url="http://crm.superlite.co.ke/expired"
+  status: failed
+failure: Fetch failed with status 301 (Location: "https://crm.superlite.co.ke/expi
+red")
+[admin@ERP] > 
+
+That output is actually the smoking gun — and it’s good news 😄
+It tells us exactly why the redirect is failing and exactly how to fix it.
+
+What MikroTik just told you (very important)
+Fetch failed with status 301
+Location: https://crm.superlite.co.ke/expired
+
+
+Meaning:
+
+✅ HTTP (port 80) is reachable
+
+❌ Server responds with 301 redirect to HTTPS
+
+❌ MikroTik HTTP proxy cannot follow HTTPS redirects
+
+So the proxy sends the user to HTTP…
+Then your server immediately jumps to HTTPS…
+And the proxy + firewall blocks it → ERR_ADDRESS_UNREACHABLE
+
+✔️ CORRECT FIX (THIS is the fix, not MikroTik)
+
+You must allow HTTP access to /expired without forcing HTTPS.
+
+Rule of thumb
+
+Expired page must be pure HTTP
+Payment action can go HTTPS after button click
+
+This is how legacy PPPoE redirects work.
+
+OPTION A (BEST PRACTICE – RECOMMENDED)
+Allow /expired on HTTP (no redirect)
+
+On your web server:
+
+🔹 NGINX
+server {
+    listen 80;
+    server_name crm.superlite.co.ke;
+
+    location /expired {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Optional: force HTTPS for everything else
+    location / {
+        return 301 https://crm.superlite.co.ke$request_uri;
+    }
+}
+
+
+Then inside /expired page:
+
+Show message
+
+“Pay Now” button → HTTPS checkout
+
+OPTION B (If you insist on HTTPS – workaround)
+
+Use TWO-STAGE redirect:
+
+1️⃣ Proxy redirects to a HTTP landing page
+http://crm.superlite.co.ke/expired-http
+
+2️⃣ That page uses JS button:
+<button onclick="window.location.href='https://crm.superlite.co.ke/expired'">
+Pay Now
+</button>
+
+
+🚫 Do NOT auto-redirect to HTTPS.
+
+OPTION C (NOT recommended but works)
+
+Disable proxy method entirely
+Move to firewall allow-only CRM IP method (modern approach)
+
+I can guide you if you want.
+
+Why HTTPS auto-redirect breaks PPPoE
+
+MikroTik proxy is HTTP-only
+
+Cannot MITM TLS
+
+Cannot follow 301 → HTTPS
+
+Browser sees unreachable path
+
+This is normal MikroTik behavior, not a bug.
+
+After you fix server config
+
+Test again:
+
+/tool fetch url="http://crm.superlite.co.ke/expired"
+
+
+You want:
+
+status: finished
+
+Final verdict 🎯
+
+Your MikroTik config is correct
+Your DNS is correct
+Your IP is correct
+
+The only problem is:
+
+HTTP → HTTPS auto redirect on /expired
+
+Fix that, and your redirect will work instantly.
