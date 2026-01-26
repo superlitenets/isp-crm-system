@@ -1,0 +1,265 @@
+root@superlitecrm:~/isp# docker compose logs -f olt-service
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
+isp_crm_olt_service  | node:internal/modules/cjs/loader:1210
+isp_crm_olt_service  |   throw err;
+isp_crm_olt_service  |   ^
+isp_crm_olt_service  |
+isp_crm_olt_service  | Error: Cannot find module 'radius'
+isp_crm_olt_service  | Require stack:
+isp_crm_olt_service  | - /app/index.js
+isp_crm_olt_service  |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+isp_crm_olt_service  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+isp_crm_olt_service  |     at require (node:internal/modules/helpers:182:18)
+isp_crm_olt_service  |     at Object.<anonymous> (/app/index.js:5:16)
+isp_crm_olt_service  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+isp_crm_olt_service  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+isp_crm_olt_service  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+isp_crm_olt_service  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+isp_crm_olt_service  |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+isp_crm_olt_service  |   code: 'MODULE_NOT_FOUND',
+isp_crm_olt_service  |   requireStack: [ '/app/index.js' ]
+isp_crm_olt_service  | }
+isp_crm_olt_service  |
+isp_crm_olt_service  | Node.js v20.20.0
