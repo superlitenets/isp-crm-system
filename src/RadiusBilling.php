@@ -1434,7 +1434,7 @@ class RadiusBilling {
         $rateLimit = $this->buildRateLimit($sub);
         
         // Send CoA via OLT service (routes through WireGuard VPN)
-        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://olt-service:3002') . '/radius/coa';
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
         
         $payload = [
             'nasIp' => $nas['ip_address'],
@@ -1758,7 +1758,7 @@ class RadiusBilling {
         }
         
         // Send CoA via OLT service with Framed-Pool
-        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://olt-service:3002') . '/radius/coa';
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
         
         $payload = [
             'nasIp' => $nas['ip_address'],
@@ -2078,7 +2078,7 @@ class RadiusBilling {
         
         // Send Disconnect-Request via OLT service (routes through WireGuard VPN)
         // In Docker, use container name; locally use localhost
-        $oltServiceUrl = getenv('OLT_SERVICE_URL') ?: 'http://olt-service:3002';
+        $oltServiceUrl = getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
         $oltServiceUrl .= '/radius/disconnect';
         
         $payload = [
@@ -2221,7 +2221,7 @@ class RadiusBilling {
         }
         
         // Send CoA via OLT service (routes through WireGuard VPN)
-        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://olt-service:3002') . '/radius/coa';
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
         
         $payload = [
             'nasIp' => $nas['ip_address'],
