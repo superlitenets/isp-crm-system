@@ -229,6 +229,57 @@ async function refreshSingleONU(oltId, onuDbId) {
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
+const net = require('net');
+
+async function tcpPing(ip, port, timeout) {
+    return new Promise((resolve) => {
+        const startTime = Date.now();
+        const socket = new net.Socket();
+        
+        socket.setTimeout(timeout * 1000);
+        
+        socket.on('connect', () => {
+            const latency = Date.now() - startTime;
+            socket.destroy();
+            resolve({ success: true, latency, port });
+        });
+        
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve({ success: false, latency: null, port, error: 'timeout' });
+        });
+        
+        socket.on('error', (err) => {
+            socket.destroy();
+            if (err.code === 'ECONNREFUSED') {
+                resolve({ success: true, latency: Date.now() - startTime, port, note: 'port closed but host reachable' });
+            } else {
+                resolve({ success: false, latency: null, port, error: err.code || err.message });
+            }
+        });
+        
+        socket.connect(port, ip);
+    });
+}
+
+async function checkHostReachable(ip, timeout = 2) {
+    const ports = [22, 23, 80, 443, 8728, 8291];
+    
+    for (const port of ports) {
+        const result = await tcpPing(ip, port, timeout);
+        if (result.success) {
+            return { 
+                success: true, 
+                method: 'tcp', 
+                port: result.port, 
+                latency_avg: result.latency,
+                note: result.note || `TCP port ${port} reachable`
+            };
+        }
+    }
+    
+    return { success: false, method: 'tcp', error: 'No ports reachable' };
+}
 
 app.post('/ping', async (req, res) => {
     try {
@@ -240,6 +291,20 @@ app.post('/ping', async (req, res) => {
         
         const { stdout, stderr } = await execPromise(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '', stderr: e.stderr || e.message }));
         const output = stdout || stderr;
+        
+        if (output.includes('Operation not permitted') || output.includes('cap_net_raw')) {
+            console.log(`[Ping] ICMP not available, falling back to TCP for ${ip}`);
+            const tcpResult = await checkHostReachable(ip, timeout);
+            return res.json({
+                ...tcpResult,
+                ip,
+                packets_sent: count,
+                packets_received: tcpResult.success ? count : 0,
+                latency_min: tcpResult.latency_avg,
+                latency_max: tcpResult.latency_avg,
+                output: tcpResult.note || tcpResult.error || 'TCP connectivity check'
+            });
+        }
         
         const result = {
             success: output.includes(' 0% packet loss') || output.includes('bytes from'),
@@ -272,6 +337,8 @@ app.post('/ping', async (req, res) => {
     }
 });
 
+let pingFallbackMode = false;
+
 app.post('/ping-batch', async (req, res) => {
     try {
         const { targets, count = 2, timeout = 2 } = req.body;
@@ -287,7 +354,29 @@ app.post('/ping-batch', async (req, res) => {
             }
             
             try {
+                if (pingFallbackMode) {
+                    const tcpResult = await checkHostReachable(ip, timeout);
+                    return {
+                        ...target,
+                        success: tcpResult.success,
+                        method: 'tcp',
+                        latency_avg: tcpResult.latency_avg
+                    };
+                }
+                
                 const { stdout } = await execPromise(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '' }));
+                
+                if (stdout.includes('Operation not permitted') || stdout.includes('cap_net_raw')) {
+                    console.log('[Ping] ICMP not available, switching to TCP fallback mode');
+                    pingFallbackMode = true;
+                    const tcpResult = await checkHostReachable(ip, timeout);
+                    return {
+                        ...target,
+                        success: tcpResult.success,
+                        method: 'tcp',
+                        latency_avg: tcpResult.latency_avg
+                    };
+                }
                 
                 const packetsMatch = stdout.match(/(\d+) packets transmitted, (\d+) (?:packets )?received/);
                 const latencyMatch = stdout.match(/min\/avg\/max.*= ([\d.]+)\/([\d.]+)\/([\d.]+)/);
@@ -295,6 +384,7 @@ app.post('/ping-batch', async (req, res) => {
                 return {
                     ...target,
                     success: packetsMatch ? parseInt(packetsMatch[2]) > 0 : false,
+                    method: 'ping',
                     latency_avg: latencyMatch ? parseFloat(latencyMatch[2]) : null
                 };
             } catch (e) {
