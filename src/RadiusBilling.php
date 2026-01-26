@@ -2099,6 +2099,13 @@ class RadiusBilling {
     
     // ==================== CoA (Change of Authorization) ====================
     
+    /**
+     * Alias for disconnectUser - for compatibility
+     */
+    public function disconnectSubscription(int $subscriptionId): array {
+        return $this->disconnectUser($subscriptionId);
+    }
+    
     public function disconnectUser(int $subscriptionId): array {
         $sub = $this->getSubscription($subscriptionId);
         if (!$sub) {
