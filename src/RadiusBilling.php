@@ -2220,34 +2220,46 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'NAS not found - please assign a NAS to this subscription or add an active NAS device'];
         }
         
-        // Build CoA attributes
-        $attrs = ['User-Name' => $sub['username']];
+        // Send CoA via OLT service (routes through WireGuard VPN)
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://olt-service:3002') . '/radius/coa';
+        
+        $payload = [
+            'nasIp' => $nas['ip_address'],
+            'nasPort' => 3799,
+            'secret' => $nas['secret'],
+            'username' => $sub['username']
+        ];
+        
+        // Add any additional attributes
         foreach ($attributes as $key => $value) {
-            $attrs[$key] = $value;
+            $payload[$key] = $value;
         }
         
-        // Send CoA directly to NAS IP on port 3799 (routed via VPN tunnel)
         try {
-            $client = new RadiusClient($nas['ip_address'], $nas['secret'], 3799, 5);
-            $result = $client->coa($attrs);
+            $ch = curl_init($oltServiceUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
             
-            if ($result['success']) {
-                return ['success' => true, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address']];
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                return ['success' => false, 'error' => 'OLT service unavailable: ' . $curlError, 'target_ip' => $nas['ip_address']];
             }
             
-            // Add diagnostic info for connection issues
-            $error = $result['error'] ?? 'CoA failed';
-            if (strpos($error, 'timeout') !== false || strpos($error, 'No response') !== false) {
-                $pingCheck = $this->checkNasReachability($nas['ip_address']);
-                if ($pingCheck['reachable']) {
-                    // Device is reachable but CoA port not responding
-                    $error = "CoA timeout - MikroTik reachable but port 3799 not responding. Enable RADIUS Incoming: /radius incoming set accept=yes port=3799";
-                } else {
-                    $error .= ". Ping FAILED - check VPN tunnel";
-                }
+            $result = json_decode($response, true);
+            if ($result && $result['success']) {
+                return ['success' => true, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address'], 'via' => 'vpn'];
             }
             
-            return ['success' => false, 'error' => $error, 'target_ip' => $nas['ip_address']];
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nas['ip_address']];
         }
