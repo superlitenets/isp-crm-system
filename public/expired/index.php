@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/Mpesa.php';
 require_once __DIR__ . '/../src/RadiusBilling.php';
 
-$db = getDbConnection();
+$db = Database::getConnection();
 
 function getClientIP(): string {
     $headers = [
@@ -33,37 +33,82 @@ $package = null;
 $message = '';
 $messageType = 'info';
 $stkPushSent = false;
+$lookupMode = false;
 
-$stmt = $db->prepare("
-    SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
-           p.name as package_name, p.price as package_price, p.validity_days,
-           p.download_speed, p.upload_speed
-    FROM radius_subscriptions s
-    LEFT JOIN customers c ON s.customer_id = c.id
-    LEFT JOIN radius_packages p ON s.package_id = p.id
-    LEFT JOIN radius_sessions rs ON rs.subscription_id = s.id
-    WHERE rs.framed_ip_address = ? OR s.static_ip = ?
-    ORDER BY rs.started_at DESC
-    LIMIT 1
-");
-$stmt->execute([$clientIP, $clientIP]);
-$subscription = $stmt->fetch(PDO::FETCH_ASSOC);
+// Load ISP settings
+$radiusBilling = new \App\RadiusBilling($db);
+$ispName = $radiusBilling->getSetting('isp_name') ?: 'Your ISP';
+$ispPhone = $radiusBilling->getSetting('isp_contact_phone') ?: '';
+$ispPhoneFormatted = $ispPhone ? preg_replace('/[^0-9]/', '', $ispPhone) : '';
+$ispWhatsApp = $ispPhoneFormatted ? '254' . substr($ispPhoneFormatted, -9) : '';
 
-if (!$subscription) {
+// Check if lookup by username/phone was submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'lookup') {
+    $lookupValue = trim($_POST['lookup_value'] ?? '');
+    if (!empty($lookupValue)) {
+        // Normalize phone number
+        $phone = preg_replace('/[^0-9]/', '', $lookupValue);
+        if (substr($phone, 0, 1) === '0') {
+            $phone = '254' . substr($phone, 1);
+        }
+        
+        // Search by username or phone
+        $stmt = $db->prepare("
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+                   p.name as package_name, p.price as package_price, p.validity_days,
+                   p.download_speed, p.upload_speed
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE s.username = ? 
+               OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') = ?
+               OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
+            LIMIT 1
+        ");
+        $stmt->execute([$lookupValue, $phone, '%' . substr($phone, -9)]);
+        $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$subscription) {
+            $message = "No subscription found for '{$lookupValue}'. Please check your username or phone number.";
+            $messageType = 'warning';
+            $lookupMode = true;
+        }
+    }
+}
+
+// Try to find by IP if no lookup was done
+if (!$subscription && !$lookupMode) {
     $stmt = $db->prepare("
         SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
                p.name as package_name, p.price as package_price, p.validity_days,
-               p.download_speed, p.upload_speed, rs.framed_ip_address
-        FROM radius_sessions rs
-        LEFT JOIN radius_subscriptions s ON rs.subscription_id = s.id
+               p.download_speed, p.upload_speed
+        FROM radius_subscriptions s
         LEFT JOIN customers c ON s.customer_id = c.id
         LEFT JOIN radius_packages p ON s.package_id = p.id
-        WHERE rs.framed_ip_address = ?
+        LEFT JOIN radius_sessions rs ON rs.subscription_id = s.id
+        WHERE rs.framed_ip_address = ? OR s.static_ip = ?
         ORDER BY rs.started_at DESC
         LIMIT 1
     ");
-    $stmt->execute([$clientIP]);
+    $stmt->execute([$clientIP, $clientIP]);
     $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$subscription) {
+        $stmt = $db->prepare("
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+                   p.name as package_name, p.price as package_price, p.validity_days,
+                   p.download_speed, p.upload_speed, rs.framed_ip_address
+            FROM radius_sessions rs
+            LEFT JOIN radius_subscriptions s ON rs.subscription_id = s.id
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE rs.framed_ip_address = ?
+            ORDER BY rs.started_at DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$clientIP]);
+        $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -279,30 +324,72 @@ try {
             </form>
             <?php endif; ?>
             
+            <?php if ($ispPhone): ?>
             <div class="text-center mt-4">
-                <p class="text-muted small mb-2">Need help?</p>
+                <p class="text-muted small mb-2">Need help? Contact <?= htmlspecialchars($ispName) ?>:</p>
                 <div class="d-flex justify-content-center gap-3">
-                    <a href="tel:0700000000" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-telephone me-1"></i> Call Support
+                    <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-telephone me-1"></i> <?= htmlspecialchars($ispPhone) ?>
                     </a>
-                    <a href="https://wa.me/254700000000" class="btn btn-outline-success btn-sm">
+                    <?php if ($ispWhatsApp): ?>
+                    <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>" class="btn btn-outline-success btn-sm">
                         <i class="bi bi-whatsapp me-1"></i> WhatsApp
                     </a>
+                    <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
         <?php else: ?>
         <div class="not-found">
-            <div class="icon"><i class="bi bi-wifi-off"></i></div>
-            <h3 class="mb-3">Connection Issue</h3>
-            <p class="text-muted mb-4">We couldn't identify your subscription from your IP address.</p>
-            <div class="ip-badge mb-4">
+            <div class="icon"><i class="bi bi-exclamation-circle text-warning"></i></div>
+            <h3 class="mb-3">Account Not Found</h3>
+            <p class="text-muted mb-4">We couldn't find your account in our system. Please contact <strong><?= htmlspecialchars($ispName) ?></strong> to register or get assistance.</p>
+            
+            <?php if ($message): ?>
+            <div class="alert alert-<?= $messageType ?> text-start mb-4">
+                <?= htmlspecialchars($message) ?>
+            </div>
+            <?php endif; ?>
+            
+            <div class="card bg-light mb-4">
+                <div class="card-body text-center">
+                    <h5 class="card-title mb-3"><i class="bi bi-headset me-2"></i>Contact <?= htmlspecialchars($ispName) ?></h5>
+                    <?php if ($ispPhone): ?>
+                    <div class="d-flex justify-content-center gap-3 mb-3">
+                        <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="btn btn-primary">
+                            <i class="bi bi-telephone me-2"></i> Call <?= htmlspecialchars($ispPhone) ?>
+                        </a>
+                        <?php if ($ispWhatsApp): ?>
+                        <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account" class="btn btn-success">
+                            <i class="bi bi-whatsapp me-2"></i> WhatsApp
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                    <?php else: ?>
+                    <p class="text-muted">Please contact your ISP for assistance.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <hr class="my-4">
+            
+            <p class="text-muted small mb-3">Already have an account? Search by username or phone:</p>
+            <form method="post" class="text-start mb-4">
+                <input type="hidden" name="action" value="lookup">
+                <div class="input-group">
+                    <input type="text" name="lookup_value" class="form-control" 
+                           placeholder="Username or phone number" required
+                           value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </form>
+            
+            <div class="ip-badge">
                 <i class="bi bi-geo-alt me-1"></i> Your IP: <?= htmlspecialchars($clientIP) ?>
             </div>
-            <p class="text-muted small">If you believe this is an error, please contact support with your username.</p>
-            <a href="tel:0700000000" class="btn btn-primary mt-3">
-                <i class="bi bi-telephone me-1"></i> Contact Support
-            </a>
         </div>
         <?php endif; ?>
     </div>
