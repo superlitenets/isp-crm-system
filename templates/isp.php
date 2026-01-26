@@ -959,10 +959,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     // Handle CoA/Disconnect based on whether expiring or extending
                     if ($isExpiring) {
-                        // Expiring user - disconnect them
-                        $disconnectResult = $radiusBilling->disconnectUser($subId);
-                        if ($disconnectResult && !empty($disconnectResult['success'])) {
-                            $msg .= ' (session disconnected)';
+                        // Expiring user - disconnect them using same method as disconnect button
+                        $stmt = $db->prepare("
+                            SELECT rs.id, rs.acct_session_id, rs.framed_ip_address, rs.mac_address,
+                                   sub.username, rn.ip_address as nas_ip, rn.secret as nas_secret
+                            FROM radius_sessions rs
+                            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
+                            LEFT JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
+                            WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+                            ORDER BY rs.session_start DESC LIMIT 1
+                        ");
+                        $stmt->execute([$subId]);
+                        $session = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($session && !empty($session['nas_ip'])) {
+                            $coaResult = $radiusBilling->sendCoADisconnect($session);
+                            if ($coaResult['success']) {
+                                $msg .= ' (session disconnected via CoA)';
+                            } else {
+                                $msg .= ' (CoA sent: ' . ($coaResult['error'] ?? 'unknown') . ')';
+                            }
+                            // Update session in database
+                            $stmt = $db->prepare("UPDATE radius_sessions SET session_end = CURRENT_TIMESTAMP, terminate_cause = 'Admin-Reset' WHERE id = ?");
+                            $stmt->execute([$session['id']]);
                         }
                     } elseif ($wasExpired && $isExtending) {
                         // Reactivating - send reactivation CoA
