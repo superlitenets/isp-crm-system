@@ -885,6 +885,7 @@ app.post('/radius/disconnect', async (req, res) => {
         const secretTrimmed = String(secret).trim();
         const attributes = [];
         
+        attributes.push(['NAS-IP-Address', nasIp]);
         if (username) attributes.push(['User-Name', username]);
         if (sessionId) attributes.push(['Acct-Session-Id', sessionId]);
         
@@ -926,6 +927,7 @@ app.post('/radius/coa', async (req, res) => {
         const secretTrimmed = String(secret).trim();
         const attributes = [];
         
+        attributes.push(['NAS-IP-Address', nasIp]);
         if (username) attributes.push(['User-Name', username]);
         if (sessionId) attributes.push(['Acct-Session-Id', sessionId]);
         if (rateLimit) {
