@@ -11671,9 +11671,9 @@ try {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-8 mb-3">
-                                        <label class="form-label">Allowed IPs</label>
-                                        <input type="text" class="form-control" name="allowed_ips" required placeholder="10.200.0.2/32">
-                                        <div class="form-text">Peer's VPN IP address</div>
+                                        <label class="form-label">Allowed IPs <span class="badge bg-success">Auto-assigned</span></label>
+                                        <input type="text" class="form-control" name="allowed_ips" placeholder="Leave empty for auto-assign">
+                                        <div class="form-text">Leave empty to auto-assign next available IP</div>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label">Keepalive</label>
@@ -11737,7 +11737,7 @@ try {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-8 mb-3">
-                                        <label class="form-label">Allowed IPs</label>
+                                        <label class="form-label">Allowed IPs <span class="badge bg-success">Auto-assigned</span></label>
                                         <input type="text" class="form-control" name="allowed_ips" id="editPeerAllowedIps" required>
                                     </div>
                                     <div class="col-md-4 mb-3">
