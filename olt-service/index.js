@@ -810,7 +810,7 @@ function sendRadiusRequest(nasIp, nasPort, code, attributes, secret, timeout = 5
             const packet = radius.encode({
                 code: code,
                 secret: secret,
-                add_message_authenticator: true,
+                add_message_authenticator: false,
                 attributes: attributes
             });
             
