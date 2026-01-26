@@ -930,7 +930,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($newExpiry) {
                 try {
-                    $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, updated_at = NOW() WHERE id = ?");
+                    // Get current subscription to check if extending from expired
+                    $stmt = $db->prepare("SELECT status, expiry_date FROM radius_subscriptions WHERE id = ?");
+                    $stmt->execute([$subId]);
+                    $oldSub = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    $wasExpired = ($oldSub && ($oldSub['status'] === 'expired' || strtotime($oldSub['expiry_date']) < time()));
+                    $isExtending = strtotime($newExpiry) > time();
+                    
+                    // Update expiry and reactivate if extending from expired
+                    if ($wasExpired && $isExtending) {
+                        $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, status = 'active', updated_at = NOW() WHERE id = ?");
+                    } else {
+                        $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, updated_at = NOW() WHERE id = ?");
+                    }
                     $stmt->execute([$newExpiry, $subId]);
                     
                     if ($reason) {
@@ -938,7 +950,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$subId, "Expiry changed to " . date('M j, Y', strtotime($newExpiry)) . ". Reason: " . $reason, $_SESSION['user_id']]);
                     }
                     
-                    $message = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
+                    $msg = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
+                    
+                    // Send CoA to update RADIUS session (disconnect expired or update active)
+                    $coaResult = $radiusBilling->sendCoAForSubscription($subId);
+                    if ($coaResult && !empty($coaResult['success'])) {
+                        $msg .= $wasExpired ? ' (session disconnected via CoA)' : ' (session updated via CoA)';
+                    }
+                    
+                    $message = $msg;
                     $messageType = 'success';
                 } catch (Exception $e) {
                     $message = 'Error updating expiry: ' . $e->getMessage();
@@ -955,7 +975,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newPackageId = (int)$_POST['new_package_id'];
             $prorateAmount = (float)($_POST['prorate_amount'] ?? 0);
             $applyProrate = isset($_POST['apply_prorate']);
-            $sendCoA = isset($_POST['send_coa']);
             
             if (!$newPackageId) {
                 $message = 'Please select a new package';
@@ -1000,11 +1019,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $msg = 'Package changed to ' . $newPkg['name'];
                 
-                if ($sendCoA) {
-                    $coaResult = $radiusBilling->sendCoAForSubscription($subId);
-                    if ($coaResult && !empty($coaResult['success'])) {
-                        $msg .= ' (speed updated via CoA)';
-                    }
+                // Always send CoA to update speed limits on MikroTik
+                $coaResult = $radiusBilling->sendCoAForSubscription($subId);
+                if ($coaResult && !empty($coaResult['success'])) {
+                    $msg .= ' (speed updated via CoA)';
+                } elseif ($coaResult && !empty($coaResult['error'])) {
+                    $msg .= ' (CoA failed: ' . $coaResult['error'] . ')';
                 }
                 
                 if ($applyProrate && $prorateAmount != 0) {
