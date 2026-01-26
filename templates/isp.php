@@ -6817,6 +6817,16 @@ try {
                             </div>
                         `;
                     }
+                    
+                    // Update live timer from Online to Offline
+                    const liveTimer = subRow.querySelector('.live-timer');
+                    if (liveTimer) {
+                        const nowTimestamp = Math.floor(Date.now() / 1000);
+                        liveTimer.dataset.start = nowTimestamp;
+                        liveTimer.dataset.type = 'offline';
+                        liveTimer.className = 'badge bg-white bg-opacity-25 text-white live-timer';
+                        liveTimer.innerHTML = '<i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline (<span class="timer-value">00:00:00 ago</span>)';
+                    }
                 }
             }
         });
