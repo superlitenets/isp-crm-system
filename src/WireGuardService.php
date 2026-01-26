@@ -888,12 +888,19 @@ class WireGuardService {
         $returnVar = 0;
         
         \exec("ping -c {$count} -W {$timeout} " . \escapeshellarg($ip) . " 2>&1", $output, $returnVar);
+        $outputStr = \implode("\n", $output);
+        
+        // If ping fails due to missing capabilities (Replit/container), fall back to OLT service
+        if (\stripos($outputStr, 'Operation not permitted') !== false || 
+            \stripos($outputStr, 'cap_net_raw') !== false) {
+            return $this->testConnectivityViaOltService($ip, $count, $timeout);
+        }
         
         $result = [
             'success' => $returnVar === 0,
             'ip' => $ip,
             'method' => 'ping',
-            'output' => \implode("\n", $output),
+            'output' => $outputStr,
             'packets_sent' => $count,
             'packets_received' => 0,
             'latency_avg' => null,
