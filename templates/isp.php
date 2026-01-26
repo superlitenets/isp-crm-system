@@ -458,37 +458,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         case 'create_location':
             $result = $radiusBilling->createLocation($_POST);
-            $message = $result['success'] ? 'Location created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $message = $result['success'] ? 'Zone created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
         case 'update_location':
             $result = $radiusBilling->updateLocation((int)$_POST['id'], $_POST);
-            $message = $result['success'] ? 'Location updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $message = $result['success'] ? 'Zone updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
         case 'delete_location':
             $result = $radiusBilling->deleteLocation((int)$_POST['id']);
-            $message = $result['success'] ? 'Location deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $message = $result['success'] ? 'Zone deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
         case 'create_sub_location':
             $result = $radiusBilling->createSubLocation($_POST);
-            $message = $result['success'] ? 'Sub-location created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $message = $result['success'] ? 'Sub-zone created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
         case 'update_sub_location':
             $result = $radiusBilling->updateSubLocation((int)$_POST['id'], $_POST);
-            $message = $result['success'] ? 'Sub-location updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $message = $result['success'] ? 'Sub-zone updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
         case 'delete_sub_location':
             $result = $radiusBilling->deleteSubLocation((int)$_POST['id']);
-            $message = $result['success'] ? 'Sub-location deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $message = $result['success'] ? 'Sub-zone deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
@@ -2357,18 +2357,18 @@ try {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Location <span class="text-danger">*</span></label>
+                                        <label class="form-label">Zone <span class="text-danger">*</span></label>
                                         <select name="location_id" id="sub_location" class="form-select" required onchange="filterSubLocations(this, 'sub_sub_location')">
-                                            <option value="">-- Select Location --</option>
+                                            <option value="">-- Select Zone --</option>
                                             <?php foreach ($ispLocations as $loc): ?>
                                             <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Sub-Location</label>
+                                        <label class="form-label">Sub-Zone</label>
                                         <select name="sub_location_id" id="sub_sub_location" class="form-select">
-                                            <option value="">-- Select Sub-Location --</option>
+                                            <option value="">-- Select Sub-Zone --</option>
                                             <?php foreach ($ispSubLocations as $sub): ?>
                                             <option value="<?= $sub['id'] ?>" data-location="<?= $sub['location_id'] ?>"><?= htmlspecialchars($sub['location_name']) ?> - <?= htmlspecialchars($sub['name']) ?></option>
                                             <?php endforeach; ?>
@@ -3870,7 +3870,6 @@ try {
                                 <tr>
                                     <th>Name</th>
                                     <th>IP Address</th>
-                                    <th>Location</th>
                                     <th>Type</th>
                                     <th>API</th>
                                     <th>VPN</th>
@@ -3889,16 +3888,6 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td><code><?= htmlspecialchars($nas['ip_address']) ?></code></td>
-                                    <td>
-                                        <?php if ($nas['location_name']): ?>
-                                        <span class="badge bg-primary"><?= htmlspecialchars($nas['location_name']) ?></span>
-                                        <?php if ($nas['sub_location_name']): ?>
-                                        <br><small class="text-muted"><?= htmlspecialchars($nas['sub_location_name']) ?></small>
-                                        <?php endif; ?>
-                                        <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
                                     <td><?= htmlspecialchars($nas['nas_type']) ?></td>
                                     <td>
                                         <?php if ($nas['api_enabled']): ?>
@@ -3997,28 +3986,6 @@ try {
                                     <textarea name="description" class="form-control" rows="2"></textarea>
                                 </div>
                                 <hr>
-                                <h6><i class="bi bi-geo-alt me-1"></i> Location</h6>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Location</label>
-                                        <select name="location_id" class="form-select" id="add_nas_location" onchange="filterSubLocations(this, 'add_nas_sub_location')">
-                                            <option value="">-- Select Location --</option>
-                                            <?php foreach ($ispLocations as $loc): ?>
-                                            <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Sub-Location</label>
-                                        <select name="sub_location_id" class="form-select" id="add_nas_sub_location">
-                                            <option value="">-- Select Sub-Location --</option>
-                                            <?php foreach ($ispSubLocations as $sub): ?>
-                                            <option value="<?= $sub['id'] ?>" data-location="<?= $sub['location_id'] ?>"><?= htmlspecialchars($sub['location_name']) ?> - <?= htmlspecialchars($sub['name']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                </div>
-                                <hr>
                                 <h6><i class="bi bi-shield-lock me-1"></i> WireGuard VPN (Optional)</h6>
                                 <div class="mb-3">
                                     <label class="form-label">VPN Peer</label>
@@ -4104,28 +4071,6 @@ try {
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" name="is_active" id="edit_nas_active" value="1">
                                     <label class="form-check-label" for="edit_nas_active">Active</label>
-                                </div>
-                                <hr>
-                                <h6><i class="bi bi-geo-alt me-1"></i> Location</h6>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Location</label>
-                                        <select name="location_id" class="form-select" id="edit_nas_location" onchange="filterSubLocations(this, 'edit_nas_sub_location')">
-                                            <option value="">-- Select Location --</option>
-                                            <?php foreach ($ispLocations as $loc): ?>
-                                            <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Sub-Location</label>
-                                        <select name="sub_location_id" class="form-select" id="edit_nas_sub_location">
-                                            <option value="">-- Select Sub-Location --</option>
-                                            <?php foreach ($ispSubLocations as $sub): ?>
-                                            <option value="<?= $sub['id'] ?>" data-location="<?= $sub['location_id'] ?>"><?= htmlspecialchars($sub['location_name']) ?> - <?= htmlspecialchars($sub['name']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
                                 </div>
                                 <hr>
                                 <h6><i class="bi bi-shield-lock me-1"></i> WireGuard VPN</h6>
@@ -4724,7 +4669,7 @@ try {
                 </li>
                 <li class="nav-item">
                     <a class="nav-link <?= $settingsTab === 'locations' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=locations">
-                        <i class="bi bi-geo-alt me-1"></i> Locations
+                        <i class="bi bi-geo-alt me-1"></i> Zones
                     </a>
                 </li>
                 <li class="nav-item">
@@ -5081,16 +5026,16 @@ try {
                 <div class="col-lg-6">
                     <div class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-geo-alt me-2"></i>Locations</span>
+                            <span><i class="bi bi-geo-alt me-2"></i>Zones</span>
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
-                                <i class="bi bi-plus-lg"></i> Add Location
+                                <i class="bi bi-plus-lg"></i> Add Zone
                             </button>
                         </div>
                         <div class="card-body p-0">
                             <?php if (empty($ispLocations)): ?>
                             <div class="p-4 text-center text-muted">
                                 <i class="bi bi-geo-alt fs-3 d-block mb-2"></i>
-                                No locations defined. Add your first location.
+                                No zones defined. Add your first zone.
                             </div>
                             <?php else: ?>
                             <div class="list-group list-group-flush">
@@ -5109,7 +5054,7 @@ try {
                                         <button type="button" class="btn btn-outline-primary" onclick="editLocation(<?= htmlspecialchars(json_encode($loc)) ?>)">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this location?')">
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this zone?')">
                                             <input type="hidden" name="action" value="delete_location">
                                             <input type="hidden" name="id" value="<?= $loc['id'] ?>">
                                             <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
@@ -5126,16 +5071,16 @@ try {
                 <div class="col-lg-6">
                     <div class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-geo me-2"></i>Sub-Locations</span>
+                            <span><i class="bi bi-geo me-2"></i>Sub-Zones</span>
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSubLocationModal">
-                                <i class="bi bi-plus-lg"></i> Add Sub-Location
+                                <i class="bi bi-plus-lg"></i> Add Sub-Zone
                             </button>
                         </div>
                         <div class="card-body p-0">
                             <?php if (empty($ispSubLocations)): ?>
                             <div class="p-4 text-center text-muted">
                                 <i class="bi bi-geo fs-3 d-block mb-2"></i>
-                                No sub-locations defined. Create locations first.
+                                No sub-zones defined. Create zones first.
                             </div>
                             <?php else: ?>
                             <div class="list-group list-group-flush">
@@ -5173,17 +5118,17 @@ try {
                         <form method="post">
                             <input type="hidden" name="action" value="create_location">
                             <div class="modal-header">
-                                <h5 class="modal-title">Add Location</h5>
+                                <h5 class="modal-title">Add Zone</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Location Name <span class="text-danger">*</span></label>
-                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Nairobi">
+                                    <label class="form-label">Zone Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Zone A - Westlands">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Code</label>
-                                    <input type="text" name="code" class="form-control" placeholder="e.g., NBI">
+                                    <input type="text" name="code" class="form-control" placeholder="e.g., ZA">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Description</label>
@@ -5192,7 +5137,7 @@ try {
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Add Location</button>
+                                <button type="submit" class="btn btn-primary">Add Zone</button>
                             </div>
                         </form>
                     </div>
@@ -5206,12 +5151,12 @@ try {
                             <input type="hidden" name="action" value="update_location">
                             <input type="hidden" name="id" id="edit_location_id">
                             <div class="modal-header">
-                                <h5 class="modal-title">Edit Location</h5>
+                                <h5 class="modal-title">Edit Zone</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Location Name <span class="text-danger">*</span></label>
+                                    <label class="form-label">Zone Name <span class="text-danger">*</span></label>
                                     <input type="text" name="name" id="edit_location_name" class="form-control" required>
                                 </div>
                                 <div class="mb-3">
@@ -5242,26 +5187,26 @@ try {
                         <form method="post">
                             <input type="hidden" name="action" value="create_sub_location">
                             <div class="modal-header">
-                                <h5 class="modal-title">Add Sub-Location</h5>
+                                <h5 class="modal-title">Add Sub-Zone</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Parent Location <span class="text-danger">*</span></label>
+                                    <label class="form-label">Parent Zone <span class="text-danger">*</span></label>
                                     <select name="location_id" class="form-select" required>
-                                        <option value="">-- Select Location --</option>
+                                        <option value="">-- Select Zone --</option>
                                         <?php foreach ($ispLocations as $loc): ?>
                                         <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Sub-Location Name <span class="text-danger">*</span></label>
-                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Westlands">
+                                    <label class="form-label">Sub-Zone Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Block A">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Code</label>
-                                    <input type="text" name="code" class="form-control" placeholder="e.g., WL">
+                                    <input type="text" name="code" class="form-control" placeholder="e.g., BA">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Description</label>
@@ -5270,7 +5215,7 @@ try {
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Add Sub-Location</button>
+                                <button type="submit" class="btn btn-primary">Add Sub-Zone</button>
                             </div>
                         </form>
                     </div>
@@ -5284,21 +5229,21 @@ try {
                             <input type="hidden" name="action" value="update_sub_location">
                             <input type="hidden" name="id" id="edit_sub_location_id">
                             <div class="modal-header">
-                                <h5 class="modal-title">Edit Sub-Location</h5>
+                                <h5 class="modal-title">Edit Sub-Zone</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Parent Location <span class="text-danger">*</span></label>
+                                    <label class="form-label">Parent Zone <span class="text-danger">*</span></label>
                                     <select name="location_id" id="edit_sub_location_parent" class="form-select" required>
-                                        <option value="">-- Select Location --</option>
+                                        <option value="">-- Select Zone --</option>
                                         <?php foreach ($ispLocations as $loc): ?>
                                         <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Sub-Location Name <span class="text-danger">*</span></label>
+                                    <label class="form-label">Sub-Zone Name <span class="text-danger">*</span></label>
                                     <input type="text" name="name" id="edit_sub_location_name" class="form-control" required>
                                 </div>
                                 <div class="mb-3">
@@ -5348,9 +5293,9 @@ try {
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Filter by Location</label>
+                                <label class="form-label">Filter by Zone</label>
                                 <select name="filter_location" class="form-select" id="bulkFilterLocation">
-                                    <option value="">All Locations</option>
+                                    <option value="">All Zones</option>
                                     <?php foreach ($ispLocations as $loc): ?>
                                     <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
                                     <?php endforeach; ?>
@@ -5509,9 +5454,6 @@ try {
         document.getElementById('edit_api_port').value = nas.api_port || 8728;
         document.getElementById('edit_api_username').value = nas.api_username || '';
         document.getElementById('edit_nas_vpn_peer').value = nas.wireguard_peer_id || '';
-        document.getElementById('edit_nas_location').value = nas.location_id || '';
-        document.getElementById('edit_nas_sub_location').value = nas.sub_location_id || '';
-        filterSubLocations(document.getElementById('edit_nas_location'), 'edit_nas_sub_location', nas.sub_location_id);
         new bootstrap.Modal(document.getElementById('editNASModal')).show();
     }
     
