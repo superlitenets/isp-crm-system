@@ -923,6 +923,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
             
+        case 'change_expiry':
+            $subId = (int)$_POST['id'];
+            $newExpiry = $_POST['new_expiry_date'] ?? '';
+            $reason = $_POST['expiry_change_reason'] ?? '';
+            
+            if ($newExpiry) {
+                try {
+                    $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, updated_at = NOW() WHERE id = ?");
+                    $stmt->execute([$newExpiry, $subId]);
+                    
+                    if ($reason) {
+                        $stmt = $db->prepare("INSERT INTO radius_subscription_notes (subscription_id, note, created_by, created_at) VALUES (?, ?, ?, NOW())");
+                        $stmt->execute([$subId, "Expiry changed to " . date('M j, Y', strtotime($newExpiry)) . ". Reason: " . $reason, $_SESSION['user_id']]);
+                    }
+                    
+                    $message = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = 'Error updating expiry: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+            } else {
+                $message = 'Please select a valid expiry date';
+                $messageType = 'warning';
+            }
+            break;
+            
+        case 'change_package':
+            $subId = (int)$_POST['id'];
+            $newPackageId = (int)$_POST['new_package_id'];
+            $prorateAmount = (float)($_POST['prorate_amount'] ?? 0);
+            $applyProrate = isset($_POST['apply_prorate']);
+            $sendCoA = isset($_POST['send_coa']);
+            
+            if (!$newPackageId) {
+                $message = 'Please select a new package';
+                $messageType = 'warning';
+                break;
+            }
+            
+            try {
+                $stmt = $db->prepare("SELECT * FROM radius_subscriptions WHERE id = ?");
+                $stmt->execute([$subId]);
+                $oldSub = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                $stmt = $db->prepare("SELECT * FROM radius_packages WHERE id = ?");
+                $stmt->execute([$newPackageId]);
+                $newPkg = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if (!$oldSub || !$newPkg) {
+                    throw new Exception('Subscription or package not found');
+                }
+                
+                $db->beginTransaction();
+                
+                $newExpiry = date('Y-m-d', strtotime('+' . $newPkg['validity_days'] . ' days'));
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET package_id = ?, expiry_date = ?, updated_at = NOW() WHERE id = ?");
+                $stmt->execute([$newPackageId, $newExpiry, $subId]);
+                
+                if ($applyProrate && $prorateAmount != 0) {
+                    if ($prorateAmount < 0) {
+                        $creditAmount = abs($prorateAmount);
+                        $stmt = $db->prepare("UPDATE radius_subscriptions SET credit_balance = credit_balance + ? WHERE id = ?");
+                        $stmt->execute([$creditAmount, $subId]);
+                        
+                        $stmt = $db->prepare("INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, created_at) VALUES (?, 'credit', ?, ?, NOW())");
+                        $stmt->execute([$subId, $creditAmount, 'Package change credit (prorated)']);
+                    } else {
+                        $stmt = $db->prepare("INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, created_at) VALUES (?, 'invoice', ?, ?, NOW())");
+                        $stmt->execute([$subId, $prorateAmount, 'Package upgrade balance due']);
+                    }
+                }
+                
+                $db->commit();
+                
+                $msg = 'Package changed to ' . $newPkg['name'];
+                
+                if ($sendCoA) {
+                    $coaResult = $radiusBilling->sendCoAForSubscription($subId);
+                    if ($coaResult && !empty($coaResult['success'])) {
+                        $msg .= ' (speed updated via CoA)';
+                    }
+                }
+                
+                if ($applyProrate && $prorateAmount != 0) {
+                    if ($prorateAmount < 0) {
+                        $msg .= '. KES ' . number_format(abs($prorateAmount)) . ' credited to wallet.';
+                    } else {
+                        $msg .= '. KES ' . number_format($prorateAmount) . ' due from customer.';
+                    }
+                }
+                
+                $message = $msg;
+                $messageType = 'success';
+            } catch (Exception $e) {
+                if ($db->inTransaction()) $db->rollBack();
+                $message = 'Error changing package: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'generate_vouchers':
             $result = $radiusBilling->generateVouchers((int)$_POST['package_id'], (int)$_POST['count'], $_SESSION['user_id']);
             $message = $result['success'] ? "Generated {$result['count']} vouchers (Batch: {$result['batch_id']})" : 'Error: ' . ($result['error'] ?? 'Unknown error');
@@ -2622,106 +2723,218 @@ try {
             <div class="row g-4">
                 <!-- Left Column -->
                 <div class="col-lg-4">
-                    <!-- Customer Info Card -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-person me-2"></i>Customer Information</h6>
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCustomerModal">
-                                <i class="bi bi-pencil"></i>
-                            </button>
+                    <!-- Premium Customer Info Card -->
+                    <div class="card border-0 shadow-lg mb-4 overflow-hidden">
+                        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 text-white fw-semibold"><i class="bi bi-person-circle me-2"></i>Customer</h6>
+                                <button class="btn btn-sm btn-light btn-outline-light rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editCustomerModal">
+                                    <i class="bi bi-pencil-fill me-1"></i> Edit
+                                </button>
+                            </div>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body p-0">
                             <?php if ($customer): ?>
-                            <table class="table table-sm mb-0">
-                                <tr><td class="text-muted" style="width:40%">Name</td><td><strong><?= htmlspecialchars($customer['name']) ?></strong></td></tr>
-                                <tr><td class="text-muted">Phone</td><td><code><?= htmlspecialchars($customer['phone']) ?></code></td></tr>
-                                <tr><td class="text-muted">Email</td><td><?= htmlspecialchars($customer['email'] ?? '-') ?></td></tr>
-                                <tr><td class="text-muted">Address</td><td><?= htmlspecialchars($customer['address'] ?? '-') ?></td></tr>
-                                <tr><td class="text-muted">Account #</td><td><code><?= htmlspecialchars($customer['phone']) ?></code></td></tr>
-                            </table>
+                            <div class="text-center py-4 px-3" style="background: linear-gradient(180deg, rgba(102,126,234,0.1) 0%, transparent 100%);">
+                                <div class="rounded-circle bg-gradient d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                    <span class="text-white fw-bold fs-3"><?= strtoupper(substr($customer['name'], 0, 1)) ?></span>
+                                </div>
+                                <h5 class="fw-bold mb-1"><?= htmlspecialchars($customer['name']) ?></h5>
+                                <p class="text-muted mb-0 small">Account #<?= htmlspecialchars($customer['phone']) ?></p>
+                            </div>
+                            <div class="px-3 pb-3">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item d-flex align-items-center px-0 py-2 border-0 bg-transparent">
+                                        <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                                            <i class="bi bi-telephone text-primary"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <small class="text-muted d-block">Phone</small>
+                                            <span class="fw-medium"><?= htmlspecialchars($customer['phone']) ?></span>
+                                        </div>
+                                        <a href="tel:<?= htmlspecialchars($customer['phone']) ?>" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-telephone-outbound"></i></a>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center px-0 py-2 border-0 bg-transparent">
+                                        <div class="rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                                            <i class="bi bi-envelope text-info"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <small class="text-muted d-block">Email</small>
+                                            <span class="fw-medium"><?= htmlspecialchars($customer['email'] ?? '-') ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center px-0 py-2 border-0 bg-transparent">
+                                        <div class="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                                            <i class="bi bi-geo-alt text-warning"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <small class="text-muted d-block">Address</small>
+                                            <span class="fw-medium"><?= htmlspecialchars($customer['address'] ?? '-') ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <?php else: ?>
-                            <p class="text-muted mb-0">No customer linked</p>
+                            <div class="text-center py-5">
+                                <i class="bi bi-person-x text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-2 mb-0">No customer linked</p>
+                            </div>
                             <?php endif; ?>
                         </div>
                     </div>
                     
-                    <!-- Subscription Info Card -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-box me-2"></i>Subscription Details</h6>
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editSubscriptionModal">
-                                <i class="bi bi-pencil"></i>
-                            </button>
+                    <!-- Premium Subscription Details Card -->
+                    <div class="card border-0 shadow-lg mb-4 overflow-hidden">
+                        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 text-white fw-semibold"><i class="bi bi-router me-2"></i>Subscription</h6>
+                                <button class="btn btn-sm btn-light btn-outline-light rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editSubscriptionModal">
+                                    <i class="bi bi-pencil-fill me-1"></i> Edit
+                                </button>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <table class="table table-sm mb-0">
-                                <tr><td class="text-muted" style="width:40%">Username</td><td>
-                                    <code><?= htmlspecialchars($subscriber['username']) ?></code>
-                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
-                                </td></tr>
-                                <tr><td class="text-muted">Password</td><td>
-                                    <code id="pwdDisplay">••••••••</code>
-                                    <button class="btn btn-sm btn-link p-0 ms-1" id="pwdToggle" onclick="togglePassword()"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['password'] ?? '') ?>')" title="Copy password"><i class="bi bi-clipboard"></i></button>
-                                    <script>
-                                        function togglePassword() {
-                                            const display = document.getElementById('pwdDisplay');
-                                            const toggle = document.getElementById('pwdToggle').querySelector('i');
-                                            if (display.textContent === '••••••••') {
-                                                display.textContent = '<?= htmlspecialchars($subscriber['password'] ?? '') ?>';
-                                                toggle.className = 'bi bi-eye-slash';
-                                            } else {
-                                                display.textContent = '••••••••';
-                                                toggle.className = 'bi bi-eye';
+                        <div class="card-body p-0">
+                            <!-- Credentials Section -->
+                            <div class="p-3 border-bottom" style="background: linear-gradient(180deg, rgba(17,153,142,0.08) 0%, transparent 100%);">
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small mb-1">Username</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-dark text-success border-dark"><i class="bi bi-person-badge"></i></span>
+                                            <input type="text" class="form-control bg-dark text-success border-dark font-monospace" value="<?= htmlspecialchars($subscriber['username']) ?>" readonly>
+                                            <button class="btn btn-dark border-dark" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small mb-1">Password</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-dark text-warning border-dark"><i class="bi bi-key"></i></span>
+                                            <input type="password" class="form-control bg-dark text-warning border-dark font-monospace" id="pwdInput" value="<?= htmlspecialchars($subscriber['password'] ?? '') ?>" readonly>
+                                            <button class="btn btn-dark border-dark" id="pwdToggle" onclick="togglePassword()"><i class="bi bi-eye"></i></button>
+                                            <button class="btn btn-dark border-dark" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['password'] ?? '') ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                        <script>
+                                            function togglePassword() {
+                                                const input = document.getElementById('pwdInput');
+                                                const toggle = document.getElementById('pwdToggle').querySelector('i');
+                                                if (input.type === 'password') {
+                                                    input.type = 'text';
+                                                    toggle.className = 'bi bi-eye-slash';
+                                                } else {
+                                                    input.type = 'password';
+                                                    toggle.className = 'bi bi-eye';
+                                                }
                                             }
-                                        }
-                                    </script>
-                                </td></tr>
-                                <tr><td class="text-muted">Package</td><td><span class="badge bg-primary-subtle text-primary border border-primary-subtle"><?= htmlspecialchars($package['name'] ?? '-') ?></span></td></tr>
-                                <tr><td class="text-muted">Speed</td><td>
-                                    <i class="bi bi-arrow-down text-success"></i> <?= $package['download_speed'] ?? '-' ?>
-                                    <i class="bi bi-arrow-up text-danger ms-2"></i> <?= $package['upload_speed'] ?? '-' ?>
-                                </td></tr>
-                                <tr><td class="text-muted">Price</td><td><strong>KES <?= number_format($package['price'] ?? 0) ?></strong></td></tr>
-                                <tr><td class="text-muted">Access Type</td><td><span class="badge bg-secondary"><?= strtoupper($subscriber['access_type']) ?></span></td></tr>
-                                <tr><td class="text-muted">Static IP</td><td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td></tr>
-                                <tr><td class="text-muted">MAC Address</td><td>
+                                        </script>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Package Info with Change Button -->
+                            <div class="p-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small">Current Package</span>
+                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#changePackageModal">
+                                        <i class="bi bi-arrow-left-right me-1"></i> Change
+                                    </button>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-3 p-3 me-3 text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-width: 70px;">
+                                        <i class="bi bi-box-seam text-white fs-4"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h5 class="fw-bold mb-1"><?= htmlspecialchars($package['name'] ?? 'N/A') ?></h5>
+                                        <div class="d-flex gap-3 text-muted small">
+                                            <span><i class="bi bi-arrow-down-circle text-success me-1"></i><?= $package['download_speed'] ?? '-' ?></span>
+                                            <span><i class="bi bi-arrow-up-circle text-danger me-1"></i><?= $package['upload_speed'] ?? '-' ?></span>
+                                        </div>
+                                        <div class="mt-1">
+                                            <span class="badge bg-success">KES <?= number_format($package['price'] ?? 0) ?>/<?= ucfirst($package['billing_cycle'] ?? 'month') ?></span>
+                                            <span class="badge bg-secondary ms-1"><?= strtoupper($subscriber['access_type']) ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Expiry Section with Change Button -->
+                            <div class="p-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-muted small">Subscription Period</span>
+                                    <button class="btn btn-sm btn-outline-warning rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#changeExpiryModal">
+                                        <i class="bi bi-calendar-event me-1"></i> Change Expiry
+                                    </button>
+                                </div>
+                                <?php 
+                                $daysLeft = $subscriber['expiry_date'] ? (strtotime($subscriber['expiry_date']) - time()) / 86400 : null;
+                                $isExpired = $daysLeft !== null && $daysLeft < 0;
+                                $expiryColor = $isExpired ? '#dc3545' : ($daysLeft < 7 ? '#ffc107' : '#198754');
+                                ?>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="rounded-3 p-3 text-center bg-light">
+                                            <small class="text-muted d-block">Start Date</small>
+                                            <strong><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="rounded-3 p-3 text-center" style="background: <?= $expiryColor ?>15; border: 2px solid <?= $expiryColor ?>;">
+                                            <small class="text-muted d-block">Expiry Date</small>
+                                            <strong style="color: <?= $expiryColor ?>;"><?= $subscriber['expiry_date'] ? date('M j, Y', strtotime($subscriber['expiry_date'])) : 'Never' ?></strong>
+                                            <?php if ($isExpired): ?>
+                                            <span class="badge bg-danger d-block mt-1">Expired</span>
+                                            <?php elseif ($daysLeft !== null && $daysLeft < 7): ?>
+                                            <span class="badge bg-warning text-dark d-block mt-1"><?= ceil($daysLeft) ?> days left</span>
+                                            <?php elseif ($daysLeft !== null): ?>
+                                            <span class="badge bg-success d-block mt-1"><?= ceil($daysLeft) ?> days left</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-center">
+                                    <span class="badge bg-<?= $subscriber['auto_renew'] ? 'success' : 'secondary' ?>">
+                                        <i class="bi bi-<?= $subscriber['auto_renew'] ? 'check-circle' : 'x-circle' ?> me-1"></i>
+                                        Auto-renew <?= $subscriber['auto_renew'] ? 'ON' : 'OFF' ?>
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <!-- Connection Details -->
+                            <div class="p-3">
+                                <h6 class="text-muted small mb-3 text-uppercase">Connection Details</h6>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="rounded-3 p-2 bg-light text-center">
+                                            <small class="text-muted d-block">Static IP</small>
+                                            <span class="fw-medium"><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="rounded-3 p-2 bg-light text-center">
+                                            <small class="text-muted d-block">MAC Binding</small>
+                                            <?php if ($subscriber['mac_address']): ?>
+                                            <span class="badge bg-success"><i class="bi bi-lock-fill me-1"></i>Bound</span>
+                                            <?php else: ?>
+                                            <span class="badge bg-secondary"><i class="bi bi-unlock me-1"></i>Not Set</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
                                     <?php if ($subscriber['mac_address']): ?>
-                                    <code><?= htmlspecialchars($subscriber['mac_address']) ?></code>
-                                    <span class="badge bg-success ms-1" title="User locked to this MAC"><i class="bi bi-lock-fill"></i> Bound</span>
-                                    <form method="post" class="d-inline ms-2">
-                                        <input type="hidden" name="action" value="clear_mac">
-                                        <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
-                                        <input type="hidden" name="return_to" value="subscriber">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Clear MAC binding" onclick="return confirm('Clear MAC binding? User will be able to connect from any device.')">
-                                            <i class="bi bi-unlock"></i>
-                                        </button>
-                                    </form>
-                                    <?php else: ?>
-                                    <span class="text-muted">-</span>
-                                    <span class="badge bg-secondary ms-1"><i class="bi bi-unlock"></i> Auto-capture pending</span>
+                                    <div class="col-12">
+                                        <div class="rounded-3 p-2 bg-dark text-center">
+                                            <code class="text-info small"><?= htmlspecialchars($subscriber['mac_address']) ?></code>
+                                            <form method="post" class="d-inline ms-2">
+                                                <input type="hidden" name="action" value="clear_mac">
+                                                <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
+                                                <input type="hidden" name="return_to" value="subscriber">
+                                                <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-2" title="Clear MAC binding" onclick="return confirm('Clear MAC binding? User will be able to connect from any device.')">
+                                                    <i class="bi bi-unlock"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
                                     <?php endif; ?>
-                                </td></tr>
-                                <tr><td class="text-muted">Start Date</td><td><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></td></tr>
-                                <tr>
-                                    <td class="text-muted">Expiry Date</td>
-                                    <td>
-                                        <?php if ($subscriber['expiry_date']): ?>
-                                        <?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?>
-                                        <?php 
-                                        $daysLeft = (strtotime($subscriber['expiry_date']) - time()) / 86400;
-                                        if ($daysLeft < 0): ?>
-                                        <span class="badge bg-danger">Expired</span>
-                                        <?php elseif ($daysLeft < 7): ?>
-                                        <span class="badge bg-warning"><?= ceil($daysLeft) ?> days left</span>
-                                        <?php endif; ?>
-                                        <?php else: ?>
-                                        -
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                                <tr><td class="text-muted">Auto Renew</td><td><?= $subscriber['auto_renew'] ? '<span class="text-success">Yes</span>' : '<span class="text-muted">No</span>' ?></td></tr>
-                            </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -3190,6 +3403,305 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- Change Expiry Modal -->
+            <div class="modal fade" id="changeExpiryModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content border-0 shadow-lg">
+                        <form method="post">
+                            <input type="hidden" name="action" value="change_expiry">
+                            <input type="hidden" name="id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header border-0" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                <h5 class="modal-title text-white"><i class="bi bi-calendar-event me-2"></i>Change Expiry Date</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="text-center mb-4">
+                                    <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                        <i class="bi bi-calendar3 text-white fs-2"></i>
+                                    </div>
+                                    <p class="text-muted">Adjust the subscription expiry date manually</p>
+                                </div>
+                                
+                                <div class="row g-3 mb-3">
+                                    <div class="col-6">
+                                        <div class="p-3 rounded-3 bg-light text-center">
+                                            <small class="text-muted d-block">Current Expiry</small>
+                                            <strong class="text-primary"><?= $subscriber['expiry_date'] ? date('M j, Y', strtotime($subscriber['expiry_date'])) : 'Not set' ?></strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-3 rounded-3 bg-light text-center">
+                                            <small class="text-muted d-block">Days Remaining</small>
+                                            <strong class="<?= ($daysLeft ?? 0) < 0 ? 'text-danger' : 'text-success' ?>"><?= $daysLeft !== null ? ($daysLeft < 0 ? 'Expired (' . abs(floor($daysLeft)) . 'd ago)' : floor($daysLeft) . ' days') : 'N/A' ?></strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">New Expiry Date</label>
+                                    <input type="date" name="new_expiry_date" class="form-control form-control-lg" value="<?= $subscriber['expiry_date'] ?? date('Y-m-d') ?>" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Quick Extend</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <button type="button" class="btn btn-outline-primary" onclick="extendExpiry(7)">+7 Days</button>
+                                        <button type="button" class="btn btn-outline-primary" onclick="extendExpiry(14)">+14 Days</button>
+                                        <button type="button" class="btn btn-outline-primary" onclick="extendExpiry(30)">+30 Days</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Reason (Optional)</label>
+                                    <textarea name="expiry_change_reason" class="form-control" rows="2" placeholder="e.g., Customer requested extension, billing adjustment..."></textarea>
+                                </div>
+                                
+                                <div class="alert alert-warning small mb-0">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    Changing expiry date will not charge the customer. Use for manual adjustments only.
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border: none;">
+                                    <i class="bi bi-check-lg me-1"></i> Update Expiry
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script>
+            function extendExpiry(days) {
+                const input = document.querySelector('#changeExpiryModal input[name="new_expiry_date"]');
+                const currentDate = input.value ? new Date(input.value) : new Date();
+                currentDate.setDate(currentDate.getDate() + days);
+                input.value = currentDate.toISOString().split('T')[0];
+            }
+            </script>
+            
+            <!-- Change Package Modal -->
+            <?php
+            $currentPackagePrice = $package['price'] ?? 0;
+            $currentValidityDays = $package['validity_days'] ?? 30;
+            $daysRemaining = max(0, ceil($daysLeft ?? 0));
+            $dailyRate = $currentValidityDays > 0 ? $currentPackagePrice / $currentValidityDays : 0;
+            $remainingCredit = round($dailyRate * $daysRemaining);
+            ?>
+            <div class="modal fade" id="changePackageModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content border-0 shadow-lg">
+                        <form method="post" id="changePackageForm">
+                            <input type="hidden" name="action" value="change_package">
+                            <input type="hidden" name="id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <input type="hidden" name="prorate_amount" id="prorateAmountInput" value="0">
+                            <div class="modal-header border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <h5 class="modal-title text-white"><i class="bi bi-arrow-left-right me-2"></i>Change Package</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row g-4">
+                                    <!-- Current Package -->
+                                    <div class="col-md-5">
+                                        <div class="card h-100 border-2 border-primary">
+                                            <div class="card-header bg-primary text-white text-center">
+                                                <small>CURRENT PACKAGE</small>
+                                            </div>
+                                            <div class="card-body text-center">
+                                                <h4 class="fw-bold"><?= htmlspecialchars($package['name'] ?? 'N/A') ?></h4>
+                                                <div class="my-3">
+                                                    <span class="fs-3 fw-bold text-primary">KES <?= number_format($currentPackagePrice) ?></span>
+                                                    <small class="text-muted">/ <?= $currentValidityDays ?> days</small>
+                                                </div>
+                                                <div class="small text-muted">
+                                                    <i class="bi bi-arrow-down text-success"></i> <?= $package['download_speed'] ?? '-' ?>
+                                                    <i class="bi bi-arrow-up text-danger ms-2"></i> <?= $package['upload_speed'] ?? '-' ?>
+                                                </div>
+                                                <hr>
+                                                <div class="bg-light rounded-3 p-2">
+                                                    <small class="text-muted d-block">Remaining Value</small>
+                                                    <span class="fw-bold text-success fs-5">KES <?= number_format($remainingCredit) ?></span>
+                                                    <small class="text-muted d-block">(<?= $daysRemaining ?> days x KES <?= number_format($dailyRate, 1) ?>/day)</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Arrow -->
+                                    <div class="col-md-2 d-flex align-items-center justify-content-center">
+                                        <div class="text-center">
+                                            <i class="bi bi-arrow-right fs-1 text-muted d-none d-md-block"></i>
+                                            <i class="bi bi-arrow-down fs-1 text-muted d-md-none"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- New Package Selection -->
+                                    <div class="col-md-5">
+                                        <div class="card h-100 border-2 border-success">
+                                            <div class="card-header bg-success text-white text-center">
+                                                <small>NEW PACKAGE</small>
+                                            </div>
+                                            <div class="card-body text-center">
+                                                <select name="new_package_id" id="newPackageSelect" class="form-select form-select-lg mb-3" onchange="calculateProrate()">
+                                                    <option value="">Select Package...</option>
+                                                    <?php foreach ($packages as $p): ?>
+                                                    <?php if ($p['id'] != $subscriber['package_id']): ?>
+                                                    <option value="<?= $p['id'] ?>" 
+                                                            data-price="<?= $p['price'] ?>" 
+                                                            data-days="<?= $p['validity_days'] ?>"
+                                                            data-name="<?= htmlspecialchars($p['name']) ?>"
+                                                            data-download="<?= htmlspecialchars($p['download_speed']) ?>"
+                                                            data-upload="<?= htmlspecialchars($p['upload_speed']) ?>">
+                                                        <?= htmlspecialchars($p['name']) ?> - KES <?= number_format($p['price']) ?>
+                                                    </option>
+                                                    <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                
+                                                <div id="newPackageInfo" style="display:none;">
+                                                    <h4 class="fw-bold" id="newPackageName">-</h4>
+                                                    <div class="my-3">
+                                                        <span class="fs-3 fw-bold text-success" id="newPackagePrice">KES 0</span>
+                                                        <small class="text-muted" id="newPackageDays">/ 0 days</small>
+                                                    </div>
+                                                    <div class="small text-muted" id="newPackageSpeeds">
+                                                        <i class="bi bi-arrow-down text-success"></i> -
+                                                        <i class="bi bi-arrow-up text-danger ms-2"></i> -
+                                                    </div>
+                                                </div>
+                                                <div id="newPackagePlaceholder" class="py-4">
+                                                    <i class="bi bi-box-seam text-muted" style="font-size: 3rem;"></i>
+                                                    <p class="text-muted mt-2">Select a package above</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Proration Calculation -->
+                                <div id="prorationSection" class="mt-4" style="display:none;">
+                                    <div class="card bg-light border-0">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold mb-3"><i class="bi bi-calculator me-2"></i>Payment Calculation</h6>
+                                            <div class="row g-2 small">
+                                                <div class="col-8">Credit from current package (<?= $daysRemaining ?> days remaining)</div>
+                                                <div class="col-4 text-end fw-bold text-success">- KES <?= number_format($remainingCredit) ?></div>
+                                                
+                                                <div class="col-8">New package cost</div>
+                                                <div class="col-4 text-end fw-bold" id="newPackageCost">+ KES 0</div>
+                                                
+                                                <div class="col-12"><hr class="my-2"></div>
+                                                
+                                                <div class="col-8 fw-bold fs-5" id="balanceLabel">Amount Due</div>
+                                                <div class="col-4 text-end fw-bold fs-5" id="balanceAmount">KES 0</div>
+                                            </div>
+                                            
+                                            <div id="refundNote" class="alert alert-info mt-3 small" style="display:none;">
+                                                <i class="bi bi-info-circle me-2"></i>
+                                                Credit will be added to customer's wallet balance.
+                                            </div>
+                                            <div id="paymentNote" class="alert alert-warning mt-3 small" style="display:none;">
+                                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                                Customer needs to pay the difference before upgrade.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-check mt-3">
+                                        <input type="checkbox" class="form-check-input" id="applyProrate" name="apply_prorate" value="1" checked>
+                                        <label class="form-check-label" for="applyProrate">
+                                            Apply prorated calculation (use credit from remaining days)
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="sendCoA" name="send_coa" value="1" checked>
+                                        <label class="form-check-label" for="sendCoA">
+                                            Send CoA to update speed immediately
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" id="changePackageBtn" disabled style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                                    <i class="bi bi-check-lg me-1"></i> Change Package
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script>
+            const currentRemainingCredit = <?= $remainingCredit ?>;
+            const currentDaysRemaining = <?= $daysRemaining ?>;
+            
+            function calculateProrate() {
+                const select = document.getElementById('newPackageSelect');
+                const option = select.options[select.selectedIndex];
+                const prorationSection = document.getElementById('prorationSection');
+                const newPackageInfo = document.getElementById('newPackageInfo');
+                const newPackagePlaceholder = document.getElementById('newPackagePlaceholder');
+                const changePackageBtn = document.getElementById('changePackageBtn');
+                
+                if (!option.value) {
+                    prorationSection.style.display = 'none';
+                    newPackageInfo.style.display = 'none';
+                    newPackagePlaceholder.style.display = 'block';
+                    changePackageBtn.disabled = true;
+                    return;
+                }
+                
+                const newPrice = parseFloat(option.dataset.price);
+                const newDays = parseInt(option.dataset.days);
+                const newName = option.dataset.name;
+                const newDownload = option.dataset.download;
+                const newUpload = option.dataset.upload;
+                
+                document.getElementById('newPackageName').textContent = newName;
+                document.getElementById('newPackagePrice').textContent = 'KES ' + newPrice.toLocaleString();
+                document.getElementById('newPackageDays').textContent = '/ ' + newDays + ' days';
+                document.getElementById('newPackageSpeeds').innerHTML = '<i class="bi bi-arrow-down text-success"></i> ' + newDownload + ' <i class="bi bi-arrow-up text-danger ms-2"></i> ' + newUpload;
+                
+                newPackageInfo.style.display = 'block';
+                newPackagePlaceholder.style.display = 'none';
+                prorationSection.style.display = 'block';
+                changePackageBtn.disabled = false;
+                
+                document.getElementById('newPackageCost').textContent = '+ KES ' + newPrice.toLocaleString();
+                
+                const balance = newPrice - currentRemainingCredit;
+                const balanceLabel = document.getElementById('balanceLabel');
+                const balanceAmount = document.getElementById('balanceAmount');
+                const refundNote = document.getElementById('refundNote');
+                const paymentNote = document.getElementById('paymentNote');
+                
+                document.getElementById('prorateAmountInput').value = balance;
+                
+                if (balance < 0) {
+                    balanceLabel.textContent = 'Credit to Wallet';
+                    balanceAmount.textContent = 'KES ' + Math.abs(balance).toLocaleString();
+                    balanceAmount.className = 'col-4 text-end fw-bold fs-5 text-success';
+                    refundNote.style.display = 'block';
+                    paymentNote.style.display = 'none';
+                } else if (balance > 0) {
+                    balanceLabel.textContent = 'Amount Due';
+                    balanceAmount.textContent = 'KES ' + balance.toLocaleString();
+                    balanceAmount.className = 'col-4 text-end fw-bold fs-5 text-danger';
+                    refundNote.style.display = 'none';
+                    paymentNote.style.display = 'block';
+                } else {
+                    balanceLabel.textContent = 'Balance';
+                    balanceAmount.textContent = 'KES 0';
+                    balanceAmount.className = 'col-4 text-end fw-bold fs-5';
+                    refundNote.style.display = 'none';
+                    paymentNote.style.display = 'none';
+                }
+            }
+            </script>
             
             <!-- Edit Subscription Modal -->
             <div class="modal fade" id="editSubscriptionModal" tabindex="-1">
