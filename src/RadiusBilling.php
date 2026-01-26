@@ -1929,31 +1929,84 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Package not found'];
         }
         
-        // Check if payment covers package price
-        if ($amount < $package['price']) {
-            return ['success' => false, 'error' => 'Insufficient amount. Package costs KES ' . $package['price']];
+        $packagePrice = (float)$package['price'];
+        $currentBalance = (float)($sub['credit_balance'] ?? 0);
+        
+        // Record the payment transaction first
+        $stmt = $this->db->prepare("
+            INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, transaction_ref, created_at)
+            VALUES (?, 'payment', ?, 'M-Pesa payment', ?, NOW())
+        ");
+        $stmt->execute([$sub['id'], $amount, $transactionId]);
+        
+        // If amount exactly equals package price, renew immediately
+        if (abs($amount - $packagePrice) < 0.01) {
+            $result = $this->renewSubscription($sub['id']);
+            
+            if ($result['success']) {
+                // Record billing record
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
+                        period_start, period_end, status, payment_method, transaction_ref)
+                    VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'mpesa', ?)
+                ");
+                $stmt->execute([
+                    $sub['id'], 
+                    $sub['package_id'], 
+                    $amount, 
+                    $result['expiry_date'],
+                    $transactionId
+                ]);
+            }
+            
+            return $result;
         }
         
-        // Renew subscription
-        $result = $this->renewSubscription($sub['id']);
+        // Partial payment - add to wallet
+        $newBalance = $currentBalance + $amount;
+        $stmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
+        $stmt->execute([$newBalance, $sub['id']]);
         
-        if ($result['success']) {
-            // Record payment
-            $stmt = $this->db->prepare("
-                INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
-                    period_start, period_end, status, payment_method, transaction_ref)
-                VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'mpesa', ?)
-            ");
-            $stmt->execute([
-                $sub['id'], 
-                $sub['package_id'], 
-                $amount, 
-                $result['expiry_date'],
-                $transactionId
-            ]);
+        // Check if wallet now has enough to renew
+        if ($newBalance >= $packagePrice) {
+            // Deduct package price from wallet and renew
+            $remainingBalance = $newBalance - $packagePrice;
+            $stmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
+            $stmt->execute([$remainingBalance, $sub['id']]);
+            
+            $result = $this->renewSubscription($sub['id']);
+            
+            if ($result['success']) {
+                // Record billing record (paid from wallet)
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
+                        period_start, period_end, status, payment_method, transaction_ref)
+                    VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'wallet', ?)
+                ");
+                $stmt->execute([
+                    $sub['id'], 
+                    $sub['package_id'], 
+                    $packagePrice, 
+                    $result['expiry_date'],
+                    $transactionId
+                ]);
+                
+                $result['wallet_used'] = true;
+                $result['wallet_remaining'] = $remainingBalance;
+            }
+            
+            return $result;
         }
         
-        return $result;
+        // Not enough for renewal, just topped up wallet
+        return [
+            'success' => true,
+            'wallet_topup' => true,
+            'amount_added' => $amount,
+            'new_balance' => $newBalance,
+            'needed_for_renewal' => $packagePrice - $newBalance,
+            'message' => "KES " . number_format($amount) . " added to wallet. Balance: KES " . number_format($newBalance, 2) . ". Need KES " . number_format($packagePrice - $newBalance, 2) . " more to renew."
+        ];
     }
     
     // ==================== CoA (Change of Authorization) ====================
