@@ -2660,10 +2660,21 @@ try {
                                 <p class="mb-2 opacity-75"><?= htmlspecialchars($customer['name']) ?></p>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-center gap-2 flex-wrap">
-                                    <?php if ($isOnline): ?>
-                                    <span class="badge bg-white text-success"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online <?= $uptimeStr ? "($uptimeStr)" : '' ?></span>
+                                    <?php if ($isOnline && $activeSession): ?>
+                                    <span class="badge bg-white text-success live-timer" data-start="<?= strtotime($activeSession['session_start']) ?>" data-type="uptime"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online (<span class="timer-value"><?= $uptimeStr ?></span>)</span>
+                                    <?php elseif (!$isOnline): ?>
+                                    <?php 
+                                    $lastSessionForTimer = null;
+                                    foreach ($allSessions as $s) {
+                                        if (!empty($s['session_end'])) {
+                                            $lastSessionForTimer = $s;
+                                            break;
+                                        }
+                                    }
+                                    ?>
+                                    <span class="badge bg-white bg-opacity-25 text-white live-timer" data-start="<?= $lastSessionForTimer ? strtotime($lastSessionForTimer['session_end']) : '' ?>" data-type="offline"><i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline (<span class="timer-value"><?= $offlineStr ?></span>)</span>
                                     <?php else: ?>
-                                    <span class="badge bg-white bg-opacity-25 text-white"><i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline <?= $offlineStr ? "($offlineStr)" : '' ?></span>
+                                    <span class="badge bg-white text-success"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online</span>
                                     <?php endif; ?>
                                     <span class="badge bg-<?= $statusClass === 'success' ? 'white text-success' : ($statusClass === 'danger' ? 'danger' : 'warning text-dark') ?>"><?= $statusLabel ?></span>
                                     <span class="badge bg-white bg-opacity-25"><?= strtoupper($subscriber['access_type']) ?></span>
@@ -6828,9 +6839,39 @@ try {
         });
     }
     
+    // Live timer update function - updates uptime/offline every second like a watch
+    function formatDuration(seconds) {
+        if (seconds < 0) seconds = 0;
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        const timeStr = String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        return days > 0 ? days + 'd ' + timeStr : timeStr;
+    }
+    
+    function updateLiveTimers() {
+        const now = Math.floor(Date.now() / 1000);
+        document.querySelectorAll('.live-timer').forEach(function(timer) {
+            const start = parseInt(timer.dataset.start);
+            const type = timer.dataset.type;
+            const valueSpan = timer.querySelector('.timer-value');
+            if (!start || !valueSpan) return;
+            
+            const elapsed = now - start;
+            let text = formatDuration(elapsed);
+            if (type === 'offline') text += ' ago';
+            valueSpan.textContent = text;
+        });
+    }
+    
+    // Update timers every second
+    setInterval(updateLiveTimers, 1000);
+    
     // Connect on page load
     document.addEventListener('DOMContentLoaded', function() {
         connectSSE();
+        updateLiveTimers(); // Initial update
     });
     
     // Cleanup on page unload
