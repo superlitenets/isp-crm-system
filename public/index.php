@@ -1717,44 +1717,6 @@ if ($page === 'api' && $action === 'vpn_peer_status') {
     exit;
 }
 
-if ($page === 'api' && $action === 'create_nas_vpn_peer') {
-    ob_clean();
-    header('Content-Type: application/json');
-    
-    if (!\App\Auth::isLoggedIn() || !\App\Auth::isAdmin()) {
-        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-        exit;
-    }
-    
-    try {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $nasId = (int)($input['nas_id'] ?? 0);
-        $nasName = $input['name'] ?? '';
-        $nasIp = $input['ip'] ?? '';
-        
-        if (!$nasId || !$nasName) {
-            throw new Exception('Missing required parameters');
-        }
-        
-        $wgService = new \App\WireGuardService($db);
-        $peerId = $wgService->createPeerForNAS($nasId, $nasName, $nasIp);
-        
-        if ($peerId) {
-            $peer = $wgService->getPeer($peerId);
-            echo json_encode([
-                'success' => true,
-                'peer_id' => $peerId,
-                'allowed_ips' => $peer['allowed_ips'] ?? 'N/A'
-            ]);
-        } else {
-            throw new Exception('Failed to create VPN peer');
-        }
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-    }
-    exit;
-}
-
 if ($page === 'api' && $action === 'repost_single_ticket') {
     ob_clean();
     header('Content-Type: application/json');

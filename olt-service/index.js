@@ -10,7 +10,7 @@ app.use(express.json());
 
 const sessionManager = new OLTSessionManager();
 const discoveryWorker = new DiscoveryWorker(sessionManager);
-const snmpWorker = new SNMPPollingWorker(sessionManager);
+const snmpWorker = new SNMPPollingWorker();
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', sessions: sessionManager.getSessionCount() });
@@ -229,57 +229,6 @@ async function refreshSingleONU(oltId, onuDbId) {
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
-const net = require('net');
-
-async function tcpPing(ip, port, timeout) {
-    return new Promise((resolve) => {
-        const startTime = Date.now();
-        const socket = new net.Socket();
-        
-        socket.setTimeout(timeout * 1000);
-        
-        socket.on('connect', () => {
-            const latency = Date.now() - startTime;
-            socket.destroy();
-            resolve({ success: true, latency, port });
-        });
-        
-        socket.on('timeout', () => {
-            socket.destroy();
-            resolve({ success: false, latency: null, port, error: 'timeout' });
-        });
-        
-        socket.on('error', (err) => {
-            socket.destroy();
-            if (err.code === 'ECONNREFUSED') {
-                resolve({ success: true, latency: Date.now() - startTime, port, note: 'port closed but host reachable' });
-            } else {
-                resolve({ success: false, latency: null, port, error: err.code || err.message });
-            }
-        });
-        
-        socket.connect(port, ip);
-    });
-}
-
-async function checkHostReachable(ip, timeout = 2) {
-    const ports = [22, 23, 80, 443, 8728, 8291];
-    
-    for (const port of ports) {
-        const result = await tcpPing(ip, port, timeout);
-        if (result.success) {
-            return { 
-                success: true, 
-                method: 'tcp', 
-                port: result.port, 
-                latency_avg: result.latency,
-                note: result.note || `TCP port ${port} reachable`
-            };
-        }
-    }
-    
-    return { success: false, method: 'tcp', error: 'No ports reachable' };
-}
 
 app.post('/ping', async (req, res) => {
     try {
@@ -291,20 +240,6 @@ app.post('/ping', async (req, res) => {
         
         const { stdout, stderr } = await execPromise(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '', stderr: e.stderr || e.message }));
         const output = stdout || stderr;
-        
-        if (output.includes('Operation not permitted') || output.includes('cap_net_raw')) {
-            console.log(`[Ping] ICMP not available, falling back to TCP for ${ip}`);
-            const tcpResult = await checkHostReachable(ip, timeout);
-            return res.json({
-                ...tcpResult,
-                ip,
-                packets_sent: count,
-                packets_received: tcpResult.success ? count : 0,
-                latency_min: tcpResult.latency_avg,
-                latency_max: tcpResult.latency_avg,
-                output: tcpResult.note || tcpResult.error || 'TCP connectivity check'
-            });
-        }
         
         const result = {
             success: output.includes(' 0% packet loss') || output.includes('bytes from'),
@@ -337,8 +272,6 @@ app.post('/ping', async (req, res) => {
     }
 });
 
-let pingFallbackMode = false;
-
 app.post('/ping-batch', async (req, res) => {
     try {
         const { targets, count = 2, timeout = 2 } = req.body;
@@ -354,29 +287,7 @@ app.post('/ping-batch', async (req, res) => {
             }
             
             try {
-                if (pingFallbackMode) {
-                    const tcpResult = await checkHostReachable(ip, timeout);
-                    return {
-                        ...target,
-                        success: tcpResult.success,
-                        method: 'tcp',
-                        latency_avg: tcpResult.latency_avg
-                    };
-                }
-                
                 const { stdout } = await execPromise(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '' }));
-                
-                if (stdout.includes('Operation not permitted') || stdout.includes('cap_net_raw')) {
-                    console.log('[Ping] ICMP not available, switching to TCP fallback mode');
-                    pingFallbackMode = true;
-                    const tcpResult = await checkHostReachable(ip, timeout);
-                    return {
-                        ...target,
-                        success: tcpResult.success,
-                        method: 'tcp',
-                        latency_avg: tcpResult.latency_avg
-                    };
-                }
                 
                 const packetsMatch = stdout.match(/(\d+) packets transmitted, (\d+) (?:packets )?received/);
                 const latencyMatch = stdout.match(/min\/avg\/max.*= ([\d.]+)\/([\d.]+)\/([\d.]+)/);
@@ -384,7 +295,6 @@ app.post('/ping-batch', async (req, res) => {
                 return {
                     ...target,
                     success: packetsMatch ? parseInt(packetsMatch[2]) > 0 : false,
-                    method: 'ping',
                     latency_avg: latencyMatch ? parseFloat(latencyMatch[2]) : null
                 };
             } catch (e) {
@@ -393,98 +303,6 @@ app.post('/ping-batch', async (req, res) => {
         }));
         
         res.json({ success: true, results });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// WireGuard status verification endpoint - check actual WireGuard peers
-app.get('/wireguard/status', async (req, res) => {
-    try {
-        const containerName = 'isp_crm_wireguard';
-        const peers = [];
-        let interfaceUp = false;
-        let error = null;
-        
-        // Try to get WireGuard status from container
-        try {
-            const { stdout } = await execPromise(`docker exec ${containerName} wg show wg0 2>&1`);
-            interfaceUp = true;
-            
-            // Parse wg show output
-            let currentPeer = null;
-            stdout.split('\n').forEach(line => {
-                line = line.trim();
-                if (line.startsWith('peer:')) {
-                    if (currentPeer) peers.push(currentPeer);
-                    currentPeer = { publicKey: line.replace('peer:', '').trim() };
-                } else if (currentPeer && line.startsWith('endpoint:')) {
-                    currentPeer.endpoint = line.replace('endpoint:', '').trim();
-                } else if (currentPeer && line.startsWith('allowed ips:')) {
-                    currentPeer.allowedIps = line.replace('allowed ips:', '').trim();
-                } else if (currentPeer && line.startsWith('latest handshake:')) {
-                    currentPeer.latestHandshake = line.replace('latest handshake:', '').trim();
-                } else if (currentPeer && line.startsWith('transfer:')) {
-                    currentPeer.transfer = line.replace('transfer:', '').trim();
-                } else if (currentPeer && line.startsWith('persistent keepalive:')) {
-                    currentPeer.keepalive = line.replace('persistent keepalive:', '').trim();
-                }
-            });
-            if (currentPeer) peers.push(currentPeer);
-        } catch (e) {
-            error = e.message;
-        }
-        
-        res.json({ 
-            success: interfaceUp, 
-            interfaceUp,
-            peers,
-            peerCount: peers.length,
-            error 
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// WireGuard routes verification endpoint - check actual routing table
-app.get('/wireguard/routes', async (req, res) => {
-    try {
-        const routes = [];
-        let wg0Exists = false;
-        let error = null;
-        
-        // Check routes on host (OLT service runs with host network)
-        try {
-            const { stdout } = await execPromise(`ip route show dev wg0 2>&1`);
-            wg0Exists = true;
-            stdout.split('\n').forEach(line => {
-                line = line.trim();
-                if (line) {
-                    const match = line.match(/^([\d.]+\/\d+)/);
-                    if (match) {
-                        routes.push({
-                            subnet: match[1],
-                            raw: line
-                        });
-                    }
-                }
-            });
-        } catch (e) {
-            if (e.message.includes('Cannot find device')) {
-                wg0Exists = false;
-            } else {
-                error = e.message;
-            }
-        }
-        
-        res.json({ 
-            success: wg0Exists, 
-            wg0Exists,
-            routes,
-            routeCount: routes.length,
-            error 
-        });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -885,7 +703,6 @@ app.post('/radius/disconnect', async (req, res) => {
         const secretTrimmed = String(secret).trim();
         const attributes = [];
         
-        attributes.push(['NAS-IP-Address', nasIp]);
         if (username) attributes.push(['User-Name', username]);
         if (sessionId) attributes.push(['Acct-Session-Id', sessionId]);
         
@@ -915,7 +732,7 @@ app.post('/radius/disconnect', async (req, res) => {
 // RADIUS CoA (speed update) endpoint (via VPN) - using radius library
 app.post('/radius/coa', async (req, res) => {
     try {
-        const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit, framedPool, subscriptionId } = req.body;
+        const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit, subscriptionId } = req.body;
         
         if (!nasIp || !secret) {
             return res.status(400).json({ success: false, error: 'Missing nasIp or secret' });
@@ -927,19 +744,14 @@ app.post('/radius/coa', async (req, res) => {
         const secretTrimmed = String(secret).trim();
         const attributes = [];
         
-        attributes.push(['NAS-IP-Address', nasIp]);
         if (username) attributes.push(['User-Name', username]);
         if (sessionId) attributes.push(['Acct-Session-Id', sessionId]);
         if (rateLimit) {
             // MikroTik-Rate-Limit VSA (Vendor 14988, Type 8)
             attributes.push(['Vendor-Specific', 14988, [['Mikrotik-Rate-Limit', rateLimit]]]);
         }
-        if (framedPool) {
-            // Framed-Pool attribute (type 88) - assigns user to IP pool
-            attributes.push(['Framed-Pool', framedPool]);
-        }
         
-        console.log(`[RADIUS] CoA request: user=${username}, session=${sessionId}, rate=${rateLimit}, pool=${framedPool}, nas=${nasIp}:${nasPort}`);
+        console.log(`[RADIUS] CoA request: user=${username}, session=${sessionId}, rate=${rateLimit}, nas=${nasIp}:${nasPort}`);
         
         const result = await sendRadiusRequest(nasIp, nasPort, 'CoA-Request', attributes, secretTrimmed);
         

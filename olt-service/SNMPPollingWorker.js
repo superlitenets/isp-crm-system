@@ -4,11 +4,10 @@ const snmp = require('net-snmp');
 const axios = require('axios');
 
 class SNMPPollingWorker {
-    constructor(sessionManager = null) {
+    constructor() {
         this.pool = new Pool({
             connectionString: process.env.DATABASE_URL
         });
-        this.sessionManager = sessionManager;
         this.isRunning = false;
         this.cronJob = null;
         this.pollInterval = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
@@ -120,149 +119,16 @@ class SNMPPollingWorker {
                 
                 await this.updateOltInfo(olt.id, sysInfo);
                 await this.updateONUStatuses(olt.id, onuStatuses);
-                await this.updatePollingStats(olt.id, true, null, 'snmp');
+                await this.updatePollingStats(olt.id, true);
                 
                 session.close();
-                
-                // If SNMP returned 0 ONUs but we have ONUs in DB, try CLI fallback
-                if (onuStatuses.length === 0) {
-                    const dbOnuCount = await this.pool.query(
-                        'SELECT COUNT(*) as cnt FROM huawei_onus WHERE olt_id = $1 AND is_authorized = true',
-                        [olt.id]
-                    );
-                    const hasDbOnus = parseInt(dbOnuCount.rows[0]?.cnt || 0) > 0;
-                    
-                    if (hasDbOnus) {
-                        console.log(`[SNMP] OLT ${olt.name} returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh`);
-                        // Trigger CLI refresh in background (don't wait)
-                        this.pollOltViaCli(olt).catch(e => {
-                            console.log(`[SNMP] CLI fallback for ${olt.name} failed: ${e.message}`);
-                        });
-                    }
-                }
-                
-                resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length, method: 'snmp' });
-            } catch (snmpError) {
+                resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length });
+            } catch (error) {
                 session.close();
-                console.log(`[SNMP] OLT ${olt.name} SNMP failed, trying CLI fallback...`);
-                
-                // Try CLI fallback for status polling
-                try {
-                    const cliResult = await this.pollOltViaCli(olt);
-                    await this.updatePollingStats(olt.id, true, null, 'cli');
-                    resolve({ olt: olt.name, ...cliResult, method: 'cli' });
-                } catch (cliError) {
-                    await this.updatePollingStats(olt.id, false, snmpError.message);
-                    reject(snmpError);
-                }
+                await this.updatePollingStats(olt.id, false, error.message);
+                reject(error);
             }
         });
-    }
-    
-    async pollOltViaCli(olt) {
-        // Get ONUs from database
-        const onuResult = await this.pool.query(`
-            SELECT id, frame, slot, port, onu_id FROM huawei_onus 
-            WHERE olt_id = $1 AND is_authorized = true
-            ORDER BY frame, slot, port, onu_id
-            LIMIT 100
-        `, [olt.id]);
-        
-        if (onuResult.rows.length === 0) {
-            return { onuCount: 0, method: 'cli' };
-        }
-        
-        if (!this.sessionManager) {
-            console.log(`[CLI] Session manager not available for CLI polling`);
-            return { onuCount: 0, method: 'cli', error: 'No session manager' };
-        }
-        
-        console.log(`[CLI] Polling ${onuResult.rows.length} ONUs for OLT ${olt.name} via CLI...`);
-        
-        // Group by frame/slot/port for efficient batch querying
-        const groupedByPort = {};
-        for (const onu of onuResult.rows) {
-            const key = `${onu.frame}/${onu.slot}/${onu.port}`;
-            if (!groupedByPort[key]) groupedByPort[key] = [];
-            groupedByPort[key].push(onu);
-        }
-        
-        let updated = 0;
-        const oltKey = olt.id.toString();
-        
-        try {
-            for (const [portKey, onus] of Object.entries(groupedByPort)) {
-                const [frame, slot, port] = portKey.split('/').map(Number);
-                
-                try {
-                    // Execute display ont info for each port to get all ONU statuses at once
-                    const cmd = `display ont info ${frame} ${slot} ${port} all`;
-                    const result = await this.sessionManager.execute(oltKey, cmd, { timeout: 30000 });
-                    
-                    // Debug: log the first 500 chars of output for troubleshooting
-                    if (result) {
-                        console.log(`[CLI] Port ${portKey} output (${result.length} chars): ${result.substring(0, 300).replace(/\n/g, '\\n')}`);
-                    }
-                    
-                    // Parse results to get status for each ONU
-                    // Huawei format varies, but typically:
-                    // ONT-ID  Control-flag  Run-state  Config-state  Match-state
-                    //   0       active       online      normal        match
-                    for (const onu of onus) {
-                        let status = 'offline';
-                        
-                        // Look for the ONU ID in the output and check its run state
-                        // Try multiple patterns since OLT output format can vary
-                        // Pattern 1: "  0       active     online   normal    match"
-                        // Pattern 2: "0    HWTC-xxx    online  ..."
-                        let found = false;
-                        
-                        // Pattern for tabular format with ONU ID at start of line
-                        const patterns = [
-                            new RegExp(`^\\s*${onu.onu_id}\\s+\\S+\\s+(online|offline|los)`, 'im'),
-                            new RegExp(`\\b${onu.onu_id}\\s+\\S+\\s+\\S+\\s+(online|offline|los)`, 'im'),
-                            new RegExp(`ONT\\s+${onu.onu_id}[^\\n]*(online|offline|los)`, 'i')
-                        ];
-                        
-                        for (const pattern of patterns) {
-                            const match = result.match(pattern);
-                            if (match) {
-                                const state = match[1].toLowerCase();
-                                if (state === 'online') status = 'online';
-                                else if (state.includes('los')) status = 'los';
-                                else if (state === 'offline') status = 'offline';
-                                found = true;
-                                console.log(`[CLI] ONU ${onu.onu_id} matched pattern, state: ${state}`);
-                                break;
-                            }
-                        }
-                        
-                        if (!found) {
-                            console.log(`[CLI] ONU ${onu.onu_id} not matched in output, defaulting to offline`);
-                        }
-                        
-                        await this.pool.query(`
-                            UPDATE huawei_onus SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
-                        `, [status, onu.id]);
-                        updated++;
-                    }
-                } catch (e) {
-                    console.log(`[CLI] Error polling port ${portKey}: ${e.message}`);
-                    // Mark these ONUs as offline since we can't check them
-                    for (const onu of onus) {
-                        await this.pool.query(`
-                            UPDATE huawei_onus SET status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
-                        `, [onu.id]);
-                        updated++;
-                    }
-                }
-            }
-        } catch (e) {
-            console.log(`[CLI] Error during CLI polling: ${e.message}`);
-        }
-        
-        console.log(`[CLI] Updated ${updated} ONUs for OLT ${olt.name}`);
-        return { onuCount: updated, method: 'cli' };
     }
 
     getSysInfo(session) {
@@ -306,41 +172,27 @@ class SNMPPollingWorker {
     getONUStatuses(session, oltId) {
         return new Promise((resolve, reject) => {
             const statuses = [];
-            
-            // Primary OID for ONU run status (hwGponDeviceOntRunStatus)
-            const primaryOid = this.OIDs.onuStatusBase;
-            // Alternative OIDs for different Huawei versions
-            const altOids = [
-                '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15',  // hwGponDeviceOntRunStatus
-                '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9',   // hwGponDeviceOntRunState (alternate)
-                '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.2'    // hwGponDeviceOntOpticalDdmStatus (optical status)
-            ];
+            const maxOid = this.OIDs.onuStatusBase + '.4294967295';
 
-            const tryWalk = (oid, callback) => {
-                const maxOid = oid + '.4294967295';
-                session.subtree(oid, maxOid, (varbinds) => {
-                    varbinds.forEach(vb => {
-                        if (snmp.isVarbindError(vb)) return;
-                        
-                        const oidParts = vb.oid.split('.');
-                        const onuIndex = oidParts.slice(-2).join('.');
-                        const statusCode = parseInt(vb.value);
-                        const status = this.STATUS_MAP[statusCode] || 'unknown';
-                        
-                        statuses.push({
-                            index: onuIndex,
-                            statusCode,
-                            status
-                        });
+            session.subtree(this.OIDs.onuStatusBase, maxOid, (varbinds) => {
+                varbinds.forEach(vb => {
+                    if (snmp.isVarbindError(vb)) return;
+                    
+                    const oidParts = vb.oid.split('.');
+                    const onuIndex = oidParts.slice(-2).join('.');
+                    const statusCode = parseInt(vb.value);
+                    const status = this.STATUS_MAP[statusCode] || 'unknown';
+                    
+                    statuses.push({
+                        index: onuIndex,
+                        statusCode,
+                        status
                     });
-                }, (error) => {
-                    callback(error);
                 });
-            };
-
-            // Try primary OID first
-            tryWalk(primaryOid, (error) => {
-                console.log(`[SNMP] ONU status walk completed for OLT ${oltId}: ${statuses.length} ONUs`);
+            }, (error) => {
+                if (error && error.message !== 'No more OIDs') {
+                    console.log(`[SNMP] ONU status walk completed for OLT ${oltId}: ${statuses.length} ONUs`);
+                }
                 resolve(statuses);
             });
         });
@@ -508,7 +360,7 @@ class SNMPPollingWorker {
         }
     }
 
-    async updatePollingStats(oltId, success, errorMsg = null, method = 'snmp') {
+    async updatePollingStats(oltId, success, errorMsg = null) {
         try {
             if (success) {
                 await this.pool.query(`
@@ -525,7 +377,6 @@ class SNMPPollingWorker {
                     WHERE id = $1
                 `, [oltId]);
             }
-            console.log(`[SNMP] Updated OLT ${oltId} status via ${method}`);
         } catch (error) {
             console.error(`[SNMP] Failed to update polling stats for OLT ${oltId}:`, error.message);
         }

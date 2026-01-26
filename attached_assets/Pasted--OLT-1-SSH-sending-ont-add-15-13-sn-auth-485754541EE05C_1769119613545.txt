@@ -1,0 +1,47 @@
+[OLT 1] SSH sending: "ont add 15 13 sn-auth 485754541EE05CA9 omci ont-lineprofile-                                                                                      id 2 ont-srvprofile-id 3 desc "Antonio muiruri""
+[SNMP] Completed in 88ms - Success: 2, Failed: 0
+[OLT 1] SSH sending: "quit"
+[OLT 1] SSH sending: "service-port vlan 902 gpon 0/2/15 ont 13 gemport 1 multi-ser                                                                                      vice user-vlan 902 tag-transform translate inbound traffic-table index 8 outbound                                                                                       traffic-table index 9"
+[OLT 1] SSH multi-line command (3 lines)
+[OLT 1] SSH sending: "interface gpon 0/2"
+[OLT 1] SSH sending: "ont port native-vlan 15 13 eth 1 vlan 902 priority 0"
+[OLT 1] SSH sending: "quit"
+[OLT 1] SSH sending: "service-port vlan 902 gpon 0/2/15 ont 13 gemport 1 multi-ser                                                                                      vice user-vlan 902 tag-transform translate inbound traffic-table index 8 outbound                                                                                       traffic-table index 9"
+[OLT 1] SSH multi-line command (3 lines)
+[OLT 1] SSH sending: "interface gpon 0/2"
+[OLT 1] SSH sending: "ont ipconfig 15 13 dhcp vlan 69 priority 2"
+[OLT 1] SSH sending: "quit"
+[OLT 1] SSH multi-line command (3 lines)
+[OLT 1] SSH sending: "interface gpon 0/2"
+[OLT 1] SSH sending: "ont tr069-server-config 15 13 profile-id 3"
+[OLT 1] SSH sending: "quit"
+[OLT 1] SSH sending: "service-port vlan 69 gpon 0/2/15 ont 13 gemport 2 multi-serv                                                                                      ice user-vlan 69 tag-transform translate inbound traffic-table index 7 outbound tr                                                                                      affic-table index 7"
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[OLT 2] SSH sending: "display ont autofind all"
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[OLT 1] SSH sending: "display ont autofind all"
+[OLT 1] SSH sending: "interface gpon 0/2"
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+[Discovery] Discovery cycle complete
+[OLT 1] SSH sending: "display ont info 15 13"
+[OLT 1] SSH sending: "quit"
+[OLT 1] SSH sending: "interface gpon 0/2"
+[OLT 1] SSH sending: "display ont optical-info 15 13"
+[OLT 1] SSH sending: "quit"
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 88ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background 
