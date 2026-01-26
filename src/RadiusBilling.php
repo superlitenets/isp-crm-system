@@ -106,12 +106,10 @@ class RadiusBilling {
         $stmt = $this->db->query("
             SELECT n.*, 
                    wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
-                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr,
-                   l.name as location_name
+                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr
             FROM radius_nas n
             LEFT JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
             LEFT JOIN wireguard_servers ws ON wp.server_id = ws.id
-            LEFT JOIN isp_locations l ON n.location_id = l.id
             ORDER BY n.name
         ");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -236,17 +234,17 @@ class RadiusBilling {
     // ==================== Location Management ====================
     
     public function getLocations(): array {
-        $stmt = $this->db->query("SELECT * FROM isp_locations ORDER BY name");
+        $stmt = $this->db->query("SELECT * FROM huawei_zones WHERE is_active = true ORDER BY name");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function getAllLocations(): array {
-        $stmt = $this->db->query("SELECT * FROM isp_locations ORDER BY name");
+        $stmt = $this->db->query("SELECT * FROM huawei_zones ORDER BY name");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function getLocation(int $id): ?array {
-        $stmt = $this->db->prepare("SELECT * FROM isp_locations WHERE id = ?");
+        $stmt = $this->db->prepare("SELECT * FROM huawei_zones WHERE id = ?");
         $stmt->execute([$id]);
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
@@ -254,12 +252,11 @@ class RadiusBilling {
     public function createLocation(array $data): array {
         try {
             $stmt = $this->db->prepare("
-                INSERT INTO isp_locations (name, code, description, is_active)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO huawei_zones (name, description, is_active)
+                VALUES (?, ?, ?)
             ");
             $stmt->execute([
                 $data['name'],
-                $data['code'] ?? null,
                 $data['description'] ?? null,
                 isset($data['is_active']) ? ($data['is_active'] ? true : false) : true
             ]);
@@ -272,13 +269,12 @@ class RadiusBilling {
     public function updateLocation(int $id, array $data): array {
         try {
             $stmt = $this->db->prepare("
-                UPDATE isp_locations 
-                SET name = ?, code = ?, description = ?, is_active = ?
+                UPDATE huawei_zones 
+                SET name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
             $stmt->execute([
                 $data['name'],
-                $data['code'] ?? null,
                 $data['description'] ?? null,
                 isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
                 $id
@@ -291,7 +287,7 @@ class RadiusBilling {
     
     public function deleteLocation(int $id): array {
         try {
-            $stmt = $this->db->prepare("DELETE FROM isp_locations WHERE id = ?");
+            $stmt = $this->db->prepare("DELETE FROM huawei_zones WHERE id = ?");
             $stmt->execute([$id]);
             return ['success' => true];
         } catch (\Exception $e) {
@@ -300,14 +296,14 @@ class RadiusBilling {
     }
     
     public function getSubLocations(?int $locationId = null): array {
-        $sql = "SELECT sl.*, l.name as location_name 
-                FROM isp_sub_locations sl 
-                JOIN isp_locations l ON sl.location_id = l.id 
+        $sql = "SELECT sl.*, l.name as location_name, sl.zone_id as location_id
+                FROM huawei_subzones sl 
+                JOIN huawei_zones l ON sl.zone_id = l.id 
                 WHERE sl.is_active = true";
         $params = [];
         
         if ($locationId) {
-            $sql .= " AND sl.location_id = ?";
+            $sql .= " AND sl.zone_id = ?";
             $params[] = $locationId;
         }
         
@@ -319,9 +315,9 @@ class RadiusBilling {
     
     public function getAllSubLocations(): array {
         $stmt = $this->db->query("
-            SELECT sl.*, l.name as location_name 
-            FROM isp_sub_locations sl 
-            JOIN isp_locations l ON sl.location_id = l.id 
+            SELECT sl.*, l.name as location_name, sl.zone_id as location_id
+            FROM huawei_subzones sl 
+            JOIN huawei_zones l ON sl.zone_id = l.id 
             ORDER BY l.name, sl.name
         ");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -329,9 +325,9 @@ class RadiusBilling {
     
     public function getSubLocation(int $id): ?array {
         $stmt = $this->db->prepare("
-            SELECT sl.*, l.name as location_name 
-            FROM isp_sub_locations sl 
-            JOIN isp_locations l ON sl.location_id = l.id 
+            SELECT sl.*, l.name as location_name, sl.zone_id as location_id
+            FROM huawei_subzones sl 
+            JOIN huawei_zones l ON sl.zone_id = l.id 
             WHERE sl.id = ?
         ");
         $stmt->execute([$id]);
@@ -341,13 +337,12 @@ class RadiusBilling {
     public function createSubLocation(array $data): array {
         try {
             $stmt = $this->db->prepare("
-                INSERT INTO isp_sub_locations (location_id, name, code, description, is_active)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO huawei_subzones (zone_id, name, description, is_active)
+                VALUES (?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['location_id'],
                 $data['name'],
-                $data['code'] ?? null,
                 $data['description'] ?? null,
                 isset($data['is_active']) ? ($data['is_active'] ? true : false) : true
             ]);
@@ -360,14 +355,13 @@ class RadiusBilling {
     public function updateSubLocation(int $id, array $data): array {
         try {
             $stmt = $this->db->prepare("
-                UPDATE isp_sub_locations 
-                SET location_id = ?, name = ?, code = ?, description = ?, is_active = ?
+                UPDATE huawei_subzones 
+                SET zone_id = ?, name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
             $stmt->execute([
                 $data['location_id'],
                 $data['name'],
-                $data['code'] ?? null,
                 $data['description'] ?? null,
                 isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
                 $id
@@ -380,7 +374,7 @@ class RadiusBilling {
     
     public function deleteSubLocation(int $id): array {
         try {
-            $stmt = $this->db->prepare("DELETE FROM isp_sub_locations WHERE id = ?");
+            $stmt = $this->db->prepare("DELETE FROM huawei_subzones WHERE id = ?");
             $stmt->execute([$id]);
             return ['success' => true];
         } catch (\Exception $e) {
@@ -397,8 +391,8 @@ class RadiusBilling {
                 LEFT JOIN customers c ON s.customer_id = c.id
                 LEFT JOIN radius_packages p ON s.package_id = p.id
                 LEFT JOIN radius_nas n ON s.nas_id = n.id
-                LEFT JOIN isp_locations l ON s.location_id = l.id
-                LEFT JOIN isp_sub_locations sl ON s.sub_location_id = sl.id
+                LEFT JOIN huawei_zones l ON s.location_id = l.id
+                LEFT JOIN huawei_subzones sl ON s.sub_location_id = sl.id
                 WHERE 1=1";
         $params = [];
         

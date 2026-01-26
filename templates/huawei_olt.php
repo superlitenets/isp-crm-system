@@ -6800,7 +6800,7 @@ try {
                     <span id="nonAuthBadgeMobile" class="badge <?= $mobileTotalPending > 0 ? 'bg-warning' : 'bg-secondary' ?> ms-auto"><?= $mobileTotalPending ?> pending</span>
                 </a>
                 <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
-                    <i class="bi bi-geo-alt me-2"></i> Locations
+                    <i class="bi bi-geo-alt me-2"></i> Zones
                 </a>
                 <a class="nav-link <?= $view === 'topology' ? 'active' : '' ?>" href="?page=huawei-olt&view=topology">
                     <i class="bi bi-diagram-3 me-2"></i> Network Map
@@ -6861,7 +6861,7 @@ try {
                     <span id="nonAuthBadgeDesktop" class="badge <?= $totalPending > 0 ? 'bg-warning badge-pulse' : 'bg-secondary' ?> ms-auto"><?= $totalPending ?> pending</span>
                 </a>
                 <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
-                    <i class="bi bi-geo-alt me-2"></i> Locations
+                    <i class="bi bi-geo-alt me-2"></i> Zones
                 </a>
                 <a class="nav-link <?= $view === 'topology' ? 'active' : '' ?>" href="?page=huawei-olt&view=topology">
                     <i class="bi bi-diagram-3 me-2"></i> Network Map
