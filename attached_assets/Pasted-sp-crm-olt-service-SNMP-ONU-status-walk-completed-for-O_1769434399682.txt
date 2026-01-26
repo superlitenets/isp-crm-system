@@ -1,0 +1,195 @@
+sp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [SNMP] Completed in 71ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [Discovery] Already running, skipping...
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via snmp
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [SNMP] Completed in 72ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [Discovery] Already running, skipping...
+isp_crm_olt_service  | [OLT 1] SSH command timeout, got 293 bytes
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (293 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] No pending notifications (last hour: 1 total, 0 pending, 1 authorized)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via snmp
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [SNMP] Completed in 68ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] No pending notifications (last hour: 1 total, 0 pending, 1 authorized)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via snmp
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [SNMP] Completed in 109ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] No pending notifications (last hour: 1 total, 0 pending, 1 authorized)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via snmp
+isp_crm_olt_service  | [SNMP] Completed in 68ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] No pending notifications (last hour: 1 total, 0 pending, 1 authorized)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via snmp
+isp_crm_olt_service  | [SNMP] Completed in 71ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] No pending notifications (last hour: 1 total, 0 pending, 1 authorized)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via snmp
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [SNMP] Completed in 90ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] No pending notifications (last hour: 1 total, 0 pending, 1 authorized)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via snmp
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via snmp
+isp_crm_olt_service  | [SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+isp_crm_olt_service  | [SNMP] Completed in 101ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [CLI] Polling 5 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [CLI] Updated 5 ONUs for OLT G45_OLT
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] No pending notifications (last hour: 1 total, 0 pending, 1 authorized)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete

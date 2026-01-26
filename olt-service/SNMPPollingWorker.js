@@ -199,20 +199,46 @@ class SNMPPollingWorker {
                     const cmd = `display ont info ${frame} ${slot} ${port} all`;
                     const result = await this.sessionManager.execute(oltKey, cmd, { timeout: 30000 });
                     
+                    // Debug: log the first 500 chars of output for troubleshooting
+                    if (result) {
+                        console.log(`[CLI] Port ${portKey} output (${result.length} chars): ${result.substring(0, 300).replace(/\n/g, '\\n')}`);
+                    }
+                    
                     // Parse results to get status for each ONU
-                    // Format: ONT-ID  Control-flag  Run-state  Config-state  Match-state  ...
+                    // Huawei format varies, but typically:
+                    // ONT-ID  Control-flag  Run-state  Config-state  Match-state
+                    //   0       active       online      normal        match
                     for (const onu of onus) {
                         let status = 'offline';
                         
                         // Look for the ONU ID in the output and check its run state
-                        // Pattern: "  0       active     online   normal    match"
-                        const onuPattern = new RegExp(`^\\s*${onu.onu_id}\\s+\\S+\\s+(\\w+)`, 'im');
-                        const match = result.match(onuPattern);
-                        if (match) {
-                            const state = match[1].toLowerCase();
-                            if (state === 'online') status = 'online';
-                            else if (state.includes('los')) status = 'los';
-                            else if (state === 'offline') status = 'offline';
+                        // Try multiple patterns since OLT output format can vary
+                        // Pattern 1: "  0       active     online   normal    match"
+                        // Pattern 2: "0    HWTC-xxx    online  ..."
+                        let found = false;
+                        
+                        // Pattern for tabular format with ONU ID at start of line
+                        const patterns = [
+                            new RegExp(`^\\s*${onu.onu_id}\\s+\\S+\\s+(online|offline|los)`, 'im'),
+                            new RegExp(`\\b${onu.onu_id}\\s+\\S+\\s+\\S+\\s+(online|offline|los)`, 'im'),
+                            new RegExp(`ONT\\s+${onu.onu_id}[^\\n]*(online|offline|los)`, 'i')
+                        ];
+                        
+                        for (const pattern of patterns) {
+                            const match = result.match(pattern);
+                            if (match) {
+                                const state = match[1].toLowerCase();
+                                if (state === 'online') status = 'online';
+                                else if (state.includes('los')) status = 'los';
+                                else if (state === 'offline') status = 'offline';
+                                found = true;
+                                console.log(`[CLI] ONU ${onu.onu_id} matched pattern, state: ${state}`);
+                                break;
+                            }
+                        }
+                        
+                        if (!found) {
+                            console.log(`[CLI] ONU ${onu.onu_id} not matched in output, defaulting to offline`);
                         }
                         
                         await this.pool.query(`
