@@ -2558,11 +2558,14 @@ try {
                 
                 $isOnline = !empty($activeSession);
                 
-                // Calculate uptime or offline duration - use strtotime which respects PHP timezone
+                // Calculate uptime or offline duration
+                // Database stores timestamps with timezone info, use DateTime for proper handling
                 $uptimeStr = '';
                 $offlineStr = '';
                 if ($isOnline && $activeSession) {
-                    $uptime = time() - strtotime($activeSession['session_start']);
+                    $sessionStart = new DateTime($activeSession['session_start']);
+                    $now = new DateTime('now', new DateTimeZone(date_default_timezone_get()));
+                    $uptime = $now->getTimestamp() - $sessionStart->getTimestamp();
                     if ($uptime < 0) $uptime = 0;
                     $days = floor($uptime / 86400);
                     $hours = floor(($uptime % 86400) / 3600);
@@ -2583,7 +2586,9 @@ try {
                         }
                     }
                     if ($lastSession) {
-                        $offline = time() - strtotime($lastSession['session_end']);
+                        $sessionEnd = new DateTime($lastSession['session_end']);
+                        $now = new DateTime('now', new DateTimeZone(date_default_timezone_get()));
+                        $offline = $now->getTimestamp() - $sessionEnd->getTimestamp();
                         if ($offline < 0) $offline = 0;
                         $days = floor($offline / 86400);
                         $hours = floor(($offline % 86400) / 3600);
