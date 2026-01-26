@@ -1728,8 +1728,7 @@ class RadiusBilling {
             curl_close($ch);
             
             if ($curlError) {
-                // Fallback to direct PHP client if OLT service unavailable
-                return $this->sendCoADisconnectDirect($session);
+                return ['success' => false, 'error' => 'OLT service unavailable: ' . $curlError, 'target_ip' => $nasIp];
             }
             
             $result = json_decode($response, true);
@@ -1739,7 +1738,7 @@ class RadiusBilling {
             
             return ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed', 'target_ip' => $nasIp];
         } catch (\Exception $e) {
-            return $this->sendCoADisconnectDirect($session);
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nasIp];
         }
     }
     
