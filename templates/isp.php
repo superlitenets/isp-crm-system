@@ -936,10 +936,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $oldSub = $stmt->fetch(\PDO::FETCH_ASSOC);
                     $wasExpired = ($oldSub && ($oldSub['status'] === 'expired' || strtotime($oldSub['expiry_date']) < time()));
                     $isExtending = strtotime($newExpiry) > time();
+                    $isExpiring = strtotime($newExpiry) < time(); // New expiry is in the past
                     
-                    // Update expiry and reactivate if extending from expired
+                    // Update expiry and status based on new date
                     if ($wasExpired && $isExtending) {
+                        // Extending from expired - reactivate
                         $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, status = 'active', updated_at = NOW() WHERE id = ?");
+                    } elseif ($isExpiring) {
+                        // Setting to past date - expire the subscription
+                        $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, status = 'expired', updated_at = NOW() WHERE id = ?");
                     } else {
                         $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, updated_at = NOW() WHERE id = ?");
                     }
@@ -952,10 +957,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $msg = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
                     
-                    // Send CoA to update RADIUS session (disconnect expired or update active)
-                    $coaResult = $radiusBilling->sendCoAForSubscription($subId);
-                    if ($coaResult && !empty($coaResult['success'])) {
-                        $msg .= $wasExpired ? ' (session disconnected via CoA)' : ' (session updated via CoA)';
+                    // Handle CoA/Disconnect based on whether expiring or extending
+                    if ($isExpiring) {
+                        // Expiring user - disconnect them
+                        $disconnectResult = $radiusBilling->disconnectSubscription($subId);
+                        if ($disconnectResult && !empty($disconnectResult['success'])) {
+                            $msg .= ' (session disconnected)';
+                        }
+                    } elseif ($wasExpired && $isExtending) {
+                        // Reactivating - send reactivation CoA
+                        $coaResult = $radiusBilling->sendReactivationCoA($subId);
+                        if ($coaResult && !empty($coaResult['success'])) {
+                            $msg .= ' (subscription reactivated via CoA)';
+                        }
                     }
                     
                     $message = $msg;
