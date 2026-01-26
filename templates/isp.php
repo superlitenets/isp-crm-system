@@ -2558,11 +2558,15 @@ try {
                 
                 $isOnline = !empty($activeSession);
                 
-                // Calculate uptime or offline duration
+                // Calculate uptime or offline duration with proper timezone handling
                 $uptimeStr = '';
                 $offlineStr = '';
+                $tz = new DateTimeZone(date_default_timezone_get());
+                $now = new DateTime('now', $tz);
                 if ($isOnline && $activeSession) {
-                    $uptime = time() - strtotime($activeSession['session_start']);
+                    $sessionStart = new DateTime($activeSession['session_start']);
+                    $uptime = $now->getTimestamp() - $sessionStart->getTimestamp();
+                    if ($uptime < 0) $uptime = 0;
                     $days = floor($uptime / 86400);
                     $hours = floor(($uptime % 86400) / 3600);
                     $mins = floor(($uptime % 3600) / 60);
@@ -2571,7 +2575,7 @@ try {
                     } elseif ($hours > 0) {
                         $uptimeStr = $hours . 'h ' . $mins . 'm';
                     } else {
-                        $uptimeStr = $mins . 'm';
+                        $uptimeStr = max(1, $mins) . 'm';
                     }
                 } else {
                     // Find last session end time
@@ -2583,7 +2587,9 @@ try {
                         }
                     }
                     if ($lastSession) {
-                        $offline = time() - strtotime($lastSession['session_end']);
+                        $sessionEnd = new DateTime($lastSession['session_end']);
+                        $offline = $now->getTimestamp() - $sessionEnd->getTimestamp();
+                        if ($offline < 0) $offline = 0;
                         $days = floor($offline / 86400);
                         $hours = floor(($offline % 86400) / 3600);
                         $mins = floor(($offline % 3600) / 60);
