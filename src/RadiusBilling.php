@@ -867,12 +867,11 @@ class RadiusBilling {
             $stmt->execute(["\nSuspended: $reason (" . date('Y-m-d H:i') . ")", $id]);
             
             // Disconnect active sessions via CoA
-            $disconnectResult = $this->disconnectSubscription($id);
+            $disconnectResult = $this->sendCoAForSubscription($id);
             
             return [
                 'success' => true, 
-                'sessions_disconnected' => $disconnectResult['disconnected'] ?? 0,
-                'coa_errors' => $disconnectResult['errors'] ?? []
+                'coa_result' => $disconnectResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
@@ -2149,6 +2148,37 @@ class RadiusBilling {
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nasIp];
         }
+    }
+    
+    /**
+     * Send CoA disconnect for a subscription (forces reconnect with new attributes)
+     * Used when expiry date changes or package changes to apply new limits
+     */
+    public function sendCoAForSubscription(int $subscriptionId): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        // Find active session for this subscription
+        $stmt = $this->db->prepare("
+            SELECT rs.*, rn.ip_address as nas_ip, rn.secret as nas_secret
+            FROM radius_sessions rs
+            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
+            WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+            ORDER BY rs.session_start DESC LIMIT 1
+        ");
+        $stmt->execute([$subscriptionId]);
+        $session = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($session && !empty($session['nas_ip'])) {
+            // Disconnect the active session
+            return $this->sendCoADisconnect($session);
+        }
+        
+        // No active session, try sending a general CoA with just the username
+        // This helps trigger any session that might exist but isn't tracked
+        return $this->sendCoA($subscriptionId, []);
     }
     
     public function sendCoA(int $subscriptionId, array $attributes): array {
