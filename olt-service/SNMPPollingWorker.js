@@ -122,6 +122,24 @@ class SNMPPollingWorker {
                 await this.updatePollingStats(olt.id, true, null, 'snmp');
                 
                 session.close();
+                
+                // If SNMP returned 0 ONUs but we have ONUs in DB, try CLI fallback
+                if (onuStatuses.length === 0) {
+                    const dbOnuCount = await this.pool.query(
+                        'SELECT COUNT(*) as cnt FROM huawei_onus WHERE olt_id = $1 AND is_authorized = true',
+                        [olt.id]
+                    );
+                    const hasDbOnus = parseInt(dbOnuCount.rows[0]?.cnt || 0) > 0;
+                    
+                    if (hasDbOnus) {
+                        console.log(`[SNMP] OLT ${olt.name} returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh`);
+                        // Trigger CLI refresh in background (don't wait)
+                        this.pollOltViaCli(olt).catch(e => {
+                            console.log(`[SNMP] CLI fallback for ${olt.name} failed: ${e.message}`);
+                        });
+                    }
+                }
+                
                 resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length, method: 'snmp' });
             } catch (snmpError) {
                 session.close();
@@ -141,61 +159,75 @@ class SNMPPollingWorker {
     }
     
     async pollOltViaCli(olt) {
-        // Use PHP API to get ONU statuses via CLI (leverages existing session infrastructure)
+        // Get ONUs from database
+        const onuResult = await this.pool.query(`
+            SELECT id, frame, slot, port, onu_id FROM huawei_onus 
+            WHERE olt_id = $1 AND is_authorized = true
+            ORDER BY frame, slot, port, onu_id
+            LIMIT 100
+        `, [olt.id]);
+        
+        if (onuResult.rows.length === 0) {
+            return { onuCount: 0, method: 'cli' };
+        }
+        
+        console.log(`[CLI] Polling ${onuResult.rows.length} ONUs for OLT ${olt.name} via CLI...`);
+        
+        // Group by frame/slot/port for efficient batch querying
+        const groupedByPort = {};
+        for (const onu of onuResult.rows) {
+            const key = `${onu.frame}/${onu.slot}/${onu.port}`;
+            if (!groupedByPort[key]) groupedByPort[key] = [];
+            groupedByPort[key].push(onu);
+        }
+        
+        let updated = 0;
+        
+        // Use existing OLT session to query all ONUs on each port
+        const sessionManager = require('./OltSessionManager').getSessionManager();
+        const oltKey = olt.id.toString();
+        
         try {
-            const response = await axios.post(`${this.phpApiUrl}/api/huawei-olt-poll.php`, {
-                olt_id: olt.id,
-                action: 'poll_onu_statuses'
-            }, { timeout: 60000 });
-            
-            if (response.data && response.data.success) {
-                return { onuCount: response.data.updated || 0, method: 'cli' };
-            }
-            throw new Error(response.data?.error || 'CLI poll failed');
-        } catch (error) {
-            // Fallback: Use the existing session manager directly
-            console.log(`[SNMP] PHP CLI fallback failed, trying direct session manager...`);
-            
-            const onuResult = await this.pool.query(`
-                SELECT id, frame, slot, port, onu_id FROM huawei_onus 
-                WHERE olt_id = $1 AND is_authorized = true
-                LIMIT 50
-            `, [olt.id]);
-            
-            if (onuResult.rows.length === 0) {
-                return { onuCount: 0, method: 'cli' };
-            }
-            
-            let updated = 0;
-            const groupedByInterface = {};
-            
-            // Group by frame/slot for efficient querying
-            for (const onu of onuResult.rows) {
-                const key = `${onu.frame}/${onu.slot}`;
-                if (!groupedByInterface[key]) groupedByInterface[key] = [];
-                groupedByInterface[key].push(onu);
-            }
-            
-            // Query each interface for all ONUs at once
-            for (const [iface, onus] of Object.entries(groupedByInterface)) {
-                try {
-                    const [frame, slot] = iface.split('/').map(Number);
+            // Get session or create new one
+            let session = sessionManager?.sessions?.[oltKey];
+            if (!session || !session.connected) {
+                // Session not available, try to get via existing CLI command execution
+                for (const [portKey, onus] of Object.entries(groupedByPort)) {
+                    const [frame, slot, port] = portKey.split('/').map(Number);
                     
-                    // Use a single display ont info command for the entire port
-                    for (const onu of onus) {
-                        // Mark as offline by default - if we can't reach the OLT, they're effectively offline
-                        await this.pool.query(`
-                            UPDATE huawei_onus SET status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
-                        `, [onu.id]);
-                        updated++;
+                    try {
+                        // Execute display ont info for each port
+                        const cmd = `display ont info ${frame} ${slot} ${port} all`;
+                        const result = await sessionManager.execute(oltKey, cmd, { timeout: 30000 });
+                        
+                        // Parse results to get status for each ONU
+                        for (const onu of onus) {
+                            let status = 'offline';
+                            const onuPattern = new RegExp(`${onu.onu_id}\\s+\\S+\\s+(\\w+)`, 'i');
+                            const match = result.match(onuPattern);
+                            if (match) {
+                                const state = match[1].toLowerCase();
+                                if (state === 'online') status = 'online';
+                                else if (state.includes('los')) status = 'los';
+                            }
+                            
+                            await this.pool.query(`
+                                UPDATE huawei_onus SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                            `, [status, onu.id]);
+                            updated++;
+                        }
+                    } catch (e) {
+                        // If CLI fails for this port, mark all ONUs as unknown
+                        console.log(`[CLI] Error polling port ${portKey}: ${e.message}`);
                     }
-                } catch (e) {
-                    console.log(`[SNMP] Error updating interface ${iface}: ${e.message}`);
                 }
             }
-            
-            return { onuCount: updated, method: 'cli-fallback' };
+        } catch (e) {
+            console.log(`[CLI] Session manager not available: ${e.message}`);
         }
+        
+        console.log(`[CLI] Updated ${updated} ONUs for OLT ${olt.name}`);
+        return { onuCount: updated, method: 'cli' };
     }
 
     getSysInfo(session) {
@@ -239,27 +271,41 @@ class SNMPPollingWorker {
     getONUStatuses(session, oltId) {
         return new Promise((resolve, reject) => {
             const statuses = [];
-            const maxOid = this.OIDs.onuStatusBase + '.4294967295';
+            
+            // Primary OID for ONU run status (hwGponDeviceOntRunStatus)
+            const primaryOid = this.OIDs.onuStatusBase;
+            // Alternative OIDs for different Huawei versions
+            const altOids = [
+                '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15',  // hwGponDeviceOntRunStatus
+                '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9',   // hwGponDeviceOntRunState (alternate)
+                '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.2'    // hwGponDeviceOntOpticalDdmStatus (optical status)
+            ];
 
-            session.subtree(this.OIDs.onuStatusBase, maxOid, (varbinds) => {
-                varbinds.forEach(vb => {
-                    if (snmp.isVarbindError(vb)) return;
-                    
-                    const oidParts = vb.oid.split('.');
-                    const onuIndex = oidParts.slice(-2).join('.');
-                    const statusCode = parseInt(vb.value);
-                    const status = this.STATUS_MAP[statusCode] || 'unknown';
-                    
-                    statuses.push({
-                        index: onuIndex,
-                        statusCode,
-                        status
+            const tryWalk = (oid, callback) => {
+                const maxOid = oid + '.4294967295';
+                session.subtree(oid, maxOid, (varbinds) => {
+                    varbinds.forEach(vb => {
+                        if (snmp.isVarbindError(vb)) return;
+                        
+                        const oidParts = vb.oid.split('.');
+                        const onuIndex = oidParts.slice(-2).join('.');
+                        const statusCode = parseInt(vb.value);
+                        const status = this.STATUS_MAP[statusCode] || 'unknown';
+                        
+                        statuses.push({
+                            index: onuIndex,
+                            statusCode,
+                            status
+                        });
                     });
+                }, (error) => {
+                    callback(error);
                 });
-            }, (error) => {
-                if (error && error.message !== 'No more OIDs') {
-                    console.log(`[SNMP] ONU status walk completed for OLT ${oltId}: ${statuses.length} ONUs`);
-                }
+            };
+
+            // Try primary OID first
+            tryWalk(primaryOid, (error) => {
+                console.log(`[SNMP] ONU status walk completed for OLT ${oltId}: ${statuses.length} ONUs`);
                 resolve(statuses);
             });
         });
