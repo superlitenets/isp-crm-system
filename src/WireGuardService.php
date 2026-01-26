@@ -236,6 +236,51 @@ class WireGuardService {
         }
     }
     
+    /**
+     * Get the next available IP address from the VPN subnet
+     */
+    public function getNextAvailableIP(int $serverId): ?string {
+        try {
+            $server = $this->getServer($serverId);
+            if (!$server) {
+                return null;
+            }
+            
+            $serverAddr = $server['interface_addr'];
+            list($serverIp, $cidr) = explode('/', $serverAddr);
+            $serverOctets = explode('.', $serverIp);
+            $baseNetwork = $serverOctets[0] . '.' . $serverOctets[1] . '.' . $serverOctets[2] . '.';
+            
+            $usedIps = [];
+            $usedIps[] = (int)$serverOctets[3];
+            
+            $stmt = $this->db->prepare("
+                SELECT allowed_ips FROM wireguard_peers WHERE server_id = ?
+            ");
+            $stmt->execute([$serverId]);
+            
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $allowedIps = $row['allowed_ips'];
+                if (preg_match('/(\d+)\.(\d+)\.(\d+)\.(\d+)/', $allowedIps, $matches)) {
+                    if ($matches[1] . '.' . $matches[2] . '.' . $matches[3] . '.' === $baseNetwork) {
+                        $usedIps[] = (int)$matches[4];
+                    }
+                }
+            }
+            
+            for ($i = 2; $i <= 254; $i++) {
+                if (!in_array($i, $usedIps)) {
+                    return $baseNetwork . $i . '/32';
+                }
+            }
+            
+            return null;
+        } catch (PDOException $e) {
+            error_log("WireGuard getNextAvailableIP error: " . $e->getMessage());
+            return null;
+        }
+    }
+    
     public function createPeer(array $data): ?int {
         try {
             $keys = $this->generateKeyPair();
@@ -244,6 +289,15 @@ class WireGuardService {
             $isActive = !empty($data['is_active']) ? true : false;
             $isOltSite = !empty($data['is_olt_site']) ? true : false;
             $oltId = !empty($data['olt_id']) ? (int)$data['olt_id'] : null;
+            
+            $allowedIps = $data['allowed_ips'] ?? null;
+            if (empty($allowedIps) && !empty($data['server_id'])) {
+                $allowedIps = $this->getNextAvailableIP($data['server_id']);
+                if (!$allowedIps) {
+                    error_log("WireGuard createPeer: No available IPs in subnet");
+                    return null;
+                }
+            }
             
             $stmt = $this->db->prepare("
                 INSERT INTO wireguard_peers 
@@ -259,7 +313,7 @@ class WireGuardService {
                 $keys['public_key'],
                 $this->encrypt($keys['private_key']),
                 $this->encrypt($psk),
-                $data['allowed_ips'],
+                $allowedIps,
                 $data['endpoint'] ?? null,
                 $data['persistent_keepalive'] ?? 25,
                 $isActive ? 'true' : 'false',
@@ -270,6 +324,49 @@ class WireGuardService {
             return (int)$stmt->fetchColumn();
         } catch (PDOException $e) {
             error_log("WireGuard createPeer error: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Create a VPN peer for a NAS device and link them
+     */
+    public function createPeerForNAS(int $nasId, string $nasName, string $nasIp, ?array $additionalNetworks = null): ?int {
+        try {
+            $servers = $this->getServers();
+            if (empty($servers)) {
+                error_log("WireGuard createPeerForNAS: No VPN servers configured");
+                return null;
+            }
+            $server = $servers[0];
+            
+            $allowedIps = $this->getNextAvailableIP($server['id']);
+            if (!$allowedIps) {
+                error_log("WireGuard createPeerForNAS: No available IPs");
+                return null;
+            }
+            
+            if ($additionalNetworks && is_array($additionalNetworks)) {
+                $allowedIps .= ', ' . implode(', ', $additionalNetworks);
+            }
+            
+            $peerId = $this->createPeer([
+                'server_id' => $server['id'],
+                'name' => $nasName,
+                'description' => "NAS Device: $nasIp",
+                'allowed_ips' => $allowedIps,
+                'is_active' => true,
+                'is_olt_site' => false
+            ]);
+            
+            if ($peerId) {
+                $stmt = $this->db->prepare("UPDATE radius_nas SET wireguard_peer_id = ? WHERE id = ?");
+                $stmt->execute([$peerId, $nasId]);
+            }
+            
+            return $peerId;
+        } catch (PDOException $e) {
+            error_log("WireGuard createPeerForNAS error: " . $e->getMessage());
             return null;
         }
     }

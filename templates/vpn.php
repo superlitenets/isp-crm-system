@@ -444,9 +444,9 @@ try {
                         <input type="text" class="form-control" name="description" placeholder="Main office OLT connection">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Allowed IPs</label>
-                        <input type="text" class="form-control" name="allowed_ips" value="10.200.0.2/32" required>
-                        <div class="form-text">IP assigned to this peer</div>
+                        <label class="form-label">Allowed IPs <span class="badge bg-success">Auto-assigned</span></label>
+                        <input type="text" class="form-control" name="allowed_ips" id="addPeerAllowedIps" placeholder="Leave empty for auto-assign">
+                        <div class="form-text">Leave empty to auto-assign the next available IP, or specify manually</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Endpoint (optional)</label>

@@ -4415,7 +4415,9 @@ try {
                                             <i class="bi bi-shield-lock me-1"></i><?= htmlspecialchars($nas['vpn_peer_name']) ?>
                                         </span>
                                         <?php else: ?>
-                                        <span class="badge bg-secondary">None</span>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="createVPNPeer(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['name']) ?>', '<?= htmlspecialchars($nas['ip_address']) ?>')" title="Create VPN Peer">
+                                            <i class="bi bi-plus-circle me-1"></i>Create
+                                        </button>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -6222,6 +6224,38 @@ try {
         
         document.body.appendChild(form);
         form.submit();
+    }
+    
+    function createVPNPeer(nasId, nasName, nasIp) {
+        if (!confirm(`Create VPN peer for ${nasName} (${nasIp})?\n\nThis will auto-assign the next available VPN IP.`)) {
+            return;
+        }
+        
+        const btn = event.target.closest('button');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        fetch('/index.php?page=api&action=create_nas_vpn_peer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nas_id: nasId, name: nasName, ip: nasIp })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert(`VPN peer created!\n\nAssigned IP: ${data.allowed_ips}\n\nReloading page...`);
+                window.location.reload();
+            } else {
+                alert('Failed to create VPN peer: ' + (data.error || 'Unknown error'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Create';
+            }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Create';
+        });
     }
     
     function testNAS(nasId, ipAddress) {
