@@ -5,6 +5,9 @@ const SNMPPollingWorker = require('./SNMPPollingWorker');
 const radius = require('radius');
 const dgram = require('dgram');
 
+// Set timezone to Africa/Nairobi
+process.env.TZ = process.env.TZ || 'Africa/Nairobi';
+
 const app = express();
 app.use(express.json());
 

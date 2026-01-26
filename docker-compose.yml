@@ -7,6 +7,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Africa/Nairobi
+      PGTZ: Africa/Nairobi
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -20,6 +22,8 @@ services:
       dockerfile: Dockerfile
     container_name: isp_crm_whatsapp
     restart: unless-stopped
+    environment:
+      - TZ=Africa/Nairobi
     ports:
       - "3001:3001"
     volumes:
@@ -36,6 +40,7 @@ services:
       - db
     network_mode: host
     environment:
+      - TZ=Africa/Nairobi
       - PGHOST=127.0.0.1
       - PGPORT=5433
       - PGDATABASE=${POSTGRES_DB}
@@ -163,6 +168,7 @@ services:
       - DISCOVERY_INTERVAL=*/30 * * * * *
       - SNMP_POLL_INTERVAL=30
       - SESSION_SECRET=${SESSION_SECRET}
+      - TZ=Africa/Nairobi
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
