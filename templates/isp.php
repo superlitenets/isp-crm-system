@@ -1710,7 +1710,7 @@ try {
                                         <strong class="small"><?= htmlspecialchars($nas['name']) ?></strong>
                                         <br><code class="small"><?= htmlspecialchars($nas['ip_address']) ?></code>
                                     </div>
-                                    <span class="badge <?= $nas['enabled'] ? 'bg-success' : 'bg-secondary' ?>"><?= $nas['enabled'] ? 'Active' : 'Off' ?></span>
+                                    <span class="badge <?= ($nas['enabled'] ?? true) ? 'bg-success' : 'bg-secondary' ?>"><?= ($nas['enabled'] ?? true) ? 'Active' : 'Off' ?></span>
                                 </li>
                                 <?php endforeach; ?>
                             </ul>

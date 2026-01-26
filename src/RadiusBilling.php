@@ -236,7 +236,7 @@ class RadiusBilling {
     // ==================== Location Management ====================
     
     public function getLocations(): array {
-        $stmt = $this->db->query("SELECT * FROM isp_locations WHERE is_active = true ORDER BY name");
+        $stmt = $this->db->query("SELECT * FROM isp_locations ORDER BY name");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
