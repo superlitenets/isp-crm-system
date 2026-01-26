@@ -841,17 +841,24 @@ class RadiusBilling {
             
             $this->createBillingRecord($id, $packageId, $package['price'], 'renewal', $startDate, $expiryDate);
             
-            // If user was expired/suspended, disconnect them so they reconnect with proper IP pool and speed
+            // If user was expired/suspended, use CoA to update their speed/pool without disconnecting
             $coaResult = null;
             if ($wasExpired) {
-                $coaResult = $this->disconnectUser($id);
+                // Try CoA first for smooth transition (updates speed and pool without disconnect)
+                $coaResult = $this->sendReactivationCoA($id);
+                
+                // If CoA fails (no active session), that's fine - they'll get new settings on next connect
+                if (!$coaResult['success'] && strpos($coaResult['error'] ?? '', 'Timeout') !== false) {
+                    // No active session - user will get correct settings on reconnect
+                    $coaResult['note'] = 'No active session - settings will apply on next login';
+                }
             }
             
             return [
                 'success' => true, 
                 'expiry_date' => $expiryDate,
                 'coa_sent' => $coaResult ? ($coaResult['success'] ?? false) : false,
-                'sessions_disconnected' => $coaResult['disconnected'] ?? 0
+                'coa_result' => $coaResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
@@ -1459,8 +1466,7 @@ class RadiusBilling {
             curl_close($ch);
             
             if ($curlError) {
-                // Fallback to direct PHP client if OLT service unavailable
-                return $this->sendSpeedUpdateCoADirect($sub, $nas, $rateLimit);
+                return ['success' => false, 'error' => 'OLT service unavailable: ' . $curlError, 'target_ip' => $nas['ip_address']];
             }
             
             $result = json_decode($response, true);
@@ -1470,7 +1476,7 @@ class RadiusBilling {
             
             return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
         } catch (\Exception $e) {
-            return $this->sendSpeedUpdateCoADirect($sub, $nas, $rateLimit);
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nas['ip_address']];
         }
     }
     
@@ -1768,6 +1774,89 @@ class RadiusBilling {
             'rateLimit' => $rateLimit,
             'framedPool' => $poolName
         ];
+        
+        try {
+            $ch = curl_init($oltServiceUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
+            
+            $response = curl_exec($ch);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                return ['success' => false, 'error' => "cURL error: $curlError"];
+            }
+            
+            $result = json_decode($response, true);
+            if ($result && $result['success']) {
+                return ['success' => true, 'pool' => $poolName, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function sendReactivationCoA(int $subscriptionId): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        $package = $this->getPackage($sub['package_id']);
+        if (!$package) {
+            return ['success' => false, 'error' => 'Package not found'];
+        }
+        
+        // Get NAS info
+        $nas = null;
+        if (!empty($sub['nas_id'])) {
+            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+            $stmt->execute([$sub['nas_id']]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$nas) {
+            $stmt = $this->db->prepare("
+                SELECT rn.ip_address, rn.secret 
+                FROM radius_sessions rs
+                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
+                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+                ORDER BY rs.session_start DESC LIMIT 1
+            ");
+            $stmt->execute([$subscriptionId]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$nas) {
+            return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        // Build rate limit and get the package's IP pool
+        $rateLimit = $this->buildRateLimit($sub);
+        $poolName = $package['address_pool'] ?? null;
+        
+        // Send CoA via OLT service with new pool and speed
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
+        
+        $payload = [
+            'nasIp' => $nas['ip_address'],
+            'nasPort' => 3799,
+            'secret' => $nas['secret'],
+            'username' => $sub['username'],
+            'rateLimit' => $rateLimit
+        ];
+        
+        if ($poolName) {
+            $payload['framedPool'] = $poolName;
+        }
         
         try {
             $ch = curl_init($oltServiceUrl);
