@@ -2538,6 +2538,47 @@ try {
                 
                 $isOnline = !empty($activeSession);
                 
+                // Calculate uptime or offline duration
+                $uptimeStr = '';
+                $offlineStr = '';
+                if ($isOnline && $activeSession) {
+                    $uptime = time() - strtotime($activeSession['session_start']);
+                    $days = floor($uptime / 86400);
+                    $hours = floor(($uptime % 86400) / 3600);
+                    $mins = floor(($uptime % 3600) / 60);
+                    if ($days > 0) {
+                        $uptimeStr = $days . 'd ' . $hours . 'h ' . $mins . 'm';
+                    } elseif ($hours > 0) {
+                        $uptimeStr = $hours . 'h ' . $mins . 'm';
+                    } else {
+                        $uptimeStr = $mins . 'm';
+                    }
+                } else {
+                    // Find last session end time
+                    $lastSession = null;
+                    foreach ($allSessions as $s) {
+                        if (!empty($s['session_end'])) {
+                            $lastSession = $s;
+                            break;
+                        }
+                    }
+                    if ($lastSession) {
+                        $offline = time() - strtotime($lastSession['session_end']);
+                        $days = floor($offline / 86400);
+                        $hours = floor(($offline % 86400) / 3600);
+                        $mins = floor(($offline % 3600) / 60);
+                        if ($days > 0) {
+                            $offlineStr = $days . 'd ' . $hours . 'h ago';
+                        } elseif ($hours > 0) {
+                            $offlineStr = $hours . 'h ' . $mins . 'm ago';
+                        } else {
+                            $offlineStr = $mins . 'm ago';
+                        }
+                    } else {
+                        $offlineStr = 'Never connected';
+                    }
+                }
+                
                 // Check if actually expired based on date
                 $isSubExpired = $subscriber['expiry_date'] && strtotime($subscriber['expiry_date']) < time();
                 $displayStatus = $subscriber['status'];
@@ -2595,9 +2636,9 @@ try {
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-center gap-2 flex-wrap">
                                     <?php if ($isOnline): ?>
-                                    <span class="badge bg-white text-success"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online</span>
+                                    <span class="badge bg-white text-success"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online <?= $uptimeStr ? "($uptimeStr)" : '' ?></span>
                                     <?php else: ?>
-                                    <span class="badge bg-white bg-opacity-25 text-white"><i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline</span>
+                                    <span class="badge bg-white bg-opacity-25 text-white"><i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline <?= $offlineStr ? "($offlineStr)" : '' ?></span>
                                     <?php endif; ?>
                                     <span class="badge bg-<?= $statusClass === 'success' ? 'white text-success' : ($statusClass === 'danger' ? 'danger' : 'warning text-dark') ?>"><?= $statusLabel ?></span>
                                     <span class="badge bg-white bg-opacity-25"><?= strtoupper($subscriber['access_type']) ?></span>
@@ -2774,304 +2815,218 @@ try {
                     <div class="tab-content">
                         <!-- Customer Tab -->
                         <div class="tab-pane fade show active" id="customerTab" role="tabpanel">
+                            <?php if ($customer): ?>
                             <div class="row g-4">
-                                <div class="col-lg-4">
-                                    <div class="text-center p-4 rounded-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                        <?php if ($customer): ?>
-                                        <div class="rounded-circle bg-white bg-opacity-25 d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
-                                            <span class="text-white fw-bold" style="font-size: 2.5rem;"><?= strtoupper(substr($customer['name'], 0, 1)) ?></span>
-                                        </div>
-                                        <h4 class="text-white fw-bold mb-1"><?= htmlspecialchars($customer['name']) ?></h4>
-                                        <p class="text-white-50 mb-3">Account #<?= htmlspecialchars($customer['phone']) ?></p>
-                                        <div class="d-flex justify-content-center gap-2">
-                                            <a href="tel:<?= htmlspecialchars($customer['phone']) ?>" class="btn btn-light btn-sm rounded-pill px-3">
-                                                <i class="bi bi-telephone-fill me-1"></i> Call
-                                            </a>
-                                            <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank" class="btn btn-success btn-sm rounded-pill px-3">
-                                                <i class="bi bi-whatsapp me-1"></i> WhatsApp
-                                            </a>
-                                            <button class="btn btn-light btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editCustomerModal">
-                                                <i class="bi bi-pencil-fill me-1"></i> Edit
-                                            </button>
-                                        </div>
-                                        <?php else: ?>
-                                        <div class="rounded-circle bg-white bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
-                                            <i class="bi bi-person-x text-white" style="font-size: 2.5rem;"></i>
-                                        </div>
-                                        <h5 class="text-white">No Customer Linked</h5>
-                                        <?php endif; ?>
-                                    </div>
+                                <div class="col-lg-6">
+                                    <table class="table table-borderless mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-muted" style="width: 140px;">Name</td>
+                                                <td class="fw-medium"><?= htmlspecialchars($customer['name']) ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Phone</td>
+                                                <td>
+                                                    <span class="fw-medium"><?= htmlspecialchars($customer['phone']) ?></span>
+                                                    <a href="tel:<?= htmlspecialchars($customer['phone']) ?>" class="btn btn-sm btn-link p-0 ms-2" title="Call"><i class="bi bi-telephone"></i></a>
+                                                    <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank" class="btn btn-sm btn-link text-success p-0 ms-1" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Email</td>
+                                                <td class="fw-medium"><?= htmlspecialchars($customer['email'] ?? '-') ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Address</td>
+                                                <td class="fw-medium"><?= htmlspecialchars($customer['address'] ?? '-') ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Wallet Balance</td>
+                                                <td><span class="fw-bold text-success">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div class="col-lg-8">
-                                    <?php if ($customer): ?>
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <div class="card h-100 border-0 bg-light">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-2">
-                                                        <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
-                                                            <i class="bi bi-telephone-fill text-primary fs-5"></i>
-                                                        </div>
-                                                        <div>
-                                                            <small class="text-muted">Phone Number</small>
-                                                            <h6 class="mb-0 fw-bold"><?= htmlspecialchars($customer['phone']) ?></h6>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="card h-100 border-0 bg-light">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-2">
-                                                        <div class="rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
-                                                            <i class="bi bi-envelope-fill text-info fs-5"></i>
-                                                        </div>
-                                                        <div>
-                                                            <small class="text-muted">Email Address</small>
-                                                            <h6 class="mb-0 fw-bold"><?= htmlspecialchars($customer['email'] ?? 'Not set') ?></h6>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="card h-100 border-0 bg-light">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-2">
-                                                        <div class="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
-                                                            <i class="bi bi-geo-alt-fill text-warning fs-5"></i>
-                                                        </div>
-                                                        <div>
-                                                            <small class="text-muted">Address</small>
-                                                            <h6 class="mb-0 fw-bold"><?= htmlspecialchars($customer['address'] ?? 'Not set') ?></h6>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="card h-100 border-0 bg-light">
-                                                <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-2">
-                                                        <div class="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
-                                                            <i class="bi bi-wallet2 text-success fs-5"></i>
-                                                        </div>
-                                                        <div>
-                                                            <small class="text-muted">Wallet Balance</small>
-                                                            <h6 class="mb-0 fw-bold text-success">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></h6>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mt-4">
-                                        <h6 class="text-muted mb-3"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h6>
+                                <div class="col-lg-6">
+                                    <div class="border-start ps-4 h-100">
+                                        <h6 class="text-muted mb-3">Quick Actions</h6>
                                         <div class="d-flex flex-wrap gap-2">
-                                            <button type="button" class="btn btn-outline-primary" onclick="copyCredentials(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>', '<?= htmlspecialchars($subscriber['password'] ?? '') ?>')">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyCredentials(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>', '<?= htmlspecialchars($subscriber['password'] ?? '') ?>')">
                                                 <i class="bi bi-key me-1"></i> Copy Credentials
                                             </button>
-                                            <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>?text=<?= urlencode('Hello ' . ($customer['name'] ?? '') . ', your WiFi credentials are:\nUsername: ' . $subscriber['username'] . '\nPassword: ' . ($subscriber['password'] ?? '')) ?>" target="_blank" class="btn btn-outline-success">
+                                            <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>?text=<?= urlencode('Hello ' . ($customer['name'] ?? '') . ', your WiFi credentials are:\nUsername: ' . $subscriber['username'] . '\nPassword: ' . ($subscriber['password'] ?? '')) ?>" target="_blank" class="btn btn-sm btn-outline-success">
                                                 <i class="bi bi-whatsapp me-1"></i> Send Credentials
                                             </a>
-                                            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#addCreditModal">
-                                                <i class="bi bi-plus-lg me-1"></i> Top Up Wallet
+                                            <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addCreditModal">
+                                                <i class="bi bi-plus-lg me-1"></i> Top Up
                                             </button>
-                                            <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#stkPushModal">
-                                                <i class="bi bi-phone me-1"></i> M-Pesa STK
+                                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#stkPushModal">
+                                                <i class="bi bi-phone me-1"></i> M-Pesa
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editCustomerModal">
+                                                <i class="bi bi-pencil me-1"></i> Edit Customer
                                             </button>
                                         </div>
                                     </div>
-                                    <?php else: ?>
-                                    <div class="text-center py-5">
-                                        <i class="bi bi-person-plus text-muted" style="font-size: 4rem;"></i>
-                                        <h5 class="mt-3">No Customer Linked</h5>
-                                        <p class="text-muted">Link a customer to this subscription to enable messaging and billing features.</p>
-                                    </div>
-                                    <?php endif; ?>
                                 </div>
                             </div>
+                            <?php else: ?>
+                            <div class="text-center py-4 text-muted">
+                                <i class="bi bi-person-x fs-1"></i>
+                                <p class="mt-2 mb-0">No customer linked to this subscription</p>
+                            </div>
+                            <?php endif; ?>
                         </div>
                         
                         <!-- Subscription Tab -->
                         <div class="tab-pane fade" id="subscriptionTab" role="tabpanel">
                             <div class="row g-4">
-                                <!-- Credentials Section -->
+                                <!-- Left Column: Details -->
                                 <div class="col-lg-6">
-                                    <div class="card border-0 h-100" style="background: #1a1a2e;">
-                                        <div class="card-header border-0 bg-transparent pt-4 pb-0">
-                                            <h6 class="text-white mb-0"><i class="bi bi-terminal me-2"></i>Connection Credentials</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="mb-3">
-                                                <label class="form-label text-white-50 small mb-1">Username</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text bg-dark text-success border-secondary"><i class="bi bi-person-badge"></i></span>
-                                                    <input type="text" class="form-control bg-dark text-success border-secondary font-monospace" value="<?= htmlspecialchars($subscriber['username']) ?>" readonly>
-                                                    <button class="btn btn-outline-secondary" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label text-white-50 small mb-1">Password</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text bg-dark text-warning border-secondary"><i class="bi bi-key"></i></span>
-                                                    <input type="password" class="form-control bg-dark text-warning border-secondary font-monospace" id="pwdInput" value="<?= htmlspecialchars($subscriber['password'] ?? '') ?>" readonly>
-                                                    <button class="btn btn-outline-secondary" id="pwdToggle" onclick="togglePassword()"><i class="bi bi-eye"></i></button>
-                                                    <button class="btn btn-outline-secondary" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['password'] ?? '') ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
-                                                </div>
-                                                <script>
-                                                    function togglePassword() {
-                                                        const input = document.getElementById('pwdInput');
-                                                        const toggle = document.getElementById('pwdToggle').querySelector('i');
-                                                        if (input.type === 'password') {
-                                                            input.type = 'text';
-                                                            toggle.className = 'bi bi-eye-slash';
-                                                        } else {
-                                                            input.type = 'password';
-                                                            toggle.className = 'bi bi-eye';
+                                    <?php 
+                                    $daysLeft = $subscriber['expiry_date'] ? (strtotime($subscriber['expiry_date']) - time()) / 86400 : null;
+                                    $isExpired = $daysLeft !== null && $daysLeft < 0;
+                                    ?>
+                                    <table class="table table-borderless mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-muted" style="width: 130px;">Username</td>
+                                                <td>
+                                                    <code class="bg-light px-2 py-1 rounded"><?= htmlspecialchars($subscriber['username']) ?></code>
+                                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Password</td>
+                                                <td>
+                                                    <code class="bg-light px-2 py-1 rounded" id="pwdDisplay">********</code>
+                                                    <button class="btn btn-sm btn-link p-0 ms-1" id="pwdToggle" onclick="togglePassword()" title="Show"><i class="bi bi-eye"></i></button>
+                                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['password'] ?? '') ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                                    <script>
+                                                        function togglePassword() {
+                                                            const display = document.getElementById('pwdDisplay');
+                                                            const toggle = document.getElementById('pwdToggle').querySelector('i');
+                                                            if (display.textContent === '********') {
+                                                                display.textContent = '<?= htmlspecialchars($subscriber['password'] ?? '') ?>';
+                                                                toggle.className = 'bi bi-eye-slash';
+                                                            } else {
+                                                                display.textContent = '********';
+                                                                toggle.className = 'bi bi-eye';
+                                                            }
                                                         }
-                                                    }
-                                                </script>
-                                            </div>
-                                            <div class="row g-2 mt-3">
-                                                <div class="col-6">
-                                                    <div class="rounded-3 p-2 text-center" style="background: rgba(255,255,255,0.05);">
-                                                        <small class="text-white-50 d-block">Access Type</small>
-                                                        <span class="badge bg-primary"><?= strtoupper($subscriber['access_type']) ?></span>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="rounded-3 p-2 text-center" style="background: rgba(255,255,255,0.05);">
-                                                        <small class="text-white-50 d-block">Static IP</small>
-                                                        <span class="text-white"><?= $subscriber['static_ip'] ?: 'Dynamic' ?></span>
-                                                    </div>
-                                                </div>
-                                                <div class="col-12">
-                                                    <div class="rounded-3 p-2 text-center" style="background: rgba(255,255,255,0.05);">
-                                                        <small class="text-white-50 d-block">MAC Address</small>
-                                                        <?php if ($subscriber['mac_address']): ?>
-                                                        <code class="text-info"><?= htmlspecialchars($subscriber['mac_address']) ?></code>
-                                                        <span class="badge bg-success ms-2"><i class="bi bi-lock-fill"></i> Bound</span>
-                                                        <form method="post" class="d-inline ms-2">
-                                                            <input type="hidden" name="action" value="clear_mac">
-                                                            <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
-                                                            <input type="hidden" name="return_to" value="subscriber">
-                                                            <button type="submit" class="btn btn-sm btn-outline-warning py-0" onclick="return confirm('Clear MAC binding?')">
-                                                                <i class="bi bi-unlock"></i>
-                                                            </button>
-                                                        </form>
-                                                        <?php else: ?>
-                                                        <span class="text-white-50">Not bound</span>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                                    </script>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Package</td>
+                                                <td>
+                                                    <strong><?= htmlspecialchars($package['name'] ?? 'N/A') ?></strong>
+                                                    <span class="text-muted small ms-2">(<?= $package['download_speed'] ?? '-' ?> / <?= $package['upload_speed'] ?? '-' ?>)</span>
+                                                    <button class="btn btn-sm btn-link p-0 ms-2" data-bs-toggle="modal" data-bs-target="#changePackageModal" title="Change Package"><i class="bi bi-arrow-left-right"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Price</td>
+                                                <td><strong class="text-success">KES <?= number_format($package['price'] ?? 0) ?></strong> / <?= ucfirst($package['billing_cycle'] ?? 'month') ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Start Date</td>
+                                                <td><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Expiry Date</td>
+                                                <td>
+                                                    <?php if ($isExpired): ?>
+                                                    <span class="text-danger fw-bold"><?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?></span>
+                                                    <span class="badge bg-danger ms-1">Expired</span>
+                                                    <?php elseif ($daysLeft !== null && $daysLeft < 7): ?>
+                                                    <span class="text-warning fw-bold"><?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?></span>
+                                                    <span class="badge bg-warning text-dark ms-1"><?= ceil($daysLeft) ?> days</span>
+                                                    <?php elseif ($subscriber['expiry_date']): ?>
+                                                    <span class="fw-medium"><?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?></span>
+                                                    <span class="badge bg-success ms-1"><?= ceil($daysLeft) ?> days</span>
+                                                    <?php else: ?>
+                                                    <span class="text-muted">Never expires</span>
+                                                    <?php endif; ?>
+                                                    <button class="btn btn-sm btn-link p-0 ms-2" data-bs-toggle="modal" data-bs-target="#changeExpiryModal" title="Change Expiry"><i class="bi bi-calendar-event"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Auto-Renew</td>
+                                                <td>
+                                                    <?php if ($subscriber['auto_renew']): ?>
+                                                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>ON</span>
+                                                    <?php else: ?>
+                                                    <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i>OFF</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Access Type</td>
+                                                <td><span class="badge bg-primary"><?= strtoupper($subscriber['access_type']) ?></span></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Static IP</td>
+                                                <td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">MAC Address</td>
+                                                <td>
+                                                    <?php if ($subscriber['mac_address']): ?>
+                                                    <code><?= htmlspecialchars($subscriber['mac_address']) ?></code>
+                                                    <span class="badge bg-success ms-1"><i class="bi bi-lock-fill"></i></span>
+                                                    <form method="post" class="d-inline">
+                                                        <input type="hidden" name="action" value="clear_mac">
+                                                        <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
+                                                        <input type="hidden" name="return_to" value="subscriber">
+                                                        <button type="submit" class="btn btn-sm btn-link text-warning p-0 ms-1" onclick="return confirm('Clear MAC binding?')" title="Unbind"><i class="bi bi-unlock"></i></button>
+                                                    </form>
+                                                    <?php else: ?>
+                                                    <span class="text-muted">Not bound</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                                 
-                                <!-- Package & Expiry Section -->
+                                <!-- Right Column: Data Usage & Actions -->
                                 <div class="col-lg-6">
-                                    <div class="card border-0 bg-light h-100">
-                                        <div class="card-body">
-                                            <!-- Current Package -->
-                                            <div class="d-flex align-items-start mb-4">
-                                                <div class="rounded-3 p-3 me-3 text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-width: 70px;">
-                                                    <i class="bi bi-box-seam text-white fs-3"></i>
-                                                </div>
-                                                <div class="flex-grow-1">
-                                                    <div class="d-flex justify-content-between align-items-start">
-                                                        <div>
-                                                            <h5 class="fw-bold mb-1"><?= htmlspecialchars($package['name'] ?? 'N/A') ?></h5>
-                                                            <div class="small text-muted">
-                                                                <i class="bi bi-arrow-down-circle text-success me-1"></i><?= $package['download_speed'] ?? '-' ?>
-                                                                <i class="bi bi-arrow-up-circle text-danger ms-2 me-1"></i><?= $package['upload_speed'] ?? '-' ?>
-                                                            </div>
-                                                            <span class="badge bg-success mt-1">KES <?= number_format($package['price'] ?? 0) ?>/<?= ucfirst($package['billing_cycle'] ?? 'month') ?></span>
-                                                        </div>
-                                                        <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#changePackageModal">
-                                                            <i class="bi bi-arrow-left-right me-1"></i> Change
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Expiry Dates -->
-                                            <?php 
-                                            $daysLeft = $subscriber['expiry_date'] ? (strtotime($subscriber['expiry_date']) - time()) / 86400 : null;
-                                            $isExpired = $daysLeft !== null && $daysLeft < 0;
-                                            $expiryColor = $isExpired ? '#dc3545' : ($daysLeft < 7 ? '#ffc107' : '#198754');
-                                            ?>
-                                            <div class="row g-2 mb-3">
-                                                <div class="col-6">
-                                                    <div class="rounded-3 p-3 text-center bg-white border">
-                                                        <small class="text-muted d-block">Start Date</small>
-                                                        <strong><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></strong>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6">
-                                                    <div class="rounded-3 p-3 text-center" style="background: <?= $expiryColor ?>15; border: 2px solid <?= $expiryColor ?>;">
-                                                        <small class="text-muted d-block">Expiry Date</small>
-                                                        <strong style="color: <?= $expiryColor ?>;"><?= $subscriber['expiry_date'] ? date('M j, Y', strtotime($subscriber['expiry_date'])) : 'Never' ?></strong>
-                                                        <?php if ($isExpired): ?>
-                                                        <span class="badge bg-danger d-block mt-1">Expired</span>
-                                                        <?php elseif ($daysLeft !== null && $daysLeft < 7): ?>
-                                                        <span class="badge bg-warning text-dark d-block mt-1"><?= ceil($daysLeft) ?> days left</span>
-                                                        <?php elseif ($daysLeft !== null): ?>
-                                                        <span class="badge bg-success d-block mt-1"><?= ceil($daysLeft) ?> days left</span>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span class="badge bg-<?= $subscriber['auto_renew'] ? 'success' : 'secondary' ?>">
-                                                    <i class="bi bi-<?= $subscriber['auto_renew'] ? 'check-circle' : 'x-circle' ?> me-1"></i>
-                                                    Auto-renew <?= $subscriber['auto_renew'] ? 'ON' : 'OFF' ?>
-                                                </span>
-                                                <button class="btn btn-sm btn-outline-warning rounded-pill" data-bs-toggle="modal" data-bs-target="#changeExpiryModal">
-                                                    <i class="bi bi-calendar-event me-1"></i> Change Expiry
-                                                </button>
-                                            </div>
-                                            
-                                            <!-- Data Usage -->
-                                            <?php if ($package && $package['data_quota_mb']): ?>
-                                            <hr class="my-3">
-                                            <h6 class="text-muted small mb-2"><i class="bi bi-bar-chart me-1"></i>Data Usage</h6>
-                                            <?php 
-                                            $usagePercent = min(100, ($subscriber['data_used_mb'] / $package['data_quota_mb']) * 100);
-                                            $barColor = $usagePercent >= 100 ? '#dc3545' : ($usagePercent >= 80 ? '#ffc107' : '#28a745');
-                                            ?>
-                                            <div class="progress mb-2" style="height: 12px;">
-                                                <div class="progress-bar" style="width: <?= $usagePercent ?>%; background: <?= $barColor ?>;">
-                                                    <?= round($usagePercent) ?>%
-                                                </div>
-                                            </div>
-                                            <div class="d-flex justify-content-between small text-muted">
-                                                <span><?= number_format($subscriber['data_used_mb'] / 1024, 2) ?> GB used</span>
-                                                <span><?= number_format($package['data_quota_mb'] / 1024, 2) ?> GB total</span>
-                                            </div>
-                                            <?php endif; ?>
+                                    <div class="border-start ps-4 h-100">
+                                        <?php if ($package && $package['data_quota_mb']): ?>
+                                        <h6 class="text-muted mb-3">Data Usage</h6>
+                                        <?php 
+                                        $usagePercent = min(100, ($subscriber['data_used_mb'] / $package['data_quota_mb']) * 100);
+                                        ?>
+                                        <div class="progress mb-2" style="height: 10px;">
+                                            <div class="progress-bar bg-<?= $usagePercent >= 100 ? 'danger' : ($usagePercent >= 80 ? 'warning' : 'success') ?>" style="width: <?= $usagePercent ?>%;"></div>
                                         </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Edit Subscription Button -->
-                                <div class="col-12">
-                                    <div class="d-flex gap-2">
-                                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editSubscriptionModal">
-                                            <i class="bi bi-pencil me-1"></i> Edit Subscription Details
-                                        </button>
-                                        <form id="resetDataForm" method="post" class="d-inline">
-                                            <input type="hidden" name="action" value="reset_data_usage">
-                                            <input type="hidden" name="id" value="<?= $subId ?>">
-                                            <input type="hidden" name="return_to" value="subscriber">
-                                            <button type="submit" class="btn btn-outline-warning" onclick="return confirm('Reset data usage to 0?')">
-                                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Data Usage
+                                        <div class="d-flex justify-content-between small text-muted mb-4">
+                                            <span><?= number_format($subscriber['data_used_mb'] / 1024, 2) ?> GB used</span>
+                                            <span><?= number_format($package['data_quota_mb'] / 1024, 2) ?> GB total</span>
+                                        </div>
+                                        <?php endif; ?>
+                                        
+                                        <h6 class="text-muted mb-3">Actions</h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editSubscriptionModal">
+                                                <i class="bi bi-pencil me-1"></i> Edit
                                             </button>
-                                        </form>
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#changePackageModal">
+                                                <i class="bi bi-arrow-left-right me-1"></i> Change Package
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#changeExpiryModal">
+                                                <i class="bi bi-calendar-event me-1"></i> Change Expiry
+                                            </button>
+                                            <form id="resetDataForm" method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="reset_data_usage">
+                                                <input type="hidden" name="id" value="<?= $subId ?>">
+                                                <input type="hidden" name="return_to" value="subscriber">
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Reset data usage to 0?')">
+                                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Data
+                                                </button>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
