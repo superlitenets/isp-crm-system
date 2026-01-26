@@ -960,7 +960,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Handle CoA/Disconnect based on whether expiring or extending
                     if ($isExpiring) {
                         // Expiring user - disconnect them
-                        $disconnectResult = $radiusBilling->disconnectSubscription($subId);
+                        $disconnectResult = $radiusBilling->disconnectUser($subId);
                         if ($disconnectResult && !empty($disconnectResult['success'])) {
                             $msg .= ' (session disconnected)';
                         }
