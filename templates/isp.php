@@ -2802,19 +2802,19 @@ try {
                 <div class="card-header bg-white border-bottom p-0">
                     <ul class="nav nav-pills nav-fill" id="subscriberTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active rounded-0 py-3 border-end" id="customer-tab" data-bs-toggle="tab" data-bs-target="#customerTab" type="button">
+                            <button class="nav-link active rounded-0 py-3 border-end" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessionsTab" type="button">
+                                <i class="bi bi-broadcast me-2"></i>Sessions
+                                <?php if ($isOnline): ?><span class="badge bg-success ms-1">1</span><?php endif; ?>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="customer-tab" data-bs-toggle="tab" data-bs-target="#customerTab" type="button">
                                 <i class="bi bi-person-circle me-2"></i>Customer
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link rounded-0 py-3 border-end" id="subscription-tab" data-bs-toggle="tab" data-bs-target="#subscriptionTab" type="button">
                                 <i class="bi bi-router me-2"></i>Subscription
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessionsTab" type="button">
-                                <i class="bi bi-broadcast me-2"></i>Sessions
-                                <?php if ($isOnline): ?><span class="badge bg-success ms-1">1</span><?php endif; ?>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
@@ -2850,7 +2850,7 @@ try {
                 <div class="card-body p-4">
                     <div class="tab-content">
                         <!-- Customer Tab -->
-                        <div class="tab-pane fade show active" id="customerTab" role="tabpanel">
+                        <div class="tab-pane fade" id="customerTab" role="tabpanel">
                             <?php if ($customer): ?>
                             <div class="row g-4">
                                 <div class="col-lg-6">
@@ -3069,7 +3069,7 @@ try {
                         </div>
                         
                         <!-- Sessions Tab -->
-                        <div class="tab-pane fade" id="sessionsTab" role="tabpanel">
+                        <div class="tab-pane fade show active" id="sessionsTab" role="tabpanel">
                             <?php if ($activeSession): ?>
                             <div class="alert alert-success mb-3">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -6850,6 +6850,11 @@ try {
     }
     
     // Live timer update function - updates uptime/offline every second like a watch
+    // Server time offset to sync with server timezone (Africa/Nairobi)
+    const serverTimeAtLoad = <?= time() ?>;
+    const clientTimeAtLoad = Math.floor(Date.now() / 1000);
+    const serverOffset = serverTimeAtLoad - clientTimeAtLoad;
+    
     function formatDuration(seconds) {
         if (seconds < 0) seconds = 0;
         const days = Math.floor(seconds / 86400);
@@ -6861,7 +6866,8 @@ try {
     }
     
     function updateLiveTimers() {
-        const now = Math.floor(Date.now() / 1000);
+        // Use server time by applying offset
+        const now = Math.floor(Date.now() / 1000) + serverOffset;
         document.querySelectorAll('.live-timer').forEach(function(timer) {
             const start = parseInt(timer.dataset.start);
             const type = timer.dataset.type;
