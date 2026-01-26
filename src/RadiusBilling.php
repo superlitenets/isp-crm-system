@@ -841,17 +841,17 @@ class RadiusBilling {
             
             $this->createBillingRecord($id, $packageId, $package['price'], 'renewal', $startDate, $expiryDate);
             
-            // If user was expired/suspended, send CoA to update their speed
+            // If user was expired/suspended, disconnect them so they reconnect with proper IP pool and speed
             $coaResult = null;
             if ($wasExpired) {
-                $coaResult = $this->sendSpeedUpdateCoA($id);
+                $coaResult = $this->disconnectUser($id);
             }
             
             return [
                 'success' => true, 
                 'expiry_date' => $expiryDate,
                 'coa_sent' => $coaResult ? ($coaResult['success'] ?? false) : false,
-                'new_speed' => $coaResult['rate_limit'] ?? null
+                'sessions_disconnected' => $coaResult['disconnected'] ?? 0
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
