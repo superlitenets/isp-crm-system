@@ -19,6 +19,10 @@ class Database {
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES => false
                 ]);
+                
+                // Set timezone for this connection
+                $timezone = getenv('APP_TIMEZONE') ?: 'Africa/Nairobi';
+                self::$connection->exec("SET timezone TO '$timezone'");
             } catch (PDOException $e) {
                 die("Database connection failed: " . $e->getMessage());
             }
