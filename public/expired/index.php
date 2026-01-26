@@ -1,7 +1,7 @@
 <?php
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../src/Mpesa.php';
-require_once __DIR__ . '/../src/RadiusBilling.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../src/Mpesa.php';
+require_once __DIR__ . '/../../src/RadiusBilling.php';
 
 $db = Database::getConnection();
 
