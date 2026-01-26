@@ -398,6 +398,98 @@ app.post('/ping-batch', async (req, res) => {
     }
 });
 
+// WireGuard status verification endpoint - check actual WireGuard peers
+app.get('/wireguard/status', async (req, res) => {
+    try {
+        const containerName = 'isp_crm_wireguard';
+        const peers = [];
+        let interfaceUp = false;
+        let error = null;
+        
+        // Try to get WireGuard status from container
+        try {
+            const { stdout } = await execPromise(`docker exec ${containerName} wg show wg0 2>&1`);
+            interfaceUp = true;
+            
+            // Parse wg show output
+            let currentPeer = null;
+            stdout.split('\n').forEach(line => {
+                line = line.trim();
+                if (line.startsWith('peer:')) {
+                    if (currentPeer) peers.push(currentPeer);
+                    currentPeer = { publicKey: line.replace('peer:', '').trim() };
+                } else if (currentPeer && line.startsWith('endpoint:')) {
+                    currentPeer.endpoint = line.replace('endpoint:', '').trim();
+                } else if (currentPeer && line.startsWith('allowed ips:')) {
+                    currentPeer.allowedIps = line.replace('allowed ips:', '').trim();
+                } else if (currentPeer && line.startsWith('latest handshake:')) {
+                    currentPeer.latestHandshake = line.replace('latest handshake:', '').trim();
+                } else if (currentPeer && line.startsWith('transfer:')) {
+                    currentPeer.transfer = line.replace('transfer:', '').trim();
+                } else if (currentPeer && line.startsWith('persistent keepalive:')) {
+                    currentPeer.keepalive = line.replace('persistent keepalive:', '').trim();
+                }
+            });
+            if (currentPeer) peers.push(currentPeer);
+        } catch (e) {
+            error = e.message;
+        }
+        
+        res.json({ 
+            success: interfaceUp, 
+            interfaceUp,
+            peers,
+            peerCount: peers.length,
+            error 
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// WireGuard routes verification endpoint - check actual routing table
+app.get('/wireguard/routes', async (req, res) => {
+    try {
+        const routes = [];
+        let wg0Exists = false;
+        let error = null;
+        
+        // Check routes on host (OLT service runs with host network)
+        try {
+            const { stdout } = await execPromise(`ip route show dev wg0 2>&1`);
+            wg0Exists = true;
+            stdout.split('\n').forEach(line => {
+                line = line.trim();
+                if (line) {
+                    const match = line.match(/^([\d.]+\/\d+)/);
+                    if (match) {
+                        routes.push({
+                            subnet: match[1],
+                            raw: line
+                        });
+                    }
+                }
+            });
+        } catch (e) {
+            if (e.message.includes('Cannot find device')) {
+                wg0Exists = false;
+            } else {
+                error = e.message;
+            }
+        }
+        
+        res.json({ 
+            success: wg0Exists, 
+            wg0Exists,
+            routes,
+            routeCount: routes.length,
+            error 
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // WireGuard config apply endpoint
 app.post('/wireguard/apply', async (req, res) => {
     try {

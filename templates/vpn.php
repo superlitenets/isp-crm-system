@@ -37,6 +37,9 @@ try {
             <button class="btn btn-outline-primary" onclick="refreshStatus()">
                 <i class="bi bi-arrow-clockwise me-1"></i>Refresh Status
             </button>
+            <button class="btn btn-info" onclick="verifyWireGuard()">
+                <i class="bi bi-shield-check me-1"></i>Verify WireGuard
+            </button>
             <span class="badge bg-<?= $wgSettings['vpn_enabled'] === 'true' ? 'success' : 'secondary' ?> fs-6 d-flex align-items-center">
                 <i class="bi bi-circle-fill me-1 small"></i>
                 VPN <?= $wgSettings['vpn_enabled'] === 'true' ? 'Enabled' : 'Disabled' ?>
@@ -574,6 +577,84 @@ function refreshStatus() {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Refresh Status';
         });
+}
+
+async function verifyWireGuard() {
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Verifying...';
+    
+    const oltServiceUrl = '<?= $wgSettings['olt_service_url'] ?? 'http://localhost:3002' ?>';
+    let statusResult = null, routesResult = null;
+    
+    try {
+        const [statusRes, routesRes] = await Promise.all([
+            fetch(`${oltServiceUrl}/wireguard/status`).then(r => r.json()).catch(e => ({ error: e.message })),
+            fetch(`${oltServiceUrl}/wireguard/routes`).then(r => r.json()).catch(e => ({ error: e.message }))
+        ]);
+        statusResult = statusRes;
+        routesResult = routesRes;
+    } catch (e) {
+        statusResult = { error: e.message };
+        routesResult = { error: e.message };
+    }
+    
+    let html = '<div class="modal fade" id="verifyModal" tabindex="-1"><div class="modal-dialog modal-lg">';
+    html += '<div class="modal-content"><div class="modal-header bg-info text-white">';
+    html += '<h5 class="modal-title"><i class="bi bi-shield-check me-2"></i>WireGuard Verification</h5>';
+    html += '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>';
+    html += '<div class="modal-body">';
+    
+    // WireGuard Peers Section
+    html += '<h6 class="mb-3"><i class="bi bi-people-fill me-2"></i>WireGuard Peers</h6>';
+    if (statusResult.error) {
+        html += `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Cannot connect to OLT Service: ${statusResult.error}</div>`;
+    } else if (!statusResult.interfaceUp) {
+        html += '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>WireGuard interface is DOWN</div>';
+    } else {
+        html += `<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>WireGuard interface UP - ${statusResult.peerCount} peer(s)</div>`;
+        if (statusResult.peers && statusResult.peers.length > 0) {
+            html += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+            html += '<thead><tr><th>Public Key</th><th>Allowed IPs</th><th>Endpoint</th><th>Last Handshake</th><th>Transfer</th></tr></thead><tbody>';
+            statusResult.peers.forEach(p => {
+                const keyShort = p.publicKey.substring(0, 20) + '...';
+                html += `<tr><td><code title="${p.publicKey}">${keyShort}</code></td>`;
+                html += `<td>${p.allowedIps || '-'}</td>`;
+                html += `<td>${p.endpoint || '<em>waiting</em>'}</td>`;
+                html += `<td>${p.latestHandshake || '<em>never</em>'}</td>`;
+                html += `<td>${p.transfer || '0 B / 0 B'}</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+        }
+    }
+    
+    // Routes Section
+    html += '<hr><h6 class="mb-3"><i class="bi bi-signpost-split me-2"></i>Routing Table (wg0)</h6>';
+    if (routesResult.error) {
+        html += `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Cannot check routes: ${routesResult.error}</div>`;
+    } else if (!routesResult.wg0Exists) {
+        html += '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>wg0 interface not found</div>';
+    } else {
+        html += `<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>${routesResult.routeCount} route(s) configured</div>`;
+        if (routesResult.routes && routesResult.routes.length > 0) {
+            html += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+            html += '<thead><tr><th>Subnet</th><th>Details</th></tr></thead><tbody>';
+            routesResult.routes.forEach(r => {
+                html += `<tr><td><code>${r.subnet}</code></td><td>${r.raw}</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+        }
+    }
+    
+    html += '</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>';
+    html += '</div></div></div>';
+    
+    document.getElementById('verifyModal')?.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+    new bootstrap.Modal(document.getElementById('verifyModal')).show();
+    
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-shield-check me-1"></i>Verify WireGuard';
 }
 
 function updatePeerStatus(peer) {
