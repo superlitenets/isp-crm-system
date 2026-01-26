@@ -61,7 +61,6 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         echo json_encode(['online' => false, 'error' => 'Invalid IP']);
         exit;
     }
-    // Use fsockopen to check common ports (same method as test_nas)
     $online = false;
     $portsToCheck = [22, 23, 80, 443, 8291, 8728];
     foreach ($portsToCheck as $port) {
@@ -73,6 +72,255 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         }
     }
     echo json_encode(['online' => $online, 'ip' => $ip]);
+    exit;
+}
+
+if ($action === 'preview_bulk_sms') {
+    header('Content-Type: application/json');
+    $filters = [
+        'status' => $_GET['status'] ?? '',
+        'location_id' => $_GET['location'] ?? '',
+        'package_id' => $_GET['package'] ?? ''
+    ];
+    $subscribers = $radiusBilling->getSubscribersByFilter($filters);
+    echo json_encode([
+        'success' => true,
+        'count' => count($subscribers),
+        'subscribers' => array_slice($subscribers, 0, 50)
+    ]);
+    exit;
+}
+
+if ($action === 'stk_push') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $phone = preg_replace('/[^0-9]/', '', $input['phone'] ?? '');
+    $amount = (int)($input['amount'] ?? 0);
+    $subscriptionId = (int)($input['subscription_id'] ?? 0);
+    
+    if (!$phone || strlen($phone) < 9) {
+        echo json_encode(['success' => false, 'error' => 'Invalid phone number']);
+        exit;
+    }
+    if ($amount < 1 || $amount > 150000) {
+        echo json_encode(['success' => false, 'error' => 'Amount must be between 1 and 150,000']);
+        exit;
+    }
+    
+    $stmt = $db->prepare("SELECT id FROM radius_subscriptions WHERE id = ?");
+    $stmt->execute([$subscriptionId]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription']);
+        exit;
+    }
+    
+    try {
+        require_once __DIR__ . '/../src/Mpesa.php';
+        $mpesa = new \App\Mpesa();
+        $result = $mpesa->stkPush($phone, $amount, 'radius_' . $subscriptionId, 'Internet subscription');
+        echo json_encode(['success' => true, 'result' => $result]);
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($action === 'get_wifi_config') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $subscriptionId = (int)($_GET['subscription_id'] ?? 0);
+    
+    $stmt = $db->prepare("SELECT s.*, c.phone as customer_phone FROM radius_subscriptions s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?");
+    $stmt->execute([$subscriptionId]);
+    $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$sub) {
+        echo json_encode(['success' => false, 'error' => 'Subscription not found']);
+        exit;
+    }
+    
+    $deviceId = null;
+    $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
+    if ($phone && strlen($phone) >= 9) {
+        $phoneSearch = '%' . substr($phone, -9) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$phoneSearch, $phoneSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId && $sub['mac_address']) {
+        $macSearch = '%' . strtoupper(str_replace([':', '-'], '', $sub['mac_address'])) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$macSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'error' => 'No TR-069 device found for this subscriber. Device may not be registered in GenieACS.']);
+        exit;
+    }
+    
+    $genieUrl = getenv('GENIEACS_URL') ?: 'http://localhost:7557';
+    $encoded = rawurlencode($deviceId);
+    
+    $wifiParams = [
+        '2.4' => [
+            'ssid' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
+            'password' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey'
+        ],
+        '5' => [
+            'ssid' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID',
+            'password' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.PreSharedKey'
+        ]
+    ];
+    
+    $result = ['success' => true, 'device_id' => $deviceId];
+    
+    foreach (['2.4', '5'] as $band) {
+        $ssidPath = $wifiParams[$band]['ssid'];
+        $ch = curl_init("$genieUrl/devices/$encoded/tasks?timeout=5000");
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode(['name' => 'getParameterValues', 'parameterNames' => [$ssidPath]]),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10
+        ]);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        
+        if ($resp) {
+            $ch = curl_init("$genieUrl/devices/$encoded?projection=$ssidPath");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $deviceData = curl_exec($ch);
+            curl_close($ch);
+            
+            if ($deviceData) {
+                $data = json_decode($deviceData, true);
+                $ssidValue = $data[$ssidPath]['_value'] ?? null;
+                if ($ssidValue) {
+                    $result['wifi_' . str_replace('.', '', $band)] = [
+                        'ssid' => $ssidValue,
+                        'password' => ''
+                    ];
+                }
+            }
+        }
+    }
+    
+    if (empty($result['wifi_24']) && empty($result['wifi_5'])) {
+        $result['wifi_24'] = ['ssid' => '', 'password' => ''];
+    }
+    
+    echo json_encode($result);
+    exit;
+}
+
+if ($action === 'set_wifi_config') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $subscriptionId = (int)($input['subscription_id'] ?? 0);
+    $band = $input['band'] ?? '2.4';
+    $ssid = trim($input['ssid'] ?? '');
+    $password = $input['password'] ?? '';
+    
+    if (!$ssid || strlen($ssid) > 32) {
+        echo json_encode(['success' => false, 'error' => 'WiFi name is required (max 32 characters)']);
+        exit;
+    }
+    if ($password && (strlen($password) < 8 || strlen($password) > 63)) {
+        echo json_encode(['success' => false, 'error' => 'Password must be 8-63 characters']);
+        exit;
+    }
+    
+    $stmt = $db->prepare("SELECT s.*, c.phone as customer_phone FROM radius_subscriptions s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?");
+    $stmt->execute([$subscriptionId]);
+    $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$sub) {
+        echo json_encode(['success' => false, 'error' => 'Subscription not found']);
+        exit;
+    }
+    
+    $deviceId = null;
+    $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
+    if ($phone && strlen($phone) >= 9) {
+        $phoneSearch = '%' . substr($phone, -9) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$phoneSearch, $phoneSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId && $sub['mac_address']) {
+        $macSearch = '%' . strtoupper(str_replace([':', '-'], '', $sub['mac_address'])) . '%';
+        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+        $stmt->execute([$macSearch]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['_id'];
+        }
+    }
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'error' => 'No TR-069 device found']);
+        exit;
+    }
+    
+    $genieUrl = getenv('GENIEACS_URL') ?: 'http://localhost:7557';
+    $encoded = rawurlencode($deviceId);
+    
+    $wlanIndex = $band === '5' ? '5' : '1';
+    $ssidPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.$wlanIndex.SSID";
+    $pskPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.$wlanIndex.PreSharedKey.1.PreSharedKey";
+    
+    $params = [[$ssidPath, $ssid, 'xsd:string']];
+    if ($password) {
+        $params[] = [$pskPath, $password, 'xsd:string'];
+    }
+    
+    $ch = curl_init("$genieUrl/devices/$encoded/tasks?timeout=30000");
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode(['name' => 'setParameterValues', 'parameterValues' => $params]),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 35
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode >= 200 && $httpCode < 300) {
+        echo json_encode(['success' => true, 'message' => "WiFi settings applied. Device will update shortly."]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to apply settings. Device may be offline.']);
+    }
     exit;
 }
 
@@ -206,6 +454,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $radiusBilling->deleteNAS((int)$_POST['id']);
             $message = $result['success'] ? 'NAS device deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+        
+        case 'create_location':
+            $result = $radiusBilling->createLocation($_POST);
+            $message = $result['success'] ? 'Zone created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'update_location':
+            $result = $radiusBilling->updateLocation((int)$_POST['id'], $_POST);
+            $message = $result['success'] ? 'Zone updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'delete_location':
+            $result = $radiusBilling->deleteLocation((int)$_POST['id']);
+            $message = $result['success'] ? 'Zone deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'create_sub_location':
+            $result = $radiusBilling->createSubLocation($_POST);
+            $message = $result['success'] ? 'Sub-zone created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'update_sub_location':
+            $result = $radiusBilling->updateSubLocation((int)$_POST['id'], $_POST);
+            $message = $result['success'] ? 'Sub-zone updated successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'delete_sub_location':
+            $result = $radiusBilling->deleteSubLocation((int)$_POST['id']);
+            $message = $result['success'] ? 'Sub-zone deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'send_bulk_sms':
+            $filters = [
+                'status' => $_POST['filter_status'] ?? '',
+                'location_id' => $_POST['filter_location'] ?? '',
+                'package_id' => $_POST['filter_package'] ?? ''
+            ];
+            $subscribers = $radiusBilling->getSubscribersByFilter($filters);
+            $sms = new \App\SMS();
+            $sendVia = $_POST['send_via'] ?? 'sms';
+            $messageTemplate = $_POST['message'] ?? '';
+            
+            $sentCount = 0;
+            $failCount = 0;
+            
+            foreach ($subscribers as $sub) {
+                $phone = $sub['customer_phone'] ?? '';
+                if (empty($phone)) continue;
+                
+                $msg = str_replace(
+                    ['{customer_name}', '{username}', '{package_name}', '{expiry_date}', '{balance}'],
+                    [$sub['customer_name'] ?? '', $sub['username'] ?? '', $sub['package_name'] ?? '', $sub['expiry_date'] ?? '', '0'],
+                    $messageTemplate
+                );
+                
+                try {
+                    if ($sendVia === 'sms' || $sendVia === 'both') {
+                        $sms->send($phone, $msg);
+                    }
+                    if ($sendVia === 'whatsapp' || $sendVia === 'both') {
+                        $wa = new \App\WhatsApp();
+                        $wa->sendMessage($phone, $msg);
+                    }
+                    $sentCount++;
+                } catch (\Exception $e) {
+                    $failCount++;
+                }
+            }
+            
+            $message = "Bulk message sent to $sentCount subscribers" . ($failCount > 0 ? " ($failCount failed)" : '');
+            $messageType = $failCount > 0 ? 'warning' : 'success';
             break;
             
         case 'create_package':
@@ -597,6 +923,127 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
             
+        case 'change_expiry':
+            $subId = (int)$_POST['id'];
+            $newExpiry = $_POST['new_expiry_date'] ?? '';
+            $reason = $_POST['expiry_change_reason'] ?? '';
+            
+            if ($newExpiry) {
+                try {
+                    // Get current subscription to check if extending from expired
+                    $stmt = $db->prepare("SELECT status, expiry_date FROM radius_subscriptions WHERE id = ?");
+                    $stmt->execute([$subId]);
+                    $oldSub = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    $wasExpired = ($oldSub && ($oldSub['status'] === 'expired' || strtotime($oldSub['expiry_date']) < time()));
+                    $isExtending = strtotime($newExpiry) > time();
+                    
+                    // Update expiry and reactivate if extending from expired
+                    if ($wasExpired && $isExtending) {
+                        $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, status = 'active', updated_at = NOW() WHERE id = ?");
+                    } else {
+                        $stmt = $db->prepare("UPDATE radius_subscriptions SET expiry_date = ?, updated_at = NOW() WHERE id = ?");
+                    }
+                    $stmt->execute([$newExpiry, $subId]);
+                    
+                    if ($reason) {
+                        $stmt = $db->prepare("INSERT INTO radius_subscription_notes (subscription_id, note, created_by, created_at) VALUES (?, ?, ?, NOW())");
+                        $stmt->execute([$subId, "Expiry changed to " . date('M j, Y', strtotime($newExpiry)) . ". Reason: " . $reason, $_SESSION['user_id']]);
+                    }
+                    
+                    $msg = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
+                    
+                    // Send CoA to update RADIUS session (disconnect expired or update active)
+                    $coaResult = $radiusBilling->sendCoAForSubscription($subId);
+                    if ($coaResult && !empty($coaResult['success'])) {
+                        $msg .= $wasExpired ? ' (session disconnected via CoA)' : ' (session updated via CoA)';
+                    }
+                    
+                    $message = $msg;
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = 'Error updating expiry: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+            } else {
+                $message = 'Please select a valid expiry date';
+                $messageType = 'warning';
+            }
+            break;
+            
+        case 'change_package':
+            $subId = (int)$_POST['id'];
+            $newPackageId = (int)$_POST['new_package_id'];
+            $prorateAmount = (float)($_POST['prorate_amount'] ?? 0);
+            $applyProrate = isset($_POST['apply_prorate']);
+            
+            if (!$newPackageId) {
+                $message = 'Please select a new package';
+                $messageType = 'warning';
+                break;
+            }
+            
+            try {
+                $stmt = $db->prepare("SELECT * FROM radius_subscriptions WHERE id = ?");
+                $stmt->execute([$subId]);
+                $oldSub = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                $stmt = $db->prepare("SELECT * FROM radius_packages WHERE id = ?");
+                $stmt->execute([$newPackageId]);
+                $newPkg = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if (!$oldSub || !$newPkg) {
+                    throw new Exception('Subscription or package not found');
+                }
+                
+                $db->beginTransaction();
+                
+                $newExpiry = date('Y-m-d', strtotime('+' . $newPkg['validity_days'] . ' days'));
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET package_id = ?, expiry_date = ?, updated_at = NOW() WHERE id = ?");
+                $stmt->execute([$newPackageId, $newExpiry, $subId]);
+                
+                if ($applyProrate && $prorateAmount != 0) {
+                    if ($prorateAmount < 0) {
+                        $creditAmount = abs($prorateAmount);
+                        $stmt = $db->prepare("UPDATE radius_subscriptions SET credit_balance = credit_balance + ? WHERE id = ?");
+                        $stmt->execute([$creditAmount, $subId]);
+                        
+                        $stmt = $db->prepare("INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, created_at) VALUES (?, 'credit', ?, ?, NOW())");
+                        $stmt->execute([$subId, $creditAmount, 'Package change credit (prorated)']);
+                    } else {
+                        $stmt = $db->prepare("INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, created_at) VALUES (?, 'invoice', ?, ?, NOW())");
+                        $stmt->execute([$subId, $prorateAmount, 'Package upgrade balance due']);
+                    }
+                }
+                
+                $db->commit();
+                
+                $msg = 'Package changed to ' . $newPkg['name'];
+                
+                // Always send CoA to update speed limits on MikroTik
+                $coaResult = $radiusBilling->sendCoAForSubscription($subId);
+                if ($coaResult && !empty($coaResult['success'])) {
+                    $msg .= ' (speed updated via CoA)';
+                } elseif ($coaResult && !empty($coaResult['error'])) {
+                    $msg .= ' (CoA failed: ' . $coaResult['error'] . ')';
+                }
+                
+                if ($applyProrate && $prorateAmount != 0) {
+                    if ($prorateAmount < 0) {
+                        $msg .= '. KES ' . number_format(abs($prorateAmount)) . ' credited to wallet.';
+                    } else {
+                        $msg .= '. KES ' . number_format($prorateAmount) . ' due from customer.';
+                    }
+                }
+                
+                $message = $msg;
+                $messageType = 'success';
+            } catch (Exception $e) {
+                if ($db->inTransaction()) $db->rollBack();
+                $message = 'Error changing package: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'generate_vouchers':
             $result = $radiusBilling->generateVouchers((int)$_POST['package_id'], (int)$_POST['count'], $_SESSION['user_id']);
             $message = $result['success'] ? "Generated {$result['count']} vouchers (Batch: {$result['batch_id']})" : 'Error: ' . ($result['error'] ?? 'Unknown error');
@@ -651,7 +1098,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (in_array($key, ['action', 'category'])) continue;
                 
                 // Handle checkboxes (unchecked checkboxes don't appear in POST)
-                if (strpos($key, 'enabled') !== false || $key === 'auto_suspend_expired' || $key === 'postpaid_enabled') {
+                if (strpos($key, 'enabled') !== false || $key === 'auto_suspend_expired' || $key === 'postpaid_enabled' || $key === 'use_expired_pool' || $key === 'allow_unknown_expired_pool') {
                     $settingsToSave[$key] = $value === 'true' ? 'true' : 'false';
                 } else {
                     $settingsToSave[$key] = $value;
@@ -659,12 +1106,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             // Handle unchecked checkboxes explicitly
-            $checkboxFields = ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled', 'postpaid_enabled', 'auto_suspend_expired'];
+            $checkboxFields = ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled', 'postpaid_enabled', 'auto_suspend_expired', 'use_expired_pool'];
             foreach ($checkboxFields as $field) {
                 if (!isset($_POST[$field]) && $category === 'notifications' && in_array($field, ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled'])) {
                     $settingsToSave[$field] = 'false';
                 }
                 if (!isset($_POST[$field]) && $category === 'billing' && in_array($field, ['postpaid_enabled', 'auto_suspend_expired'])) {
+                    $settingsToSave[$field] = 'false';
+                }
+                if (!isset($_POST[$field]) && $category === 'radius' && in_array($field, ['use_expired_pool', 'allow_unknown_expired_pool'])) {
                     $settingsToSave[$field] = 'false';
                 }
             }
@@ -1381,7 +1831,7 @@ try {
                                         <strong class="small"><?= htmlspecialchars($nas['name']) ?></strong>
                                         <br><code class="small"><?= htmlspecialchars($nas['ip_address']) ?></code>
                                     </div>
-                                    <span class="badge <?= $nas['enabled'] ? 'bg-success' : 'bg-secondary' ?>"><?= $nas['enabled'] ? 'Active' : 'Off' ?></span>
+                                    <span class="badge <?= ($nas['enabled'] ?? true) ? 'bg-success' : 'bg-secondary' ?>"><?= ($nas['enabled'] ?? true) ? 'Active' : 'Off' ?></span>
                                 </li>
                                 <?php endforeach; ?>
                             </ul>
@@ -1531,6 +1981,8 @@ try {
             
             $packages = $radiusBilling->getPackages();
             $nasDevices = $radiusBilling->getNASDevices();
+            $ispLocations = $radiusBilling->getLocations();
+            $ispSubLocations = $radiusBilling->getAllSubLocations();
             $onlineSubscribers = $radiusBilling->getOnlineSubscribers();
             $onlineFilter = $_GET['online'] ?? '';
             
@@ -1696,23 +2148,31 @@ try {
                                 <?php 
                                 $isOnline = isset($onlineSubscribers[$sub['id']]);
                                 $onlineInfo = $isOnline ? $onlineSubscribers[$sub['id']] : null;
-                                $statusClass = match($sub['status']) {
+                                // Check if actually expired based on date (regardless of DB status)
+                                $isExpiringSoon = $sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days') && strtotime($sub['expiry_date']) > time();
+                                $isExpired = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
+                                $daysLeft = $sub['expiry_date'] ? ceil((strtotime($sub['expiry_date']) - time()) / 86400) : null;
+                                
+                                // Determine display status - override with Expired if date has passed
+                                $displayStatus = $sub['status'];
+                                if ($isExpired && $sub['status'] === 'active') {
+                                    $displayStatus = 'expired';
+                                }
+                                
+                                $statusClass = match($displayStatus) {
                                     'active' => 'success',
                                     'suspended' => 'warning',
                                     'expired' => 'danger',
                                     'inactive' => 'secondary',
                                     default => 'secondary'
                                 };
-                                $statusLabel = match($sub['status']) {
+                                $statusLabel = match($displayStatus) {
                                     'active' => 'Active',
                                     'suspended' => 'Suspended',
                                     'expired' => 'Expired',
                                     'inactive' => 'Inactive',
-                                    default => ucfirst($sub['status'])
+                                    default => ucfirst($displayStatus)
                                 };
-                                $isExpiringSoon = $sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days') && strtotime($sub['expiry_date']) > time();
-                                $isExpired = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
-                                $daysLeft = $sub['expiry_date'] ? ceil((strtotime($sub['expiry_date']) - time()) / 86400) : null;
                                 $needsActivation = ($sub['status'] === 'inactive');
                                 ?>
                                 <tr class="sub-row" data-sub-id="<?= $sub['id'] ?>">
@@ -2016,6 +2476,26 @@ try {
                                         </select>
                                     </div>
                                 </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Zone <span class="text-danger">*</span></label>
+                                        <select name="location_id" id="sub_location" class="form-select" required onchange="filterSubLocations(this, 'sub_sub_location')">
+                                            <option value="">-- Select Zone --</option>
+                                            <?php foreach ($ispLocations as $loc): ?>
+                                            <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Sub-Zone</label>
+                                        <select name="sub_location_id" id="sub_sub_location" class="form-select">
+                                            <option value="">-- Select Sub-Zone --</option>
+                                            <?php foreach ($ispSubLocations as $sub): ?>
+                                            <option value="<?= $sub['id'] ?>" data-location="<?= $sub['location_id'] ?>"><?= htmlspecialchars($sub['location_name']) ?> - <?= htmlspecialchars($sub['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div class="mb-3">
                                     <label class="form-label">Notes</label>
                                     <textarea name="notes" class="form-control" rows="2"></textarea>
@@ -2052,10 +2532,11 @@ try {
                 $stmt->execute([$subId]);
                 $billingHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                // Get session history
-                $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? ORDER BY session_start DESC LIMIT 50");
+                // Get session history (limit to 3 for display, but get more for stats)
+                $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? ORDER BY session_start DESC LIMIT 20");
                 $stmt->execute([$subId]);
-                $sessionHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $allSessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $sessionHistory = array_slice($allSessions, 0, 3); // Only show 3 in table
                 
                 // Get active session
                 $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? AND session_end IS NULL ORDER BY session_start DESC LIMIT 1");
@@ -2076,62 +2557,175 @@ try {
                 }
                 
                 $isOnline = !empty($activeSession);
-                $statusClass = match($subscriber['status']) {
+                
+                // Calculate uptime or offline duration
+                $uptimeStr = '';
+                $offlineStr = '';
+                if ($isOnline && $activeSession) {
+                    $uptime = time() - strtotime($activeSession['session_start']);
+                    $days = floor($uptime / 86400);
+                    $hours = floor(($uptime % 86400) / 3600);
+                    $mins = floor(($uptime % 3600) / 60);
+                    if ($days > 0) {
+                        $uptimeStr = $days . 'd ' . $hours . 'h ' . $mins . 'm';
+                    } elseif ($hours > 0) {
+                        $uptimeStr = $hours . 'h ' . $mins . 'm';
+                    } else {
+                        $uptimeStr = $mins . 'm';
+                    }
+                } else {
+                    // Find last session end time
+                    $lastSession = null;
+                    foreach ($allSessions as $s) {
+                        if (!empty($s['session_end'])) {
+                            $lastSession = $s;
+                            break;
+                        }
+                    }
+                    if ($lastSession) {
+                        $offline = time() - strtotime($lastSession['session_end']);
+                        $days = floor($offline / 86400);
+                        $hours = floor(($offline % 86400) / 3600);
+                        $mins = floor(($offline % 3600) / 60);
+                        if ($days > 0) {
+                            $offlineStr = $days . 'd ' . $hours . 'h ago';
+                        } elseif ($hours > 0) {
+                            $offlineStr = $hours . 'h ' . $mins . 'm ago';
+                        } else {
+                            $offlineStr = $mins . 'm ago';
+                        }
+                    } else {
+                        $offlineStr = 'Never connected';
+                    }
+                }
+                
+                // Check if actually expired based on date
+                $isSubExpired = $subscriber['expiry_date'] && strtotime($subscriber['expiry_date']) < time();
+                $displayStatus = $subscriber['status'];
+                if ($isSubExpired && $subscriber['status'] === 'active') {
+                    $displayStatus = 'expired';
+                }
+                
+                $statusClass = match($displayStatus) {
                     'active' => 'success',
                     'suspended' => 'warning',
                     'expired' => 'danger',
                     default => 'secondary'
                 };
+                $statusLabel = ucfirst($displayStatus);
             ?>
             
             <?php
-            $totalSessions = count($sessionHistory);
-            $totalDownload = array_sum(array_column($sessionHistory, 'input_octets')) / 1073741824;
-            $totalUpload = array_sum(array_column($sessionHistory, 'output_octets')) / 1073741824;
-            $lastSession = !empty($sessionHistory) ? $sessionHistory[0] : null;
+            $totalSessions = count($allSessions);
+            $totalDownload = array_sum(array_column($allSessions, 'input_octets')) / 1073741824;
+            $totalUpload = array_sum(array_column($allSessions, 'output_octets')) / 1073741824;
+            $lastSession = !empty($allSessions) ? $allSessions[0] : null;
             $avgSessionDuration = $totalSessions > 0 ? array_sum(array_map(fn($s) => 
                 (($s['session_end'] ? strtotime($s['session_end']) : time()) - strtotime($s['session_start'])), 
-                $sessionHistory)) / $totalSessions / 3600 : 0;
+                $allSessions)) / $totalSessions / 3600 : 0;
             ?>
             
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <a href="?page=isp&view=subscriptions" class="btn btn-outline-secondary btn-sm mb-2">
-                        <i class="bi bi-arrow-left me-1"></i> Back to Subscribers
-                    </a>
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="position-relative">
-                            <?php if ($isOnline): ?>
-                            <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
-                                <i class="bi bi-wifi text-white fs-4"></i>
-                            </div>
-                            <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 16px; height: 16px;"></span>
-                            <?php else: ?>
-                            <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
-                                <i class="bi bi-wifi-off text-secondary fs-4"></i>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                        <div>
-                            <h4 class="page-title mb-0">
-                                <?= htmlspecialchars($subscriber['username']) ?>
-                                <button class="btn btn-link btn-sm p-0 text-muted" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
-                            </h4>
-                            <div class="d-flex gap-2 mt-1">
-                                <?php if ($isOnline): ?>
-                                <span class="badge bg-success"><i class="bi bi-wifi me-1"></i>Online</span>
-                                <?php else: ?>
-                                <span class="badge bg-secondary"><i class="bi bi-wifi-off me-1"></i>Offline</span>
+            <!-- Premium Subscriber Header Card -->
+            <div class="card border-0 shadow-lg mb-4 overflow-hidden">
+                <div class="card-body p-0">
+                    <div class="row g-0">
+                        <!-- Left: Profile Section with Gradient -->
+                        <div class="col-lg-4" style="background: linear-gradient(135deg, <?= $isOnline ? '#198754' : '#6c757d' ?> 0%, <?= $isOnline ? '#0d6efd' : '#495057' ?> 100%);">
+                            <div class="p-4 text-white text-center">
+                                <a href="?page=isp&view=subscriptions" class="btn btn-sm btn-light btn-outline-light mb-3 opacity-75">
+                                    <i class="bi bi-arrow-left me-1"></i> Back
+                                </a>
+                                <div class="position-relative d-inline-block mb-3">
+                                    <?php if ($isOnline): ?>
+                                    <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px;">
+                                        <i class="bi bi-wifi text-white" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    <span class="position-absolute bottom-0 end-0 bg-success border border-3 border-white rounded-circle" style="width: 24px; height: 24px;"></span>
+                                    <?php else: ?>
+                                    <div class="rounded-circle bg-white bg-opacity-10 d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px;">
+                                        <i class="bi bi-wifi-off text-white opacity-50" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <h4 class="fw-bold mb-1">
+                                    <?= htmlspecialchars($subscriber['username']) ?>
+                                    <button class="btn btn-link btn-sm p-0 text-white opacity-75" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                </h4>
+                                <?php if ($customer): ?>
+                                <p class="mb-2 opacity-75"><?= htmlspecialchars($customer['name']) ?></p>
                                 <?php endif; ?>
-                                <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($subscriber['status']) ?></span>
-                                <span class="badge bg-light text-dark border"><?= strtoupper($subscriber['access_type']) ?></span>
+                                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                    <?php if ($isOnline): ?>
+                                    <span class="badge bg-white text-success"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online <?= $uptimeStr ? "($uptimeStr)" : '' ?></span>
+                                    <?php else: ?>
+                                    <span class="badge bg-white bg-opacity-25 text-white"><i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline <?= $offlineStr ? "($offlineStr)" : '' ?></span>
+                                    <?php endif; ?>
+                                    <span class="badge bg-<?= $statusClass === 'success' ? 'white text-success' : ($statusClass === 'danger' ? 'danger' : 'warning text-dark') ?>"><?= $statusLabel ?></span>
+                                    <span class="badge bg-white bg-opacity-25"><?= strtoupper($subscriber['access_type']) ?></span>
+                                </div>
                                 <?php if ($subscriber['mac_address']): ?>
-                                <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span>
+                                <div class="mt-2"><span class="badge bg-white bg-opacity-10"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span></div>
                                 <?php endif; ?>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        <!-- Right: Quick Stats -->
+                        <div class="col-lg-8">
+                            <div class="p-4">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 bg-primary bg-opacity-10">
+                                            <div class="fs-4 fw-bold text-primary"><?= $package['name'] ?? 'N/A' ?></div>
+                                            <small class="text-muted">Package</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 bg-success bg-opacity-10">
+                                            <div class="fs-4 fw-bold text-success"><?= number_format($totalDownload, 1) ?> GB</div>
+                                            <small class="text-muted">Downloaded</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 bg-info bg-opacity-10">
+                                            <div class="fs-4 fw-bold text-info"><?= $totalSessions ?></div>
+                                            <small class="text-muted">Sessions</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-3 rounded-3 <?= $isSubExpired ? 'bg-danger bg-opacity-10' : 'bg-warning bg-opacity-10' ?>">
+                                            <?php 
+                                            $daysRemaining = $subscriber['expiry_date'] ? ceil((strtotime($subscriber['expiry_date']) - time()) / 86400) : null;
+                                            ?>
+                                            <div class="fs-4 fw-bold <?= $isSubExpired ? 'text-danger' : 'text-warning' ?>">
+                                                <?= $daysRemaining !== null ? ($daysRemaining < 0 ? 'Expired' : $daysRemaining . 'd') : '∞' ?>
+                                            </div>
+                                            <small class="text-muted"><?= $isSubExpired ? 'Days Ago' : 'Days Left' ?></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Wallet Card at Top -->
+                                <div class="d-flex align-items-center gap-3 mb-3 p-3 rounded-3 bg-gradient" style="background: linear-gradient(90deg, rgba(25,135,84,0.15) 0%, rgba(13,110,253,0.15) 100%); border: 1px solid rgba(25,135,84,0.2);">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                            <i class="bi bi-wallet2 fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-muted small">Wallet Balance</div>
+                                            <div class="fw-bold fs-5 text-success">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></div>
+                                        </div>
+                                    </div>
+                                    <div class="vr mx-2"></div>
+                                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addCreditModal">
+                                        <i class="bi bi-plus-lg me-1"></i> Top Up
+                                    </button>
+                                    <?php if ($customer && !empty($customer['phone'])): ?>
+                                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#stkPushModal">
+                                        <i class="bi bi-phone me-1"></i> M-Pesa STK
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <!-- Action Buttons -->
+                                <div class="d-flex flex-wrap gap-2">
                 <div class="btn-group">
                     <?php if ($subscriber['status'] === 'active'): ?>
                     <form method="post" class="d-inline">
@@ -2154,6 +2748,9 @@ try {
                     <button type="button" class="btn btn-info" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
                         <i class="bi bi-lightning me-1"></i> Ping
                     </button>
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
+                        <i class="bi bi-wifi me-1"></i> WiFi Config
+                    </button>
                     <div class="btn-group">
                         <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
                             <i class="bi bi-three-dots-vertical"></i>
@@ -2169,7 +2766,6 @@ try {
                             <li><a class="dropdown-item" href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank"><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <?php endif; ?>
-                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addCreditModal"><i class="bi bi-plus-circle me-2"></i>Add Credit</a></li>
                             <li><a class="dropdown-item text-danger" href="#" onclick="if(confirm('Reset data usage to 0?')) document.getElementById('resetDataForm').submit()"><i class="bi bi-arrow-counterclockwise me-2"></i>Reset Data Usage</a></li>
                         </ul>
                     </div>
@@ -2178,290 +2774,286 @@ try {
                         <input type="hidden" name="id" value="<?= $subId ?>">
                         <input type="hidden" name="return_to" value="subscriber">
                     </form>
-                </div>
-            </div>
-            
-            <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-primary-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-primary"><?= $totalSessions ?></div>
-                            <div class="small text-muted">Total Sessions</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-success-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-success"><?= number_format($totalDownload, 2) ?> GB</div>
-                            <div class="small text-muted">Total Download</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-info-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-info"><?= number_format($totalUpload, 2) ?> GB</div>
-                            <div class="small text-muted">Total Upload</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-warning-subtle">
-                        <div class="card-body py-3 text-center">
-                            <div class="fs-4 fw-bold text-warning"><?= number_format($avgSessionDuration, 1) ?>h</div>
-                            <div class="small text-muted">Avg Session</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div class="row g-4">
-                <!-- Left Column -->
-                <div class="col-lg-4">
-                    <!-- Customer Info Card -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-person me-2"></i>Customer Information</h6>
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCustomerModal">
-                                <i class="bi bi-pencil"></i>
+            <!-- Full Width Tabs Layout -->
+            <div class="card border-0 shadow-lg">
+                <div class="card-header bg-white border-bottom p-0">
+                    <ul class="nav nav-pills nav-fill" id="subscriberTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active rounded-0 py-3 border-end" id="customer-tab" data-bs-toggle="tab" data-bs-target="#customerTab" type="button">
+                                <i class="bi bi-person-circle me-2"></i>Customer
                             </button>
-                        </div>
-                        <div class="card-body">
-                            <?php if ($customer): ?>
-                            <table class="table table-sm mb-0">
-                                <tr><td class="text-muted" style="width:40%">Name</td><td><strong><?= htmlspecialchars($customer['name']) ?></strong></td></tr>
-                                <tr><td class="text-muted">Phone</td><td><code><?= htmlspecialchars($customer['phone']) ?></code></td></tr>
-                                <tr><td class="text-muted">Email</td><td><?= htmlspecialchars($customer['email'] ?? '-') ?></td></tr>
-                                <tr><td class="text-muted">Address</td><td><?= htmlspecialchars($customer['address'] ?? '-') ?></td></tr>
-                                <tr><td class="text-muted">Account #</td><td><code><?= htmlspecialchars($customer['phone']) ?></code></td></tr>
-                            </table>
-                            <?php else: ?>
-                            <p class="text-muted mb-0">No customer linked</p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <!-- Subscription Info Card -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-box me-2"></i>Subscription Details</h6>
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editSubscriptionModal">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                        </div>
-                        <div class="card-body">
-                            <table class="table table-sm mb-0">
-                                <tr><td class="text-muted" style="width:40%">Username</td><td>
-                                    <code><?= htmlspecialchars($subscriber['username']) ?></code>
-                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
-                                </td></tr>
-                                <tr><td class="text-muted">Password</td><td>
-                                    <code id="pwdDisplay">••••••••</code>
-                                    <button class="btn btn-sm btn-link p-0 ms-1" id="pwdToggle" onclick="togglePassword()"><i class="bi bi-eye"></i></button>
-                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['password'] ?? '') ?>')" title="Copy password"><i class="bi bi-clipboard"></i></button>
-                                    <script>
-                                        function togglePassword() {
-                                            const display = document.getElementById('pwdDisplay');
-                                            const toggle = document.getElementById('pwdToggle').querySelector('i');
-                                            if (display.textContent === '••••••••') {
-                                                display.textContent = '<?= htmlspecialchars($subscriber['password'] ?? '') ?>';
-                                                toggle.className = 'bi bi-eye-slash';
-                                            } else {
-                                                display.textContent = '••••••••';
-                                                toggle.className = 'bi bi-eye';
-                                            }
-                                        }
-                                    </script>
-                                </td></tr>
-                                <tr><td class="text-muted">Package</td><td><span class="badge bg-primary-subtle text-primary border border-primary-subtle"><?= htmlspecialchars($package['name'] ?? '-') ?></span></td></tr>
-                                <tr><td class="text-muted">Speed</td><td>
-                                    <i class="bi bi-arrow-down text-success"></i> <?= $package['download_speed'] ?? '-' ?>
-                                    <i class="bi bi-arrow-up text-danger ms-2"></i> <?= $package['upload_speed'] ?? '-' ?>
-                                </td></tr>
-                                <tr><td class="text-muted">Price</td><td><strong>KES <?= number_format($package['price'] ?? 0) ?></strong></td></tr>
-                                <tr><td class="text-muted">Access Type</td><td><span class="badge bg-secondary"><?= strtoupper($subscriber['access_type']) ?></span></td></tr>
-                                <tr><td class="text-muted">Static IP</td><td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td></tr>
-                                <tr><td class="text-muted">MAC Address</td><td>
-                                    <?php if ($subscriber['mac_address']): ?>
-                                    <code><?= htmlspecialchars($subscriber['mac_address']) ?></code>
-                                    <span class="badge bg-success ms-1" title="User locked to this MAC"><i class="bi bi-lock-fill"></i> Bound</span>
-                                    <form method="post" class="d-inline ms-2">
-                                        <input type="hidden" name="action" value="clear_mac">
-                                        <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
-                                        <input type="hidden" name="return_to" value="subscriber">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Clear MAC binding" onclick="return confirm('Clear MAC binding? User will be able to connect from any device.')">
-                                            <i class="bi bi-unlock"></i>
-                                        </button>
-                                    </form>
-                                    <?php else: ?>
-                                    <span class="text-muted">-</span>
-                                    <span class="badge bg-secondary ms-1"><i class="bi bi-unlock"></i> Auto-capture pending</span>
-                                    <?php endif; ?>
-                                </td></tr>
-                                <tr><td class="text-muted">Start Date</td><td><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></td></tr>
-                                <tr>
-                                    <td class="text-muted">Expiry Date</td>
-                                    <td>
-                                        <?php if ($subscriber['expiry_date']): ?>
-                                        <?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?>
-                                        <?php 
-                                        $daysLeft = (strtotime($subscriber['expiry_date']) - time()) / 86400;
-                                        if ($daysLeft < 0): ?>
-                                        <span class="badge bg-danger">Expired</span>
-                                        <?php elseif ($daysLeft < 7): ?>
-                                        <span class="badge bg-warning"><?= ceil($daysLeft) ?> days left</span>
-                                        <?php endif; ?>
-                                        <?php else: ?>
-                                        -
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                                <tr><td class="text-muted">Auto Renew</td><td><?= $subscriber['auto_renew'] ? '<span class="text-success">Yes</span>' : '<span class="text-muted">No</span>' ?></td></tr>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Credit/Balance Card -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="bi bi-wallet2 me-2"></i>Account Balance</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <h4 class="text-success mb-0">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></h4>
-                                    <small class="text-muted">Credit Balance</small>
-                                </div>
-                                <div class="col-6">
-                                    <h4 class="text-info mb-0">KES <?= number_format($subscriber['credit_limit'] ?? 0) ?></h4>
-                                    <small class="text-muted">Credit Limit</small>
-                                </div>
-                            </div>
-                            <hr>
-                            <button class="btn btn-outline-success btn-sm w-100" data-bs-toggle="modal" data-bs-target="#addCreditModal">
-                                <i class="bi bi-plus-circle me-1"></i> Add Credit
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Data Usage Card -->
-                    <?php if ($package && $package['data_quota_mb']): ?>
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Data Usage</h6>
-                        </div>
-                        <div class="card-body">
-                            <?php 
-                            $usagePercent = min(100, ($subscriber['data_used_mb'] / $package['data_quota_mb']) * 100);
-                            $barColor = $usagePercent >= 100 ? '#dc3545' : ($usagePercent >= 80 ? '#ffc107' : '#28a745');
-                            ?>
-                            <div class="progress mb-2" style="height: 20px;">
-                                <div class="progress-bar" style="width: <?= $usagePercent ?>%; background: <?= $barColor ?>;">
-                                    <?= round($usagePercent) ?>%
-                                </div>
-                            </div>
-                            <div class="d-flex justify-content-between small text-muted">
-                                <span><?= number_format($subscriber['data_used_mb'] / 1024, 2) ?> GB used</span>
-                                <span><?= number_format($package['data_quota_mb'] / 1024, 2) ?> GB total</span>
-                            </div>
-                            <button class="btn btn-outline-warning btn-sm w-100 mt-3" onclick="if(confirm('Reset data usage to 0?')) { document.getElementById('resetDataForm').submit(); }">
-                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Usage
-                            </button>
-                            <form id="resetDataForm" method="post" style="display:none;">
-                                <input type="hidden" name="action" value="reset_data_usage">
-                                <input type="hidden" name="id" value="<?= $subId ?>">
-                                <input type="hidden" name="return_to" value="subscriber">
-                            </form>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-                    
-                    <?php if ($customer && !empty($customer['phone'])): ?>
-                    <div class="card shadow-sm mb-4 border-success">
-                        <div class="card-header bg-success-subtle">
-                            <h6 class="mb-0"><i class="bi bi-phone me-2"></i>Quick M-Pesa Payment</h6>
-                        </div>
-                        <div class="card-body">
-                            <form id="mpesaQuickPayForm" onsubmit="return submitMpesaQuickPay(event)">
-                                <div class="mb-3">
-                                    <label class="form-label small text-muted">Phone Number</label>
-                                    <input type="text" class="form-control" id="mpesaPayPhone" value="<?= htmlspecialchars(preg_replace('/[^0-9]/', '', $customer['phone'])) ?>" readonly>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label small text-muted">Amount (KES)</label>
-                                    <input type="number" class="form-control" id="mpesaPayAmount" value="<?= (int)($package['price'] ?? 0) ?>" min="1">
-                                </div>
-                                <button type="submit" class="btn btn-success w-100" id="mpesaStkBtn">
-                                    <i class="bi bi-lightning-charge me-1"></i> Send STK Push
-                                </button>
-                            </form>
-                            <div id="mpesaPayResult" class="mt-2 text-center small"></div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-                    
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="bi bi-share me-2"></i>Quick Actions</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-grid gap-2">
-                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyCredentials(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>', '<?= htmlspecialchars($subscriber['password'] ?? '') ?>')">
-                                    <i class="bi bi-key me-1"></i> Copy Credentials
-                                </button>
-                                <?php if ($customer && !empty($customer['phone'])): ?>
-                                <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>?text=<?= urlencode('Hello ' . ($customer['name'] ?? '') . ', your WiFi credentials are:\nUsername: ' . $subscriber['username'] . '\nPassword: ' . ($subscriber['password'] ?? '')) ?>" target="_blank" class="btn btn-outline-success btn-sm">
-                                    <i class="bi bi-whatsapp me-1"></i> Send Credentials via WhatsApp
-                                </a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Right Column -->
-                <div class="col-lg-8">
-                    <!-- Tabs -->
-                    <ul class="nav nav-tabs mb-3">
-                        <li class="nav-item">
-                            <a class="nav-link active" data-bs-toggle="tab" href="#sessionsTab">
-                                <i class="bi bi-broadcast me-1"></i> Sessions
-                                <?php if ($isOnline): ?><span class="badge bg-success">1</span><?php endif; ?>
-                            </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#billingTab">
-                                <i class="bi bi-receipt me-1"></i> Billing
-                            </a>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="subscription-tab" data-bs-toggle="tab" data-bs-target="#subscriptionTab" type="button">
+                                <i class="bi bi-router me-2"></i>Subscription
+                            </button>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#invoicesTab">
-                                <i class="bi bi-file-text me-1"></i> Invoices
-                            </a>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessionsTab" type="button">
+                                <i class="bi bi-broadcast me-2"></i>Sessions
+                                <?php if ($isOnline): ?><span class="badge bg-success ms-1">1</span><?php endif; ?>
+                            </button>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#ticketsTab">
-                                <i class="bi bi-ticket me-1"></i> Tickets
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="billing-tab" data-bs-toggle="tab" data-bs-target="#billingTab" type="button">
+                                <i class="bi bi-receipt me-2"></i>Billing
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoicesTab" type="button">
+                                <i class="bi bi-file-text me-2"></i>Invoices
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="tickets-tab" data-bs-toggle="tab" data-bs-target="#ticketsTab" type="button">
+                                <i class="bi bi-ticket me-2"></i>Tickets
                                 <?php $openTickets = count(array_filter($tickets, fn($t) => in_array($t['status'], ['open', 'in_progress']))); ?>
-                                <?php if ($openTickets): ?><span class="badge bg-danger"><?= $openTickets ?></span><?php endif; ?>
-                            </a>
+                                <?php if ($openTickets): ?><span class="badge bg-danger ms-1"><?= $openTickets ?></span><?php endif; ?>
+                            </button>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#notesTab">
-                                <i class="bi bi-sticky me-1"></i> Notes
-                            </a>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="notes-tab" data-bs-toggle="tab" data-bs-target="#notesTab" type="button">
+                                <i class="bi bi-sticky me-2"></i>Notes
+                            </button>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#speedOverridesTab">
-                                <i class="bi bi-speedometer2 me-1"></i> Speed Schedules
-                            </a>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3" id="speed-tab" data-bs-toggle="tab" data-bs-target="#speedOverridesTab" type="button">
+                                <i class="bi bi-speedometer2 me-2"></i>Speed
+                            </button>
                         </li>
                     </ul>
-                    
+                </div>
+                
+                <div class="card-body p-4">
                     <div class="tab-content">
+                        <!-- Customer Tab -->
+                        <div class="tab-pane fade show active" id="customerTab" role="tabpanel">
+                            <?php if ($customer): ?>
+                            <div class="row g-4">
+                                <div class="col-lg-6">
+                                    <table class="table table-borderless mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-muted" style="width: 140px;">Name</td>
+                                                <td class="fw-medium"><?= htmlspecialchars($customer['name']) ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Phone</td>
+                                                <td>
+                                                    <span class="fw-medium"><?= htmlspecialchars($customer['phone']) ?></span>
+                                                    <a href="tel:<?= htmlspecialchars($customer['phone']) ?>" class="btn btn-sm btn-link p-0 ms-2" title="Call"><i class="bi bi-telephone"></i></a>
+                                                    <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank" class="btn btn-sm btn-link text-success p-0 ms-1" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Email</td>
+                                                <td class="fw-medium"><?= htmlspecialchars($customer['email'] ?? '-') ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Address</td>
+                                                <td class="fw-medium"><?= htmlspecialchars($customer['address'] ?? '-') ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Wallet Balance</td>
+                                                <td><span class="fw-bold text-success">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="border-start ps-4 h-100">
+                                        <h6 class="text-muted mb-3">Quick Actions</h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyCredentials(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>', '<?= htmlspecialchars($subscriber['password'] ?? '') ?>')">
+                                                <i class="bi bi-key me-1"></i> Copy Credentials
+                                            </button>
+                                            <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>?text=<?= urlencode('Hello ' . ($customer['name'] ?? '') . ', your WiFi credentials are:\nUsername: ' . $subscriber['username'] . '\nPassword: ' . ($subscriber['password'] ?? '')) ?>" target="_blank" class="btn btn-sm btn-outline-success">
+                                                <i class="bi bi-whatsapp me-1"></i> Send Credentials
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addCreditModal">
+                                                <i class="bi bi-plus-lg me-1"></i> Top Up
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#stkPushModal">
+                                                <i class="bi bi-phone me-1"></i> M-Pesa
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editCustomerModal">
+                                                <i class="bi bi-pencil me-1"></i> Edit Customer
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php else: ?>
+                            <div class="text-center py-4 text-muted">
+                                <i class="bi bi-person-x fs-1"></i>
+                                <p class="mt-2 mb-0">No customer linked to this subscription</p>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Subscription Tab -->
+                        <div class="tab-pane fade" id="subscriptionTab" role="tabpanel">
+                            <div class="row g-4">
+                                <!-- Left Column: Details -->
+                                <div class="col-lg-6">
+                                    <?php 
+                                    $daysLeft = $subscriber['expiry_date'] ? (strtotime($subscriber['expiry_date']) - time()) / 86400 : null;
+                                    $isExpired = $daysLeft !== null && $daysLeft < 0;
+                                    ?>
+                                    <table class="table table-borderless mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-muted" style="width: 130px;">Username</td>
+                                                <td>
+                                                    <code class="bg-light px-2 py-1 rounded"><?= htmlspecialchars($subscriber['username']) ?></code>
+                                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Password</td>
+                                                <td>
+                                                    <code class="bg-light px-2 py-1 rounded" id="pwdDisplay">********</code>
+                                                    <button class="btn btn-sm btn-link p-0 ms-1" id="pwdToggle" onclick="togglePassword()" title="Show"><i class="bi bi-eye"></i></button>
+                                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['password'] ?? '') ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                                    <script>
+                                                        function togglePassword() {
+                                                            const display = document.getElementById('pwdDisplay');
+                                                            const toggle = document.getElementById('pwdToggle').querySelector('i');
+                                                            if (display.textContent === '********') {
+                                                                display.textContent = '<?= htmlspecialchars($subscriber['password'] ?? '') ?>';
+                                                                toggle.className = 'bi bi-eye-slash';
+                                                            } else {
+                                                                display.textContent = '********';
+                                                                toggle.className = 'bi bi-eye';
+                                                            }
+                                                        }
+                                                    </script>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Package</td>
+                                                <td>
+                                                    <strong><?= htmlspecialchars($package['name'] ?? 'N/A') ?></strong>
+                                                    <span class="text-muted small ms-2">(<?= $package['download_speed'] ?? '-' ?> / <?= $package['upload_speed'] ?? '-' ?>)</span>
+                                                    <button class="btn btn-sm btn-link p-0 ms-2" data-bs-toggle="modal" data-bs-target="#changePackageModal" title="Change Package"><i class="bi bi-arrow-left-right"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Price</td>
+                                                <td><strong class="text-success">KES <?= number_format($package['price'] ?? 0) ?></strong> / <?= ucfirst($package['billing_cycle'] ?? 'month') ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Start Date</td>
+                                                <td><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Expiry Date</td>
+                                                <td>
+                                                    <?php if ($isExpired): ?>
+                                                    <span class="text-danger fw-bold"><?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?></span>
+                                                    <span class="badge bg-danger ms-1">Expired</span>
+                                                    <?php elseif ($daysLeft !== null && $daysLeft < 7): ?>
+                                                    <span class="text-warning fw-bold"><?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?></span>
+                                                    <span class="badge bg-warning text-dark ms-1"><?= ceil($daysLeft) ?> days</span>
+                                                    <?php elseif ($subscriber['expiry_date']): ?>
+                                                    <span class="fw-medium"><?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?></span>
+                                                    <span class="badge bg-success ms-1"><?= ceil($daysLeft) ?> days</span>
+                                                    <?php else: ?>
+                                                    <span class="text-muted">Never expires</span>
+                                                    <?php endif; ?>
+                                                    <button class="btn btn-sm btn-link p-0 ms-2" data-bs-toggle="modal" data-bs-target="#changeExpiryModal" title="Change Expiry"><i class="bi bi-calendar-event"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Auto-Renew</td>
+                                                <td>
+                                                    <?php if ($subscriber['auto_renew']): ?>
+                                                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>ON</span>
+                                                    <?php else: ?>
+                                                    <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i>OFF</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Access Type</td>
+                                                <td><span class="badge bg-primary"><?= strtoupper($subscriber['access_type']) ?></span></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Static IP</td>
+                                                <td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">MAC Address</td>
+                                                <td>
+                                                    <?php if ($subscriber['mac_address']): ?>
+                                                    <code><?= htmlspecialchars($subscriber['mac_address']) ?></code>
+                                                    <span class="badge bg-success ms-1"><i class="bi bi-lock-fill"></i></span>
+                                                    <form method="post" class="d-inline">
+                                                        <input type="hidden" name="action" value="clear_mac">
+                                                        <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
+                                                        <input type="hidden" name="return_to" value="subscriber">
+                                                        <button type="submit" class="btn btn-sm btn-link text-warning p-0 ms-1" onclick="return confirm('Clear MAC binding?')" title="Unbind"><i class="bi bi-unlock"></i></button>
+                                                    </form>
+                                                    <?php else: ?>
+                                                    <span class="text-muted">Not bound</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Right Column: Data Usage & Actions -->
+                                <div class="col-lg-6">
+                                    <div class="border-start ps-4 h-100">
+                                        <?php if ($package && $package['data_quota_mb']): ?>
+                                        <h6 class="text-muted mb-3">Data Usage</h6>
+                                        <?php 
+                                        $usagePercent = min(100, ($subscriber['data_used_mb'] / $package['data_quota_mb']) * 100);
+                                        ?>
+                                        <div class="progress mb-2" style="height: 10px;">
+                                            <div class="progress-bar bg-<?= $usagePercent >= 100 ? 'danger' : ($usagePercent >= 80 ? 'warning' : 'success') ?>" style="width: <?= $usagePercent ?>%;"></div>
+                                        </div>
+                                        <div class="d-flex justify-content-between small text-muted mb-4">
+                                            <span><?= number_format($subscriber['data_used_mb'] / 1024, 2) ?> GB used</span>
+                                            <span><?= number_format($package['data_quota_mb'] / 1024, 2) ?> GB total</span>
+                                        </div>
+                                        <?php endif; ?>
+                                        
+                                        <h6 class="text-muted mb-3">Actions</h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editSubscriptionModal">
+                                                <i class="bi bi-pencil me-1"></i> Edit
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#changePackageModal">
+                                                <i class="bi bi-arrow-left-right me-1"></i> Change Package
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#changeExpiryModal">
+                                                <i class="bi bi-calendar-event me-1"></i> Change Expiry
+                                            </button>
+                                            <form id="resetDataForm" method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="reset_data_usage">
+                                                <input type="hidden" name="id" value="<?= $subId ?>">
+                                                <input type="hidden" name="return_to" value="subscriber">
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Reset data usage to 0?')">
+                                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Data
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Sessions Tab -->
-                        <div class="tab-pane fade show active" id="sessionsTab">
+                        <div class="tab-pane fade" id="sessionsTab" role="tabpanel">
                             <?php if ($activeSession): ?>
                             <div class="alert alert-success mb-3">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -2483,14 +3075,14 @@ try {
                             </div>
                             <?php endif; ?>
                             
-                            <div class="card shadow-sm">
-                                <div class="card-header">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-header bg-transparent">
                                     <h6 class="mb-0">Session History</h6>
                                 </div>
                                 <div class="card-body p-0">
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-hover mb-0">
-                                            <thead>
+                                        <table class="table table-hover mb-0">
+                                            <thead class="table-light">
                                                 <tr>
                                                     <th>Started</th>
                                                     <th>Ended</th>
@@ -2833,6 +3425,305 @@ try {
                 </div>
             </div>
             
+            <!-- Change Expiry Modal -->
+            <div class="modal fade" id="changeExpiryModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content border-0 shadow-lg">
+                        <form method="post">
+                            <input type="hidden" name="action" value="change_expiry">
+                            <input type="hidden" name="id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header border-0" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                <h5 class="modal-title text-white"><i class="bi bi-calendar-event me-2"></i>Change Expiry Date</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="text-center mb-4">
+                                    <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                        <i class="bi bi-calendar3 text-white fs-2"></i>
+                                    </div>
+                                    <p class="text-muted">Adjust the subscription expiry date manually</p>
+                                </div>
+                                
+                                <div class="row g-3 mb-3">
+                                    <div class="col-6">
+                                        <div class="p-3 rounded-3 bg-light text-center">
+                                            <small class="text-muted d-block">Current Expiry</small>
+                                            <strong class="text-primary"><?= $subscriber['expiry_date'] ? date('M j, Y', strtotime($subscriber['expiry_date'])) : 'Not set' ?></strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-3 rounded-3 bg-light text-center">
+                                            <small class="text-muted d-block">Days Remaining</small>
+                                            <strong class="<?= ($daysLeft ?? 0) < 0 ? 'text-danger' : 'text-success' ?>"><?= $daysLeft !== null ? ($daysLeft < 0 ? 'Expired (' . abs(floor($daysLeft)) . 'd ago)' : floor($daysLeft) . ' days') : 'N/A' ?></strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">New Expiry Date</label>
+                                    <input type="date" name="new_expiry_date" class="form-control form-control-lg" value="<?= $subscriber['expiry_date'] ?? date('Y-m-d') ?>" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Quick Extend</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <button type="button" class="btn btn-outline-primary" onclick="extendExpiry(7)">+7 Days</button>
+                                        <button type="button" class="btn btn-outline-primary" onclick="extendExpiry(14)">+14 Days</button>
+                                        <button type="button" class="btn btn-outline-primary" onclick="extendExpiry(30)">+30 Days</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Reason (Optional)</label>
+                                    <textarea name="expiry_change_reason" class="form-control" rows="2" placeholder="e.g., Customer requested extension, billing adjustment..."></textarea>
+                                </div>
+                                
+                                <div class="alert alert-warning small mb-0">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    Changing expiry date will not charge the customer. Use for manual adjustments only.
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border: none;">
+                                    <i class="bi bi-check-lg me-1"></i> Update Expiry
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script>
+            function extendExpiry(days) {
+                const input = document.querySelector('#changeExpiryModal input[name="new_expiry_date"]');
+                const currentDate = input.value ? new Date(input.value) : new Date();
+                currentDate.setDate(currentDate.getDate() + days);
+                input.value = currentDate.toISOString().split('T')[0];
+            }
+            </script>
+            
+            <!-- Change Package Modal -->
+            <?php
+            $currentPackagePrice = $package['price'] ?? 0;
+            $currentValidityDays = $package['validity_days'] ?? 30;
+            $daysRemaining = max(0, ceil($daysLeft ?? 0));
+            $dailyRate = $currentValidityDays > 0 ? $currentPackagePrice / $currentValidityDays : 0;
+            $remainingCredit = round($dailyRate * $daysRemaining);
+            ?>
+            <div class="modal fade" id="changePackageModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content border-0 shadow-lg">
+                        <form method="post" id="changePackageForm">
+                            <input type="hidden" name="action" value="change_package">
+                            <input type="hidden" name="id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <input type="hidden" name="prorate_amount" id="prorateAmountInput" value="0">
+                            <div class="modal-header border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <h5 class="modal-title text-white"><i class="bi bi-arrow-left-right me-2"></i>Change Package</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row g-4">
+                                    <!-- Current Package -->
+                                    <div class="col-md-5">
+                                        <div class="card h-100 border-2 border-primary">
+                                            <div class="card-header bg-primary text-white text-center">
+                                                <small>CURRENT PACKAGE</small>
+                                            </div>
+                                            <div class="card-body text-center">
+                                                <h4 class="fw-bold"><?= htmlspecialchars($package['name'] ?? 'N/A') ?></h4>
+                                                <div class="my-3">
+                                                    <span class="fs-3 fw-bold text-primary">KES <?= number_format($currentPackagePrice) ?></span>
+                                                    <small class="text-muted">/ <?= $currentValidityDays ?> days</small>
+                                                </div>
+                                                <div class="small text-muted">
+                                                    <i class="bi bi-arrow-down text-success"></i> <?= $package['download_speed'] ?? '-' ?>
+                                                    <i class="bi bi-arrow-up text-danger ms-2"></i> <?= $package['upload_speed'] ?? '-' ?>
+                                                </div>
+                                                <hr>
+                                                <div class="bg-light rounded-3 p-2">
+                                                    <small class="text-muted d-block">Remaining Value</small>
+                                                    <span class="fw-bold text-success fs-5">KES <?= number_format($remainingCredit) ?></span>
+                                                    <small class="text-muted d-block">(<?= $daysRemaining ?> days x KES <?= number_format($dailyRate, 1) ?>/day)</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Arrow -->
+                                    <div class="col-md-2 d-flex align-items-center justify-content-center">
+                                        <div class="text-center">
+                                            <i class="bi bi-arrow-right fs-1 text-muted d-none d-md-block"></i>
+                                            <i class="bi bi-arrow-down fs-1 text-muted d-md-none"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- New Package Selection -->
+                                    <div class="col-md-5">
+                                        <div class="card h-100 border-2 border-success">
+                                            <div class="card-header bg-success text-white text-center">
+                                                <small>NEW PACKAGE</small>
+                                            </div>
+                                            <div class="card-body text-center">
+                                                <select name="new_package_id" id="newPackageSelect" class="form-select form-select-lg mb-3" onchange="calculateProrate()">
+                                                    <option value="">Select Package...</option>
+                                                    <?php foreach ($packages as $p): ?>
+                                                    <?php if ($p['id'] != $subscriber['package_id']): ?>
+                                                    <option value="<?= $p['id'] ?>" 
+                                                            data-price="<?= $p['price'] ?>" 
+                                                            data-days="<?= $p['validity_days'] ?>"
+                                                            data-name="<?= htmlspecialchars($p['name']) ?>"
+                                                            data-download="<?= htmlspecialchars($p['download_speed']) ?>"
+                                                            data-upload="<?= htmlspecialchars($p['upload_speed']) ?>">
+                                                        <?= htmlspecialchars($p['name']) ?> - KES <?= number_format($p['price']) ?>
+                                                    </option>
+                                                    <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                
+                                                <div id="newPackageInfo" style="display:none;">
+                                                    <h4 class="fw-bold" id="newPackageName">-</h4>
+                                                    <div class="my-3">
+                                                        <span class="fs-3 fw-bold text-success" id="newPackagePrice">KES 0</span>
+                                                        <small class="text-muted" id="newPackageDays">/ 0 days</small>
+                                                    </div>
+                                                    <div class="small text-muted" id="newPackageSpeeds">
+                                                        <i class="bi bi-arrow-down text-success"></i> -
+                                                        <i class="bi bi-arrow-up text-danger ms-2"></i> -
+                                                    </div>
+                                                </div>
+                                                <div id="newPackagePlaceholder" class="py-4">
+                                                    <i class="bi bi-box-seam text-muted" style="font-size: 3rem;"></i>
+                                                    <p class="text-muted mt-2">Select a package above</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Proration Calculation -->
+                                <div id="prorationSection" class="mt-4" style="display:none;">
+                                    <div class="card bg-light border-0">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold mb-3"><i class="bi bi-calculator me-2"></i>Payment Calculation</h6>
+                                            <div class="row g-2 small">
+                                                <div class="col-8">Credit from current package (<?= $daysRemaining ?> days remaining)</div>
+                                                <div class="col-4 text-end fw-bold text-success">- KES <?= number_format($remainingCredit) ?></div>
+                                                
+                                                <div class="col-8">New package cost</div>
+                                                <div class="col-4 text-end fw-bold" id="newPackageCost">+ KES 0</div>
+                                                
+                                                <div class="col-12"><hr class="my-2"></div>
+                                                
+                                                <div class="col-8 fw-bold fs-5" id="balanceLabel">Amount Due</div>
+                                                <div class="col-4 text-end fw-bold fs-5" id="balanceAmount">KES 0</div>
+                                            </div>
+                                            
+                                            <div id="refundNote" class="alert alert-info mt-3 small" style="display:none;">
+                                                <i class="bi bi-info-circle me-2"></i>
+                                                Credit will be added to customer's wallet balance.
+                                            </div>
+                                            <div id="paymentNote" class="alert alert-warning mt-3 small" style="display:none;">
+                                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                                Customer needs to pay the difference before upgrade.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-check mt-3">
+                                        <input type="checkbox" class="form-check-input" id="applyProrate" name="apply_prorate" value="1" checked>
+                                        <label class="form-check-label" for="applyProrate">
+                                            Apply prorated calculation (use credit from remaining days)
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="sendCoA" name="send_coa" value="1" checked>
+                                        <label class="form-check-label" for="sendCoA">
+                                            Send CoA to update speed immediately
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" id="changePackageBtn" disabled style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                                    <i class="bi bi-check-lg me-1"></i> Change Package
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script>
+            const currentRemainingCredit = <?= $remainingCredit ?>;
+            const currentDaysRemaining = <?= $daysRemaining ?>;
+            
+            function calculateProrate() {
+                const select = document.getElementById('newPackageSelect');
+                const option = select.options[select.selectedIndex];
+                const prorationSection = document.getElementById('prorationSection');
+                const newPackageInfo = document.getElementById('newPackageInfo');
+                const newPackagePlaceholder = document.getElementById('newPackagePlaceholder');
+                const changePackageBtn = document.getElementById('changePackageBtn');
+                
+                if (!option.value) {
+                    prorationSection.style.display = 'none';
+                    newPackageInfo.style.display = 'none';
+                    newPackagePlaceholder.style.display = 'block';
+                    changePackageBtn.disabled = true;
+                    return;
+                }
+                
+                const newPrice = parseFloat(option.dataset.price);
+                const newDays = parseInt(option.dataset.days);
+                const newName = option.dataset.name;
+                const newDownload = option.dataset.download;
+                const newUpload = option.dataset.upload;
+                
+                document.getElementById('newPackageName').textContent = newName;
+                document.getElementById('newPackagePrice').textContent = 'KES ' + newPrice.toLocaleString();
+                document.getElementById('newPackageDays').textContent = '/ ' + newDays + ' days';
+                document.getElementById('newPackageSpeeds').innerHTML = '<i class="bi bi-arrow-down text-success"></i> ' + newDownload + ' <i class="bi bi-arrow-up text-danger ms-2"></i> ' + newUpload;
+                
+                newPackageInfo.style.display = 'block';
+                newPackagePlaceholder.style.display = 'none';
+                prorationSection.style.display = 'block';
+                changePackageBtn.disabled = false;
+                
+                document.getElementById('newPackageCost').textContent = '+ KES ' + newPrice.toLocaleString();
+                
+                const balance = newPrice - currentRemainingCredit;
+                const balanceLabel = document.getElementById('balanceLabel');
+                const balanceAmount = document.getElementById('balanceAmount');
+                const refundNote = document.getElementById('refundNote');
+                const paymentNote = document.getElementById('paymentNote');
+                
+                document.getElementById('prorateAmountInput').value = balance;
+                
+                if (balance < 0) {
+                    balanceLabel.textContent = 'Credit to Wallet';
+                    balanceAmount.textContent = 'KES ' + Math.abs(balance).toLocaleString();
+                    balanceAmount.className = 'col-4 text-end fw-bold fs-5 text-success';
+                    refundNote.style.display = 'block';
+                    paymentNote.style.display = 'none';
+                } else if (balance > 0) {
+                    balanceLabel.textContent = 'Amount Due';
+                    balanceAmount.textContent = 'KES ' + balance.toLocaleString();
+                    balanceAmount.className = 'col-4 text-end fw-bold fs-5 text-danger';
+                    refundNote.style.display = 'none';
+                    paymentNote.style.display = 'block';
+                } else {
+                    balanceLabel.textContent = 'Balance';
+                    balanceAmount.textContent = 'KES 0';
+                    balanceAmount.className = 'col-4 text-end fw-bold fs-5';
+                    refundNote.style.display = 'none';
+                    paymentNote.style.display = 'none';
+                }
+            }
+            </script>
+            
             <!-- Edit Subscription Modal -->
             <div class="modal fade" id="editSubscriptionModal" tabindex="-1">
                 <div class="modal-dialog">
@@ -2957,6 +3848,264 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- STK Push Modal -->
+            <?php if ($customer && !empty($customer['phone'])): ?>
+            <div class="modal fade" id="stkPushModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success-subtle">
+                            <h5 class="modal-title"><i class="bi bi-phone me-2"></i>M-Pesa STK Push</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="stkPushForm" onsubmit="return submitStkPush(event)">
+                                <div class="mb-3">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="text" class="form-control" id="stkPhone" value="<?= htmlspecialchars(preg_replace('/[^0-9]/', '', $customer['phone'])) ?>" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Amount (KES)</label>
+                                    <input type="number" class="form-control" id="stkAmount" value="<?= (int)($package['price'] ?? 0) ?>" min="1" required>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('stkAmount').value=<?= (int)($package['price'] ?? 0) ?>">Package Price</button>
+                                    <button type="button" class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('stkAmount').value=500">500</button>
+                                    <button type="button" class="btn btn-outline-secondary flex-fill" onclick="document.getElementById('stkAmount').value=1000">1000</button>
+                                </div>
+                            </form>
+                            <div id="stkResult" class="mt-3 text-center"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-success" onclick="submitStkPush()" id="stkSubmitBtn">
+                                <i class="bi bi-lightning-charge me-1"></i> Send STK Push
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <!-- WiFi Config Modal -->
+            <div class="modal fade" id="wifiConfigModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-wifi me-2"></i>WiFi Configuration (TR-069)</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>Configure WiFi settings directly on the customer's device via TR-069/GenieACS.
+                            </div>
+                            
+                            <div id="wifiConfigLoading" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading device info...</p>
+                            </div>
+                            
+                            <div id="wifiConfigContent" style="display: none;">
+                                <ul class="nav nav-tabs" role="tablist">
+                                    <li class="nav-item">
+                                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#wifi24ghz">2.4 GHz</button>
+                                    </li>
+                                    <li class="nav-item" id="wifi5ghzTab" style="display: none;">
+                                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#wifi5ghz">5 GHz</button>
+                                    </li>
+                                </ul>
+                                
+                                <div class="tab-content pt-3">
+                                    <div class="tab-pane fade show active" id="wifi24ghz">
+                                        <form id="wifi24Form">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Name (SSID)</label>
+                                                        <input type="text" class="form-control" id="wifi24Ssid" placeholder="Enter WiFi name">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Password</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" id="wifi24Password" placeholder="Enter password" minlength="8">
+                                                            <button type="button" class="btn btn-outline-secondary" onclick="toggleWifiPwd('wifi24Password')"><i class="bi bi-eye"></i></button>
+                                                        </div>
+                                                        <small class="text-muted">Minimum 8 characters</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-primary" onclick="saveWifiConfig('2.4')">
+                                                <i class="bi bi-check-lg me-1"></i> Save 2.4 GHz Settings
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="tab-pane fade" id="wifi5ghz">
+                                        <form id="wifi5Form">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Name (SSID)</label>
+                                                        <input type="text" class="form-control" id="wifi5Ssid" placeholder="Enter WiFi name">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">WiFi Password</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" id="wifi5Password" placeholder="Enter password" minlength="8">
+                                                            <button type="button" class="btn btn-outline-secondary" onclick="toggleWifiPwd('wifi5Password')"><i class="bi bi-eye"></i></button>
+                                                        </div>
+                                                        <small class="text-muted">Minimum 8 characters</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-primary" onclick="saveWifiConfig('5')">
+                                                <i class="bi bi-check-lg me-1"></i> Save 5 GHz Settings
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="wifiConfigError" class="alert alert-warning" style="display: none;">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <span id="wifiErrorMsg">No TR-069 device found for this subscriber.</span>
+                            </div>
+                            
+                            <div id="wifiConfigResult" class="mt-3" style="display: none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            // WiFi Config Modal initialization
+            document.getElementById('wifiConfigModal').addEventListener('show.bs.modal', function() {
+                loadWifiConfig();
+            });
+            
+            function loadWifiConfig() {
+                document.getElementById('wifiConfigLoading').style.display = 'block';
+                document.getElementById('wifiConfigContent').style.display = 'none';
+                document.getElementById('wifiConfigError').style.display = 'none';
+                
+                fetch('/index.php?page=isp&action=get_wifi_config&subscription_id=<?= $subId ?>')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('wifiConfigLoading').style.display = 'none';
+                        if (data.success) {
+                            document.getElementById('wifiConfigContent').style.display = 'block';
+                            if (data.wifi_24) {
+                                document.getElementById('wifi24Ssid').value = data.wifi_24.ssid || '';
+                                document.getElementById('wifi24Password').value = data.wifi_24.password || '';
+                            }
+                            if (data.wifi_5) {
+                                document.getElementById('wifi5ghzTab').style.display = 'block';
+                                document.getElementById('wifi5Ssid').value = data.wifi_5.ssid || '';
+                                document.getElementById('wifi5Password').value = data.wifi_5.password || '';
+                            }
+                        } else {
+                            document.getElementById('wifiConfigError').style.display = 'block';
+                            document.getElementById('wifiErrorMsg').textContent = data.error || 'No TR-069 device found';
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById('wifiConfigLoading').style.display = 'none';
+                        document.getElementById('wifiConfigError').style.display = 'block';
+                        document.getElementById('wifiErrorMsg').textContent = 'Failed to load WiFi configuration';
+                    });
+            }
+            
+            function toggleWifiPwd(id) {
+                const input = document.getElementById(id);
+                input.type = input.type === 'password' ? 'text' : 'password';
+            }
+            
+            function saveWifiConfig(band) {
+                const ssidId = band === '2.4' ? 'wifi24Ssid' : 'wifi5Ssid';
+                const pwdId = band === '2.4' ? 'wifi24Password' : 'wifi5Password';
+                const ssid = document.getElementById(ssidId).value;
+                const password = document.getElementById(pwdId).value;
+                
+                if (!ssid) {
+                    alert('Please enter a WiFi name');
+                    return;
+                }
+                if (password && password.length < 8) {
+                    alert('Password must be at least 8 characters');
+                    return;
+                }
+                
+                const resultDiv = document.getElementById('wifiConfigResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split me-2"></i>Applying WiFi settings...</div>';
+                
+                fetch('/index.php?page=isp&action=set_wifi_config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        subscription_id: <?= $subId ?>,
+                        band: band,
+                        ssid: ssid,
+                        password: password
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>' + (data.message || 'WiFi settings applied successfully!') + '</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>' + (data.error || 'Failed to apply settings') + '</div>';
+                    }
+                })
+                .catch(err => {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Request failed</div>';
+                });
+            }
+            
+            function submitStkPush() {
+                const phone = document.getElementById('stkPhone').value;
+                const amount = document.getElementById('stkAmount').value;
+                const btn = document.getElementById('stkSubmitBtn');
+                const result = document.getElementById('stkResult');
+                
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending...';
+                result.innerHTML = '';
+                
+                fetch('/index.php?page=isp&action=stk_push', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        phone: phone,
+                        amount: amount,
+                        subscription_id: <?= $subId ?>
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> Send STK Push';
+                    if (data.success) {
+                        result.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>STK Push sent! Check your phone.</div>';
+                    } else {
+                        result.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>' + (data.error || 'Failed to send STK Push') + '</div>';
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> Send STK Push';
+                    result.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Request failed</div>';
+                });
+                
+                return false;
+            }
+            </script>
             
             <!-- Add Speed Override Modal -->
             <div class="modal fade" id="addSpeedOverrideModal" tabindex="-1">
@@ -3229,6 +4378,8 @@ try {
             $nasDevices = $radiusBilling->getNASDevices();
             $wireguardService = new \App\WireGuardService($db);
             $vpnPeers = $wireguardService->getAllPeers();
+            $ispLocations = $radiusBilling->getLocations();
+            $ispSubLocations = $radiusBilling->getAllSubLocations();
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-hdd-network"></i> NAS Devices (MikroTik Routers)</h4>
@@ -3253,7 +4404,6 @@ try {
                                     <th>Name</th>
                                     <th>IP Address</th>
                                     <th>Type</th>
-                                    <th>RADIUS Port</th>
                                     <th>API</th>
                                     <th>VPN</th>
                                     <th>Online</th>
@@ -3272,7 +4422,6 @@ try {
                                     </td>
                                     <td><code><?= htmlspecialchars($nas['ip_address']) ?></code></td>
                                     <td><?= htmlspecialchars($nas['nas_type']) ?></td>
-                                    <td><?= $nas['ports'] ?></td>
                                     <td>
                                         <?php if ($nas['api_enabled']): ?>
                                         <span class="badge bg-success">Enabled (<?= $nas['api_port'] ?>)</span>
@@ -3286,7 +4435,9 @@ try {
                                             <i class="bi bi-shield-lock me-1"></i><?= htmlspecialchars($nas['vpn_peer_name']) ?>
                                         </span>
                                         <?php else: ?>
-                                        <span class="badge bg-secondary">None</span>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="createVPNPeer(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['name']) ?>', '<?= htmlspecialchars($nas['ip_address']) ?>')" title="Create VPN Peer">
+                                            <i class="bi bi-plus-circle me-1"></i>Create
+                                        </button>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -4051,6 +5202,16 @@ try {
                         <i class="bi bi-hdd-network me-1"></i> RADIUS
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'locations' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=locations">
+                        <i class="bi bi-geo-alt me-1"></i> Zones
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'bulk_sms' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=bulk_sms">
+                        <i class="bi bi-envelope-paper me-1"></i> Bulk SMS
+                    </a>
+                </li>
             </ul>
             
             <?php if ($settingsTab === 'notifications'): ?>
@@ -4249,7 +5410,7 @@ try {
                 </div>
             </form>
             
-            <?php else: ?>
+            <?php elseif ($settingsTab === 'radius'): ?>
             <form method="post">
                 <input type="hidden" name="action" value="save_isp_settings">
                 <input type="hidden" name="category" value="radius">
@@ -4267,6 +5428,20 @@ try {
                                         <label class="form-check-label" for="use_expired_pool"><strong>Enable Expired Pool</strong></label>
                                     </div>
                                     <small class="text-muted">Accept expired users but assign to restricted pool (instead of rejecting)</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="allow_unknown_expired_pool" id="allow_unknown_expired_pool" value="true" <?= $radiusBilling->getSetting('allow_unknown_expired_pool') === 'true' ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="allow_unknown_expired_pool"><strong>Allow Unknown Users</strong></label>
+                                    </div>
+                                    <small class="text-muted">Accept non-registered accounts and assign to expired pool (redirects to payment portal)</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">ISP Contact Phone</label>
+                                    <input type="text" class="form-control" name="isp_contact_phone" value="<?= htmlspecialchars($radiusBilling->getSetting('isp_contact_phone') ?: '') ?>" placeholder="+254712345678">
+                                    <small class="text-muted">Displayed on expired page for unknown users to contact support</small>
                                 </div>
                                 
                                 <div class="mb-3">
@@ -4377,6 +5552,379 @@ try {
                     </div>
                 </div>
             </div>
+            <?php elseif ($settingsTab === 'locations'): ?>
+            <?php
+            $ispLocations = $radiusBilling->getAllLocations();
+            $ispSubLocations = $radiusBilling->getAllSubLocations();
+            ?>
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-geo-alt me-2"></i>Zones</span>
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+                                <i class="bi bi-plus-lg"></i> Add Zone
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($ispLocations)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-geo-alt fs-3 d-block mb-2"></i>
+                                No zones defined. Add your first zone.
+                            </div>
+                            <?php else: ?>
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($ispLocations as $loc): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><?= htmlspecialchars($loc['name']) ?></strong>
+                                        <?php if ($loc['code']): ?>
+                                        <span class="badge bg-secondary ms-2"><?= htmlspecialchars($loc['code']) ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($loc['description']): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($loc['description']) ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary" onclick="editLocation(<?= htmlspecialchars(json_encode($loc)) ?>)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this zone?')">
+                                            <input type="hidden" name="action" value="delete_location">
+                                            <input type="hidden" name="id" value="<?= $loc['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-geo me-2"></i>Sub-Zones</span>
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSubLocationModal">
+                                <i class="bi bi-plus-lg"></i> Add Sub-Zone
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($ispSubLocations)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-geo fs-3 d-block mb-2"></i>
+                                No sub-zones defined. Create zones first.
+                            </div>
+                            <?php else: ?>
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($ispSubLocations as $sub): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-primary me-2"><?= htmlspecialchars($sub['location_name']) ?></span>
+                                        <strong><?= htmlspecialchars($sub['name']) ?></strong>
+                                        <?php if ($sub['code']): ?>
+                                        <span class="badge bg-secondary ms-2"><?= htmlspecialchars($sub['code']) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary" onclick="editSubLocation(<?= htmlspecialchars(json_encode($sub)) ?>)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this sub-location?')">
+                                            <input type="hidden" name="action" value="delete_sub_location">
+                                            <input type="hidden" name="id" value="<?= $sub['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="addLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="create_location">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add Zone</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Zone Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Zone A - Westlands">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" class="form-control" placeholder="e.g., ZA">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Add Zone</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="editLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_location">
+                            <input type="hidden" name="id" id="edit_location_id">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Zone</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Zone Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" id="edit_location_name" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" id="edit_location_code" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="edit_location_desc" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="is_active" id="edit_location_active" value="1">
+                                    <label class="form-check-label" for="edit_location_active">Active</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="addSubLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="create_sub_location">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add Sub-Zone</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Parent Zone <span class="text-danger">*</span></label>
+                                    <select name="location_id" class="form-select" required>
+                                        <option value="">-- Select Zone --</option>
+                                        <?php foreach ($ispLocations as $loc): ?>
+                                        <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Sub-Zone Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" required placeholder="e.g., Block A">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" class="form-control" placeholder="e.g., BA">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Add Sub-Zone</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="editSubLocationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_sub_location">
+                            <input type="hidden" name="id" id="edit_sub_location_id">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Sub-Zone</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Parent Zone <span class="text-danger">*</span></label>
+                                    <select name="location_id" id="edit_sub_location_parent" class="form-select" required>
+                                        <option value="">-- Select Zone --</option>
+                                        <?php foreach ($ispLocations as $loc): ?>
+                                        <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Sub-Zone Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" id="edit_sub_location_name" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Code</label>
+                                    <input type="text" name="code" id="edit_sub_location_code" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="edit_sub_location_desc" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="is_active" id="edit_sub_location_active" value="1">
+                                    <label class="form-check-label" for="edit_sub_location_active">Active</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <?php elseif ($settingsTab === 'bulk_sms'): ?>
+            <?php
+            $ispLocations = $radiusBilling->getLocations();
+            $packages = $radiusBilling->getPackages();
+            ?>
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-envelope-paper me-2"></i>Bulk SMS to Subscribers
+                </div>
+                <div class="card-body">
+                    <form method="post" id="bulkSmsForm">
+                        <input type="hidden" name="action" value="send_bulk_sms">
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Status</label>
+                                <select name="filter_status" class="form-select" id="bulkFilterStatus">
+                                    <option value="">All Statuses</option>
+                                    <option value="active">Active</option>
+                                    <option value="expired">Expired</option>
+                                    <option value="suspended">Suspended</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Zone</label>
+                                <select name="filter_location" class="form-select" id="bulkFilterLocation">
+                                    <option value="">All Zones</option>
+                                    <?php foreach ($ispLocations as $loc): ?>
+                                    <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Package</label>
+                                <select name="filter_package" class="form-select" id="bulkFilterPackage">
+                                    <option value="">All Packages</option>
+                                    <?php foreach ($packages as $p): ?>
+                                    <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary" onclick="previewRecipients()">
+                                <i class="bi bi-eye me-1"></i> Preview Recipients
+                            </button>
+                            <span id="recipientCount" class="ms-3 text-muted"></span>
+                        </div>
+                        
+                        <div id="recipientPreview" class="mb-3" style="display: none;">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>Selected Recipients:</h6>
+                                    <div id="recipientList" style="max-height: 200px; overflow-y: auto;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Message <span class="text-danger">*</span></label>
+                            <textarea name="message" class="form-control" rows="4" required placeholder="Type your message here..."></textarea>
+                            <div class="d-flex justify-content-between mt-2">
+                                <small class="text-muted">Variables: {customer_name}, {username}, {package_name}, {expiry_date}, {balance}</small>
+                                <small class="text-muted"><span id="charCount">0</span>/160 characters</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Send Via</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="send_via" id="sendSms" value="sms" checked>
+                                <label class="btn btn-outline-primary" for="sendSms"><i class="bi bi-chat-dots me-1"></i> SMS</label>
+                                <input type="radio" class="btn-check" name="send_via" id="sendWhatsapp" value="whatsapp">
+                                <label class="btn btn-outline-success" for="sendWhatsapp"><i class="bi bi-whatsapp me-1"></i> WhatsApp</label>
+                                <input type="radio" class="btn-check" name="send_via" id="sendBoth" value="both">
+                                <label class="btn btn-outline-info" for="sendBoth"><i class="bi bi-send me-1"></i> Both</label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('Send bulk message to selected subscribers?')">
+                            <i class="bi bi-send-fill me-1"></i> Send Bulk Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <script>
+            document.querySelector('textarea[name="message"]').addEventListener('input', function() {
+                document.getElementById('charCount').textContent = this.value.length;
+            });
+            
+            function previewRecipients() {
+                const status = document.getElementById('bulkFilterStatus').value;
+                const location = document.getElementById('bulkFilterLocation').value;
+                const pkg = document.getElementById('bulkFilterPackage').value;
+                
+                fetch(`/index.php?page=isp&action=preview_bulk_sms&status=${status}&location=${location}&package=${pkg}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('recipientCount').textContent = `${data.count} subscribers selected`;
+                        
+                        if (data.subscribers && data.subscribers.length > 0) {
+                            let html = '<table class="table table-sm table-striped mb-0"><thead><tr><th>Customer</th><th>Phone</th><th>Package</th><th>Status</th></tr></thead><tbody>';
+                            data.subscribers.slice(0, 50).forEach(s => {
+                                html += `<tr><td>${s.customer_name || 'N/A'}</td><td>${s.customer_phone || 'N/A'}</td><td>${s.package_name || 'N/A'}</td><td>${s.status}</td></tr>`;
+                            });
+                            if (data.count > 50) {
+                                html += `<tr><td colspan="4" class="text-center text-muted">...and ${data.count - 50} more</td></tr>`;
+                            }
+                            html += '</tbody></table>';
+                            document.getElementById('recipientList').innerHTML = html;
+                            document.getElementById('recipientPreview').style.display = 'block';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Preview error:', err);
+                        document.getElementById('recipientCount').textContent = 'Error loading preview';
+                    });
+            }
+            </script>
             <?php endif; ?>
             
             <?php endif; ?>
@@ -4444,6 +5992,47 @@ try {
         new bootstrap.Modal(document.getElementById('editNASModal')).show();
     }
     
+    function filterSubLocations(locationSelect, subLocationSelectId, selectedValue = '') {
+        const locationId = locationSelect.value;
+        const subSelect = document.getElementById(subLocationSelectId);
+        const options = subSelect.querySelectorAll('option');
+        
+        options.forEach(opt => {
+            if (opt.value === '') {
+                opt.style.display = '';
+            } else if (!locationId || opt.dataset.location === locationId) {
+                opt.style.display = '';
+            } else {
+                opt.style.display = 'none';
+            }
+        });
+        
+        if (selectedValue) {
+            subSelect.value = selectedValue;
+        } else if (locationId) {
+            subSelect.value = '';
+        }
+    }
+    
+    function editLocation(loc) {
+        document.getElementById('edit_location_id').value = loc.id;
+        document.getElementById('edit_location_name').value = loc.name;
+        document.getElementById('edit_location_code').value = loc.code || '';
+        document.getElementById('edit_location_desc').value = loc.description || '';
+        document.getElementById('edit_location_active').checked = loc.is_active == true;
+        new bootstrap.Modal(document.getElementById('editLocationModal')).show();
+    }
+    
+    function editSubLocation(sub) {
+        document.getElementById('edit_sub_location_id').value = sub.id;
+        document.getElementById('edit_sub_location_parent').value = sub.location_id;
+        document.getElementById('edit_sub_location_name').value = sub.name;
+        document.getElementById('edit_sub_location_code').value = sub.code || '';
+        document.getElementById('edit_sub_location_desc').value = sub.description || '';
+        document.getElementById('edit_sub_location_active').checked = sub.is_active == true;
+        new bootstrap.Modal(document.getElementById('editSubLocationModal')).show();
+    }
+    
     function generateSecret(inputId) {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
         let secret = '';
@@ -4498,9 +6087,15 @@ try {
                     radiusServer = data.radius_server || radiusServer || '<?= gethostbyname(gethostname()) ?>';
                     const secret = data.secret || radiusSecret;
                     
-                    radiusScript = `# RADIUS Configuration for ${nas.name}
+                    const expiredPoolName = '<?= $radiusBilling->getSetting('expired_ip_pool') ?: 'expired-pool' ?>';
+                    const expiredPageUrl = '<?= rtrim($_ENV['APP_URL'] ?? 'https://your-crm-domain.com', '/') ?>/expired.php';
+                    
+                    radiusScript = `# ============================================
+# RADIUS Configuration for ${nas.name}
 # Generated: ${new Date().toLocaleString()}
+# ============================================
 
+# ---- RADIUS SERVER SETUP ----
 # Add RADIUS server for authentication
 /radius add service=ppp address=${radiusServer} secret="${secret}" timeout=3000ms
 
@@ -4516,6 +6111,45 @@ try {
 
 # Optional: Set NAS identifier
 /system identity set name="${nas.name}"
+
+# ============================================
+# EXPIRED POOL REDIRECT CONFIGURATION
+# ============================================
+# Create IP pool for expired/unknown users
+/ip pool add name=${expiredPoolName} ranges=10.255.255.2-10.255.255.254
+
+# Create address list for expired users
+/ip firewall address-list remove [find list=expired-users]
+
+# NAT rule to redirect HTTP traffic from expired pool to payment page
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=80 protocol=tcp action=dst-nat to-addresses=${radiusServer.split(':')[0]} to-ports=5000 comment="Redirect expired users to payment page"
+
+# NAT rule to redirect HTTPS (falls back to HTTP redirect page)
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=443 protocol=tcp action=dst-nat to-addresses=${radiusServer.split(':')[0]} to-ports=5000 comment="Redirect expired users HTTPS"
+
+# Allow expired pool to access DNS (important!)
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=udp action=accept comment="Allow expired users DNS"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=tcp action=accept comment="Allow expired users DNS"
+
+# Allow expired pool to access CRM server only
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-address=${radiusServer} action=accept comment="Allow expired users to CRM"
+
+# Block all other traffic from expired pool
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 action=drop comment="Block expired users internet"
+
+# ============================================
+# PPP PROFILE (Create or update)
+# ============================================
+# Note: RADIUS will return Framed-Pool attribute to assign users to expired-pool
+# Your default PPP profile should NOT have a fixed remote-address if using RADIUS pools
+# /ppp profile set [find name=default] remote-address=""
+
+# ============================================
+# WALLED GARDEN (for Hotspot only)
+# ============================================
+# If using Hotspot, add walled garden entries:
+# /ip hotspot walled-garden add dst-host=*your-crm-domain.com* action=allow
+# /ip hotspot walled-garden ip add dst-address=${radiusServer} action=accept
 `;
                     document.getElementById('radiusScript').textContent = radiusScript;
                     document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
@@ -4540,6 +6174,16 @@ try {
 
 # IMPORTANT: Enable RADIUS Incoming for CoA/Disconnect
 /radius incoming set accept=yes port=3799
+
+# ============================================
+# EXPIRED POOL REDIRECT (Update IPs as needed)
+# ============================================
+/ip pool add name=expired-pool ranges=10.255.255.2-10.255.255.254
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=80 protocol=tcp action=dst-nat to-addresses=YOUR_CRM_IP to-ports=5000 comment="Redirect expired to payment"
+/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=443 protocol=tcp action=dst-nat to-addresses=YOUR_CRM_IP to-ports=5000 comment="Redirect expired HTTPS"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=udp action=accept comment="Allow DNS"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-address=YOUR_CRM_IP action=accept comment="Allow CRM"
+/ip firewall filter add chain=forward src-address=10.255.255.0/24 action=drop comment="Block expired internet"
 `;
                 document.getElementById('radiusScript').textContent = radiusScript;
                 document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
@@ -4600,6 +6244,38 @@ try {
         
         document.body.appendChild(form);
         form.submit();
+    }
+    
+    function createVPNPeer(nasId, nasName, nasIp) {
+        if (!confirm(`Create VPN peer for ${nasName} (${nasIp})?\n\nThis will auto-assign the next available VPN IP.`)) {
+            return;
+        }
+        
+        const btn = event.target.closest('button');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        fetch('/index.php?page=api&action=create_nas_vpn_peer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nas_id: nasId, name: nasName, ip: nasIp })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert(`VPN peer created!\n\nAssigned IP: ${data.allowed_ips}\n\nReloading page...`);
+                window.location.reload();
+            } else {
+                alert('Failed to create VPN peer: ' + (data.error || 'Unknown error'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Create';
+            }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Create';
+        });
     }
     
     function testNAS(nasId, ipAddress) {

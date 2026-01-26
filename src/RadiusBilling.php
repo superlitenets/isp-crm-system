@@ -144,8 +144,9 @@ class RadiusBilling {
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_nas (name, ip_address, secret, nas_type, ports, description, 
-                                        api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?)
+                                        api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id,
+                                        location_id, sub_location_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['name'],
@@ -159,7 +160,9 @@ class RadiusBilling {
                 $data['api_username'] ?? '',
                 !empty($data['api_password']) ? $this->encrypt($data['api_password']) : '',
                 $isActive,
-                !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null
+                !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null,
+                !empty($data['location_id']) ? (int)$data['location_id'] : null,
+                !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -172,6 +175,7 @@ class RadiusBilling {
             $fields = ['name', 'ip_address', 'secret', 'nas_type', 'ports', 'description', 
                        'api_port', 'api_username'];
             $boolFields = ['api_enabled', 'is_active'];
+            $intFields = ['location_id', 'sub_location_id'];
             $updates = [];
             $params = [];
             
@@ -186,6 +190,13 @@ class RadiusBilling {
                 if (isset($data[$field])) {
                     $updates[] = "$field = ?::boolean";
                     $params[] = !empty($data[$field]) ? 'true' : 'false';
+                }
+            }
+            
+            foreach ($intFields as $field) {
+                if (array_key_exists($field, $data)) {
+                    $updates[] = "$field = ?";
+                    $params[] = !empty($data[$field]) ? (int)$data[$field] : null;
                 }
             }
             
@@ -218,6 +229,208 @@ class RadiusBilling {
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+    
+    // ==================== Location Management ====================
+    
+    public function getLocations(): array {
+        $stmt = $this->db->query("SELECT * FROM huawei_zones WHERE is_active = true ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAllLocations(): array {
+        $stmt = $this->db->query("SELECT * FROM huawei_zones ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getLocation(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_zones WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function createLocation(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_zones (name, description, is_active)
+                VALUES (?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function updateLocation(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE huawei_zones 
+                SET name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteLocation(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM huawei_zones WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSubLocations(?int $locationId = null): array {
+        $sql = "SELECT sl.*, l.name as location_name, sl.zone_id as location_id
+                FROM huawei_subzones sl 
+                JOIN huawei_zones l ON sl.zone_id = l.id 
+                WHERE sl.is_active = true";
+        $params = [];
+        
+        if ($locationId) {
+            $sql .= " AND sl.zone_id = ?";
+            $params[] = $locationId;
+        }
+        
+        $sql .= " ORDER BY l.name, sl.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAllSubLocations(): array {
+        $stmt = $this->db->query("
+            SELECT sl.*, l.name as location_name, sl.zone_id as location_id
+            FROM huawei_subzones sl 
+            JOIN huawei_zones l ON sl.zone_id = l.id 
+            ORDER BY l.name, sl.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSubLocation(int $id): ?array {
+        $stmt = $this->db->prepare("
+            SELECT sl.*, l.name as location_name, sl.zone_id as location_id
+            FROM huawei_subzones sl 
+            JOIN huawei_zones l ON sl.zone_id = l.id 
+            WHERE sl.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function createSubLocation(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_subzones (zone_id, name, description, is_active)
+                VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['location_id'],
+                $data['name'],
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function updateSubLocation(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE huawei_subzones 
+                SET zone_id = ?, name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['location_id'],
+                $data['name'],
+                $data['description'] ?? null,
+                isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteSubLocation(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM huawei_subzones WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSubscribersByFilter(array $filters): array {
+        $sql = "SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+                       p.name as package_name, p.price as package_price,
+                       n.name as nas_name, n.ip_address as nas_ip,
+                       l.name as location_name, sl.name as sub_location_name
+                FROM radius_subscriptions s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                LEFT JOIN radius_packages p ON s.package_id = p.id
+                LEFT JOIN radius_nas n ON s.nas_id = n.id
+                LEFT JOIN huawei_zones l ON s.location_id = l.id
+                LEFT JOIN huawei_subzones sl ON s.sub_location_id = sl.id
+                WHERE 1=1";
+        $params = [];
+        
+        if (!empty($filters['status'])) {
+            if ($filters['status'] === 'expired') {
+                $sql .= " AND s.expiry_date < CURRENT_DATE";
+            } elseif ($filters['status'] === 'active') {
+                $sql .= " AND s.status = 'active' AND s.expiry_date >= CURRENT_DATE";
+            } else {
+                $sql .= " AND s.status = ?";
+                $params[] = $filters['status'];
+            }
+        }
+        
+        if (!empty($filters['location_id'])) {
+            $sql .= " AND s.location_id = ?";
+            $params[] = $filters['location_id'];
+        }
+        
+        if (!empty($filters['sub_location_id'])) {
+            $sql .= " AND s.sub_location_id = ?";
+            $params[] = $filters['sub_location_id'];
+        }
+        
+        if (!empty($filters['package_id'])) {
+            $sql .= " AND s.package_id = ?";
+            $params[] = $filters['package_id'];
+        }
+        
+        if (!empty($filters['nas_id'])) {
+            $sql .= " AND s.nas_id = ?";
+            $params[] = $filters['nas_id'];
+        }
+        
+        $sql .= " ORDER BY c.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     // ==================== Package Management ====================
@@ -513,8 +726,8 @@ class RadiusBilling {
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_subscriptions (customer_id, package_id, username, password, password_encrypted,
-                    access_type, static_ip, mac_address, status, start_date, expiry_date, nas_id, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    access_type, static_ip, mac_address, status, start_date, expiry_date, nas_id, notes, location_id, sub_location_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['customer_id'],
@@ -529,7 +742,9 @@ class RadiusBilling {
                 $startDate,
                 $expiryDate,
                 !empty($data['nas_id']) ? (int)$data['nas_id'] : null,
-                $data['notes'] ?? ''
+                $data['notes'] ?? '',
+                !empty($data['location_id']) ? (int)$data['location_id'] : null,
+                !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null
             ]);
             
             $subscriptionId = $this->db->lastInsertId();
@@ -626,17 +841,17 @@ class RadiusBilling {
             
             $this->createBillingRecord($id, $packageId, $package['price'], 'renewal', $startDate, $expiryDate);
             
-            // If user was expired/suspended, send CoA to update their speed
+            // If user was expired/suspended, disconnect them so they reconnect with proper IP pool and speed
             $coaResult = null;
             if ($wasExpired) {
-                $coaResult = $this->sendSpeedUpdateCoA($id);
+                $coaResult = $this->disconnectUser($id);
             }
             
             return [
                 'success' => true, 
                 'expiry_date' => $expiryDate,
                 'coa_sent' => $coaResult ? ($coaResult['success'] ?? false) : false,
-                'new_speed' => $coaResult['rate_limit'] ?? null
+                'sessions_disconnected' => $coaResult['disconnected'] ?? 0
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
@@ -652,12 +867,11 @@ class RadiusBilling {
             $stmt->execute(["\nSuspended: $reason (" . date('Y-m-d H:i') . ")", $id]);
             
             // Disconnect active sessions via CoA
-            $disconnectResult = $this->disconnectSubscription($id);
+            $disconnectResult = $this->sendCoAForSubscription($id);
             
             return [
                 'success' => true, 
-                'sessions_disconnected' => $disconnectResult['disconnected'] ?? 0,
-                'coa_errors' => $disconnectResult['errors'] ?? []
+                'coa_result' => $disconnectResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
@@ -985,7 +1199,28 @@ class RadiusBilling {
     public function authenticate(string $username, string $password, string $nasIp = '', string $callingStationId = ''): array {
         $sub = $this->getSubscriptionByUsername($username);
         
+        // Get expired pool settings upfront
+        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        $allowUnknownUsers = $this->getSetting('allow_unknown_expired_pool') === 'true';
+        $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
+        
         if (!$sub) {
+            // If unknown users should be allowed with expired pool
+            if ($useExpiredPool && $allowUnknownUsers) {
+                return [
+                    'success' => true,
+                    'reply' => 'Access-Accept',
+                    'unknown_user' => true,
+                    'attributes' => [
+                        'Framed-Pool' => $expiredPoolName,
+                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                        'Session-Timeout' => 300,
+                        'Acct-Interim-Interval' => 60
+                    ],
+                    'subscription' => null
+                ];
+            }
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'User not found'];
         }
         
@@ -1199,7 +1434,7 @@ class RadiusBilling {
         $rateLimit = $this->buildRateLimit($sub);
         
         // Send CoA via OLT service (routes through WireGuard VPN)
-        $oltServiceUrl = 'http://localhost:3002/radius/coa';
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
         
         $payload = [
             'nasIp' => $nas['ip_address'],
@@ -1443,6 +1678,11 @@ class RadiusBilling {
     public function processExpiredSubscriptions(): array {
         $processed = 0;
         $ipsReleased = 0;
+        $coaSent = 0;
+        
+        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '64k/64k';
         
         // Get expired subscriptions past grace period
         $stmt = $this->db->query("
@@ -1452,8 +1692,16 @@ class RadiusBilling {
         ");
         
         while ($sub = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            // Disconnect active sessions
-            $this->disconnectUser($sub['id']);
+            if ($useExpiredPool) {
+                // Send CoA to move user to expired pool (don't disconnect, redirect to captive portal)
+                $coaResult = $this->sendExpiredPoolCoA($sub['id'], $expiredPoolName, $expiredRateLimit);
+                if ($coaResult['success']) {
+                    $coaSent++;
+                }
+            } else {
+                // Disconnect active sessions
+                $this->disconnectUser($sub['id']);
+            }
             
             // Release static IP back to pool if assigned
             $releaseIp = !empty($sub['static_ip']);
@@ -1473,7 +1721,81 @@ class RadiusBilling {
             $processed++;
         }
         
-        return ['success' => true, 'processed' => $processed, 'ips_released' => $ipsReleased];
+        return ['success' => true, 'processed' => $processed, 'ips_released' => $ipsReleased, 'coa_sent' => $coaSent];
+    }
+    
+    public function sendExpiredPoolCoA(int $subscriptionId, ?string $poolName = null, ?string $rateLimit = null): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        $poolName = $poolName ?: $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $rateLimit = $rateLimit ?: $this->getSetting('expired_rate_limit') ?: '64k/64k';
+        
+        // Get NAS info
+        $nas = null;
+        if (!empty($sub['nas_id'])) {
+            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+            $stmt->execute([$sub['nas_id']]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$nas) {
+            $stmt = $this->db->prepare("
+                SELECT rn.ip_address, rn.secret 
+                FROM radius_sessions rs
+                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
+                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+                ORDER BY rs.session_start DESC LIMIT 1
+            ");
+            $stmt->execute([$subscriptionId]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$nas) {
+            return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        // Send CoA via OLT service with Framed-Pool
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
+        
+        $payload = [
+            'nasIp' => $nas['ip_address'],
+            'nasPort' => 3799,
+            'secret' => $nas['secret'],
+            'username' => $sub['username'],
+            'rateLimit' => $rateLimit,
+            'framedPool' => $poolName
+        ];
+        
+        try {
+            $ch = curl_init($oltServiceUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
+            
+            $response = curl_exec($ch);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                return ['success' => false, 'error' => "cURL error: $curlError"];
+            }
+            
+            $result = json_decode($response, true);
+            if ($result && $result['success']) {
+                return ['success' => true, 'pool' => $poolName, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
     
     public function getSubscriberOnlineStatus(int $subscriptionId): bool {
@@ -1606,31 +1928,84 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Package not found'];
         }
         
-        // Check if payment covers package price
-        if ($amount < $package['price']) {
-            return ['success' => false, 'error' => 'Insufficient amount. Package costs KES ' . $package['price']];
+        $packagePrice = (float)$package['price'];
+        $currentBalance = (float)($sub['credit_balance'] ?? 0);
+        
+        // Record the payment transaction first
+        $stmt = $this->db->prepare("
+            INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, transaction_ref, created_at)
+            VALUES (?, 'payment', ?, 'M-Pesa payment', ?, NOW())
+        ");
+        $stmt->execute([$sub['id'], $amount, $transactionId]);
+        
+        // If amount exactly equals package price, renew immediately
+        if (abs($amount - $packagePrice) < 0.01) {
+            $result = $this->renewSubscription($sub['id']);
+            
+            if ($result['success']) {
+                // Record billing record
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
+                        period_start, period_end, status, payment_method, transaction_ref)
+                    VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'mpesa', ?)
+                ");
+                $stmt->execute([
+                    $sub['id'], 
+                    $sub['package_id'], 
+                    $amount, 
+                    $result['expiry_date'],
+                    $transactionId
+                ]);
+            }
+            
+            return $result;
         }
         
-        // Renew subscription
-        $result = $this->renewSubscription($sub['id']);
+        // Partial payment - add to wallet
+        $newBalance = $currentBalance + $amount;
+        $stmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
+        $stmt->execute([$newBalance, $sub['id']]);
         
-        if ($result['success']) {
-            // Record payment
-            $stmt = $this->db->prepare("
-                INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
-                    period_start, period_end, status, payment_method, transaction_ref)
-                VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'mpesa', ?)
-            ");
-            $stmt->execute([
-                $sub['id'], 
-                $sub['package_id'], 
-                $amount, 
-                $result['expiry_date'],
-                $transactionId
-            ]);
+        // Check if wallet now has enough to renew
+        if ($newBalance >= $packagePrice) {
+            // Deduct package price from wallet and renew
+            $remainingBalance = $newBalance - $packagePrice;
+            $stmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
+            $stmt->execute([$remainingBalance, $sub['id']]);
+            
+            $result = $this->renewSubscription($sub['id']);
+            
+            if ($result['success']) {
+                // Record billing record (paid from wallet)
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
+                        period_start, period_end, status, payment_method, transaction_ref)
+                    VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'wallet', ?)
+                ");
+                $stmt->execute([
+                    $sub['id'], 
+                    $sub['package_id'], 
+                    $packagePrice, 
+                    $result['expiry_date'],
+                    $transactionId
+                ]);
+                
+                $result['wallet_used'] = true;
+                $result['wallet_remaining'] = $remainingBalance;
+            }
+            
+            return $result;
         }
         
-        return $result;
+        // Not enough for renewal, just topped up wallet
+        return [
+            'success' => true,
+            'wallet_topup' => true,
+            'amount_added' => $amount,
+            'new_balance' => $newBalance,
+            'needed_for_renewal' => $packagePrice - $newBalance,
+            'message' => "KES " . number_format($amount) . " added to wallet. Balance: KES " . number_format($newBalance, 2) . ". Need KES " . number_format($packagePrice - $newBalance, 2) . " more to renew."
+        ];
     }
     
     // ==================== CoA (Change of Authorization) ====================
@@ -1702,7 +2077,9 @@ class RadiusBilling {
         }
         
         // Send Disconnect-Request via OLT service (routes through WireGuard VPN)
-        $oltServiceUrl = 'http://localhost:3002/radius/disconnect';
+        // In Docker, use container name; locally use localhost
+        $oltServiceUrl = getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
+        $oltServiceUrl .= '/radius/disconnect';
         
         $payload = [
             'nasIp' => $nasIp,
@@ -1774,6 +2151,37 @@ class RadiusBilling {
         }
     }
     
+    /**
+     * Send CoA disconnect for a subscription (forces reconnect with new attributes)
+     * Used when expiry date changes or package changes to apply new limits
+     */
+    public function sendCoAForSubscription(int $subscriptionId): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        // Find active session for this subscription
+        $stmt = $this->db->prepare("
+            SELECT rs.*, rn.ip_address as nas_ip, rn.secret as nas_secret
+            FROM radius_sessions rs
+            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
+            WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+            ORDER BY rs.session_start DESC LIMIT 1
+        ");
+        $stmt->execute([$subscriptionId]);
+        $session = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($session && !empty($session['nas_ip'])) {
+            // Disconnect the active session
+            return $this->sendCoADisconnect($session);
+        }
+        
+        // No active session, try sending a general CoA with just the username
+        // This helps trigger any session that might exist but isn't tracked
+        return $this->sendCoA($subscriptionId, []);
+    }
+    
     public function sendCoA(int $subscriptionId, array $attributes): array {
         $sub = $this->getSubscription($subscriptionId);
         if (!$sub) {
@@ -1811,34 +2219,46 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'NAS not found - please assign a NAS to this subscription or add an active NAS device'];
         }
         
-        // Build CoA attributes
-        $attrs = ['User-Name' => $sub['username']];
+        // Send CoA via OLT service (routes through WireGuard VPN)
+        $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
+        
+        $payload = [
+            'nasIp' => $nas['ip_address'],
+            'nasPort' => 3799,
+            'secret' => $nas['secret'],
+            'username' => $sub['username']
+        ];
+        
+        // Add any additional attributes
         foreach ($attributes as $key => $value) {
-            $attrs[$key] = $value;
+            $payload[$key] = $value;
         }
         
-        // Send CoA directly to NAS IP on port 3799 (routed via VPN tunnel)
         try {
-            $client = new RadiusClient($nas['ip_address'], $nas['secret'], 3799, 5);
-            $result = $client->coa($attrs);
+            $ch = curl_init($oltServiceUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
             
-            if ($result['success']) {
-                return ['success' => true, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address']];
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                return ['success' => false, 'error' => 'OLT service unavailable: ' . $curlError, 'target_ip' => $nas['ip_address']];
             }
             
-            // Add diagnostic info for connection issues
-            $error = $result['error'] ?? 'CoA failed';
-            if (strpos($error, 'timeout') !== false || strpos($error, 'No response') !== false) {
-                $pingCheck = $this->checkNasReachability($nas['ip_address']);
-                if ($pingCheck['reachable']) {
-                    // Device is reachable but CoA port not responding
-                    $error = "CoA timeout - MikroTik reachable but port 3799 not responding. Enable RADIUS Incoming: /radius incoming set accept=yes port=3799";
-                } else {
-                    $error .= ". Ping FAILED - check VPN tunnel";
-                }
+            $result = json_decode($response, true);
+            if ($result && $result['success']) {
+                return ['success' => true, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address'], 'via' => 'vpn'];
             }
             
-            return ['success' => false, 'error' => $error, 'target_ip' => $nas['ip_address']];
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nas['ip_address']];
         }
