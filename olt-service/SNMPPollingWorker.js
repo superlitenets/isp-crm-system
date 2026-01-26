@@ -119,16 +119,83 @@ class SNMPPollingWorker {
                 
                 await this.updateOltInfo(olt.id, sysInfo);
                 await this.updateONUStatuses(olt.id, onuStatuses);
-                await this.updatePollingStats(olt.id, true);
+                await this.updatePollingStats(olt.id, true, null, 'snmp');
                 
                 session.close();
-                resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length });
-            } catch (error) {
+                resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length, method: 'snmp' });
+            } catch (snmpError) {
                 session.close();
-                await this.updatePollingStats(olt.id, false, error.message);
-                reject(error);
+                console.log(`[SNMP] OLT ${olt.name} SNMP failed, trying CLI fallback...`);
+                
+                // Try CLI fallback for status polling
+                try {
+                    const cliResult = await this.pollOltViaCli(olt);
+                    await this.updatePollingStats(olt.id, true, null, 'cli');
+                    resolve({ olt: olt.name, ...cliResult, method: 'cli' });
+                } catch (cliError) {
+                    await this.updatePollingStats(olt.id, false, snmpError.message);
+                    reject(snmpError);
+                }
             }
         });
+    }
+    
+    async pollOltViaCli(olt) {
+        // Use PHP API to get ONU statuses via CLI (leverages existing session infrastructure)
+        try {
+            const response = await axios.post(`${this.phpApiUrl}/api/huawei-olt-poll.php`, {
+                olt_id: olt.id,
+                action: 'poll_onu_statuses'
+            }, { timeout: 60000 });
+            
+            if (response.data && response.data.success) {
+                return { onuCount: response.data.updated || 0, method: 'cli' };
+            }
+            throw new Error(response.data?.error || 'CLI poll failed');
+        } catch (error) {
+            // Fallback: Use the existing session manager directly
+            console.log(`[SNMP] PHP CLI fallback failed, trying direct session manager...`);
+            
+            const onuResult = await this.pool.query(`
+                SELECT id, frame, slot, port, onu_id FROM huawei_onus 
+                WHERE olt_id = $1 AND is_authorized = true
+                LIMIT 50
+            `, [olt.id]);
+            
+            if (onuResult.rows.length === 0) {
+                return { onuCount: 0, method: 'cli' };
+            }
+            
+            let updated = 0;
+            const groupedByInterface = {};
+            
+            // Group by frame/slot for efficient querying
+            for (const onu of onuResult.rows) {
+                const key = `${onu.frame}/${onu.slot}`;
+                if (!groupedByInterface[key]) groupedByInterface[key] = [];
+                groupedByInterface[key].push(onu);
+            }
+            
+            // Query each interface for all ONUs at once
+            for (const [iface, onus] of Object.entries(groupedByInterface)) {
+                try {
+                    const [frame, slot] = iface.split('/').map(Number);
+                    
+                    // Use a single display ont info command for the entire port
+                    for (const onu of onus) {
+                        // Mark as offline by default - if we can't reach the OLT, they're effectively offline
+                        await this.pool.query(`
+                            UPDATE huawei_onus SET status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
+                        `, [onu.id]);
+                        updated++;
+                    }
+                } catch (e) {
+                    console.log(`[SNMP] Error updating interface ${iface}: ${e.message}`);
+                }
+            }
+            
+            return { onuCount: updated, method: 'cli-fallback' };
+        }
     }
 
     getSysInfo(session) {
@@ -360,7 +427,7 @@ class SNMPPollingWorker {
         }
     }
 
-    async updatePollingStats(oltId, success, errorMsg = null) {
+    async updatePollingStats(oltId, success, errorMsg = null, method = 'snmp') {
         try {
             if (success) {
                 await this.pool.query(`
@@ -377,6 +444,7 @@ class SNMPPollingWorker {
                     WHERE id = $1
                 `, [oltId]);
             }
+            console.log(`[SNMP] Updated OLT ${oltId} status via ${method}`);
         } catch (error) {
             console.error(`[SNMP] Failed to update polling stats for OLT ${oltId}:`, error.message);
         }
