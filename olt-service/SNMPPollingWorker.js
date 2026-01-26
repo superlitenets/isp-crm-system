@@ -4,10 +4,11 @@ const snmp = require('net-snmp');
 const axios = require('axios');
 
 class SNMPPollingWorker {
-    constructor() {
+    constructor(sessionManager = null) {
         this.pool = new Pool({
             connectionString: process.env.DATABASE_URL
         });
+        this.sessionManager = sessionManager;
         this.isRunning = false;
         this.cronJob = null;
         this.pollInterval = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
@@ -171,6 +172,11 @@ class SNMPPollingWorker {
             return { onuCount: 0, method: 'cli' };
         }
         
+        if (!this.sessionManager) {
+            console.log(`[CLI] Session manager not available for CLI polling`);
+            return { onuCount: 0, method: 'cli', error: 'No session manager' };
+        }
+        
         console.log(`[CLI] Polling ${onuResult.rows.length} ONUs for OLT ${olt.name} via CLI...`);
         
         // Group by frame/slot/port for efficient batch querying
@@ -182,48 +188,51 @@ class SNMPPollingWorker {
         }
         
         let updated = 0;
-        
-        // Use existing OLT session to query all ONUs on each port
-        const sessionManager = require('./OltSessionManager').getSessionManager();
         const oltKey = olt.id.toString();
         
         try {
-            // Get session or create new one
-            let session = sessionManager?.sessions?.[oltKey];
-            if (!session || !session.connected) {
-                // Session not available, try to get via existing CLI command execution
-                for (const [portKey, onus] of Object.entries(groupedByPort)) {
-                    const [frame, slot, port] = portKey.split('/').map(Number);
+            for (const [portKey, onus] of Object.entries(groupedByPort)) {
+                const [frame, slot, port] = portKey.split('/').map(Number);
+                
+                try {
+                    // Execute display ont info for each port to get all ONU statuses at once
+                    const cmd = `display ont info ${frame} ${slot} ${port} all`;
+                    const result = await this.sessionManager.execute(oltKey, cmd, { timeout: 30000 });
                     
-                    try {
-                        // Execute display ont info for each port
-                        const cmd = `display ont info ${frame} ${slot} ${port} all`;
-                        const result = await sessionManager.execute(oltKey, cmd, { timeout: 30000 });
+                    // Parse results to get status for each ONU
+                    // Format: ONT-ID  Control-flag  Run-state  Config-state  Match-state  ...
+                    for (const onu of onus) {
+                        let status = 'offline';
                         
-                        // Parse results to get status for each ONU
-                        for (const onu of onus) {
-                            let status = 'offline';
-                            const onuPattern = new RegExp(`${onu.onu_id}\\s+\\S+\\s+(\\w+)`, 'i');
-                            const match = result.match(onuPattern);
-                            if (match) {
-                                const state = match[1].toLowerCase();
-                                if (state === 'online') status = 'online';
-                                else if (state.includes('los')) status = 'los';
-                            }
-                            
-                            await this.pool.query(`
-                                UPDATE huawei_onus SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
-                            `, [status, onu.id]);
-                            updated++;
+                        // Look for the ONU ID in the output and check its run state
+                        // Pattern: "  0       active     online   normal    match"
+                        const onuPattern = new RegExp(`^\\s*${onu.onu_id}\\s+\\S+\\s+(\\w+)`, 'im');
+                        const match = result.match(onuPattern);
+                        if (match) {
+                            const state = match[1].toLowerCase();
+                            if (state === 'online') status = 'online';
+                            else if (state.includes('los')) status = 'los';
+                            else if (state === 'offline') status = 'offline';
                         }
-                    } catch (e) {
-                        // If CLI fails for this port, mark all ONUs as unknown
-                        console.log(`[CLI] Error polling port ${portKey}: ${e.message}`);
+                        
+                        await this.pool.query(`
+                            UPDATE huawei_onus SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                        `, [status, onu.id]);
+                        updated++;
+                    }
+                } catch (e) {
+                    console.log(`[CLI] Error polling port ${portKey}: ${e.message}`);
+                    // Mark these ONUs as offline since we can't check them
+                    for (const onu of onus) {
+                        await this.pool.query(`
+                            UPDATE huawei_onus SET status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
+                        `, [onu.id]);
+                        updated++;
                     }
                 }
             }
         } catch (e) {
-            console.log(`[CLI] Session manager not available: ${e.message}`);
+            console.log(`[CLI] Error during CLI polling: ${e.message}`);
         }
         
         console.log(`[CLI] Updated ${updated} ONUs for OLT ${olt.name}`);

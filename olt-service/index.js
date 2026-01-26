@@ -10,7 +10,7 @@ app.use(express.json());
 
 const sessionManager = new OLTSessionManager();
 const discoveryWorker = new DiscoveryWorker(sessionManager);
-const snmpWorker = new SNMPPollingWorker();
+const snmpWorker = new SNMPPollingWorker(sessionManager);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', sessions: sessionManager.getSessionCount() });
