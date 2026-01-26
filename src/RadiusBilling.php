@@ -841,15 +841,13 @@ class RadiusBilling {
             
             $this->createBillingRecord($id, $packageId, $package['price'], 'renewal', $startDate, $expiryDate);
             
-            // If user was expired/suspended, use CoA to update their speed/pool without disconnecting
+            // If user was expired/suspended, disconnect them so they reconnect with new settings
             $coaResult = null;
             if ($wasExpired) {
-                // Try CoA first for smooth transition (updates speed and pool without disconnect)
-                $coaResult = $this->sendReactivationCoA($id);
-                
-                // If CoA fails (no active session), that's fine - they'll get new settings on next connect
-                if (!$coaResult['success'] && strpos($coaResult['error'] ?? '', 'Timeout') !== false) {
-                    // No active session - user will get correct settings on reconnect
+                // Disconnect first to force reconnection with new expiry/pool
+                $coaResult = $this->disconnectUser($id);
+                if (!$coaResult['success'] && ($coaResult['disconnected'] ?? 0) == 0) {
+                    // No active session - user will get correct settings on next connect
                     $coaResult['note'] = 'No active session - settings will apply on next login';
                 }
             }
@@ -857,7 +855,7 @@ class RadiusBilling {
             return [
                 'success' => true, 
                 'expiry_date' => $expiryDate,
-                'coa_sent' => $coaResult ? ($coaResult['success'] ?? false) : false,
+                'disconnected' => $coaResult ? ($coaResult['disconnected'] ?? 0) : 0,
                 'coa_result' => $coaResult
             ];
         } catch (\Exception $e) {

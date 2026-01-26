@@ -626,10 +626,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'update_subscription':
             $id = (int)$_POST['id'];
             try {
-                // Get current package to detect changes
+                // Get current subscription to detect changes
                 $currentSub = $radiusBilling->getSubscription($id);
                 $oldPackageId = $currentSub['package_id'] ?? null;
+                $oldPassword = $currentSub['password'] ?? '';
                 $newPackageId = (int)$_POST['package_id'];
+                $newPassword = $_POST['password'];
                 
                 $stmt = $db->prepare("
                     UPDATE radius_subscriptions SET 
@@ -645,8 +647,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $stmt->execute([
                     $newPackageId,
-                    $_POST['password'],
-                    $radiusBilling->encryptPassword($_POST['password']),
+                    $newPassword,
+                    $radiusBilling->encryptPassword($newPassword),
                     $_POST['expiry_date'] ?: null,
                     !empty($_POST['static_ip']) ? $_POST['static_ip'] : null,
                     !empty($_POST['mac_address']) ? $_POST['mac_address'] : null,
@@ -654,9 +656,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $id
                 ]);
                 
-                // Auto-send CoA if package changed (speed update)
                 $coaMessage = '';
-                if ($oldPackageId != $newPackageId) {
+                
+                // If password changed, disconnect user (must reconnect with new credentials)
+                if ($oldPassword !== $newPassword) {
+                    $disconnectResult = $radiusBilling->disconnectSubscription($id);
+                    if (!empty($disconnectResult['success']) && $disconnectResult['disconnected'] > 0) {
+                        $coaMessage = ' User disconnected (password changed).';
+                    }
+                }
+                // Otherwise if package changed, send speed update CoA
+                elseif ($oldPackageId != $newPackageId) {
                     $coaResult = $radiusBilling->sendSpeedUpdateCoA($id);
                     if ($coaResult['success']) {
                         $coaMessage = ' Speed updated via CoA.';
