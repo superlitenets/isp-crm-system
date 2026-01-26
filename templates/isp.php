@@ -2558,24 +2558,20 @@ try {
                 
                 $isOnline = !empty($activeSession);
                 
-                // Calculate uptime or offline duration with proper timezone handling
+                // Calculate uptime or offline duration - use strtotime which respects PHP timezone
                 $uptimeStr = '';
                 $offlineStr = '';
-                $tz = new DateTimeZone(date_default_timezone_get());
-                $now = new DateTime('now', $tz);
                 if ($isOnline && $activeSession) {
-                    $sessionStart = new DateTime($activeSession['session_start']);
-                    $uptime = $now->getTimestamp() - $sessionStart->getTimestamp();
+                    $uptime = time() - strtotime($activeSession['session_start']);
                     if ($uptime < 0) $uptime = 0;
                     $days = floor($uptime / 86400);
                     $hours = floor(($uptime % 86400) / 3600);
                     $mins = floor(($uptime % 3600) / 60);
+                    $secs = $uptime % 60;
                     if ($days > 0) {
-                        $uptimeStr = $days . 'd ' . $hours . 'h ' . $mins . 'm';
-                    } elseif ($hours > 0) {
-                        $uptimeStr = $hours . 'h ' . $mins . 'm';
+                        $uptimeStr = $days . 'd ' . sprintf('%02d:%02d:%02d', $hours, $mins, $secs);
                     } else {
-                        $uptimeStr = max(1, $mins) . 'm';
+                        $uptimeStr = sprintf('%02d:%02d:%02d', $hours, $mins, $secs);
                     }
                 } else {
                     // Find last session end time
@@ -2587,18 +2583,16 @@ try {
                         }
                     }
                     if ($lastSession) {
-                        $sessionEnd = new DateTime($lastSession['session_end']);
-                        $offline = $now->getTimestamp() - $sessionEnd->getTimestamp();
+                        $offline = time() - strtotime($lastSession['session_end']);
                         if ($offline < 0) $offline = 0;
                         $days = floor($offline / 86400);
                         $hours = floor(($offline % 86400) / 3600);
                         $mins = floor(($offline % 3600) / 60);
+                        $secs = $offline % 60;
                         if ($days > 0) {
-                            $offlineStr = $days . 'd ' . $hours . 'h ago';
-                        } elseif ($hours > 0) {
-                            $offlineStr = $hours . 'h ' . $mins . 'm ago';
+                            $offlineStr = $days . 'd ' . sprintf('%02d:%02d:%02d', $hours, $mins, $secs) . ' ago';
                         } else {
-                            $offlineStr = $mins . 'm ago';
+                            $offlineStr = sprintf('%02d:%02d:%02d', $hours, $mins, $secs) . ' ago';
                         }
                     } else {
                         $offlineStr = 'Never connected';
