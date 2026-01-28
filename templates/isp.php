@@ -729,16 +729,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($needsDisconnect) {
-                    $disconnectResult = $radiusBilling->disconnectSubscription($id);
-                    if (!empty($disconnectResult['success']) && $disconnectResult['disconnected'] > 0) {
+                    // Use sendCoAForSubscription which has better NAS fallback logic
+                    $coaResult = $radiusBilling->sendCoAForSubscription($id);
+                    if (!empty($coaResult['success'])) {
                         $coaMessage = " User disconnected ({$disconnectReason}).";
-                    } elseif (!empty($disconnectResult['success'])) {
-                        $coaMessage = " No active sessions to disconnect.";
+                    } elseif (!empty($coaResult['error'])) {
+                        $coaMessage = " (CoA: {$coaResult['error']})";
                     }
                 } elseif ($oldPackageId != $newPackageId) {
                     // Package changed but same pool - just update speed
-                    $coaResult = $radiusBilling->sendSpeedUpdateCoA($id);
-                    if ($coaResult['success']) {
+                    $speedResult = $radiusBilling->sendSpeedUpdateCoA($id);
+                    if (!empty($speedResult['success'])) {
                         $coaMessage = ' Speed updated via CoA.';
                     }
                 }
@@ -1095,18 +1096,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $msg = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
                     
                     // Handle CoA/Disconnect - always disconnect when expiry changes
-                    // This forces user to reconnect and get the new expiry applied
-                    $disconnectResult = $radiusBilling->disconnectSubscription($subId);
-                    if (!empty($disconnectResult['success']) && $disconnectResult['disconnected'] > 0) {
+                    // Use sendCoAForSubscription which has better NAS fallback logic
+                    $coaResult = $radiusBilling->sendCoAForSubscription($subId);
+                    if (!empty($coaResult['success'])) {
                         $msg .= ' (session disconnected via CoA)';
                     } elseif ($wasExpired && $isExtending) {
-                        // Reactivating from expired - send reactivation CoA if no session to disconnect
-                        $coaResult = $radiusBilling->sendReactivationCoA($subId);
-                        if ($coaResult && !empty($coaResult['success'])) {
+                        // Reactivating from expired - send reactivation CoA
+                        $reactivateResult = $radiusBilling->sendReactivationCoA($subId);
+                        if ($reactivateResult && !empty($reactivateResult['success'])) {
                             $msg .= ' (subscription reactivated via CoA)';
                         }
-                    } elseif (!empty($disconnectResult['success']) && $disconnectResult['disconnected'] === 0) {
-                        $msg .= ' (no active session to disconnect)';
+                    } elseif (!empty($coaResult['error'])) {
+                        $msg .= ' (CoA: ' . $coaResult['error'] . ')';
                     }
                     
                     $message = $msg;
