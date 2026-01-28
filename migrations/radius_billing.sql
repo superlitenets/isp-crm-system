@@ -282,3 +282,25 @@ CREATE TABLE IF NOT EXISTS radius_auth_logs (
 CREATE INDEX IF NOT EXISTS idx_radius_auth_logs_subscription ON radius_auth_logs(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_radius_auth_logs_username ON radius_auth_logs(username);
 CREATE INDEX IF NOT EXISTS idx_radius_auth_logs_created ON radius_auth_logs(created_at DESC);
+
+-- Timed Speed Overrides
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS speed_override VARCHAR(50);
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS override_expires_at TIMESTAMP WITH TIME ZONE;
+
+-- Package Speed Schedules (time-based speed changes)
+CREATE TABLE IF NOT EXISTS radius_package_schedules (
+    id SERIAL PRIMARY KEY,
+    package_id INTEGER NOT NULL REFERENCES radius_packages(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    days_of_week VARCHAR(20) DEFAULT '0123456',
+    download_speed VARCHAR(20) NOT NULL,
+    upload_speed VARCHAR(20) NOT NULL,
+    priority INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_package_schedules_package ON radius_package_schedules(package_id);
+CREATE INDEX IF NOT EXISTS idx_package_schedules_active ON radius_package_schedules(is_active) WHERE is_active = TRUE;
