@@ -802,12 +802,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $downloadUnit = $_POST['download_unit'] === 'k' ? 'k' : 'M';
             $uploadSpeed = (int)$_POST['upload_speed'];
             $uploadUnit = $_POST['upload_unit'] === 'k' ? 'k' : 'M';
+            $durationHours = !empty($_POST['duration_hours']) ? (int)$_POST['duration_hours'] : null;
             
             $rateLimit = "{$downloadSpeed}{$downloadUnit}/{$uploadSpeed}{$uploadUnit}";
             
+            // Save override to database
+            $radiusBilling->setSpeedOverride($subId, $rateLimit, $durationHours);
+            
+            // Send CoA to apply immediately
             $result = $radiusBilling->sendSpeedUpdateCoA($subId, $rateLimit);
             if ($result['success']) {
-                $message = "Speed override applied: {$rateLimit}";
+                $expiryText = $durationHours ? "for {$durationHours} hours" : "(permanent)";
+                $message = "Speed override applied: {$rateLimit} {$expiryText}";
                 $messageType = 'success';
             } else {
                 $errorMsg = $result['error'] ?? 'Unknown error';
@@ -819,8 +825,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $errorMsg .= ' | NAS (' . $diag['nas_ip'] . ') is not reachable. Check VPN tunnel or firewall.';
                     }
                 }
-                $message = 'CoA failed: ' . $errorMsg;
-                $messageType = 'danger';
+                $message = "Override saved but CoA failed: {$errorMsg} - Override will apply on next reconnect.";
+                $messageType = 'warning';
+            }
+            break;
+            
+        case 'clear_speed_override':
+            $subId = (int)$_POST['subscription_id'];
+            $radiusBilling->clearSpeedOverride($subId);
+            
+            // Send CoA to reset to package speed
+            $result = $radiusBilling->sendSpeedUpdateCoA($subId);
+            if ($result['success']) {
+                $message = 'Speed override cleared, package speed restored';
+                $messageType = 'success';
+            } else {
+                $message = 'Override cleared. Speed will reset on next reconnect.';
+                $messageType = 'warning';
             }
             break;
             
@@ -3604,9 +3625,20 @@ try {
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                                <?php if (!empty($subscription['speed_override'])): ?>
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Active Override:</strong> <?= htmlspecialchars($subscription['speed_override']) ?>
+                                    <?php if (!empty($subscription['override_expires_at'])): ?>
+                                        <br><small>Expires: <?= date('M j, Y g:i A', strtotime($subscription['override_expires_at'])) ?></small>
+                                    <?php else: ?>
+                                        <br><small>No expiry (permanent until cleared)</small>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
                                 <div class="alert alert-info">
                                     <i class="bi bi-info-circle me-2"></i>
-                                    This temporarily overrides the user's speed. It will reset to package speed when the user reconnects.
+                                    Override speeds are saved and will persist across reconnects until they expire or are cleared.
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-6">
@@ -3631,6 +3663,20 @@ try {
                                     </div>
                                 </div>
                                 <div class="mt-3">
+                                    <label class="form-label">Duration</label>
+                                    <select name="duration_hours" class="form-select">
+                                        <option value="1">1 hour</option>
+                                        <option value="2">2 hours</option>
+                                        <option value="6">6 hours</option>
+                                        <option value="12">12 hours</option>
+                                        <option value="24" selected>24 hours</option>
+                                        <option value="48">2 days</option>
+                                        <option value="72">3 days</option>
+                                        <option value="168">1 week</option>
+                                        <option value="">Permanent (no expiry)</option>
+                                    </select>
+                                </div>
+                                <div class="mt-3">
                                     <label class="form-label">Quick Presets</label>
                                     <div class="d-flex flex-wrap gap-2">
                                         <button type="button" class="btn btn-sm btn-outline-secondary speed-preset" data-down="5" data-up="2">5/2 Mbps</button>
@@ -3643,6 +3689,11 @@ try {
                                 </div>
                             </div>
                             <div class="modal-footer border-0">
+                                <?php if (!empty($subscription['speed_override'])): ?>
+                                <button type="submit" name="action" value="clear_speed_override" class="btn btn-outline-danger me-auto">
+                                    <i class="bi bi-x-circle me-1"></i> Clear Override
+                                </button>
+                                <?php endif; ?>
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-send me-1"></i> Apply Speed Override

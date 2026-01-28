@@ -681,7 +681,8 @@ class RadiusBilling {
     public function getSubscription(int $id): ?array {
         $stmt = $this->db->prepare("
             SELECT s.*, c.name as customer_name, c.phone as customer_phone,
-                   p.name as package_name, p.download_speed, p.upload_speed
+                   p.name as package_name, p.download_speed, p.upload_speed,
+                   p.fup_enabled, p.fup_quota_mb, p.fup_download_speed, p.fup_upload_speed
             FROM radius_subscriptions s
             LEFT JOIN customers c ON s.customer_id = c.id
             LEFT JOIN radius_packages p ON s.package_id = p.id
@@ -1427,35 +1428,48 @@ class RadiusBilling {
         $download = $sub['download_speed'] ?? '10M';
         $upload = $sub['upload_speed'] ?? '5M';
         
-        // Check if FUP applies
-        if (!empty($sub['fup_enabled']) && !empty($sub['data_quota_mb']) && ($sub['data_used_mb'] ?? 0) >= ($sub['fup_quota_mb'] ?? 0)) {
-            $download = $sub['fup_download_speed'] ?? '1M';
-            $upload = $sub['fup_upload_speed'] ?? '512k';
+        // Priority 1: Check for active subscription-level speed override (timed)
+        if (!empty($sub['speed_override'])) {
+            $expiresAt = $sub['override_expires_at'] ?? null;
+            if (!$expiresAt || strtotime($expiresAt) > time()) {
+                // Override is still active - parse it (format: download/upload e.g., "10M/5M")
+                $parts = explode('/', $sub['speed_override']);
+                if (count($parts) === 2) {
+                    return $sub['speed_override']; // Already in correct format
+                }
+            }
         }
         
-        // Check for time-based speed override
-        $override = $this->getActiveSpeedOverride($sub['package_id'] ?? null);
-        if ($override) {
-            $download = $override['download_speed'];
-            $upload = $override['upload_speed'];
+        // Priority 2: Check if FUP applies (quota exceeded)
+        if (!empty($sub['fup_enabled']) && !empty($sub['fup_quota_mb']) && ($sub['data_used_mb'] ?? 0) >= ($sub['fup_quota_mb'] ?? 0)) {
+            $download = $sub['fup_download_speed'] ?? '1M';
+            $upload = $sub['fup_upload_speed'] ?? '512k';
+            return "{$upload}/{$download}";
+        }
+        
+        // Priority 3: Check for time-based package speed schedule
+        $schedule = $this->getActivePackageSchedule($sub['package_id'] ?? null);
+        if ($schedule) {
+            $download = $schedule['download_speed'];
+            $upload = $schedule['upload_speed'];
         }
         
         return "{$upload}/{$download}";
     }
     
-    public function getActiveSpeedOverride(?int $packageId): ?array {
+    public function getActivePackageSchedule(?int $packageId): ?array {
         if (!$packageId) return null;
         
-        $currentTime = \date('H:i:s');
-        $currentDay = \strtolower(\date('l')); // monday, tuesday, etc.
+        $currentTime = date('H:i:s');
+        $currentDay = (string)date('w'); // 0=Sun, 1=Mon, ..., 6=Sat
         
         $stmt = $this->db->prepare("
             SELECT download_speed, upload_speed, name
-            FROM radius_speed_overrides
+            FROM radius_package_schedules
             WHERE package_id = ? 
             AND is_active = TRUE
-            AND start_time <= ?
-            AND end_time >= ?
+            AND start_time <= ?::time
+            AND end_time >= ?::time
             AND (
                 days_of_week IS NULL 
                 OR days_of_week = '' 
@@ -1570,6 +1584,96 @@ class RadiusBilling {
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nas['ip_address']];
         }
+    }
+    
+    // ==================== Timed Speed Override ====================
+    
+    public function setSpeedOverride(int $subscriptionId, string $rateLimit, ?int $durationHours = null): bool {
+        $expiresAt = $durationHours ? date('Y-m-d H:i:s', strtotime("+{$durationHours} hours")) : null;
+        
+        $stmt = $this->db->prepare("
+            UPDATE radius_subscriptions 
+            SET speed_override = ?, override_expires_at = ?, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        ");
+        return $stmt->execute([$rateLimit, $expiresAt, $subscriptionId]);
+    }
+    
+    public function clearSpeedOverride(int $subscriptionId): bool {
+        $stmt = $this->db->prepare("
+            UPDATE radius_subscriptions 
+            SET speed_override = NULL, override_expires_at = NULL, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        ");
+        return $stmt->execute([$subscriptionId]);
+    }
+    
+    public function clearExpiredOverrides(): int {
+        $stmt = $this->db->prepare("
+            UPDATE radius_subscriptions 
+            SET speed_override = NULL, override_expires_at = NULL, updated_at = CURRENT_TIMESTAMP 
+            WHERE override_expires_at IS NOT NULL AND override_expires_at < CURRENT_TIMESTAMP
+        ");
+        $stmt->execute();
+        return $stmt->rowCount();
+    }
+    
+    // ==================== Package Speed Schedules ====================
+    
+    public function getPackageSchedules(int $packageId): array {
+        $stmt = $this->db->prepare("
+            SELECT * FROM radius_package_schedules 
+            WHERE package_id = ? 
+            ORDER BY priority DESC, start_time
+        ");
+        $stmt->execute([$packageId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function createPackageSchedule(array $data): int {
+        $stmt = $this->db->prepare("
+            INSERT INTO radius_package_schedules 
+            (package_id, name, start_time, end_time, days_of_week, download_speed, upload_speed, priority, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $data['package_id'],
+            $data['name'],
+            $data['start_time'],
+            $data['end_time'],
+            $data['days_of_week'] ?? '0123456',
+            $data['download_speed'],
+            $data['upload_speed'],
+            $data['priority'] ?? 0,
+            $data['is_active'] ?? true
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function updatePackageSchedule(int $id, array $data): bool {
+        $stmt = $this->db->prepare("
+            UPDATE radius_package_schedules SET
+                name = ?, start_time = ?, end_time = ?, days_of_week = ?,
+                download_speed = ?, upload_speed = ?, priority = ?, is_active = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            $data['name'],
+            $data['start_time'],
+            $data['end_time'],
+            $data['days_of_week'] ?? '0123456',
+            $data['download_speed'],
+            $data['upload_speed'],
+            $data['priority'] ?? 0,
+            $data['is_active'] ?? true,
+            $id
+        ]);
+    }
+    
+    public function deletePackageSchedule(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM radius_package_schedules WHERE id = ?");
+        return $stmt->execute([$id]);
     }
     
     // ==================== MAC Authentication (Hotspot) ====================
