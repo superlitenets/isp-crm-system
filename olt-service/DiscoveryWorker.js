@@ -249,6 +249,13 @@ class DiscoveryWorker {
 
     async cleanupAuthorizedOnus(olt, currentAutofindOnus) {
         try {
+            // CRITICAL: Do not clean up if autofind returned empty result
+            // Empty result usually means the command failed or session issue
+            if (!currentAutofindOnus || currentAutofindOnus.length === 0) {
+                console.log(`[Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)`);
+                return;
+            }
+
             // Get all pending (not authorized) ONUs for this OLT from discovery log
             const pendingResult = await this.pool.query(`
                 SELECT id, serial_number FROM onu_discovery_log 
