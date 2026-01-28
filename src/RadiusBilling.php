@@ -1463,13 +1463,19 @@ class RadiusBilling {
         $currentTime = date('H:i:s');
         $currentDay = (string)date('w'); // 0=Sun, 1=Mon, ..., 6=Sat
         
+        // Handle both normal schedules (09:00-17:00) and overnight schedules (22:00-06:00)
         $stmt = $this->db->prepare("
             SELECT download_speed, upload_speed, name
             FROM radius_package_schedules
             WHERE package_id = ? 
             AND is_active = TRUE
-            AND start_time <= ?::time
-            AND end_time >= ?::time
+            AND (
+                -- Normal schedule (start < end): e.g., 09:00-17:00
+                (start_time <= end_time AND ?::time >= start_time AND ?::time <= end_time)
+                OR
+                -- Overnight schedule (start > end): e.g., 22:00-06:00
+                (start_time > end_time AND (?::time >= start_time OR ?::time <= end_time))
+            )
             AND (
                 days_of_week IS NULL 
                 OR days_of_week = '' 
@@ -1478,7 +1484,7 @@ class RadiusBilling {
             ORDER BY priority DESC
             LIMIT 1
         ");
-        $stmt->execute([$packageId, $currentTime, $currentTime, '%' . $currentDay . '%']);
+        $stmt->execute([$packageId, $currentTime, $currentTime, $currentTime, $currentTime, '%' . $currentDay . '%']);
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
