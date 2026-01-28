@@ -640,10 +640,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newPackage = $radiusBilling->getPackage($newPackageId);
                 $poolChanged = ($oldPackage['address_pool'] ?? null) !== ($newPackage['address_pool'] ?? null);
                 
-                // Detect if expiry is being changed to a past date (user becoming expired)
-                $wasActive = $oldExpiry && strtotime($oldExpiry) >= strtotime(date('Y-m-d'));
-                $nowExpired = $newExpiry && strtotime($newExpiry) < strtotime(date('Y-m-d'));
-                $expiryStatusChanged = $wasActive && $nowExpired;
+                // Detect if expiry date changed at all (past or future)
+                $expiryChanged = $oldExpiry !== $newExpiry;
                 
                 $stmt = $db->prepare("
                     UPDATE radius_subscriptions SET 
@@ -676,9 +674,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($oldPassword !== $newPassword) {
                     $needsDisconnect = true;
                     $disconnectReason = 'password changed';
-                } elseif ($expiryStatusChanged) {
+                } elseif ($expiryChanged) {
                     $needsDisconnect = true;
-                    $disconnectReason = 'expiry changed to past date';
+                    $disconnectReason = 'expiry date changed';
                 } elseif ($poolChanged) {
                     $needsDisconnect = true;
                     $disconnectReason = 'IP pool changed';
@@ -846,7 +844,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt = $db->prepare("UPDATE radius_subscriptions SET credit_balance = COALESCE(credit_balance, 0) + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                 $stmt->execute([$amount, $subId]);
-                $message = 'Credit of KES ' . number_format($amount) . ' added successfully';
+                
+                // Disconnect user after manual topup so they can reconnect with updated balance
+                $disconnectResult = $radiusBilling->disconnectSubscription($subId);
+                $disconnectMsg = '';
+                if (!empty($disconnectResult['success']) && $disconnectResult['disconnected'] > 0) {
+                    $disconnectMsg = ' User disconnected to apply changes.';
+                }
+                
+                $message = 'Credit of KES ' . number_format($amount) . ' added successfully.' . $disconnectMsg;
                 $messageType = 'success';
             } catch (Exception $e) {
                 $message = 'Error adding credit: ' . $e->getMessage();

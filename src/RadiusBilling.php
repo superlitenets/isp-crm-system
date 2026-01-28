@@ -1252,9 +1252,28 @@ class RadiusBilling {
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
         $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
         
-        // Check status - suspended users get rejected
+        // Get suspended pool settings (uses same pool as expired by default, or dedicated suspended-pool)
+        $suspendedPoolName = $this->getSetting('suspended_ip_pool') ?: $expiredPoolName;
+        $suspendedRateLimit = $this->getSetting('suspended_rate_limit') ?: $expiredRateLimit;
+        
+        // Suspended users authenticate but go to suspended/restricted pool for captive portal
         if ($sub['status'] === 'suspended') {
-            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
+            if ($useExpiredPool) {
+                return [
+                    'success' => true,
+                    'reply' => 'Access-Accept',
+                    'suspended' => true,
+                    'attributes' => [
+                        'Framed-Pool' => $suspendedPoolName,
+                        'Mikrotik-Rate-Limit' => $suspendedRateLimit,
+                        'Session-Timeout' => 300,
+                        'Acct-Interim-Interval' => 60
+                    ],
+                    'subscription' => $sub
+                ];
+            } else {
+                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
+            }
         }
         
         // Check if expired
@@ -1915,21 +1934,44 @@ class RadiusBilling {
     
     public function processAutoRenewals(): array {
         $renewed = 0;
+        $disconnected = 0;
         
         // Get subscriptions with auto_renew that expired today
         $stmt = $this->db->query("
-            SELECT s.id, s.package_id, b.status as billing_status FROM radius_subscriptions s
+            SELECT s.id, s.package_id, s.credit_balance, p.price as package_price, 
+                   b.status as billing_status 
+            FROM radius_subscriptions s
+            LEFT JOIN radius_packages p ON s.package_id = p.id
             LEFT JOIN radius_billing b ON b.subscription_id = s.id AND b.period_end = s.expiry_date
             WHERE s.auto_renew = TRUE AND s.expiry_date = CURRENT_DATE AND s.status = 'active'
             AND (b.status IS NULL OR b.status = 'paid')
         ");
         
         while ($sub = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            $result = $this->renewSubscription($sub['id']);
-            if ($result['success']) $renewed++;
+            $walletBalance = (float)($sub['credit_balance'] ?? 0);
+            $packagePrice = (float)($sub['package_price'] ?? 0);
+            
+            // Check if wallet has enough for renewal
+            if ($walletBalance >= $packagePrice && $packagePrice > 0) {
+                // Deduct from wallet
+                $newBalance = $walletBalance - $packagePrice;
+                $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
+                $updateStmt->execute([$newBalance, $sub['id']]);
+                
+                $result = $this->renewSubscription($sub['id']);
+                if ($result['success']) {
+                    $renewed++;
+                    
+                    // Disconnect user after wallet-based auto-renewal
+                    $disconnectResult = $this->disconnectSubscription($sub['id']);
+                    if ($disconnectResult['disconnected'] > 0) {
+                        $disconnected++;
+                    }
+                }
+            }
         }
         
-        return ['success' => true, 'renewed' => $renewed];
+        return ['success' => true, 'renewed' => $renewed, 'disconnected' => $disconnected];
     }
     
     // ==================== Expiry & Alerts ====================
@@ -2077,8 +2119,12 @@ class RadiusBilling {
                     $transactionId
                 ]);
                 
+                // Disconnect user after wallet-based renewal so they reconnect with new settings
+                $disconnectResult = $this->disconnectSubscription($sub['id']);
+                
                 $result['wallet_used'] = true;
                 $result['wallet_remaining'] = $remainingBalance;
+                $result['disconnected'] = $disconnectResult['disconnected'] ?? 0;
             }
             
             return $result;
