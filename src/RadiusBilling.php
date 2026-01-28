@@ -1223,14 +1223,19 @@ class RadiusBilling {
     }
     
     public function getAuthLogs(int $subscriptionId, int $limit = 20): array {
-        $stmt = $this->db->prepare("
-            SELECT * FROM radius_auth_logs 
-            WHERE subscription_id = ? 
-            ORDER BY created_at DESC 
-            LIMIT ?
-        ");
-        $stmt->execute([$subscriptionId, $limit]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->db->prepare("
+                SELECT * FROM radius_auth_logs 
+                WHERE subscription_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT ?
+            ");
+            $stmt->execute([$subscriptionId, $limit]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            // Table may not exist yet
+            return [];
+        }
     }
     
     public function authenticate(string $username, string $password, string $nasIp = '', string $callingStationId = ''): array {
