@@ -3,6 +3,9 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/Mpesa.php';
 require_once __DIR__ . '/../src/RadiusBilling.php';
 
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+
 $db = Database::getConnection();
 
 function getClientIP(): string {
@@ -35,24 +38,22 @@ $messageType = 'info';
 $stkPushSent = false;
 $lookupMode = false;
 
-// Load ISP settings
 $radiusBilling = new \App\RadiusBilling($db);
 $ispName = $radiusBilling->getSetting('isp_name') ?: 'Your ISP';
 $ispPhone = $radiusBilling->getSetting('isp_contact_phone') ?: '';
 $ispPhoneFormatted = $ispPhone ? preg_replace('/[^0-9]/', '', $ispPhone) : '';
 $ispWhatsApp = $ispPhoneFormatted ? '254' . substr($ispPhoneFormatted, -9) : '';
+$ispLogo = $radiusBilling->getSetting('isp_logo') ?: '';
+$mpesaPaybill = $radiusBilling->getSetting('mpesa_shortcode') ?: '';
 
-// Check if lookup by username/phone was submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'lookup') {
     $lookupValue = trim($_POST['lookup_value'] ?? '');
     if (!empty($lookupValue)) {
-        // Normalize phone number
         $phone = preg_replace('/[^0-9]/', '', $lookupValue);
         if (substr($phone, 0, 1) === '0') {
             $phone = '254' . substr($phone, 1);
         }
         
-        // Search by username or phone
         $stmt = $db->prepare("
             SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
                    p.name as package_name, p.price as package_price, p.validity_days,
@@ -76,7 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Try to find by IP if no lookup was done
 if (!$subscription && !$lookupMode) {
     $stmt = $db->prepare("
         SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
@@ -115,6 +115,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'stk_push' && $subscription) {
         $phone = $_POST['phone'] ?? $subscription['customer_phone'] ?? '';
         $amount = (int)($subscription['package_price'] ?? 0);
+        $walletBalance = (float)($subscription['credit_balance'] ?? 0);
+        
+        if ($walletBalance > 0 && $walletBalance < $amount) {
+            $amount = $amount - floor($walletBalance);
+        }
+        
         $accountRef = $subscription['username'];
         
         if (empty($phone)) {
@@ -129,15 +135,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($mpesa->isConfigured()) {
                     $result = $mpesa->stkPush($phone, $amount, $accountRef, "Internet Renewal - {$subscription['package_name']}");
                     if ($result && isset($result['ResponseCode']) && $result['ResponseCode'] == '0') {
-                        $message = "Payment request sent to your phone. Please enter your M-Pesa PIN to complete the payment.";
+                        $message = "Payment request sent! Check your phone for the M-Pesa prompt.";
                         $messageType = 'success';
                         $stkPushSent = true;
                     } else {
-                        $message = "Failed to send payment request. Error: " . ($result['errorMessage'] ?? $result['ResponseDescription'] ?? 'Unknown error');
+                        $message = "Failed to send payment request: " . ($result['errorMessage'] ?? $result['ResponseDescription'] ?? 'Unknown error');
                         $messageType = 'danger';
                     }
                 } else {
-                    $message = "To renew your subscription, please send KES " . number_format($amount) . " to our M-Pesa Paybill. Use your username '{$accountRef}' as the account number.";
+                    $message = "M-Pesa STK Push not configured. Please pay manually via Paybill.";
                     $messageType = 'info';
                 }
             } catch (Exception $e) {
@@ -155,273 +161,727 @@ try {
 } catch (Exception $e) {
     $mpesaConfigured = false;
 }
+
+$isSuspended = $subscription && ($subscription['status'] === 'suspended');
+$walletBalance = $subscription ? (float)($subscription['credit_balance'] ?? 0) : 0;
+$packagePrice = $subscription ? (float)($subscription['package_price'] ?? 0) : 0;
+$amountNeeded = max(0, $packagePrice - $walletBalance);
+
+$daysExpired = 0;
+if ($subscription && $subscription['expiry_date']) {
+    $expiryTime = strtotime($subscription['expiry_date']);
+    $daysExpired = max(0, floor((time() - $expiryTime) / 86400));
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subscription Expired</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title><?= $isSuspended ? 'Account Suspended' : 'Subscription Expired' ?> - <?= htmlspecialchars($ispName) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: <?= $isSuspended ? '#fd7e14' : '#dc3545' ?>;
+            --primary-dark: <?= $isSuspended ? '#e55a00' : '#c82333' ?>;
+            --success-color: #198754;
+        }
+        
+        * { box-sizing: border-box; }
+        
         body {
-            background: linear-gradient(135deg, #1e3a5f 0%, #0d1b2a 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .page-container {
+            width: 100%;
+            max-width: 440px;
+            animation: slideUp 0.5s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .expired-card {
+            background: #fff;
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 35px 25px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .card-header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.5;
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0 auto 20px;
+            font-size: 40px;
+            animation: <?= $isSuspended ? 'pulse 2s infinite' : 'shake 0.5s ease-in-out' ?>;
         }
-        .expired-card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 100%;
-            overflow: hidden;
+        
+        .header-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 8px;
         }
-        .expired-header {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
-        }
-        .expired-header .icon {
-            font-size: 64px;
+        
+        .header-subtitle {
+            opacity: 0.9;
+            font-size: 0.95rem;
             margin-bottom: 15px;
         }
-        .expired-body {
-            padding: 30px;
+        
+        .package-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
         }
-        .info-row {
+        
+        .days-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            backdrop-filter: blur(5px);
+        }
+        
+        .card-body {
+            padding: 25px;
+        }
+        
+        .info-grid {
+            display: grid;
+            gap: 0;
+        }
+        
+        .info-item {
             display: flex;
             justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #eee;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid #f0f0f0;
         }
-        .info-row:last-child {
+        
+        .info-item:last-child {
             border-bottom: none;
         }
+        
         .info-label {
             color: #6c757d;
-            font-size: 14px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        
         .info-value {
             font-weight: 600;
-            color: #1e3a5f;
+            color: #1a1a2e;
+            text-align: right;
         }
-        .renew-btn {
-            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
-            border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            font-weight: 600;
-            border-radius: 10px;
+        
+        .wallet-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .wallet-balance {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--success-color);
+        }
+        
+        .wallet-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .amount-needed {
+            background: linear-gradient(135deg, var(--success-color), #157347);
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .amount-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        .amount-label {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        
+        .payment-section {
+            margin-top: 25px;
+        }
+        
+        .phone-input-group {
+            position: relative;
+        }
+        
+        .phone-input {
             width: 100%;
+            padding: 16px 20px;
+            padding-left: 50px;
+            font-size: 1.1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .phone-input:focus {
+            outline: none;
+            border-color: var(--success-color);
+            box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.1);
+        }
+        
+        .phone-prefix {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+        
+        .pay-btn {
+            width: 100%;
+            padding: 18px;
+            font-size: 1.15rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--success-color), #157347);
+            color: white;
+            margin-top: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .pay-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(25, 135, 84, 0.3);
+        }
+        
+        .pay-btn:active {
+            transform: translateY(0);
+        }
+        
+        .mpesa-icon {
+            width: 28px;
+            height: 28px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--success-color);
+            font-weight: 700;
+            font-size: 0.7rem;
+        }
+        
+        .paybill-info {
+            background: #f8f9fa;
+            border-radius: 14px;
+            padding: 20px;
             margin-top: 20px;
         }
-        .renew-btn:hover {
-            background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+        
+        .paybill-title {
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .package-badge {
-            background: rgba(255,255,255,0.2);
-            padding: 8px 20px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-top: 10px;
+        
+        .paybill-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px dashed #dee2e6;
         }
-        .not-found {
+        
+        .paybill-row:last-child {
+            border-bottom: none;
+        }
+        
+        .copy-btn {
+            background: none;
+            border: none;
+            color: var(--success-color);
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background: rgba(25, 135, 84, 0.1);
+        }
+        
+        .waiting-payment {
             text-align: center;
-            padding: 60px 30px;
+            padding: 30px 20px;
         }
-        .not-found .icon {
-            font-size: 80px;
-            color: #6c757d;
-            margin-bottom: 20px;
+        
+        .waiting-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e9ecef;
+            border-top-color: var(--success-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
         }
-        .ip-badge {
-            background: rgba(0,0,0,0.1);
-            padding: 5px 15px;
-            border-radius: 15px;
-            font-size: 12px;
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .suspended-notice {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            border-left: 4px solid #fd7e14;
+            padding: 20px;
+            border-radius: 0 14px 14px 0;
+            margin: 20px 0;
+        }
+        
+        .contact-section {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+            margin-top: 20px;
+        }
+        
+        .contact-btns {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
             margin-top: 15px;
-            display: inline-block;
+        }
+        
+        .contact-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .contact-btn-call {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .contact-btn-call:hover {
+            background: #dee2e6;
+            color: #212529;
+        }
+        
+        .contact-btn-whatsapp {
+            background: #25d366;
+            color: white;
+        }
+        
+        .contact-btn-whatsapp:hover {
+            background: #1da851;
+            color: white;
+        }
+        
+        .not-found-card {
+            text-align: center;
+            padding: 50px 30px;
+        }
+        
+        .not-found-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 25px;
+            font-size: 50px;
+            color: white;
+        }
+        
+        .search-form {
+            margin-top: 30px;
+        }
+        
+        .search-input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1rem;
+        }
+        
+        .search-btn {
+            padding: 14px 24px;
+            background: #1a1a2e;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        
+        .isp-footer {
+            text-align: center;
+            margin-top: 25px;
+            color: rgba(255,255,255,0.6);
+            font-size: 0.85rem;
+        }
+        
+        .alert {
+            border-radius: 12px;
+            border: none;
+            padding: 15px 20px;
+        }
+        
+        .alert-success {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #842029;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #664d03;
+        }
+        
+        @media (max-width: 480px) {
+            body { padding: 15px; }
+            .card-header { padding: 30px 20px; }
+            .card-body { padding: 20px; }
+            .header-title { font-size: 1.5rem; }
+            .amount-value { font-size: 2rem; }
+            .contact-btns { flex-direction: column; }
+            .contact-btn { justify-content: center; }
         }
     </style>
 </head>
 <body>
-    <div class="expired-card">
-        <?php 
-        if ($subscription): 
-            $isSuspended = ($subscription['status'] === 'suspended');
-            $headerBg = $isSuspended ? 'linear-gradient(135deg, #fd7e14 0%, #e55a00 100%)' : 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
-            $headerIcon = $isSuspended ? 'bi-pause-circle' : 'bi-exclamation-triangle';
-            $headerTitle = $isSuspended ? 'Account Suspended' : 'Subscription Expired';
-            $headerSubtitle = $isSuspended ? 'Your account has been suspended' : 'Your internet subscription has expired';
-        ?>
-        <div class="expired-header" style="background: <?= $headerBg ?>;">
-            <div class="icon"><i class="bi <?= $headerIcon ?>"></i></div>
-            <h2 class="mb-2"><?= $headerTitle ?></h2>
-            <p class="mb-0 opacity-75"><?= $headerSubtitle ?></p>
-            <div class="package-badge">
-                <i class="bi bi-box me-1"></i> <?= htmlspecialchars($subscription['package_name'] ?? 'Unknown Package') ?>
-            </div>
-        </div>
-        <div class="expired-body">
-            <?php if ($message): ?>
-            <div class="alert alert-<?= $messageType ?> mb-4">
-                <?= htmlspecialchars($message) ?>
-            </div>
-            <?php endif; ?>
-            
-            <div class="info-row">
-                <span class="info-label">Customer Name</span>
-                <span class="info-value"><?= htmlspecialchars($subscription['customer_name'] ?? 'N/A') ?></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Username</span>
-                <span class="info-value"><?= htmlspecialchars($subscription['username']) ?></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Package</span>
-                <span class="info-value">
-                    <?= htmlspecialchars($subscription['package_name'] ?? 'N/A') ?>
-                    <br><small class="text-muted"><?= $subscription['download_speed'] ?? '' ?>/<?= $subscription['upload_speed'] ?? '' ?></small>
-                </span>
-            </div>
-            <?php if ($isSuspended): ?>
-            <div class="info-row">
-                <span class="info-label">Status</span>
-                <span class="info-value text-warning">
-                    <i class="bi bi-pause-circle-fill me-1"></i> Suspended
-                </span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Expires</span>
-                <span class="info-value">
-                    <?= $subscription['expiry_date'] ? date('M j, Y', strtotime($subscription['expiry_date'])) : 'N/A' ?>
-                </span>
-            </div>
-            <div class="alert alert-warning mt-3">
-                <i class="bi bi-info-circle me-1"></i>
-                Your account has been suspended. Please contact support to resolve this issue and reactivate your service.
-            </div>
-            <?php else: ?>
-            <div class="info-row">
-                <span class="info-label">Expired On</span>
-                <span class="info-value text-danger">
-                    <?= $subscription['expiry_date'] ? date('M j, Y', strtotime($subscription['expiry_date'])) : 'N/A' ?>
-                </span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Renewal Amount</span>
-                <span class="info-value text-success fs-5">KES <?= number_format($subscription['package_price'] ?? 0) ?></span>
-            </div>
-            <?php endif; ?>
-            <div class="info-row">
-                <span class="info-label">Your IP Address</span>
-                <span class="info-value"><code><?= htmlspecialchars($clientIP) ?></code></span>
-            </div>
-            
-            <?php if (!$isSuspended): ?>
-            <?php if ($stkPushSent): ?>
-            <div class="text-center py-4">
-                <div class="spinner-border text-success mb-3" role="status"></div>
-                <h5>Waiting for Payment...</h5>
-                <p class="text-muted">Check your phone for the M-Pesa prompt</p>
-                <button onclick="location.reload()" class="btn btn-outline-secondary mt-3">
-                    <i class="bi bi-arrow-clockwise me-1"></i> Refresh Status
-                </button>
-            </div>
-            <?php else: ?>
-            <form method="post">
-                <input type="hidden" name="action" value="stk_push">
-                <div class="mb-3">
-                    <label class="form-label text-muted small">M-Pesa Phone Number</label>
-                    <input type="tel" name="phone" class="form-control form-control-lg" 
-                           value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" 
-                           placeholder="0712345678" required
-                           pattern="^(07|01|2547|2541)[0-9]{8}$">
-                    <div class="form-text">Enter the phone number to receive M-Pesa payment request</div>
+    <div class="page-container">
+        <div class="expired-card">
+            <?php if ($subscription): ?>
+            <div class="card-header">
+                <div class="header-content">
+                    <?php if ($daysExpired > 0 && !$isSuspended): ?>
+                    <div class="days-badge">
+                        <i class="bi bi-calendar-x me-1"></i>
+                        <?= $daysExpired ?> day<?= $daysExpired > 1 ? 's' : '' ?> ago
+                    </div>
+                    <?php endif; ?>
+                    
+                    <div class="status-icon">
+                        <i class="bi <?= $isSuspended ? 'bi-pause-circle-fill' : 'bi-wifi-off' ?>"></i>
+                    </div>
+                    
+                    <h1 class="header-title">
+                        <?= $isSuspended ? 'Account Suspended' : 'Subscription Expired' ?>
+                    </h1>
+                    <p class="header-subtitle">
+                        <?= $isSuspended ? 'Your account has been suspended' : 'Renew now to restore your internet' ?>
+                    </p>
+                    
+                    <div class="package-pill">
+                        <i class="bi bi-speedometer2"></i>
+                        <?= htmlspecialchars($subscription['package_name'] ?? 'Package') ?>
+                        <?php if ($subscription['download_speed']): ?>
+                        <span style="opacity:0.7">|</span>
+                        <?= htmlspecialchars($subscription['download_speed']) ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-success renew-btn">
-                    <i class="bi bi-phone me-2"></i> Pay KES <?= number_format($subscription['package_price'] ?? 0) ?> via M-Pesa
-                </button>
-            </form>
-            <?php endif; ?>
-            <?php endif; ?>
+            </div>
             
-            <?php if ($ispPhone): ?>
-            <div class="text-center mt-4">
-                <p class="text-muted small mb-2">Need help? Contact <?= htmlspecialchars($ispName) ?>:</p>
-                <div class="d-flex justify-content-center gap-3">
-                    <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-telephone me-1"></i> <?= htmlspecialchars($ispPhone) ?>
-                    </a>
-                    <?php if ($ispWhatsApp): ?>
-                    <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>" class="btn btn-outline-success btn-sm">
-                        <i class="bi bi-whatsapp me-1"></i> WhatsApp
-                    </a>
+            <div class="card-body">
+                <?php if ($message): ?>
+                <div class="alert alert-<?= $messageType ?> mb-4">
+                    <i class="bi bi-<?= $messageType === 'success' ? 'check-circle' : ($messageType === 'danger' ? 'exclamation-circle' : 'info-circle') ?> me-2"></i>
+                    <?= htmlspecialchars($message) ?>
+                </div>
+                <?php endif; ?>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-person"></i> Account</span>
+                        <span class="info-value"><?= htmlspecialchars($subscription['customer_name'] ?? 'N/A') ?></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-key"></i> Username</span>
+                        <span class="info-value"><?= htmlspecialchars($subscription['username']) ?></span>
+                    </div>
+                    <?php if (!$isSuspended): ?>
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-calendar-x"></i> Expired</span>
+                        <span class="info-value text-danger">
+                            <?= $subscription['expiry_date'] ? date('M j, Y', strtotime($subscription['expiry_date'])) : 'N/A' ?>
+                        </span>
+                    </div>
+                    <?php else: ?>
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-shield-x"></i> Status</span>
+                        <span class="info-value" style="color: var(--primary-color);">
+                            <i class="bi bi-pause-circle-fill me-1"></i> Suspended
+                        </span>
+                    </div>
                     <?php endif; ?>
                 </div>
-            </div>
-            <?php endif; ?>
-        </div>
-        <?php else: ?>
-        <div class="not-found">
-            <div class="icon"><i class="bi bi-exclamation-circle text-warning"></i></div>
-            <h3 class="mb-3">Account Not Found</h3>
-            <p class="text-muted mb-4">We couldn't find your account in our system. Please contact <strong><?= htmlspecialchars($ispName) ?></strong> to register or get assistance.</p>
-            
-            <?php if ($message): ?>
-            <div class="alert alert-<?= $messageType ?> text-start mb-4">
-                <?= htmlspecialchars($message) ?>
-            </div>
-            <?php endif; ?>
-            
-            <div class="card bg-light mb-4">
-                <div class="card-body text-center">
-                    <h5 class="card-title mb-3"><i class="bi bi-headset me-2"></i>Contact <?= htmlspecialchars($ispName) ?></h5>
-                    <?php if ($ispPhone): ?>
-                    <div class="d-flex justify-content-center gap-3 mb-3">
-                        <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="btn btn-primary">
-                            <i class="bi bi-telephone me-2"></i> Call <?= htmlspecialchars($ispPhone) ?>
+                
+                <?php if ($isSuspended): ?>
+                <div class="suspended-notice">
+                    <strong><i class="bi bi-exclamation-triangle me-2"></i>Account Suspended</strong>
+                    <p class="mb-0 mt-2" style="font-size: 0.9rem;">
+                        Your account has been suspended. Please contact <?= htmlspecialchars($ispName) ?> support to resolve this issue and reactivate your service.
+                    </p>
+                </div>
+                <?php else: ?>
+                
+                <?php if ($walletBalance > 0): ?>
+                <div class="wallet-card">
+                    <div class="wallet-label">Wallet Balance</div>
+                    <div class="wallet-balance">KES <?= number_format($walletBalance, 0) ?></div>
+                    <?php if ($walletBalance >= $packagePrice): ?>
+                    <div class="text-success mt-2"><i class="bi bi-check-circle me-1"></i> Sufficient for renewal!</div>
+                    <?php else: ?>
+                    <div class="text-muted mt-2">Need KES <?= number_format($amountNeeded, 0) ?> more</div>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+                
+                <div class="amount-needed">
+                    <div class="amount-label">Amount to Pay</div>
+                    <div class="amount-value">KES <?= number_format($amountNeeded, 0) ?></div>
+                    <div class="amount-label" style="margin-top:5px;">
+                        <?= $subscription['validity_days'] ? $subscription['validity_days'] . ' days validity' : '' ?>
+                    </div>
+                </div>
+                
+                <?php if ($stkPushSent): ?>
+                <div class="waiting-payment">
+                    <div class="waiting-spinner"></div>
+                    <h5>Waiting for Payment</h5>
+                    <p class="text-muted">Check your phone for the M-Pesa prompt<br>and enter your PIN to complete</p>
+                    <button onclick="location.reload()" class="btn btn-outline-secondary mt-3">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Check Status
+                    </button>
+                </div>
+                <script>
+                    setTimeout(function() { location.reload(); }, 30000);
+                </script>
+                <?php else: ?>
+                <div class="payment-section">
+                    <form method="post">
+                        <input type="hidden" name="action" value="stk_push">
+                        <div class="phone-input-group">
+                            <i class="bi bi-phone phone-prefix"></i>
+                            <input type="tel" name="phone" class="phone-input" 
+                                   value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" 
+                                   placeholder="0712 345 678" required
+                                   pattern="^(07|01|2547|2541)[0-9]{8}$">
+                        </div>
+                        <button type="submit" class="pay-btn">
+                            <span class="mpesa-icon">M</span>
+                            Pay KES <?= number_format($amountNeeded, 0) ?> with M-Pesa
+                        </button>
+                    </form>
+                    
+                    <?php if ($mpesaPaybill): ?>
+                    <div class="paybill-info">
+                        <div class="paybill-title">
+                            <i class="bi bi-info-circle"></i> Or Pay via Paybill
+                        </div>
+                        <div class="paybill-row">
+                            <span class="text-muted">Paybill Number</span>
+                            <span>
+                                <strong><?= htmlspecialchars($mpesaPaybill) ?></strong>
+                                <button class="copy-btn" onclick="copyText('<?= htmlspecialchars($mpesaPaybill) ?>')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </span>
+                        </div>
+                        <div class="paybill-row">
+                            <span class="text-muted">Account Number</span>
+                            <span>
+                                <strong><?= htmlspecialchars($subscription['username']) ?></strong>
+                                <button class="copy-btn" onclick="copyText('<?= htmlspecialchars($subscription['username']) ?>')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </span>
+                        </div>
+                        <div class="paybill-row">
+                            <span class="text-muted">Amount</span>
+                            <span><strong>KES <?= number_format($amountNeeded, 0) ?></strong></span>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+                <?php endif; ?>
+                
+                <?php if ($ispPhone): ?>
+                <div class="contact-section">
+                    <p class="text-muted mb-0">Need help?</p>
+                    <div class="contact-btns">
+                        <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="contact-btn contact-btn-call">
+                            <i class="bi bi-telephone"></i>
+                            <?= htmlspecialchars($ispPhone) ?>
                         </a>
                         <?php if ($ispWhatsApp): ?>
-                        <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account" class="btn btn-success">
-                            <i class="bi bi-whatsapp me-2"></i> WhatsApp
+                        <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account%20(<?= urlencode($subscription['username']) ?>)" 
+                           class="contact-btn contact-btn-whatsapp">
+                            <i class="bi bi-whatsapp"></i>
+                            WhatsApp
                         </a>
                         <?php endif; ?>
                     </div>
-                    <?php else: ?>
-                    <p class="text-muted">Please contact your ISP for assistance.</p>
-                    <?php endif; ?>
                 </div>
+                <?php endif; ?>
             </div>
             
-            <hr class="my-4">
-            
-            <p class="text-muted small mb-3">Already have an account? Search by username or phone:</p>
-            <form method="post" class="text-start mb-4">
-                <input type="hidden" name="action" value="lookup">
-                <div class="input-group">
-                    <input type="text" name="lookup_value" class="form-control" 
-                           placeholder="Username or phone number" required
-                           value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
-                    <button type="submit" class="btn btn-outline-primary">
-                        <i class="bi bi-search"></i> Search
-                    </button>
+            <?php else: ?>
+            <div class="not-found-card">
+                <div class="not-found-icon">
+                    <i class="bi bi-question-lg"></i>
                 </div>
-            </form>
-            
-            <div class="ip-badge">
-                <i class="bi bi-geo-alt me-1"></i> Your IP: <?= htmlspecialchars($clientIP) ?>
+                <h3>Account Not Found</h3>
+                <p class="text-muted">We couldn't identify your account.<br>Please search using your details below.</p>
+                
+                <?php if ($message): ?>
+                <div class="alert alert-<?= $messageType ?> text-start mb-4">
+                    <?= htmlspecialchars($message) ?>
+                </div>
+                <?php endif; ?>
+                
+                <form method="post" class="search-form">
+                    <input type="hidden" name="action" value="lookup">
+                    <div class="search-input-group">
+                        <input type="text" name="lookup_value" class="search-input" 
+                               placeholder="Username or phone number" required
+                               value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
+                        <button type="submit" class="search-btn">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </form>
+                
+                <?php if ($ispPhone): ?>
+                <div class="contact-section" style="border-top: none; margin-top: 30px;">
+                    <p class="text-muted mb-0">Contact <?= htmlspecialchars($ispName) ?></p>
+                    <div class="contact-btns">
+                        <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="contact-btn contact-btn-call">
+                            <i class="bi bi-telephone"></i> Call
+                        </a>
+                        <?php if ($ispWhatsApp): ?>
+                        <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account" 
+                           class="contact-btn contact-btn-whatsapp">
+                            <i class="bi bi-whatsapp"></i> WhatsApp
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <div class="text-muted mt-4" style="font-size: 0.8rem;">
+                    <i class="bi bi-geo-alt me-1"></i> Your IP: <?= htmlspecialchars($clientIP) ?>
+                </div>
             </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
+        
+        <div class="isp-footer">
+            <strong><?= htmlspecialchars($ispName) ?></strong>
+        </div>
     </div>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Copied: ' + text);
+            });
+        }
+    </script>
 </body>
 </html>
