@@ -531,27 +531,42 @@ class DiscoveryWorker {
     }
 
     async sendPendingNotifications() {
-        const result = await this.pool.query(`
-            SELECT d.*, o.name as olt_name, o.ip_address as olt_ip, 
-                   b.name as branch_name, b.code as branch_code, b.whatsapp_group
-            FROM onu_discovery_log d
-            JOIN huawei_olts o ON d.olt_id = o.id
-            LEFT JOIN branches b ON o.branch_id = b.id
-            WHERE d.notified = false AND d.authorized = false
-        `);
+        // Use transaction with SELECT FOR UPDATE to prevent duplicate notifications
+        const client = await this.pool.connect();
+        let result;
+        try {
+            await client.query('BEGIN');
+            
+            // Lock and immediately mark as notified to prevent race conditions
+            result = await client.query(`
+                WITH pending AS (
+                    SELECT d.id
+                    FROM onu_discovery_log d
+                    WHERE d.notified = false AND d.authorized = false
+                    FOR UPDATE SKIP LOCKED
+                )
+                UPDATE onu_discovery_log d
+                SET notified = true, notified_at = CURRENT_TIMESTAMP
+                FROM pending p
+                WHERE d.id = p.id
+                RETURNING d.*, 
+                    (SELECT name FROM huawei_olts WHERE id = d.olt_id) as olt_name,
+                    (SELECT ip_address FROM huawei_olts WHERE id = d.olt_id) as olt_ip,
+                    (SELECT b.name FROM huawei_olts o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.id = d.olt_id) as branch_name,
+                    (SELECT b.code FROM huawei_olts o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.id = d.olt_id) as branch_code,
+                    (SELECT b.whatsapp_group FROM huawei_olts o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.id = d.olt_id) as whatsapp_group
+            `);
+            
+            await client.query('COMMIT');
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error('[Discovery] Error locking notifications:', error.message);
+            return;
+        } finally {
+            client.release();
+        }
 
         if (result.rows.length === 0) {
-            // Debug: check if there are any pending but why they're not queued
-            const debugResult = await this.pool.query(`
-                SELECT COUNT(*) as total, 
-                       SUM(CASE WHEN notified = false AND authorized = false THEN 1 ELSE 0 END) as pending,
-                       SUM(CASE WHEN authorized = true THEN 1 ELSE 0 END) as authorized
-                FROM onu_discovery_log WHERE first_seen_at > NOW() - INTERVAL '1 hour'
-            `);
-            const stats = debugResult.rows[0];
-            if (parseInt(stats.total) > 0) {
-                console.log(`[Discovery] No pending notifications (last hour: ${stats.total} total, ${stats.pending} pending, ${stats.authorized} authorized)`);
-            }
             return;
         }
 
@@ -560,9 +575,6 @@ class DiscoveryWorker {
         const notifyEnabled = await this.isDiscoveryNotifyEnabled();
         if (!notifyEnabled) {
             console.log('[Discovery] Discovery notifications disabled in settings');
-            for (const d of result.rows) {
-                await this.markNotified(d.id, true);
-            }
             return;
         }
 
@@ -610,15 +622,12 @@ class DiscoveryWorker {
                 });
 
                 if (response.data && response.data.success) {
-                    for (const d of discoveries) {
-                        await this.markNotified(d.id, true);
-                    }
                     console.log(`[Discovery] Notified group about ${discoveries.length} new ONUs`);
                 } else {
                     console.error(`[Discovery] PHP API returned failure:`, JSON.stringify(response.data));
                 }
             } catch (error) {
-                console.error(`[Discovery] Failed to notify (will retry):`, error.message);
+                console.error(`[Discovery] Failed to notify:`, error.message);
                 if (error.response) {
                     console.error(`[Discovery] Response status: ${error.response.status}, data:`, JSON.stringify(error.response.data));
                 }
