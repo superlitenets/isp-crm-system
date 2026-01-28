@@ -285,31 +285,6 @@ services:
     networks:
       - crm_network
 
-  license-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: isp_crm_license_server
-    restart: unless-stopped
-    depends_on:
-      - db
-    environment:
-      - TZ=Africa/Nairobi
-      - LICENSE_DB_HOST=isp_crm_db
-      - LICENSE_DB_PORT=5432
-      - LICENSE_DB_NAME=${POSTGRES_DB}
-      - LICENSE_DB_USER=${POSTGRES_USER}
-      - LICENSE_DB_PASSWORD=${POSTGRES_PASSWORD}
-      - LICENSE_JWT_SECRET=${LICENSE_JWT_SECRET:-isp-crm-license-server-jwt-secret-2026}
-      - LICENSE_ADMIN_PASSWORD=${LICENSE_ADMIN_PASSWORD:-LicenseAdmin2026!}
-    ports:
-      - "8081:80"
-    volumes:
-      - ./license-server:/var/www/html/license-server:ro
-    networks:
-      - crm_network
-    command: ["php", "-S", "0.0.0.0:80", "-t", "/var/www/html/license-server/public"]
-
 networks:
   crm_network:
     driver: bridge
