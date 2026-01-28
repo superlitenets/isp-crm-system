@@ -8,6 +8,10 @@ class SNMPPollingWorker {
         this.pool = new Pool({
             connectionString: process.env.DATABASE_URL
         });
+        // Set timezone on each connection to match PHP (Africa/Nairobi)
+        this.pool.on('connect', (client) => {
+            client.query("SET timezone TO 'Africa/Nairobi'");
+        });
         this.sessionManager = sessionManager;
         this.isRunning = false;
         this.cronJob = null;

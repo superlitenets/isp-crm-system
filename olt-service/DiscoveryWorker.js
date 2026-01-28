@@ -8,6 +8,10 @@ class DiscoveryWorker {
         this.pool = new Pool({
             connectionString: process.env.DATABASE_URL
         });
+        // Set timezone on each connection to match PHP (Africa/Nairobi)
+        this.pool.on('connect', (client) => {
+            client.query("SET timezone TO 'Africa/Nairobi'");
+        });
         this.isRunning = false;
         this.phpApiUrl = process.env.PHP_API_URL || 'http://localhost:5000';
         this.cronJob = null;
