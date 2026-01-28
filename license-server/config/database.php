@@ -21,11 +21,11 @@ if (empty($adminPassword) || $adminPassword === 'change-this-in-production') {
 }
 
 return [
-    'host' => getenv('LICENSE_DB_HOST') ?: 'localhost',
-    'port' => getenv('LICENSE_DB_PORT') ?: '5432',
-    'database' => getenv('LICENSE_DB_NAME') ?: 'license_server',
-    'username' => getenv('LICENSE_DB_USER') ?: 'postgres',
-    'password' => getenv('LICENSE_DB_PASSWORD') ?: '',
+    'host' => getenv('LICENSE_DB_HOST') ?: getenv('PGHOST') ?: 'localhost',
+    'port' => getenv('LICENSE_DB_PORT') ?: getenv('PGPORT') ?: '5432',
+    'database' => getenv('LICENSE_DB_NAME') ?: getenv('PGDATABASE') ?: 'license_server',
+    'username' => getenv('LICENSE_DB_USER') ?: getenv('PGUSER') ?: 'postgres',
+    'password' => getenv('LICENSE_DB_PASSWORD') ?: getenv('PGPASSWORD') ?: '',
     
     'jwt_secret' => $jwtSecret ?: 'change-this-in-production',
     'admin_password' => $adminPassword ?: 'change-this-in-production',

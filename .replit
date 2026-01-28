@@ -23,6 +23,10 @@ args = "WhatsApp Service"
 task = "workflow.run"
 args = "OLT Session Manager"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "License Server"
+
 [[workflows.workflow]]
 name = "Start PHP Server"
 author = "agent"
@@ -59,6 +63,18 @@ waitForPort = 3002
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "License Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php -S 0.0.0.0:8080 -t license-server/public"
+waitForPort = 8080
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 3002
 externalPort = 80
@@ -66,6 +82,10 @@ externalPort = 80
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
 
 [nix]
 channel = "stable-25_05"
@@ -79,3 +99,5 @@ ONE_ISP_PASSWORD = "demo@123"
 SMARTOLT_API_URL = "https://betacom.smartolt.com"
 SMARTOLT_API_KEY = "470e8903ab194051af3e6cb67dffc309"
 SKIP_DB_INIT = "1"
+LICENSE_JWT_SECRET = "isp-crm-license-server-jwt-secret-2026"
+LICENSE_ADMIN_PASSWORD = "LicenseAdmin2026!"
