@@ -935,7 +935,20 @@ app.post('/radius/coa', async (req, res) => {
         if (sessionId) attributes.push(['Acct-Session-Id', sessionId]);
         if (rateLimit) {
             // MikroTik-Rate-Limit VSA (Vendor 14988, Type 8)
-            attributes.push(['Vendor-Specific', 14988, [['Mikrotik-Rate-Limit', rateLimit]]]);
+            // Must encode as raw Buffer: Vendor-ID (4 bytes) + Type (1) + Length (1) + Value
+            const rateLimitStr = String(rateLimit);
+            const vendorId = 14988; // MikroTik
+            const attrType = 8; // Mikrotik-Rate-Limit
+            const attrValue = Buffer.from(rateLimitStr, 'utf8');
+            const attrLen = 2 + attrValue.length; // Type + Length + Value
+            
+            const vsaBuffer = Buffer.alloc(4 + attrLen);
+            vsaBuffer.writeUInt32BE(vendorId, 0);
+            vsaBuffer.writeUInt8(attrType, 4);
+            vsaBuffer.writeUInt8(attrLen, 5);
+            attrValue.copy(vsaBuffer, 6);
+            
+            attributes.push(['Vendor-Specific', vsaBuffer]);
         }
         if (framedPool) {
             // Framed-Pool attribute (type 88) - assigns user to IP pool
