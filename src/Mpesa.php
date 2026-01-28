@@ -490,7 +490,7 @@ class Mpesa {
                     
                     // Only disconnect if subscription was expired - allows subscriber to redial with new session
                     if ($wasExpired) {
-                        $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
+                        $disconnectResult = $radiusBilling->disconnectSubscription($subscription['id']);
                         if ($disconnectResult['success']) {
                             error_log("Disconnected expired {$subscription['username']} after STK payment for session refresh");
                         }
@@ -643,7 +643,7 @@ class Mpesa {
                     
                     // Only disconnect if subscription was expired - allows subscriber to redial with new session
                     if ($wasExpired) {
-                        $disconnectResult = $radiusBilling->disconnectSubscriber($subscription['id']);
+                        $disconnectResult = $radiusBilling->disconnectSubscription($subscription['id']);
                         if ($disconnectResult['success']) {
                             error_log("Disconnected expired {$subscription['username']} after C2B payment for session refresh");
                         }

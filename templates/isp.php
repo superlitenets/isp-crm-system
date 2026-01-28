@@ -630,8 +630,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $currentSub = $radiusBilling->getSubscription($id);
                 $oldPackageId = $currentSub['package_id'] ?? null;
                 $oldPassword = $currentSub['password'] ?? '';
+                $oldExpiry = $currentSub['expiry_date'] ?? null;
                 $newPackageId = (int)$_POST['package_id'];
                 $newPassword = $_POST['password'];
+                $newExpiry = $_POST['expiry_date'] ?: null;
+                
+                // Check if old package and new package have different address pools
+                $oldPackage = $oldPackageId ? $radiusBilling->getPackage($oldPackageId) : null;
+                $newPackage = $radiusBilling->getPackage($newPackageId);
+                $poolChanged = ($oldPackage['address_pool'] ?? null) !== ($newPackage['address_pool'] ?? null);
+                
+                // Detect if expiry is being changed to a past date (user becoming expired)
+                $wasActive = $oldExpiry && strtotime($oldExpiry) >= strtotime(date('Y-m-d'));
+                $nowExpired = $newExpiry && strtotime($newExpiry) < strtotime(date('Y-m-d'));
+                $expiryStatusChanged = $wasActive && $nowExpired;
                 
                 $stmt = $db->prepare("
                     UPDATE radius_subscriptions SET 
@@ -649,7 +661,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newPackageId,
                     $newPassword,
                     $radiusBilling->encryptPassword($newPassword),
-                    $_POST['expiry_date'] ?: null,
+                    $newExpiry,
                     !empty($_POST['static_ip']) ? $_POST['static_ip'] : null,
                     !empty($_POST['mac_address']) ? $_POST['mac_address'] : null,
                     isset($_POST['auto_renew']) ? 'true' : 'false',
@@ -657,16 +669,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 
                 $coaMessage = '';
+                $needsDisconnect = false;
+                $disconnectReason = '';
                 
-                // If password changed, disconnect user (must reconnect with new credentials)
+                // Determine if disconnect is needed
                 if ($oldPassword !== $newPassword) {
+                    $needsDisconnect = true;
+                    $disconnectReason = 'password changed';
+                } elseif ($expiryStatusChanged) {
+                    $needsDisconnect = true;
+                    $disconnectReason = 'expiry changed to past date';
+                } elseif ($poolChanged) {
+                    $needsDisconnect = true;
+                    $disconnectReason = 'IP pool changed';
+                }
+                
+                if ($needsDisconnect) {
                     $disconnectResult = $radiusBilling->disconnectSubscription($id);
                     if (!empty($disconnectResult['success']) && $disconnectResult['disconnected'] > 0) {
-                        $coaMessage = ' User disconnected (password changed).';
+                        $coaMessage = " User disconnected ({$disconnectReason}).";
+                    } elseif (!empty($disconnectResult['success'])) {
+                        $coaMessage = " No active sessions to disconnect.";
                     }
-                }
-                // Otherwise if package changed, send speed update CoA
-                elseif ($oldPackageId != $newPackageId) {
+                } elseif ($oldPackageId != $newPackageId) {
+                    // Package changed but same pool - just update speed
                     $coaResult = $radiusBilling->sendSpeedUpdateCoA($id);
                     if ($coaResult['success']) {
                         $coaMessage = ' Speed updated via CoA.';
