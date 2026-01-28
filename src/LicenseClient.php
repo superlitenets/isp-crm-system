@@ -132,14 +132,21 @@ class LicenseClient {
     private function callServer(string $endpoint, array $data): array {
         $url = rtrim($this->config['server_url'], '/') . '/api/' . $endpoint;
         
+        $parsedUrl = parse_url($this->config['server_url']);
+        $host = $parsedUrl['host'] ?? '';
+        $isIpAddress = filter_var($host, FILTER_VALIDATE_IP) !== false;
+        $isHttps = ($parsedUrl['scheme'] ?? '') === 'https';
+        
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($data),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => true
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => $isHttps && !$isIpAddress,
+            CURLOPT_SSL_VERIFYHOST => $isHttps && !$isIpAddress ? 2 : 0
         ]);
         
         $response = curl_exec($ch);
