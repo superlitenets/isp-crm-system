@@ -552,6 +552,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
+        case 'create_package_schedule':
+            $packageId = (int)$_POST['package_id'];
+            $downloadSpeed = (int)$_POST['download_speed'] . ($_POST['download_unit'] === 'k' ? 'k' : 'M');
+            $uploadSpeed = (int)$_POST['upload_speed'] . ($_POST['upload_unit'] === 'k' ? 'k' : 'M');
+            $daysOfWeek = implode('', $_POST['days'] ?? []);
+            
+            try {
+                $radiusBilling->createPackageSchedule([
+                    'package_id' => $packageId,
+                    'name' => $_POST['name'],
+                    'start_time' => $_POST['start_time'],
+                    'end_time' => $_POST['end_time'],
+                    'days_of_week' => $daysOfWeek,
+                    'download_speed' => $downloadSpeed,
+                    'upload_speed' => $uploadSpeed,
+                    'priority' => (int)($_POST['priority'] ?? 0),
+                    'is_active' => (bool)($_POST['is_active'] ?? true)
+                ]);
+                $message = 'Speed schedule created successfully';
+                $messageType = 'success';
+            } catch (\Exception $e) {
+                $message = 'Error creating schedule: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            header("Location: ?page=isp&view=package_schedules&package_id={$packageId}&msg=" . urlencode($message) . "&type={$messageType}");
+            exit;
+            
+        case 'delete_package_schedule':
+            $scheduleId = (int)$_POST['schedule_id'];
+            $packageId = (int)$_POST['package_id'];
+            try {
+                $radiusBilling->deletePackageSchedule($scheduleId);
+                $message = 'Speed schedule deleted';
+                $messageType = 'success';
+            } catch (\Exception $e) {
+                $message = 'Error deleting schedule: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            header("Location: ?page=isp&view=package_schedules&package_id={$packageId}&msg=" . urlencode($message) . "&type={$messageType}");
+            exit;
+            
         case 'create_subscription':
             $postData = $_POST;
             $customerId = null;
@@ -4545,10 +4586,13 @@ try {
                                     <th>Quota</th>
                                     <th>Sessions</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($packages as $pkg): ?>
+                                <?php foreach ($packages as $pkg): 
+                                    $scheduleCount = count($radiusBilling->getPackageSchedules($pkg['id']));
+                                ?>
                                 <tr>
                                     <td>
                                         <strong><?= htmlspecialchars($pkg['name']) ?></strong>
@@ -4562,6 +4606,9 @@ try {
                                     <td>
                                         <i class="bi bi-arrow-down text-success"></i> <?= $pkg['download_speed'] ?>
                                         <i class="bi bi-arrow-up text-primary ms-2"></i> <?= $pkg['upload_speed'] ?>
+                                        <?php if ($pkg['fup_enabled']): ?>
+                                        <br><small class="text-warning"><i class="bi bi-exclamation-triangle"></i> FUP: <?= $pkg['fup_download_speed'] ?>/<?= $pkg['fup_upload_speed'] ?></small>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?= $pkg['data_quota_mb'] ? number_format($pkg['data_quota_mb'] / 1024) . ' GB' : 'Unlimited' ?></td>
                                     <td><?= $pkg['simultaneous_sessions'] ?></td>
@@ -4571,6 +4618,16 @@ try {
                                         <?php else: ?>
                                         <span class="badge bg-secondary">Inactive</span>
                                         <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="?page=isp&view=package_schedules&package_id=<?= $pkg['id'] ?>" class="btn btn-outline-primary" title="Speed Schedules">
+                                                <i class="bi bi-clock-history"></i>
+                                                <?php if ($scheduleCount > 0): ?>
+                                                <span class="badge bg-primary"><?= $scheduleCount ?></span>
+                                                <?php endif; ?>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -4660,6 +4717,218 @@ try {
                     </div>
                 </div>
             </div>
+
+            <?php elseif ($view === 'package_schedules'): ?>
+            <?php 
+            $packageId = (int)($_GET['package_id'] ?? 0);
+            $pkg = $radiusBilling->getPackage($packageId);
+            $schedules = $radiusBilling->getPackageSchedules($packageId);
+            $dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            ?>
+            <?php if (!$pkg): ?>
+            <div class="alert alert-danger">Package not found. <a href="?page=isp&view=packages">Back to Packages</a></div>
+            <?php else: ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <a href="?page=isp&view=packages" class="btn btn-sm btn-outline-secondary me-2">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
+                    <h4 class="page-title mb-0 d-inline"><i class="bi bi-clock-history"></i> Speed Schedules: <?= htmlspecialchars($pkg['name']) ?></h4>
+                </div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+                    <i class="bi bi-plus-lg me-1"></i> Add Schedule
+                </button>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Package Base Speed</h6>
+                            <p class="mb-0">
+                                <i class="bi bi-arrow-down text-success"></i> Download: <strong><?= $pkg['download_speed'] ?></strong>
+                                <i class="bi bi-arrow-up text-primary ms-3"></i> Upload: <strong><?= $pkg['upload_speed'] ?></strong>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card <?= $pkg['fup_enabled'] ? 'bg-warning-subtle' : 'bg-light' ?>">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">FUP (Fair Usage Policy)</h6>
+                            <?php if ($pkg['fup_enabled']): ?>
+                            <p class="mb-0">
+                                After <?= number_format(($pkg['fup_quota_mb'] ?? 0) / 1024, 1) ?> GB:
+                                <i class="bi bi-arrow-down text-warning"></i> <?= $pkg['fup_download_speed'] ?>
+                                <i class="bi bi-arrow-up text-warning ms-2"></i> <?= $pkg['fup_upload_speed'] ?>
+                            </p>
+                            <?php else: ?>
+                            <p class="mb-0 text-muted">FUP not enabled for this package</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>How Speed Schedules Work:</strong> During scheduled times, users on this package will get the scheduled speeds instead of the base package speeds. 
+                Higher priority schedules take precedence if times overlap. FUP throttling is applied first if the user has exceeded their quota.
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <?php if (empty($schedules)): ?>
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-clock-history display-4"></i>
+                        <p class="mt-2">No speed schedules configured for this package.</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addScheduleModal">
+                            <i class="bi bi-plus-lg me-1"></i> Add First Schedule
+                        </button>
+                    </div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Time Range</th>
+                                    <th>Days</th>
+                                    <th>Speed</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($schedules as $sch): ?>
+                                <tr>
+                                    <td><strong><?= htmlspecialchars($sch['name']) ?></strong></td>
+                                    <td><?= date('g:i A', strtotime($sch['start_time'])) ?> - <?= date('g:i A', strtotime($sch['end_time'])) ?></td>
+                                    <td>
+                                        <?php 
+                                        $days = str_split($sch['days_of_week'] ?? '0123456');
+                                        foreach ($days as $d) {
+                                            echo '<span class="badge bg-secondary me-1">' . $dayNames[(int)$d] . '</span>';
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <i class="bi bi-arrow-down text-success"></i> <?= $sch['download_speed'] ?>
+                                        <i class="bi bi-arrow-up text-primary ms-2"></i> <?= $sch['upload_speed'] ?>
+                                    </td>
+                                    <td><span class="badge bg-info"><?= $sch['priority'] ?></span></td>
+                                    <td>
+                                        <?php if ($sch['is_active']): ?>
+                                        <span class="badge bg-success">Active</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-secondary">Inactive</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="delete_package_schedule">
+                                            <input type="hidden" name="schedule_id" value="<?= $sch['id'] ?>">
+                                            <input type="hidden" name="package_id" value="<?= $packageId ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this schedule?')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Add Schedule Modal -->
+            <div class="modal fade" id="addScheduleModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="create_package_schedule">
+                            <input type="hidden" name="package_id" value="<?= $packageId ?>">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Add Speed Schedule</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Schedule Name</label>
+                                    <input type="text" name="name" class="form-control" placeholder="e.g., Peak Hours, Night Boost" required>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Start Time</label>
+                                        <input type="time" name="start_time" class="form-control" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">End Time</label>
+                                        <input type="time" name="end_time" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Days of Week</label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <?php foreach ($dayNames as $i => $day): ?>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="days[]" value="<?= $i ?>" id="day<?= $i ?>" checked>
+                                            <label class="form-check-label" for="day<?= $i ?>"><?= $day ?></label>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Download Speed</label>
+                                        <div class="input-group">
+                                            <input type="number" name="download_speed" class="form-control" placeholder="e.g., 5" required min="1">
+                                            <select name="download_unit" class="form-select" style="max-width: 80px;">
+                                                <option value="M" selected>Mbps</option>
+                                                <option value="k">Kbps</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Upload Speed</label>
+                                        <div class="input-group">
+                                            <input type="number" name="upload_speed" class="form-control" placeholder="e.g., 2" required min="1">
+                                            <select name="upload_unit" class="form-select" style="max-width: 80px;">
+                                                <option value="M" selected>Mbps</option>
+                                                <option value="k">Kbps</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Priority</label>
+                                        <input type="number" name="priority" class="form-control" value="0" min="0" max="100">
+                                        <small class="text-muted">Higher priority wins if schedules overlap</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Status</label>
+                                        <select name="is_active" class="form-select">
+                                            <option value="1" selected>Active</option>
+                                            <option value="0">Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i> Create Schedule
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php elseif ($view === 'nas'): ?>
             <?php 
