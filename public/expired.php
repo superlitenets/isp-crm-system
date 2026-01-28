@@ -252,11 +252,18 @@ try {
 </head>
 <body>
     <div class="expired-card">
-        <?php if ($subscription): ?>
-        <div class="expired-header">
-            <div class="icon"><i class="bi bi-exclamation-triangle"></i></div>
-            <h2 class="mb-2">Subscription Expired</h2>
-            <p class="mb-0 opacity-75">Your internet subscription has expired</p>
+        <?php 
+        if ($subscription): 
+            $isSuspended = ($subscription['status'] === 'suspended');
+            $headerBg = $isSuspended ? 'linear-gradient(135deg, #fd7e14 0%, #e55a00 100%)' : 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+            $headerIcon = $isSuspended ? 'bi-pause-circle' : 'bi-exclamation-triangle';
+            $headerTitle = $isSuspended ? 'Account Suspended' : 'Subscription Expired';
+            $headerSubtitle = $isSuspended ? 'Your account has been suspended' : 'Your internet subscription has expired';
+        ?>
+        <div class="expired-header" style="background: <?= $headerBg ?>;">
+            <div class="icon"><i class="bi <?= $headerIcon ?>"></i></div>
+            <h2 class="mb-2"><?= $headerTitle ?></h2>
+            <p class="mb-0 opacity-75"><?= $headerSubtitle ?></p>
             <div class="package-badge">
                 <i class="bi bi-box me-1"></i> <?= htmlspecialchars($subscription['package_name'] ?? 'Unknown Package') ?>
             </div>
@@ -283,6 +290,24 @@ try {
                     <br><small class="text-muted"><?= $subscription['download_speed'] ?? '' ?>/<?= $subscription['upload_speed'] ?? '' ?></small>
                 </span>
             </div>
+            <?php if ($isSuspended): ?>
+            <div class="info-row">
+                <span class="info-label">Status</span>
+                <span class="info-value text-warning">
+                    <i class="bi bi-pause-circle-fill me-1"></i> Suspended
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Expires</span>
+                <span class="info-value">
+                    <?= $subscription['expiry_date'] ? date('M j, Y', strtotime($subscription['expiry_date'])) : 'N/A' ?>
+                </span>
+            </div>
+            <div class="alert alert-warning mt-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Your account has been suspended. Please contact support to resolve this issue and reactivate your service.
+            </div>
+            <?php else: ?>
             <div class="info-row">
                 <span class="info-label">Expired On</span>
                 <span class="info-value text-danger">
@@ -293,11 +318,13 @@ try {
                 <span class="info-label">Renewal Amount</span>
                 <span class="info-value text-success fs-5">KES <?= number_format($subscription['package_price'] ?? 0) ?></span>
             </div>
+            <?php endif; ?>
             <div class="info-row">
                 <span class="info-label">Your IP Address</span>
                 <span class="info-value"><code><?= htmlspecialchars($clientIP) ?></code></span>
             </div>
             
+            <?php if (!$isSuspended): ?>
             <?php if ($stkPushSent): ?>
             <div class="text-center py-4">
                 <div class="spinner-border text-success mb-3" role="status"></div>
@@ -322,6 +349,7 @@ try {
                     <i class="bi bi-phone me-2"></i> Pay KES <?= number_format($subscription['package_price'] ?? 0) ?> via M-Pesa
                 </button>
             </form>
+            <?php endif; ?>
             <?php endif; ?>
             
             <?php if ($ispPhone): ?>

@@ -1247,16 +1247,13 @@ class RadiusBilling {
             }
         }
         
-        // Get expired pool settings
+        // Get expired/suspended pool settings (same pool for both - redirect based on status check)
         $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
         $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
         
-        // Get suspended pool settings (uses same pool as expired by default, or dedicated suspended-pool)
-        $suspendedPoolName = $this->getSetting('suspended_ip_pool') ?: $expiredPoolName;
-        $suspendedRateLimit = $this->getSetting('suspended_rate_limit') ?: $expiredRateLimit;
-        
-        // Suspended users authenticate but go to suspended/restricted pool for captive portal
+        // Suspended users authenticate but go to same pool as expired for captive portal
+        // The captive portal page checks status and shows appropriate message
         if ($sub['status'] === 'suspended') {
             if ($useExpiredPool) {
                 return [
@@ -1264,8 +1261,8 @@ class RadiusBilling {
                     'reply' => 'Access-Accept',
                     'suspended' => true,
                     'attributes' => [
-                        'Framed-Pool' => $suspendedPoolName,
-                        'Mikrotik-Rate-Limit' => $suspendedRateLimit,
+                        'Framed-Pool' => $expiredPoolName,
+                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
                         'Session-Timeout' => 300,
                         'Acct-Interim-Interval' => 60
                     ],
