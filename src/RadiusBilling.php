@@ -1201,6 +1201,38 @@ class RadiusBilling {
     
     // ==================== RADIUS Authentication (for integration) ====================
     
+    private function logAuthAttempt(?int $subscriptionId, string $username, string $nasIp, string $mac, string $result, ?string $reason = null, ?string $replyMessage = null, ?array $attributes = null): void {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_auth_logs (subscription_id, username, nas_ip_address, mac_address, auth_result, reject_reason, reply_message, attributes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $subscriptionId,
+                $username,
+                $nasIp ?: null,
+                $mac ?: null,
+                $result,
+                $reason,
+                $replyMessage,
+                $attributes ? json_encode($attributes) : null
+            ]);
+        } catch (\Exception $e) {
+            // Don't fail auth if logging fails
+        }
+    }
+    
+    public function getAuthLogs(int $subscriptionId, int $limit = 20): array {
+        $stmt = $this->db->prepare("
+            SELECT * FROM radius_auth_logs 
+            WHERE subscription_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        ");
+        $stmt->execute([$subscriptionId, $limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
     public function authenticate(string $username, string $password, string $nasIp = '', string $callingStationId = ''): array {
         $sub = $this->getSubscriptionByUsername($username);
         
@@ -1213,24 +1245,28 @@ class RadiusBilling {
         if (!$sub) {
             // If unknown users should be allowed with expired pool
             if ($useExpiredPool && $allowUnknownUsers) {
+                $attrs = [
+                    'Framed-Pool' => $expiredPoolName,
+                    'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                    'Session-Timeout' => 300,
+                    'Acct-Interim-Interval' => 60
+                ];
+                $this->logAuthAttempt(null, $username, $nasIp, $callingStationId, 'Accept', 'Unknown user - expired pool', null, $attrs);
                 return [
                     'success' => true,
                     'reply' => 'Access-Accept',
                     'unknown_user' => true,
-                    'attributes' => [
-                        'Framed-Pool' => $expiredPoolName,
-                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
-                        'Session-Timeout' => 300,
-                        'Acct-Interim-Interval' => 60
-                    ],
+                    'attributes' => $attrs,
                     'subscription' => null
                 ];
             }
+            $this->logAuthAttempt(null, $username, $nasIp, $callingStationId, 'Reject', 'User not found');
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'User not found'];
         }
         
         // Check password
         if ($this->decrypt($sub['password_encrypted']) !== $password) {
+            $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Invalid password');
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
         }
         
@@ -1243,6 +1279,7 @@ class RadiusBilling {
             $normalizedSubMac = strtoupper(str_replace(['-', '.'], ':', $sub['mac_address']));
             $normalizedCallingMac = strtoupper(str_replace(['-', '.'], ':', $callingStationId));
             if ($normalizedSubMac !== $normalizedCallingMac) {
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'MAC address mismatch');
                 return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'MAC address mismatch'];
             }
         }
@@ -1256,19 +1293,22 @@ class RadiusBilling {
         // The captive portal page checks status and shows appropriate message
         if ($sub['status'] === 'suspended') {
             if ($useExpiredPool) {
+                $attrs = [
+                    'Framed-Pool' => $expiredPoolName,
+                    'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                    'Session-Timeout' => 300,
+                    'Acct-Interim-Interval' => 60
+                ];
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Suspended - expired pool', null, $attrs);
                 return [
                     'success' => true,
                     'reply' => 'Access-Accept',
                     'suspended' => true,
-                    'attributes' => [
-                        'Framed-Pool' => $expiredPoolName,
-                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
-                        'Session-Timeout' => 300,
-                        'Acct-Interim-Interval' => 60
-                    ],
+                    'attributes' => $attrs,
                     'subscription' => $sub
                 ];
             } else {
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Account suspended');
                 return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
             }
         }
@@ -1288,19 +1328,22 @@ class RadiusBilling {
         if ($isExpired) {
             if ($useExpiredPool) {
                 // Accept with restricted pool for captive portal
+                $attrs = [
+                    'Framed-Pool' => $expiredPoolName,
+                    'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                    'Session-Timeout' => 300, // 5 min sessions to force re-auth
+                    'Acct-Interim-Interval' => 60
+                ];
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Expired - expired pool', null, $attrs);
                 return [
                     'success' => true,
                     'reply' => 'Access-Accept',
                     'expired' => true,
-                    'attributes' => [
-                        'Framed-Pool' => $expiredPoolName,
-                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
-                        'Session-Timeout' => 300, // 5 min sessions to force re-auth
-                        'Acct-Interim-Interval' => 60
-                    ],
+                    'attributes' => $attrs,
                     'subscription' => $sub
                 ];
             } else {
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Subscription expired');
                 return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Subscription expired'];
             }
         }
@@ -1310,18 +1353,21 @@ class RadiusBilling {
             if (!$sub['fup_enabled']) {
                 if ($useExpiredPool) {
                     // Put quota-exhausted users in expired pool too
+                    $attrs = [
+                        'Framed-Pool' => $expiredPoolName,
+                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                        'Session-Timeout' => 300
+                    ];
+                    $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Quota exhausted - expired pool', null, $attrs);
                     return [
                         'success' => true,
                         'reply' => 'Access-Accept',
                         'quota_exhausted' => true,
-                        'attributes' => [
-                            'Framed-Pool' => $expiredPoolName,
-                            'Mikrotik-Rate-Limit' => $expiredRateLimit,
-                            'Session-Timeout' => 300
-                        ],
+                        'attributes' => $attrs,
                         'subscription' => $sub
                     ];
                 } else {
+                    $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Data quota exhausted');
                     return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Data quota exhausted'];
                 }
             }
@@ -1360,6 +1406,9 @@ class RadiusBilling {
                 $updateStmt->execute([$normalizedMac, $sub['id']]);
             }
         }
+        
+        // Log successful authentication
+        $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', null, null, $attributes);
         
         return [
             'success' => true,

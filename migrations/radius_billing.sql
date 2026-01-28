@@ -176,6 +176,23 @@ CREATE TABLE IF NOT EXISTS radpostauth (
     callingstationid VARCHAR(50)
 );
 
+-- Authentication Logs (detailed auth history with accept/reject reasons)
+CREATE TABLE IF NOT EXISTS radius_auth_logs (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+    username VARCHAR(100) NOT NULL,
+    nas_ip_address VARCHAR(45),
+    mac_address VARCHAR(50),
+    auth_result VARCHAR(20) NOT NULL, -- Accept, Reject
+    reject_reason VARCHAR(100), -- User not found, Invalid password, MAC mismatch, Expired, Suspended, Quota exhausted
+    reply_message TEXT,
+    attributes JSONB, -- Store RADIUS attributes returned
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_radius_auth_logs_subscription ON radius_auth_logs(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_radius_auth_logs_username ON radius_auth_logs(username);
+CREATE INDEX IF NOT EXISTS idx_radius_auth_logs_created ON radius_auth_logs(created_at DESC);
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_radpostauth_username ON radpostauth(username);
 CREATE INDEX IF NOT EXISTS idx_radpostauth_authdate ON radpostauth(authdate);

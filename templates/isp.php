@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Africa/Nairobi');
 require_once __DIR__ . '/../src/RadiusBilling.php';
 $radiusBilling = new \App\RadiusBilling($db);
 
@@ -2604,6 +2605,9 @@ try {
                 $stmt->execute([$subId]);
                 $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
+                // Get auth logs (login attempts with accept/reject status)
+                $authLogs = $radiusBilling->getAuthLogs($subId, 20);
+                
                 // Get tickets for this customer
                 $tickets = [];
                 if ($customer) {
@@ -3184,6 +3188,62 @@ try {
                                                 <?php endforeach; ?>
                                                 <?php if (empty($sessionHistory)): ?>
                                                 <tr><td colspan="6" class="text-center text-muted py-4">No session history</td></tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Authentication Logs -->
+                            <div class="card shadow-sm border-0 mt-3">
+                                <div class="card-header bg-transparent">
+                                    <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Authentication History</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Time</th>
+                                                    <th>Result</th>
+                                                    <th>Status/Reason</th>
+                                                    <th>MAC Address</th>
+                                                    <th>NAS IP</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($authLogs ?? [] as $auth): ?>
+                                                <tr>
+                                                    <td><?= date('M j, H:i:s', strtotime($auth['created_at'])) ?></td>
+                                                    <td>
+                                                        <?php if ($auth['auth_result'] === 'Accept'): ?>
+                                                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Accept</span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Reject</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php 
+                                                        $reason = $auth['reject_reason'] ?? '';
+                                                        $reasonClass = match(true) {
+                                                            str_contains($reason, 'password') => 'text-danger',
+                                                            str_contains($reason, 'MAC') => 'text-warning',
+                                                            str_contains($reason, 'expired') || str_contains($reason, 'Expired') => 'text-info',
+                                                            str_contains($reason, 'suspended') || str_contains($reason, 'Suspended') => 'text-secondary',
+                                                            str_contains($reason, 'quota') || str_contains($reason, 'Quota') => 'text-primary',
+                                                            str_contains($reason, 'not found') => 'text-danger',
+                                                            default => 'text-muted'
+                                                        };
+                                                        ?>
+                                                        <small class="<?= $reasonClass ?>"><?= htmlspecialchars($reason ?: 'Active user') ?></small>
+                                                    </td>
+                                                    <td><code class="small"><?= htmlspecialchars($auth['mac_address'] ?? '-') ?></code></td>
+                                                    <td><small><?= htmlspecialchars($auth['nas_ip_address'] ?? '-') ?></small></td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                                <?php if (empty($authLogs)): ?>
+                                                <tr><td colspan="5" class="text-center text-muted py-4">No authentication logs</td></tr>
                                                 <?php endif; ?>
                                             </tbody>
                                         </table>
