@@ -99,6 +99,36 @@ CREATE TABLE IF NOT EXISTS license_validation_logs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS license_subscriptions (
+    id SERIAL PRIMARY KEY,
+    license_id INTEGER REFERENCES licenses(id),
+    tier_id INTEGER REFERENCES license_tiers(id),
+    billing_cycle VARCHAR(20) DEFAULT 'monthly',
+    amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'KES',
+    status VARCHAR(20) DEFAULT 'pending',
+    next_billing_date DATE,
+    auto_renew BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS license_payments (
+    id SERIAL PRIMARY KEY,
+    license_id INTEGER REFERENCES licenses(id),
+    subscription_id INTEGER REFERENCES license_subscriptions(id),
+    amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'KES',
+    payment_method VARCHAR(50) DEFAULT 'mpesa',
+    transaction_id VARCHAR(100),
+    mpesa_receipt VARCHAR(50),
+    phone_number VARCHAR(20),
+    status VARCHAR(20) DEFAULT 'pending',
+    paid_at TIMESTAMP,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_licenses_key ON licenses(license_key);
 CREATE INDEX idx_licenses_customer ON licenses(customer_id);
 CREATE INDEX idx_licenses_active ON licenses(is_active, is_suspended);
@@ -107,6 +137,9 @@ CREATE INDEX idx_activations_token ON license_activations(activation_token);
 CREATE INDEX idx_activations_domain ON license_activations(domain);
 CREATE INDEX idx_validation_logs_license ON license_validation_logs(license_id);
 CREATE INDEX idx_validation_logs_created ON license_validation_logs(created_at);
+CREATE INDEX idx_subscriptions_license ON license_subscriptions(license_id);
+CREATE INDEX idx_payments_license ON license_payments(license_id);
+CREATE INDEX idx_payments_mpesa ON license_payments(mpesa_receipt);
 
 -- Insert default product
 INSERT INTO license_products (code, name, description, features) VALUES 
