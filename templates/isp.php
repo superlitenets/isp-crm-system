@@ -796,6 +796,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
             
+        case 'override_speed_coa':
+            $subId = (int)$_POST['subscription_id'];
+            $downloadSpeed = (int)$_POST['download_speed'];
+            $downloadUnit = $_POST['download_unit'] === 'k' ? 'k' : 'M';
+            $uploadSpeed = (int)$_POST['upload_speed'];
+            $uploadUnit = $_POST['upload_unit'] === 'k' ? 'k' : 'M';
+            
+            $rateLimit = "{$downloadSpeed}{$downloadUnit}/{$uploadSpeed}{$uploadUnit}";
+            
+            $result = $radiusBilling->sendSpeedUpdateCoA($subId, $rateLimit);
+            if ($result['success']) {
+                $message = "Speed override applied: {$rateLimit}";
+                $messageType = 'success';
+            } else {
+                $errorMsg = $result['error'] ?? 'Unknown error';
+                if (!empty($result['diagnostic'])) {
+                    $diag = $result['diagnostic'];
+                    if ($diag['ping_reachable']) {
+                        $errorMsg .= ' | NAS is reachable but CoA port not responding. Run on MikroTik: /radius incoming set accept=yes port=3799';
+                    } else {
+                        $errorMsg .= ' | NAS (' . $diag['nas_ip'] . ') is not reachable. Check VPN tunnel or firewall.';
+                    }
+                }
+                $message = 'CoA failed: ' . $errorMsg;
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'reset_data_usage':
             $id = (int)$_POST['id'];
             try {
@@ -3502,16 +3530,22 @@ try {
                                     <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Quick Actions</h6>
                                 </div>
                                 <div class="card-body">
-                                    <form method="post" class="d-inline">
-                                        <input type="hidden" name="action" value="send_speed_coa">
-                                        <input type="hidden" name="subscription_id" value="<?= $subId ?>">
-                                        <input type="hidden" name="return_to" value="subscriber">
-                                        <button type="submit" class="btn btn-warning">
-                                            <i class="bi bi-arrow-repeat me-1"></i> Apply Current Speed (Send CoA)
+                                    <div class="d-flex gap-2 flex-wrap mb-3">
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="send_speed_coa">
+                                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                                            <input type="hidden" name="return_to" value="subscriber">
+                                            <button type="submit" class="btn btn-warning">
+                                                <i class="bi bi-arrow-repeat me-1"></i> Apply Package Speed
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#overrideSpeedModal">
+                                            <i class="bi bi-speedometer2 me-1"></i> Override Speed
                                         </button>
-                                    </form>
-                                    <small class="text-muted d-block mt-2">
-                                        Immediately sends a Change of Authorization to update the user's speed based on current package and active schedules.
+                                    </div>
+                                    <small class="text-muted">
+                                        <strong>Apply Package Speed:</strong> Sends CoA with current package speeds.<br>
+                                        <strong>Override Speed:</strong> Temporarily set custom speeds (resets on reconnect).
                                     </small>
                                 </div>
                             </div>
@@ -3556,6 +3590,77 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- Override Speed Modal -->
+            <div class="modal fade" id="overrideSpeedModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content border-0 shadow-lg">
+                        <form method="post">
+                            <input type="hidden" name="action" value="override_speed_coa">
+                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header border-0 bg-primary text-white">
+                                <h5 class="modal-title"><i class="bi bi-speedometer2 me-2"></i>Override Speed</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    This temporarily overrides the user's speed. It will reset to package speed when the user reconnects.
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Download Speed</label>
+                                        <div class="input-group">
+                                            <input type="number" name="download_speed" class="form-control" placeholder="e.g. 50" value="<?= intval($package['download_speed'] ?? 10) ?>" required min="1">
+                                            <select name="download_unit" class="form-select" style="max-width: 80px;">
+                                                <option value="M" selected>Mbps</option>
+                                                <option value="k">Kbps</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Upload Speed</label>
+                                        <div class="input-group">
+                                            <input type="number" name="upload_speed" class="form-control" placeholder="e.g. 25" value="<?= intval($package['upload_speed'] ?? 5) ?>" required min="1">
+                                            <select name="upload_unit" class="form-select" style="max-width: 80px;">
+                                                <option value="M" selected>Mbps</option>
+                                                <option value="k">Kbps</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <label class="form-label">Quick Presets</label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary speed-preset" data-down="5" data-up="2">5/2 Mbps</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary speed-preset" data-down="10" data-up="5">10/5 Mbps</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary speed-preset" data-down="20" data-up="10">20/10 Mbps</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary speed-preset" data-down="50" data-up="25">50/25 Mbps</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary speed-preset" data-down="100" data-up="50">100/50 Mbps</button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning speed-preset" data-down="1" data-up="1">1/1 Mbps (Throttle)</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send me-1"></i> Apply Speed Override
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script>
+            document.querySelectorAll('.speed-preset').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelector('input[name="download_speed"]').value = this.dataset.down;
+                    document.querySelector('input[name="upload_speed"]').value = this.dataset.up;
+                    document.querySelectorAll('select[name$="_unit"]').forEach(s => s.value = 'M');
+                });
+            });
+            </script>
             
             <!-- Change Expiry Modal -->
             <div class="modal fade" id="changeExpiryModal" tabindex="-1">

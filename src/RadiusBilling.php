@@ -1468,7 +1468,7 @@ class RadiusBilling {
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
-    public function sendSpeedUpdateCoA(int $subscriptionId): array {
+    public function sendSpeedUpdateCoA(int $subscriptionId, ?string $customRateLimit = null): array {
         $sub = $this->getSubscription($subscriptionId);
         if (!$sub) {
             return ['success' => false, 'error' => 'Subscription not found'];
@@ -1505,8 +1505,8 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'NAS not found - please assign a NAS to this subscription or add an active NAS device'];
         }
         
-        // Build CoA with new rate limit
-        $rateLimit = $this->buildRateLimit($sub);
+        // Build CoA with new rate limit (use custom if provided, otherwise build from package)
+        $rateLimit = $customRateLimit ?: $this->buildRateLimit($sub);
         
         // Send CoA via OLT service (routes through WireGuard VPN)
         $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
