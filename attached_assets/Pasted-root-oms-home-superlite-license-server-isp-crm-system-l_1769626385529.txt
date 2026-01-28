@@ -1,0 +1,97 @@
+root@oms:/home/superlite/license-server/isp-crm-system/license-server# docker compose logs -f
+WARN[0000] /home/superlite/license-server/isp-crm-system/license-server/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion
+license_server_app  | [Wed Jan 28 21:51:35 2026] PHP 8.2.30 Development Server (http://0.0.0.0:80) started
+license_server_app  | [Wed Jan 28 21:51:50 2026] 102.205.239.82:52946 Accepted
+license_server_app  | [Wed Jan 28 21:51:50 2026] 102.205.239.82:52947 Accepted
+license_server_app  | [Wed Jan 28 21:51:50 2026] 102.205.239.82:52947 [500]: GET /
+license_server_app  | [Wed Jan 28 21:51:50 2026] 102.205.239.82:52947 Closing
+license_server_app  | [Wed Jan 28 21:51:50 2026] 102.205.239.82:52946 [404]: GET /favicon.ico - No such file or directory
+license_server_app  | [Wed Jan 28 21:51:50 2026] 102.205.239.82:52946 Closing
+license_server_app  | [Wed Jan 28 21:51:58 2026] 102.205.239.82:52958 Accepted
+license_server_app  | [Wed Jan 28 21:51:58 2026] 102.205.239.82:52958 [200]: GET /admin.php
+license_server_app  | [Wed Jan 28 21:51:58 2026] 102.205.239.82:52958 Closing
+license_server_app  | [Wed Jan 28 21:51:58 2026] 102.205.239.82:52959 Accepted
+license_server_db   | The files belonging to this database system will be owned by user "postgres".
+license_server_db   | This user must also own the server process.
+license_server_db   |
+license_server_db   | The database cluster will be initialized with locale "en_US.utf8".
+license_server_db   | The default database encoding has accordingly been set to "UTF8".
+license_server_db   | The default text search configuration will be set to "english".
+license_server_db   |
+license_server_db   | Data page checksums are disabled.
+license_server_db   |
+license_server_db   | fixing permissions on existing directory /var/lib/postgresql/data ... ok
+license_server_db   | creating subdirectories ... ok
+license_server_db   | selecting dynamic shared memory implementation ... posix
+license_server_db   | selecting default max_connections ... 100
+license_server_db   | selecting default shared_buffers ... 128MB
+license_server_db   | selecting default time zone ... Africa/Nairobi
+license_server_db   | creating configuration files ... ok
+license_server_db   | running bootstrap script ... ok
+license_server_db   | sh: locale: not found
+license_server_db   | 2026-01-28 21:51:27.660 EAT [35] WARNING:  no usable system locales were found
+license_server_db   | performing post-bootstrap initialization ... ok
+license_server_db   | initdb: warning: enabling "trust" authentication for local connections
+license_server_db   | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+license_server_db   | syncing data to disk ... ok
+license_server_db   |
+license_server_db   |
+license_server_db   | Success. You can now start the database server using:
+license_server_db   |
+license_server_db   |     pg_ctl -D /var/lib/postgresql/data -l logfile start
+license_server_db   |
+license_server_db   | waiting for server to start....2026-01-28 21:51:30.258 EAT [41] LOG:  starting PostgreSQL 15.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+license_server_db   | 2026-01-28 21:51:30.260 EAT [41] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+license_server_db   | 2026-01-28 21:51:30.272 EAT [44] LOG:  database system was shut down at 2026-01-28 21:51:29 EAT
+license_server_db   | 2026-01-28 21:51:30.368 EAT [41] LOG:  database system is ready to accept connections
+license_server_db   |  done
+license_server_db   | server started
+license_server_db   | CREATE DATABASE
+license_server_db   |
+license_server_db   |
+license_server_db   | /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/01-schema.sql
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE TABLE
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | CREATE INDEX
+license_server_db   | INSERT 0 1
+license_server_db   | INSERT 0 3
+license_server_db   |
+license_server_db   |
+license_server_db   | waiting for server to shut down....2026-01-28 21:51:31.703 EAT [41] LOG:  received fast shutdown request
+license_server_db   | 2026-01-28 21:51:31.704 EAT [41] LOG:  aborting any active transactions
+license_server_db   | 2026-01-28 21:51:31.711 EAT [41] LOG:  background worker "logical replication launcher" (PID 47) exited with exit code 1
+license_server_db   | 2026-01-28 21:51:31.711 EAT [42] LOG:  shutting down
+license_server_db   | 2026-01-28 21:51:31.713 EAT [42] LOG:  checkpoint starting: shutdown immediate
+license_server_db   | 2026-01-28 21:51:31.924 EAT [42] LOG:  checkpoint complete: wrote 965 buffers (5.9%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.157 s, sync=0.046 s, total=0.213 s; sync files=356, longest=0.002 s, average=0.001 s; distance=4537 kB, estimate=4537 kB
+license_server_db   | 2026-01-28 21:51:32.009 EAT [41] LOG:  database system is shut down
+license_server_db   |  done
+license_server_db   | server stopped
+license_server_db   |
+license_server_db   | PostgreSQL init process complete; ready for start up.
+license_server_db   |
+license_server_db   | 2026-01-28 21:51:32.165 EAT [1] LOG:  starting PostgreSQL 15.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+license_server_db   | 2026-01-28 21:51:32.165 EAT [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+license_server_db   | 2026-01-28 21:51:32.165 EAT [1] LOG:  listening on IPv6 address "::", port 5432
+license_server_db   | 2026-01-28 21:51:32.169 EAT [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+license_server_db   | 2026-01-28 21:51:32.178 EAT [59] LOG:  database system was shut down at 2026-01-28 21:51:31 EAT
+license_server_db   | 2026-01-28 21:51:32.191 EAT [1] LOG:  database system is ready to accept connections
+license_server_db   | 2026-01-28 21:51:35.049 EAT [69] FATAL:  database "license" does not exist
+license_server_db   | 2026-01-28 21:51:45.192 EAT [76] FATAL:  database "license" does not exist
+license_server_db   | 2026-01-28 21:51:55.313 EAT [84] FATAL:  database "license" does not exist
+license_server_db   | 2026-01-28 21:52:05.441 EAT [91] FATAL:  database "license" does not exist
