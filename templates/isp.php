@@ -1612,9 +1612,51 @@ try {
             }
             .main-content {
                 padding-top: 70px !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
             }
             .sidebar {
                 display: none !important;
+            }
+            .stat-icon {
+                width: 36px !important;
+                height: 36px !important;
+                font-size: 0.9rem !important;
+            }
+            .stat-value {
+                font-size: 1.25rem !important;
+            }
+            .table th, .table td {
+                padding: 0.5rem 0.4rem;
+                font-size: 0.85rem;
+            }
+            .btn-group-sm .btn {
+                padding: 0.25rem 0.4rem;
+            }
+            .modal-dialog {
+                margin: 0.5rem;
+            }
+            .card-body {
+                padding: 0.75rem;
+            }
+        }
+        @media (max-width: 575.98px) {
+            .main-content {
+                padding: 0.5rem !important;
+                padding-top: 65px !important;
+            }
+            .page-title {
+                font-size: 1.1rem;
+            }
+            h4.page-title {
+                font-size: 1rem;
+            }
+            .btn {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.85rem;
+            }
+            .form-control, .form-select {
+                font-size: 0.9rem;
             }
         }
     </style>
@@ -1762,71 +1804,71 @@ try {
             <?php endif; ?>
             
             <?php if ($view === 'dashboard'): ?>
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
                 <div>
                     <h4 class="page-title mb-1"><i class="bi bi-speedometer2"></i> ISP Dashboard</h4>
-                    <span class="text-muted small">Last updated: <?= date('M j, Y H:i:s') ?></span>
+                    <span class="text-muted small d-none d-sm-inline">Last updated: <?= date('M j, Y H:i:s') ?></span>
                 </div>
-                <div class="d-flex gap-2">
-                    <a href="?page=isp&view=subscriptions&filter=expiring" class="btn btn-warning">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="?page=isp&view=subscriptions&filter=expiring" class="btn btn-warning btn-sm">
                         <i class="bi bi-exclamation-triangle me-1"></i> Expiring (<?= $stats['expiring_soon'] ?>)
                     </a>
-                    <button class="btn btn-outline-primary" onclick="location.reload()">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    <button class="btn btn-outline-primary btn-sm" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i><span class="d-none d-sm-inline ms-1">Refresh</span>
                     </button>
                 </div>
             </div>
             
-            <div class="row g-4 mb-4">
-                <div class="col-md-3">
+            <div class="row g-2 g-md-4 mb-4">
+                <div class="col-6 col-md-3">
                     <div class="card stat-card shadow-sm h-100 stat-success">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                        <div class="card-body py-2 py-md-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2 mb-md-3">
+                                <div class="stat-icon bg-success bg-opacity-10 text-success" style="width: 40px; height: 40px; font-size: 1rem;">
                                     <i class="bi bi-people"></i>
                                 </div>
                             </div>
-                            <div class="stat-value"><?= number_format($stats['active_subscriptions']) ?></div>
-                            <div class="stat-label">Active Subscribers</div>
+                            <div class="stat-value fs-4 fs-md-3"><?= number_format($stats['active_subscriptions']) ?></div>
+                            <div class="stat-label small">Active</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-6 col-md-3">
                     <div class="card stat-card shadow-sm h-100 stat-info">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-info bg-opacity-10 text-info">
+                        <div class="card-body py-2 py-md-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2 mb-md-3">
+                                <div class="stat-icon bg-info bg-opacity-10 text-info" style="width: 40px; height: 40px; font-size: 1rem;">
                                     <i class="bi bi-wifi"></i>
                                 </div>
                             </div>
-                            <div class="stat-value"><?= number_format($stats['online_now'] ?? 0) ?></div>
-                            <div class="stat-label">Online Now</div>
+                            <div class="stat-value fs-4 fs-md-3"><?= number_format($stats['online_now'] ?? 0) ?></div>
+                            <div class="stat-label small">Online</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-6 col-md-3">
                     <div class="card stat-card shadow-sm h-100 stat-warning">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                        <div class="card-body py-2 py-md-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2 mb-md-3">
+                                <div class="stat-icon bg-warning bg-opacity-10 text-warning" style="width: 40px; height: 40px; font-size: 1rem;">
                                     <i class="bi bi-exclamation-triangle"></i>
                                 </div>
                             </div>
-                            <div class="stat-value"><?= number_format($stats['expiring_soon']) ?></div>
-                            <div class="stat-label">Expiring Soon</div>
+                            <div class="stat-value fs-4 fs-md-3"><?= number_format($stats['expiring_soon']) ?></div>
+                            <div class="stat-label small">Expiring</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-6 col-md-3">
                     <div class="card stat-card shadow-sm h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                        <div class="card-body py-2 py-md-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2 mb-md-3">
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary" style="width: 40px; height: 40px; font-size: 1rem;">
                                     <i class="bi bi-currency-exchange"></i>
                                 </div>
                             </div>
-                            <div class="stat-value">KES <?= number_format($stats['monthly_revenue']) ?></div>
-                            <div class="stat-label">Monthly Revenue</div>
+                            <div class="stat-value fs-5"><?= number_format($stats['monthly_revenue']) ?></div>
+                            <div class="stat-label small">Revenue</div>
                         </div>
                     </div>
                 </div>

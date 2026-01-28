@@ -17,22 +17,22 @@ $orderUserFilter = $canViewAllOrders ? null : $currentUserId;
 $stats = $orderModel->getStats($orderUserFilter);
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-cart3"></i> Orders</h2>
-    <div class="d-flex gap-2">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <h2 class="mb-0"><i class="bi bi-cart3"></i> Orders</h2>
+    <div class="d-flex flex-column flex-md-row gap-2 w-100 w-md-auto">
         <a href="?page=orders&action=create" class="btn btn-success">
             <i class="bi bi-plus-circle"></i> New Order
         </a>
-        <form method="GET" class="d-flex gap-2">
+        <form method="GET" class="d-flex flex-wrap gap-2">
             <input type="hidden" name="page" value="orders">
-            <select name="status" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
+            <select name="status" class="form-select form-select-sm flex-grow-1" style="min-width: 120px;" onchange="this.form.submit()">
                 <option value="">All Status</option>
                 <option value="new" <?= ($_GET['status'] ?? '') === 'new' ? 'selected' : '' ?>>New (Leads)</option>
                 <option value="confirmed" <?= ($_GET['status'] ?? '') === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
                 <option value="converted" <?= ($_GET['status'] ?? '') === 'converted' ? 'selected' : '' ?>>Converted</option>
                 <option value="cancelled" <?= ($_GET['status'] ?? '') === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
             </select>
-            <select name="salesperson" class="form-select form-select-sm" style="width: 150px;" onchange="this.form.submit()">
+            <select name="salesperson" class="form-select form-select-sm flex-grow-1 d-none d-sm-block" style="min-width: 130px;" onchange="this.form.submit()">
                 <option value="">All Leads</option>
                 <?php foreach ($activeSalespersons as $sp): ?>
                 <option value="<?= $sp['id'] ?>" <?= ($_GET['salesperson'] ?? '') == $sp['id'] ? 'selected' : '' ?>>
@@ -40,42 +40,44 @@ $stats = $orderModel->getStats($orderUserFilter);
                 </option>
                 <?php endforeach; ?>
             </select>
-            <input type="text" class="form-control form-control-sm" name="search" 
-                   placeholder="Search orders..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" style="width: 200px;">
-            <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+            <div class="input-group flex-grow-1" style="min-width: 150px;">
+                <input type="text" class="form-control form-control-sm" name="search" 
+                       placeholder="Search..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+            </div>
         </form>
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card border-0 bg-primary bg-opacity-10">
-            <div class="card-body text-center">
-                <h3 class="mb-0 text-primary"><?= number_format($stats['total'] ?? 0) ?></h3>
-                <small class="text-muted">Total Orders</small>
+<div class="row g-2 g-md-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-primary bg-opacity-10 h-100">
+            <div class="card-body text-center py-2 py-md-3">
+                <h4 class="mb-0 text-primary"><?= number_format($stats['total'] ?? 0) ?></h4>
+                <small class="text-muted">Total</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 bg-warning bg-opacity-10">
-            <div class="card-body text-center">
-                <h3 class="mb-0 text-warning"><?= number_format($stats['new_orders'] ?? 0) ?></h3>
-                <small class="text-muted">New Orders</small>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-warning bg-opacity-10 h-100">
+            <div class="card-body text-center py-2 py-md-3">
+                <h4 class="mb-0 text-warning"><?= number_format($stats['new_orders'] ?? 0) ?></h4>
+                <small class="text-muted">New</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 bg-success bg-opacity-10">
-            <div class="card-body text-center">
-                <h3 class="mb-0 text-success"><?= number_format($stats['confirmed'] ?? 0) ?></h3>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-success bg-opacity-10 h-100">
+            <div class="card-body text-center py-2 py-md-3">
+                <h4 class="mb-0 text-success"><?= number_format($stats['confirmed'] ?? 0) ?></h4>
                 <small class="text-muted">Confirmed</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 bg-info bg-opacity-10">
-            <div class="card-body text-center">
-                <h3 class="mb-0 text-info">KES <?= number_format($stats['total_paid'] ?? 0) ?></h3>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-info bg-opacity-10 h-100">
+            <div class="card-body text-center py-2 py-md-3">
+                <h4 class="mb-0 text-info fs-6">KES <?= number_format($stats['total_paid'] ?? 0) ?></h4>
                 <small class="text-muted">Revenue</small>
             </div>
         </div>

@@ -217,23 +217,23 @@ if ($action === 'view' && $id) {
 </div>
 
 <?php else: ?>
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-people"></i> Customers</h2>
+<div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4">
+    <h2 class="mb-0"><i class="bi bi-people"></i> Customers</h2>
     <a href="?page=customers&action=create" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> Add Customer
     </a>
 </div>
 
 <div class="card mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-3">
+    <div class="card-body py-2 py-md-3">
+        <form method="GET" class="d-flex flex-column flex-sm-row gap-2">
             <input type="hidden" name="page" value="customers">
-            <div class="col-md-8">
-                <input type="text" class="form-control" name="search" placeholder="Search by name, account, phone, or email..." value="<?= htmlspecialchars($search) ?>">
+            <div class="flex-grow-1">
+                <input type="text" class="form-control" name="search" placeholder="Search name, account, phone..." value="<?= htmlspecialchars($search) ?>">
             </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i> Search
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1 flex-sm-grow-0">
+                    <i class="bi bi-search"></i><span class="d-none d-sm-inline"> Search</span>
                 </button>
                 <a href="?page=customers" class="btn btn-outline-secondary">Clear</a>
             </div>
