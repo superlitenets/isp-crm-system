@@ -1,0 +1,44 @@
+root@superlitecrm:~/isp# # Check PHP logs for the latest payment processing
+docker compose logs php 2>&1 | grep -i "RADIUS\|wallet\|credit\|payment\|error" | tail -30
+
+# Check current wallet balances
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT id, username, credit_balance, status, expiry_date, updated_at FROM radius_subscriptions ORDER BY updated_at DESC LIMIT 5;"
+
+# Check if billing history records were created
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT * FROM radius_billing_history ORDER BY created_at DESC LIMIT 10;"
+
+# Check latest M-Pesa transactions
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT id, phone_number, amount, status, account_reference, mpesa_receipt_number, created_at FROM mpesa_transactions ORDER BY created_at DESC LIMIT 5;"
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing error: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_billing_history" does not exist
+isp_crm_php  | LINE 2:             INSERT INTO radius_billing_history (subscription...
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing error: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_billing_history" does not exist
+isp_crm_php  | LINE 2:             INSERT INTO radius_billing_history (subscription...
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing error: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_billing_history" does not exist
+isp_crm_php  | LINE 2:             INSERT INTO radius_billing_history (subscription...
+isp_crm_php  | NOTICE: PHP message: RADIUS: KES 100 credited to wallet for SFL002. Balance: KES 100. Ref: UATF05AYTZ
+isp_crm_php  | NOTICE: PHP message: RADIUS: KES 100 credited to wallet for SFL002. Balance: KES 200. Ref: UATF05AYTZ
+isp_crm_php  | NOTICE: PHP message: RADIUS: KES 100 credited to wallet for SFL002. Balance: KES 300. Ref: UATF05AYTZ
+ id | username | credit_balance | status | expiry_date |         updated_at
+----+----------+----------------+--------+-------------+----------------------------
+  1 | SFL001   |        8000.00 | active | 2026-01-30  | 2026-01-29 07:25:09.515576
+  3 | SFL003   |           0.00 | active | 2026-02-22  | 2026-01-22 22:35:22.033189
+  2 | SFL002   |         300.00 | active | 2026-05-26  | 2026-01-06 05:51:14.775676
+(3 rows)
+
+ id | subscription_id | transaction_type | amount |  description   | transaction_ref |         created_at
+----+-----------------+------------------+--------+----------------+-----------------+----------------------------
+  3 |               2 | payment          | 100.00 | M-Pesa payment | UATF05AYTZ      | 2026-01-29 20:10:23.679571
+  2 |               2 | payment          | 100.00 | M-Pesa payment | UATF05AYTZ      | 2026-01-29 20:10:22.873426
+  1 |               2 | payment          | 100.00 | M-Pesa payment | UATF05AYTZ      | 2026-01-29 20:10:22.043661
+(3 rows)
+
+ id | phone_number | amount  |  status   | account_reference | mpesa_receipt_number |         created_at
+----+--------------+---------+-----------+-------------------+----------------------+----------------------------
+ 22 | 254701031531 |  100.00 | completed | radius_1          | UATF05AYTZ           | 2026-01-29 20:10:15.098942
+ 21 | 254701031531 |   10.00 | completed | radius_1          | UATF05AYQD           | 2026-01-29 20:06:36.417164
+ 20 | 254701031531 |   10.00 | completed | radius_1          | UATF05ATT4           | 2026-01-29 19:52:38.412719
+ 19 | 254701031531 | 8000.00 | failed    | SFL001            |                      | 2026-01-29 07:23:47.732138
+ 18 | 254701031531 |   20.00 | completed | radius_1          | UAQF051OL7           | 2026-01-26 23:28:38.310049
+(5 rows)
+
+root@superlitecrm:~/isp#

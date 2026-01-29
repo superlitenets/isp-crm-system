@@ -2200,6 +2200,14 @@ class RadiusBilling {
     // ==================== M-Pesa Integration ====================
     
     public function processPayment(string $transactionId, string $phone, float $amount, string $accountRef = ''): array {
+        // Idempotency check - prevent duplicate processing of same transaction
+        $checkStmt = $this->db->prepare("SELECT id FROM radius_billing_history WHERE transaction_ref = ? LIMIT 1");
+        $checkStmt->execute([$transactionId]);
+        if ($checkStmt->fetch()) {
+            error_log("RADIUS: Duplicate payment ignored - transaction {$transactionId} already processed");
+            return ['success' => true, 'duplicate' => true, 'message' => 'Payment already processed'];
+        }
+        
         // Find subscription by phone or account reference
         $stmt = $this->db->prepare("
             SELECT s.* FROM radius_subscriptions s
