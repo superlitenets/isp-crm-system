@@ -15,7 +15,7 @@ The system features a clean, responsive design, including a mobile PWA for field
 **Technical Implementations:**
 - **Authentication**: Session-based with password hashing, CSRF/SQL injection/XSS protection, and granular role-based access control (RBAC).
 - **Database**: PostgreSQL is the primary database.
-- **SMS & WhatsApp Integration**: Supports custom gateways (any POST/GET API) and Twilio for SMS; full-featured WhatsApp Web integration with real-time chat, automatic customer linking, and a Node.js Puppeteer service.
+- **SMS & WhatsApp Integration**: Supports custom gateways (any POST/GET API) and Twilio for SMS; full-featured WhatsApp integration with real-time chat, automatic customer linking, and a Node.js Baileys service (direct WebSocket connection - no Chromium/Puppeteer required, ~50-100MB RAM vs 300-800MB).
 - **Template Engine**: A custom `TemplateEngine.php` class for dynamic content replacement.
 - **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco, Hikvision, and BioTime Cloud.
 - **M-Pesa Integration**: Handles STK Push for payments, C2B payments, and real-time callback processing. Features robust network error handling with automatic retry logic (up to 3 attempts), detailed error messages for DNS/SSL/timeout issues, and graceful fallback mechanisms.
