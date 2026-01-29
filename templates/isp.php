@@ -4632,6 +4632,7 @@ try {
                                     <th>Speed</th>
                                     <th>Quota</th>
                                     <th>Sessions</th>
+                                    <th>Devices</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -4659,6 +4660,10 @@ try {
                                     </td>
                                     <td><?= $pkg['data_quota_mb'] ? number_format($pkg['data_quota_mb'] / 1024) . ' GB' : 'Unlimited' ?></td>
                                     <td><?= $pkg['simultaneous_sessions'] ?></td>
+                                    <td>
+                                        <?php $maxDevices = $pkg['max_devices'] ?? 1; ?>
+                                        <?= $maxDevices ?><?php if ($maxDevices > 1): ?> <i class="bi bi-people-fill text-info" title="Multi-device"></i><?php endif; ?>
+                                    </td>
                                     <td>
                                         <?php if ($pkg['is_active']): ?>
                                         <span class="badge bg-success">Active</span>
@@ -4749,6 +4754,11 @@ try {
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Simultaneous Sessions</label>
                                         <input type="number" name="simultaneous_sessions" class="form-control" value="1" min="1">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Max Devices (MACs)</label>
+                                        <input type="number" name="max_devices" class="form-control" value="1" min="1" max="10">
+                                        <small class="text-muted">For hotspot multi-device sharing</small>
                                     </div>
                                 </div>
                                 <div class="mb-3">
@@ -5490,32 +5500,61 @@ try {
 
             <?php elseif ($view === 'expiring'): ?>
             <?php $expiringList = $radiusBilling->getExpiringSubscriptions(14); ?>
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-clock-history"></i> Expiring Subscribers</h4>
                 <form method="post" class="d-inline">
                     <input type="hidden" name="action" value="send_expiry_alerts">
-                    <button type="submit" class="btn btn-warning"><i class="bi bi-send me-1"></i> Send Expiry Alerts</button>
+                    <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-send me-1"></i> Send Alerts</button>
                 </form>
+            </div>
+            
+            <!-- Mobile Summary Cards -->
+            <div class="row g-2 mb-3 d-md-none">
+                <div class="col-4">
+                    <div class="card bg-danger bg-opacity-10 border-0">
+                        <div class="card-body text-center py-2">
+                            <div class="fw-bold text-danger"><?= count(array_filter($expiringList, fn($s) => (int)$s['days_remaining'] <= 1)) ?></div>
+                            <small class="text-muted">Critical</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card bg-warning bg-opacity-10 border-0">
+                        <div class="card-body text-center py-2">
+                            <div class="fw-bold text-warning"><?= count(array_filter($expiringList, fn($s) => (int)$s['days_remaining'] > 1 && (int)$s['days_remaining'] <= 3)) ?></div>
+                            <small class="text-muted">Soon</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card bg-info bg-opacity-10 border-0">
+                        <div class="card-body text-center py-2">
+                            <div class="fw-bold text-info"><?= count(array_filter($expiringList, fn($s) => (int)$s['days_remaining'] > 3)) ?></div>
+                            <small class="text-muted">Later</small>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="card shadow-sm">
                 <div class="card-body p-0">
                     <?php if (empty($expiringList)): ?>
-                    <div class="p-5 text-center text-muted">
+                    <div class="p-4 p-md-5 text-center text-muted">
                         <i class="bi bi-check-circle fs-1 mb-3 d-block text-success"></i>
                         <h5>All Clear!</h5>
-                        <p>No subscribers expiring in the next 14 days.</p>
+                        <p class="mb-0">No subscribers expiring in the next 14 days.</p>
                     </div>
                     <?php else: ?>
-                    <div class="table-responsive">
+                    <!-- Desktop Table -->
+                    <div class="table-responsive d-none d-md-block">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
                                     <th>Customer</th>
                                     <th>Username</th>
                                     <th>Package</th>
-                                    <th>Expiry Date</th>
-                                    <th>Days Left</th>
+                                    <th>Expiry</th>
+                                    <th>Days</th>
                                     <th>Amount</th>
                                     <th>Actions</th>
                                 </tr>
@@ -5527,13 +5566,13 @@ try {
                                         <strong><?= htmlspecialchars($sub['customer_name'] ?? 'N/A') ?></strong>
                                         <br><small class="text-muted"><?= htmlspecialchars($sub['customer_phone'] ?? '') ?></small>
                                     </td>
-                                    <td><code><?= htmlspecialchars($sub['username']) ?></code></td>
+                                    <td><code class="small"><?= htmlspecialchars($sub['username']) ?></code></td>
                                     <td><?= htmlspecialchars($sub['package_name'] ?? 'N/A') ?></td>
-                                    <td><?= date('M j, Y', strtotime($sub['expiry_date'])) ?></td>
+                                    <td><?= date('M j', strtotime($sub['expiry_date'])) ?></td>
                                     <td>
                                         <?php $days = (int)$sub['days_remaining']; ?>
                                         <span class="badge bg-<?= $days <= 1 ? 'danger' : ($days <= 3 ? 'warning' : 'info') ?>">
-                                            <?= $days ?> day<?= $days != 1 ? 's' : '' ?>
+                                            <?= $days ?>d
                                         </span>
                                     </td>
                                     <td>KES <?= number_format($sub['package_price'] ?? 0) ?></td>
@@ -5541,13 +5580,42 @@ try {
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="renew_subscription">
                                             <input type="hidden" name="subscription_id" value="<?= $sub['id'] ?>">
-                                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-arrow-repeat"></i> Renew</button>
+                                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-arrow-repeat"></i></button>
                                         </form>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+                    <!-- Mobile Card List -->
+                    <div class="d-md-none">
+                        <?php foreach ($expiringList as $sub): ?>
+                        <?php $days = (int)$sub['days_remaining']; ?>
+                        <div class="p-3 border-bottom">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <strong><?= htmlspecialchars($sub['customer_name'] ?? 'N/A') ?></strong>
+                                    <br><small class="text-muted"><?= htmlspecialchars($sub['customer_phone'] ?? '') ?></small>
+                                </div>
+                                <span class="badge bg-<?= $days <= 1 ? 'danger' : ($days <= 3 ? 'warning' : 'info') ?>">
+                                    <?= $days ?> day<?= $days != 1 ? 's' : '' ?>
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted"><?= htmlspecialchars($sub['package_name'] ?? 'N/A') ?></small>
+                                    <span class="mx-1">&bull;</span>
+                                    <strong class="text-success">KES <?= number_format($sub['package_price'] ?? 0) ?></strong>
+                                </div>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="renew_subscription">
+                                    <input type="hidden" name="subscription_id" value="<?= $sub['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-arrow-repeat me-1"></i>Renew</button>
+                                </form>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
                     <?php endif; ?>
                 </div>
