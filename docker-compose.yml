@@ -286,24 +286,6 @@ services:
     networks:
       - crm_network
 
-  license-server:
-    build:
-      context: ./license-server
-      dockerfile: Dockerfile
-    container_name: isp_crm_license_server
-    restart: unless-stopped
-    depends_on:
-      - db
-    ports:
-      - "8081:80"
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@isp_crm_db:5432/${POSTGRES_DB}
-      - TZ=Africa/Nairobi
-    volumes:
-      - ./license-server:/app
-    networks:
-      - crm_network
-
 networks:
   crm_network:
     driver: bridge
