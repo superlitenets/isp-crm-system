@@ -1,0 +1,603 @@
+ => [freeradius  7/16] COPY config/policy.d/ /etc/freeradius/policy.d/     0.0s
+ => [freeradius  8/16] COPY config/clients.conf /etc/freeradius/clients.c  0.0s
+ => [freeradius  9/16] COPY config/radiusd.conf /etc/freeradius/radiusd.c  0.0s
+ => [freeradius 10/16] COPY config/proxy.conf /etc/freeradius/proxy.conf   0.0s
+ => [freeradius 11/16] COPY config/huntgroups /etc/freeradius/huntgroups   0.0s
+ => [freeradius 12/16] COPY config/hints /etc/freeradius/hints             0.0s
+ => [freeradius 13/16] COPY config/users /etc/freeradius/users             0.0s
+ => [freeradius 14/16] COPY config/acct_users /etc/freeradius/acct_users   0.0s
+ => [freeradius 15/16] COPY docker-entrypoint.sh /docker-entrypoint.sh     0.1s
+ => [freeradius 16/16] RUN chmod +x /docker-entrypoint.sh &&     chown -R  1.2s
+ => [freeradius] exporting to image                                        1.4s
+ => => exporting layers                                                    0.6s
+ => => exporting manifest sha256:dcb0ab557d494b671ebf13db702df5d811560fc8  0.0s
+ => => exporting config sha256:54d467a675c43b8e5b4e91ebb9c0d2f1429f23760c  0.0s
+ => => exporting attestation manifest sha256:5d138fca22cec026f09cb8b56395  0.0s
+ => => exporting manifest list sha256:ece75151f4448bd514028ebafd074109d85  0.0s
+ => => naming to docker.io/library/isp-freeradius:latest                   0.0s
+ => => unpacking to docker.io/library/isp-freeradius:latest                0.5s
+ => [whatsapp 3/7] WORKDIR /app                                            0.1s
+ => [whatsapp 4/7] COPY package*.json ./                                   0.1s
+ => [whatsapp 5/7] RUN npm install --production                           38.9s
+ => [olt-service 6/6] COPY . .                                             0.1s
+ => [olt-service] exporting to image                                       8.1s
+ => => exporting layers                                                    4.8s
+ => => exporting manifest sha256:8d8feffb50ed0d58231bbbc2d4e954d43431fb2b  0.1s
+ => => exporting config sha256:40ef0dba7f8eb2185b3ff07021485555c6768249e8  0.0s
+ => => exporting attestation manifest sha256:ee48078fe18498bd79067f523654  0.2s
+ => => exporting manifest list sha256:5d49b7f3f639b2f58f20a5f0e2d4dd4347d  0.1s
+ => => naming to docker.io/library/isp-olt-service:latest                  0.0s
+ => => unpacking to docker.io/library/isp-olt-service:latest               2.8s
+ => [freeradius] resolving provenance for metadata file                    0.0s
+ => [olt-service] resolving provenance for metadata file                   0.0s
+ => [whatsapp 6/7] COPY index.js ./                                        0.1s
+ => [whatsapp 7/7] RUN mkdir -p .baileys_auth .api_secret_dir              0.4s
+ => [whatsapp] exporting to image                                         15.6s
+ => => exporting layers                                                   10.6s
+ => => exporting manifest sha256:61a1b136f477632e7890b3770a226865051bd530  0.0s
+ => => exporting config sha256:74d2b1d1b920b11052e7ef7ad15de0c41744be38f5  0.0s
+ => => exporting attestation manifest sha256:d05583aec0d5da2cdc0d5b7988a4  0.0s
+ => => exporting manifest list sha256:ec81f5db155f1528e4d87252861ddb5f845  0.0s
+ => => naming to docker.io/library/isp-whatsapp:latest                     0.0s
+ => => unpacking to docker.io/library/isp-whatsapp:latest                  4.9s
+ => [whatsapp] resolving provenance for metadata file                      0.0s
+ => [php stage-0  4/12] RUN mv "/usr/local/etc/php/php.ini-production" "/  0.5s
+ => [php stage-0  5/12] RUN echo "opcache.enable=1" >> /usr/local/etc/php  0.4s
+ => [php stage-0  6/12] COPY --from=composer:latest /usr/bin/composer /us  0.1s
+ => [php stage-0  7/12] WORKDIR /var/www/html                              0.0s
+ => [php stage-0  8/12] COPY composer.json composer.lock ./                0.1s
+ => [php stage-0  9/12] RUN composer install --no-dev --optimize-autoload  6.6s
+ => [php stage-0 10/12] COPY . .                                           0.5s
+ => [php stage-0 11/12] COPY docker/security.ini /usr/local/etc/php/conf.  0.1s
+ => [php stage-0 12/12] RUN chown -R www-data:www-data /var/www/html       9.3s
+ => [php] exporting to image                                              39.3s
+ => => exporting layers                                                   25.6s
+ => => exporting manifest sha256:c13292464c66378c50a4bae682de01087a3d8275  0.0s
+ => => exporting config sha256:52e7ec5d6f4807d07aff3c8a4b57cfdd3d245d7509  0.0s
+ => => exporting attestation manifest sha256:2e19fadf81ccc2b72227009d5c05  0.0s
+ => => exporting manifest list sha256:63888347e1168a3be1a34c57f9a736514d3  0.0s
+ => => naming to docker.io/library/isp-php:latest                          0.0s
+ => => unpacking to docker.io/library/isp-php:latest                      13.4s
+ => [php] resolving provenance for metadata file                           0.0s
+ [+] build 4/4
+ ✔ Image isp-olt-service Built                                           331.8s  ✔ Image isp-php         Built                                           331.8s  ✔ Image isp-freeradius  Built                                           331.8s  ✔ Image isp-whatsapp    Built                                           331.8s root@superlitecrm:~/isp#
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp# docker compose up -d --build
+ [+] Building 0.0s (0/1)
+ [+] Building 0.2s (1/1)
+ [+] Building 0.3s (1/2)
+ [+] Building 0.5s (5/10)
+ [+] Building 0.6s (5/10)
+ [+] Building 0.8s (5/10)
+ [+] Building 0.9s (5/10)
+ [+] Building 1.1s (5/10)
+ [+] Building 1.2s (5/10)
+ [+] Building 1.4s (5/10)
+ [+] Building 1.5s (5/10)
+ [+] Building 1.7s (5/10)
+ [+] Building 1.8s (6/10)
+ [+] Building 1.9s (24/29)
+ [+] Building 2.0s (24/29)
+ [+] Building 2.1s (28/30)
+ [+] Building 2.2s (30/47)
+ [+] Building 2.4s (34/50)
+ [+] Building 2.6s (34/50)
+ [+] Building 2.7s (34/50)
+ [+] Building 2.9s (34/50)
+ [+] Building 2.9s (35/50)
+ [+] Building 3.0s (51/65)
+ [+] Building 3.1s (64/66)
+ [+] Building 3.3s (66/66)
+ [+] Building 3.5s (66/66)
+ [+] Building 3.6s (66/66)
+ [+] Building 3.7s (66/67)
+ [+] Building 3.8s (68/68) FINISHED
+ => => unpacking to docker.io/library/isp-freeradius:latest                0.0s
+ => [internal] load local bake definitions                                 0.0s
+ => => reading from stdin 1.71kB                                           0.0s
+ => [freeradius internal] load build definition from Dockerfile            0.0s
+ => => transferring dockerfile: 1.09kB                                     0.0s
+ => [whatsapp internal] load build definition from Dockerfile              0.0s
+ => => transferring dockerfile: 356B                                       0.0s
+ => [php internal] load build definition from Dockerfile                   0.0s
+ => => transferring dockerfile: 1.52kB                                     0.0s
+ => [olt-service internal] load build definition from Dockerfile           0.0s
+ => => transferring dockerfile: 233B                                       0.0s
+ => [freeradius internal] load metadata for docker.io/freeradius/freeradi  1.8s
+ => [whatsapp internal] load metadata for docker.io/library/node:20-slim   1.4s
+ => [olt-service internal] load metadata for docker.io/library/node:20-al  1.4s
+ => [php internal] load metadata for docker.io/library/composer:latest     1.7s
+ => [php internal] load metadata for docker.io/library/php:8.3-fpm         2.0s
+ => [whatsapp internal] load .dockerignore                                 0.0s
+ => => transferring context: 2B                                            0.0s
+ => [olt-service internal] load .dockerignore                              0.0s
+ => => transferring context: 2B                                            0.0s
+ => [whatsapp 1/7] FROM docker.io/library/node:20-slim@sha256:6c51af7dc83  0.0s
+ => => resolve docker.io/library/node:20-slim@sha256:6c51af7dc83f4708aaac  0.0s
+ => [whatsapp internal] load build context                                 0.0s
+ => => transferring context: 101B                                          0.0s
+ => [olt-service internal] load build context                              0.0s
+ => => transferring context: 324B                                          0.0s
+ => [olt-service 1/6] FROM docker.io/library/node:20-alpine@sha256:09e2b3  0.0s
+ => => resolve docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf  0.0s
+ => CACHED [whatsapp 2/7] RUN apt-get update && apt-get install -y     cu  0.0s
+ => CACHED [whatsapp 3/7] WORKDIR /app                                     0.0s
+ => CACHED [whatsapp 4/7] COPY package*.json ./                            0.0s
+ => CACHED [whatsapp 5/7] RUN npm install --production                     0.0s
+ => CACHED [whatsapp 6/7] COPY index.js ./                                 0.0s
+ => CACHED [whatsapp 7/7] RUN mkdir -p .baileys_auth .api_secret_dir       0.0s
+ => [whatsapp] exporting to image                                          0.2s
+ => => exporting layers                                                    0.0s
+ => => exporting manifest sha256:61a1b136f477632e7890b3770a226865051bd530  0.0s
+ => => exporting config sha256:74d2b1d1b920b11052e7ef7ad15de0c41744be38f5  0.0s
+ => => exporting attestation manifest sha256:58a14c70a53200111a1581900be3  0.0s
+ => => exporting manifest list sha256:6d6718e7bb08da5d5bf75d68d637f938d74  0.0s
+ => => naming to docker.io/library/isp-whatsapp:latest                     0.0s
+ => => unpacking to docker.io/library/isp-whatsapp:latest                  0.0s
+ => CACHED [olt-service 2/6] WORKDIR /app                                  0.0s
+ => CACHED [olt-service 3/6] RUN apk add --no-cache net-snmp net-snmp-too  0.0s
+ => CACHED [olt-service 4/6] COPY package*.json ./                         0.0s
+ => CACHED [olt-service 5/6] RUN npm install --production                  0.0s
+ => CACHED [olt-service 6/6] COPY . .                                      0.0s
+ => [olt-service] exporting to image                                       0.2s
+ => => exporting layers                                                    0.0s
+ => => exporting manifest sha256:8d8feffb50ed0d58231bbbc2d4e954d43431fb2b  0.0s
+ => => exporting config sha256:40ef0dba7f8eb2185b3ff07021485555c6768249e8  0.0s
+ => => exporting attestation manifest sha256:6022089b4dae05b666c5fa0c0a5f  0.0s
+ => => exporting manifest list sha256:e85a1623bdd698019b412ebe96e6e42a265  0.0s
+ => => naming to docker.io/library/isp-olt-service:latest                  0.0s
+ => => unpacking to docker.io/library/isp-olt-service:latest               0.0s
+ => [freeradius internal] load .dockerignore                               0.0s
+ => => transferring context: 2B                                            0.0s
+ => [freeradius internal] load build context                               0.0s
+ => => transferring context: 1.51kB                                        0.0s
+ => [freeradius  1/16] FROM docker.io/freeradius/freeradius-server:3.2.3@  0.0s
+ => => resolve docker.io/freeradius/freeradius-server:3.2.3@sha256:1ca67f  0.0s
+ => [olt-service] resolving provenance for metadata file                   0.0s
+ => [whatsapp] resolving provenance for metadata file                      0.0s
+ => [php internal] load .dockerignore                                      0.0s
+ => => transferring context: 434B                                          0.0s
+ => CACHED [freeradius  2/16] RUN apt-get update && apt-get install -y     0.0s
+ => CACHED [freeradius  3/16] COPY config/mods-enabled/ /etc/freeradius/m  0.0s
+ => CACHED [freeradius  4/16] COPY config/sql.template /etc/freeradius/sq  0.0s
+ => CACHED [freeradius  5/16] COPY config/mods-config/ /etc/freeradius/mo  0.0s
+ => CACHED [freeradius  6/16] COPY config/sites-enabled/ /etc/freeradius/  0.0s
+ => CACHED [freeradius  7/16] COPY config/policy.d/ /etc/freeradius/polic  0.0s
+ => CACHED [freeradius  8/16] COPY config/clients.conf /etc/freeradius/cl  0.0s
+ => CACHED [freeradius  9/16] COPY config/radiusd.conf /etc/freeradius/ra  0.0s
+ => CACHED [freeradius 10/16] COPY config/proxy.conf /etc/freeradius/prox  0.0s
+ => CACHED [freeradius 11/16] COPY config/huntgroups /etc/freeradius/hunt  0.0s
+ => CACHED [freeradius 12/16] COPY config/hints /etc/freeradius/hints      0.0s
+ => CACHED [freeradius 13/16] COPY config/users /etc/freeradius/users      0.0s
+ => CACHED [freeradius 14/16] COPY config/acct_users /etc/freeradius/acct  0.0s
+ => CACHED [freeradius 15/16] COPY docker-entrypoint.sh /docker-entrypoin  0.0s
+ => CACHED [freeradius 16/16] RUN chmod +x /docker-entrypoint.sh &&     c  0.0s
+ => [freeradius] exporting to image                                        0.2s
+ => => exporting layers                                                    0.0s
+ => => exporting manifest sha256:dcb0ab557d494b671ebf13db702df5d811560fc8  0.0s
+ => => exporting config sha256:54d467a675c43b8e5b4e91ebb9c0d2f1429f23760c  0.0s
+ => => exporting attestation manifest sha256:5a6145d22cff1b8934afcc27654d  0.0s
+ => => exporting manifest list sha256:06d842c25c04cf5a9a6263155fbee1ee3a2  0.0s
+ => => naming to docker.io/library/isp-freeradius:latest                   0.0s
+ => => unpacking to docker.io/library/isp-freeradius:latest                0.0s
+ => [php stage-0  1/12] FROM docker.io/library/php:8.3-fpm@sha256:548eb1d  0.1s
+ => => resolve docker.io/library/php:8.3-fpm@sha256:548eb1d89a06f83301d19  0.1s
+ => [php internal] load build context                                      0.0s
+ => => transferring context: 15.65kB                                       0.0s
+ => [php] FROM docker.io/library/composer:latest@sha256:22a95bd2bc3cf6ff1  0.1s
+ => => resolve docker.io/library/composer:latest@sha256:22a95bd2bc3cf6ff1  0.1s
+ => CACHED [php stage-0  2/12] RUN ln -snf /usr/share/zoneinfo/Africa/Nai  0.0s
+ => CACHED [php stage-0  3/12] RUN apt-get update && apt-get install -y    0.0s
+ => CACHED [php stage-0  4/12] RUN mv "/usr/local/etc/php/php.ini-product  0.0s
+ => CACHED [php stage-0  5/12] RUN echo "opcache.enable=1" >> /usr/local/  0.0s
+ => CACHED [php stage-0  6/12] COPY --from=composer:latest /usr/bin/compo  0.0s
+ => CACHED [php stage-0  7/12] WORKDIR /var/www/html                       0.0s
+ => CACHED [php stage-0  8/12] COPY composer.json composer.lock ./         0.0s
+ => CACHED [php stage-0  9/12] RUN composer install --no-dev --optimize-a  0.0s
+ => CACHED [php stage-0 10/12] COPY . .                                    0.0s
+ => CACHED [php stage-0 11/12] COPY docker/security.ini /usr/local/etc/ph  0.0s
+ => CACHED [php stage-0 12/12] RUN chown -R www-data:www-data /var/www/ht  0.0s
+ => [php] exporting to image                                               0.2s
+ => => exporting layers                                                    0.0s
+ => => exporting manifest sha256:c13292464c66378c50a4bae682de01087a3d8275  0.0s
+ => => exporting config sha256:52e7ec5d6f4807d07aff3c8a4b57cfdd3d245d7509  0.0s
+ => => exporting attestation manifest sha256:4c547c823a906441f6ea9b14ca72  0.0s
+ => => exporting manifest list sha256:b1dc4d4a0fb3e794f11101f8cd38e074f70  0.0s
+ => => naming to docker.io/library/isp-php:latest                          0.0s
+ => => unpacking to docker.io/library/isp-php:latest                       0.0s
+ => [php] resolving provenance for metadata file                           0.1s
+ => [freeradius] resolving provenance for metadata file                    0.0s
+WARN[0004] Found orphan containers ([isp_crm_license_server]) for this project.
+If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up.
+ [+] up 15/15
+ [+] up 15/15whatsapp               Built                                  4.0s  [+] up 15/15whatsapp               Built                                  4.0s  [+] up 15/15whatsapp               Built                                  4.0s  ✔ Image isp-whatsapp               Built                                  4.0s  ✔ Image isp-php                    Built                                  4.0s  ✔ Image isp-olt-service            Built                                  4.0s  ✔ Image isp-freeradius             Built                                  4.0s  ✔ Container isp_crm_db             Created                                0.5s  ✔ Container isp_crm_genieacs_mongo Healthy                                8.7s  ✔ Container isp_crm_whatsapp       Created                                0.5s  ✔ Container isp_crm_freepbx_db     Created                                0.5s  ✔ Container isp_crm_wireguard      Created                                0.5s  ✔ Container isp_crm_freepbx        Created                                0.3s  ✔ Container isp_crm_genieacs       Created                                0.2s  ✔ Container isp_crm_php            Created                                0.3s  ✔ Container isp_crm_freeradius     Created                                0.3s  ✔ Container isp_crm_olt_service    Created                                0.3s  ✔ Container isp_crm_nginx          Created                                0.2s root@superlitecrm:~/isp#
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp# docker compose ps
+NAME                     IMAGE                           COMMAND
+  SERVICE          CREATED         STATUS                     PORTS
+isp_crm_db               postgres:15-alpine              "docker-entrypoint.s…"
+  db               2 minutes ago   Up 2 minutes               127.0.0.1:5433->5432/tcp
+isp_crm_freepbx          tiredofit/freepbx:latest        "/init"
+  freepbx          2 minutes ago   Up 2 minutes               80/tcp, 443/tcp, 4445/tcp, 0.0.0.0:5038->5038/tcp, [::]:5038->5038/tcp, 0.0.0.0:5060-5061->5060-5061/tcp, 0.0.0.0:5060-5061->5060-5061/udp, [::]:5060-5061->5060-5061/tcp, [::]:5060-5061->5060-5061/udp, 4569/tcp, 5161/tcp, 8001/tcp, 8003/tcp, 8008-8009/tcp, 0.0.0.0:5160->5160/tcp, [::]:5160->5160/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 8025/tcp, 0.0.0.0:5160->5160/udp, [::]:5160->5160/udp, 10050/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp, 0.0.0.0:18000-18100->18000-18100/udp, [::]:18000-18100->18000-18100/udp, 18101-20000/udp
+isp_crm_freepbx_db       mariadb:10.6                    "docker-entrypoint.s…"
+  freepbx-db       2 minutes ago   Up 2 minutes               3306/tcp
+isp_crm_freeradius       isp-freeradius                  "/docker-entrypoint.…"
+  freeradius       2 minutes ago   Up 2 minutes               0.0.0.0:1812-1813->1812-1813/udp, [::]:1812-1813->1812-1813/udp, 0.0.0.0:3799->3799/udp, [::]:3799->3799/udp
+isp_crm_genieacs         drumsergio/genieacs:1.2.13.2    "/usr/bin/supervisor…"
+  genieacs         2 minutes ago   Up 2 minutes (unhealthy)   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp, 0.0.0.0:7547->7547/tcp, [::]:7547->7547/tcp, 0.0.0.0:7557->7557/tcp, [::]:7557->7557/tcp, 0.0.0.0:7567->7567/tcp, [::]:7567->7567/tcpisp_crm_genieacs_mongo   mongo:8.0                       "docker-entrypoint.s…"
+  genieacs-mongo   2 minutes ago   Up 2 minutes (healthy)     27017/tcp
+isp_crm_license_server   isp-license-server              "docker-php-entrypoi…"
+  license-server   22 hours ago    Up 22 hours                9000/tcp, 0.0.0.0:8081->80/tcp, [::]:8081->80/tcp
+isp_crm_nginx            nginx:stable-alpine             "/docker-entrypoint.…"
+  nginx            2 minutes ago   Up 2 minutes               0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+isp_crm_olt_service      isp-olt-service                 "docker-entrypoint.s…"
+  olt-service      2 minutes ago   Up 2 minutes
+isp_crm_php              isp-php                         "docker-php-entrypoi…"
+  php              2 minutes ago   Up 2 minutes
+isp_crm_whatsapp         isp-whatsapp                    "docker-entrypoint.s…"
+  whatsapp         2 minutes ago   Up 2 minutes               0.0.0.0:3001->3001/tcp, [::]:3001->3001/tcp
+isp_crm_wireguard        lscr.io/linuxserver/wireguard   "/init"
+  wireguard        2 minutes ago   Up 2 minutes
+root@superlitecrm:~/isp# docker compose logs -f whatsapp
+isp_crm_whatsapp  | Generated API secret saved
+isp_crm_whatsapp  | Session found, auto-initializing...
+isp_crm_whatsapp  | WhatsApp service (Baileys) running on 0.0.0.0:3001
+isp_crm_whatsapp  | API Secret: Configured
+isp_crm_whatsapp  | Benefits: No Chromium, No Puppeteer, Direct WebSocket, ~50-100MB RAM
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Initializing WhatsApp client...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | Connection closed: undefined Reconnecting: true
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
+isp_crm_whatsapp  | Connection closed: Connection Failure Reconnecting: true
+isp_crm_whatsapp  | Attempting to reconnect...
+isp_crm_whatsapp  | ⚠️ The printQRInTerminal option has been deprecated. You will no longer receive QR codes in the terminal automatically. Please listen to the connection.update event yourself and handle the QR your way. You can remove this message by removing this opttion. This message will be removed in a future version.
+isp_crm_whatsapp  | Baileys client initializing...
