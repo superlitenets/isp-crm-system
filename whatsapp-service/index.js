@@ -72,172 +72,192 @@ let saveCreds = null;
 let recentMessages = [];
 let messageCallbacks = [];
 
+let isInitializing = false;
+
 async function initializeClient() {
+    if (isInitializing) return;
+    isInitializing = true;
+    
     if (sock) {
         try {
+            sock.ev.removeAllListeners('connection.update');
+            sock.ev.removeAllListeners('creds.update');
+            sock.ev.removeAllListeners('messages.upsert');
             sock.end();
         } catch (e) {}
         sock = null;
     }
     
     connectionStatus = 'initializing';
+    console.log('Baileys client initializing...');
     
-    if (!fs.existsSync(SESSION_PATH)) {
-        fs.mkdirSync(SESSION_PATH, { recursive: true });
-    }
-    
-    const { state, saveCreds: saveCredsFunc } = await useMultiFileAuthState(SESSION_PATH);
-    saveCreds = saveCredsFunc;
-    
-    sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false,
-        logger: logger,
-        browser: ['ISP CRM', 'Chrome', '120.0.0'],
-        connectTimeoutMs: 120000,
-        defaultQueryTimeoutMs: 120000,
-        keepAliveIntervalMs: 25000,
-        markOnlineOnConnect: true,
-        syncFullHistory: false,
-        retryRequestDelayMs: 5000
-    });
-    
-    sock.ev.on('creds.update', saveCreds);
-    
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        
-        if (qr) {
-            console.log('QR Code received');
-            connectionStatus = 'qr_ready';
-            qrCodeString = qr;
-            qrCodeData = await qrcode.toDataURL(qr);
+    try {
+        if (!fs.existsSync(SESSION_PATH)) {
+            fs.mkdirSync(SESSION_PATH, { recursive: true });
         }
         
-        if (connection === 'close') {
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            
-            console.log('Connection closed:', lastDisconnect?.error?.message, 'Reconnecting:', shouldReconnect);
-            connectionStatus = 'disconnected';
-            clientInfo = null;
-            qrCodeData = null;
-            qrCodeString = null;
-            
-            if (shouldReconnect) {
-                const delay = Math.min(30000, 5000 * Math.pow(2, recentMessages.length % 5)); // Exponential backoff
-                setTimeout(() => {
-                    console.log(`Attempting to reconnect in ${delay/1000}s...`);
-                    initializeClient();
-                }, delay);
-            }
-        } else if (connection === 'open') {
-            console.log('WhatsApp client is ready!');
-            connectionStatus = 'connected';
-            qrCodeData = null;
-            qrCodeString = null;
-            
-            if (sock.user) {
-                clientInfo = {
-                    id: sock.user.id,
-                    name: sock.user.name || sock.user.verifiedName,
-                    phone: sock.user.id.split(':')[0].split('@')[0]
-                };
-                console.log('Connected as:', clientInfo.name, clientInfo.phone);
-            }
-        }
-    });
-    
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
+        const { state, saveCreds: saveCredsFunc } = await useMultiFileAuthState(SESSION_PATH);
+        saveCreds = saveCredsFunc;
         
-        for (const msg of messages) {
-            if (msg.key.fromMe) continue;
+        sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            logger: logger,
+            browser: ["Ubuntu", "Chrome", "20.0.04"],
+            connectTimeoutMs: 120000,
+            defaultQueryTimeoutMs: 120000,
+            keepAliveIntervalMs: 30000,
+            markOnlineOnConnect: true,
+            syncFullHistory: false,
+            retryRequestDelayMs: 5000,
+            qrTimeout: 40000,
+            version: [2, 3000, 1015901307],
+            linkPreviewImageThumbnailWidth: 192,
+            generateHighQualityLinkPreview: true
+        });
+        
+        sock.ev.on('creds.update', saveCreds);
+        
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
             
-            const messageType = getContentType(msg.message);
-            const textContent = msg.message?.conversation || 
-                               msg.message?.extendedTextMessage?.text || 
-                               msg.message?.imageMessage?.caption ||
-                               msg.message?.videoMessage?.caption ||
-                               '';
+            if (qr) {
+                console.log('QR Code received');
+                connectionStatus = 'qr_ready';
+                qrCodeString = qr;
+                qrCodeData = await qrcode.toDataURL(qr);
+            }
             
-            console.log('Incoming message from:', msg.key.remoteJid, 'Body:', textContent?.substring(0, 50));
-            
-            // Send webhook to PHP
-            try {
-                const domain = process.env.REPL_SLUG + '.' + process.env.REPL_OWNER + '.repl.co';
-                const webhookUrl = `https://${domain}/webhooks/whatsapp.php`;
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.code;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 
-                fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(msg)
-                }).catch(err => console.error('Webhook fetch error:', err.message));
-            } catch (webhookErr) {
-                console.error('Webhook preparation error:', webhookErr.message);
-            }
-            
-            const messageData = {
-                event: 'message_received',
-                from: msg.key.remoteJid,
-                to: sock.user?.id || '',
-                body: textContent,
-                type: messageType || 'text',
-                timestamp: msg.messageTimestamp,
-                messageId: msg.key.id,
-                isGroup: msg.key.remoteJid.endsWith('@g.us'),
-                senderName: msg.pushName || null,
-                hasMedia: ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'].includes(messageType),
-                mediaData: null,
-                mimetype: null,
-                filename: null
-            };
-            
-            if (messageData.hasMedia) {
-                try {
-                    const buffer = await downloadMediaMessage(msg, 'buffer', {});
-                    if (buffer) {
-                        messageData.mediaData = buffer.toString('base64');
-                        messageData.mimetype = msg.message[messageType]?.mimetype || null;
-                        messageData.filename = msg.message[messageType]?.fileName || null;
-                        console.log('Media downloaded:', messageData.mimetype, messageData.filename || 'no filename');
-                    }
-                } catch (mediaErr) {
-                    console.error('Failed to download media:', mediaErr.message);
+                console.log('Connection closed. Reason:', lastDisconnect?.error?.message || 'Unknown', 'Status Code:', statusCode, 'Reconnecting:', shouldReconnect);
+                connectionStatus = 'disconnected';
+                clientInfo = null;
+                qrCodeData = null;
+                qrCodeString = null;
+                
+                if (shouldReconnect) {
+                    const delay = Math.min(30000, 5000); 
+                    setTimeout(() => {
+                        console.log(`Attempting to reconnect in ${delay/1000}s...`);
+                        initializeClient();
+                    }, delay);
+                }
+            } else if (connection === 'open') {
+                console.log('WhatsApp client is ready!');
+                connectionStatus = 'connected';
+                qrCodeData = null;
+                qrCodeString = null;
+                
+                if (sock.user) {
+                    clientInfo = {
+                        id: sock.user.id,
+                        name: sock.user.name || sock.user.verifiedName,
+                        phone: sock.user.id.split(':')[0].split('@')[0]
+                    };
+                    console.log('Connected as:', clientInfo.name, clientInfo.phone);
                 }
             }
+        });
+        
+        sock.ev.on('messages.upsert', async ({ messages, type }) => {
+            if (type !== 'notify') return;
             
-            recentMessages.push(messageData);
-            if (recentMessages.length > 100) recentMessages.shift();
-            
-            messageCallbacks.forEach(cb => cb(messageData));
-        }
-    });
-    
-    sock.ev.on('messages.update', (updates) => {
-        for (const update of updates) {
-            if (update.update?.status) {
-                const ackStatus = {
-                    0: 'error',
-                    1: 'pending',
-                    2: 'sent',
-                    3: 'delivered',
-                    4: 'read',
-                    5: 'played'
-                };
-                console.log('Message ack:', update.key.id, ackStatus[update.update.status] || update.update.status);
+            for (const msg of messages) {
+                if (msg.key.fromMe) continue;
                 
-                messageCallbacks.forEach(cb => cb({
-                    event: 'message_ack',
-                    messageId: update.key.id,
-                    ack: update.update.status,
-                    status: ackStatus[update.update.status] || 'unknown'
-                }));
+                const messageType = getContentType(msg.message);
+                const textContent = msg.message?.conversation || 
+                                   msg.message?.extendedTextMessage?.text || 
+                                   msg.message?.imageMessage?.caption ||
+                                   msg.message?.videoMessage?.caption ||
+                                   '';
+                
+                console.log('Incoming message from:', msg.key.remoteJid, 'Body:', textContent?.substring(0, 50));
+                
+                // Send webhook to PHP
+                try {
+                    const domain = process.env.REPL_SLUG + '.' + process.env.REPL_OWNER + '.repl.co';
+                    const webhookUrl = `https://${domain}/webhooks/whatsapp.php`;
+                    
+                    fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(msg)
+                    }).catch(err => console.error('Webhook fetch error:', err.message));
+                } catch (webhookErr) {
+                    console.error('Webhook preparation error:', webhookErr.message);
+                }
+                
+                const messageData = {
+                    event: 'message_received',
+                    from: msg.key.remoteJid,
+                    to: sock.user?.id || '',
+                    body: textContent,
+                    type: messageType || 'text',
+                    timestamp: msg.messageTimestamp,
+                    messageId: msg.key.id,
+                    isGroup: msg.key.remoteJid.endsWith('@g.us'),
+                    senderName: msg.pushName || null,
+                    hasMedia: ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'].includes(messageType),
+                    mediaData: null,
+                    mimetype: null,
+                    filename: null
+                };
+                
+                if (messageData.hasMedia) {
+                    try {
+                        const buffer = await downloadMediaMessage(msg, 'buffer', {});
+                        if (buffer) {
+                            messageData.mediaData = buffer.toString('base64');
+                            messageData.mimetype = msg.message[messageType]?.mimetype || null;
+                            messageData.filename = msg.message[messageType]?.fileName || null;
+                            console.log('Media downloaded:', messageData.mimetype, messageData.filename || 'no filename');
+                        }
+                    } catch (mediaErr) {
+                        console.error('Failed to download media:', mediaErr.message);
+                    }
+                }
+                
+                recentMessages.push(messageData);
+                if (recentMessages.length > 100) recentMessages.shift();
+                
+                messageCallbacks.forEach(cb => cb(messageData));
             }
-        }
-    });
-    
-    console.log('Baileys client initializing...');
+        });
+        
+        sock.ev.on('messages.update', (updates) => {
+            for (const update of updates) {
+                if (update.update?.status) {
+                    const ackStatus = {
+                        0: 'error',
+                        1: 'pending',
+                        2: 'sent',
+                        3: 'delivered',
+                        4: 'read',
+                        5: 'played'
+                    };
+                    console.log('Message ack:', update.key.id, ackStatus[update.update.status] || update.update.status);
+                    
+                    messageCallbacks.forEach(cb => cb({
+                        event: 'message_ack',
+                        messageId: update.key.id,
+                        ack: update.update.status,
+                        status: ackStatus[update.update.status] || 'unknown'
+                    }));
+                }
+            }
+        });
+        
+        console.log('Baileys client initialized.');
+    } catch (err) {
+        console.error('Initialization error:', err);
+        connectionStatus = 'disconnected';
+    } finally {
+        isInitializing = false;
+    }
 }
 
 app.get('/status', (req, res) => {
