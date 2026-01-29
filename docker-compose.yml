@@ -29,7 +29,7 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - whatsapp_session:/app/auth_info_baileys
+      - whatsapp_session:/app/.baileys_auth
     networks:
       - crm_network
 
