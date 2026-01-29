@@ -1,0 +1,27 @@
+root@superlitecrm:~/isp# docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT id, phone_number, amount, status, mpesa_receipt_number, created_at FROM mpesa_transactions ORDER BY created_at DESC LIMIT 5;"
+ id | phone_number | amount  |  status   | mpesa_receipt_number |         created_at
+----+--------------+---------+-----------+----------------------+----------------------------
+ 21 | 254701031531 |   10.00 | completed | UATF05AYQD           | 2026-01-29 20:06:36.417164
+ 20 | 254701031531 |   10.00 | completed | UATF05ATT4           | 2026-01-29 19:52:38.412719
+ 19 | 254701031531 | 8000.00 | failed    |                      | 2026-01-29 07:23:47.732138
+ 18 | 254701031531 |   20.00 | completed | UAQF051OL7           | 2026-01-26 23:28:38.310049
+ 17 | 254701031531 | 8000.00 | failed    |                      | 2026-01-26 23:22:07.402163
+(5 rows)
+
+root@superlitecrm:~/isp# docker compose logs php 2>&1 | grep -i "RADIUS\|wallet\|credit\|payment" | tail -20
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing error: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_billing_history" does not exist
+isp_crm_php  | LINE 2:             INSERT INTO radius_billing_history (subscription...
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing error: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_billing_history" does not exist
+isp_crm_php  | LINE 2:             INSERT INTO radius_billing_history (subscription...
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing error: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_billing_history" does not exist
+isp_crm_php  | LINE 2:             INSERT INTO radius_billing_history (subscription...
+root@superlitecrm:~/isp# docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT id, username, credit_balance, status, expiry_date FROM radius_subscriptions ORDER BY updated_at DESC LIMIT 10;"
+ id | username | credit_balance | status | expiry_date
+----+----------+----------------+--------+-------------
+  1 | SFL001   |        8000.00 | active | 2026-01-30
+  3 | SFL003   |           0.00 | active | 2026-02-22
+  2 | SFL002   |           0.00 | active | 2026-05-26
+(3 rows)
+
+root@superlitecrm:~/isp#
+
