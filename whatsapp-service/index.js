@@ -99,19 +99,30 @@ async function initializeClient() {
         const { state, saveCreds: saveCredsFunc } = await useMultiFileAuthState(SESSION_PATH);
         saveCreds = saveCredsFunc;
         
+        // Fetch latest version from Baileys if possible, else use a modern default
+        let version = [2, 3000, 1015901307];
+        try {
+            const { fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+            const { version: latestVersion } = await fetchLatestBaileysVersion();
+            version = latestVersion;
+            console.log(`Using Baileys version: ${version.join('.')}`);
+        } catch (vErr) {
+            console.log('Using default Baileys version');
+        }
+
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: false,
             logger: logger,
             browser: ["Ubuntu", "Chrome", "20.0.04"],
+            version: version,
             connectTimeoutMs: 120000,
             defaultQueryTimeoutMs: 120000,
             keepAliveIntervalMs: 30000,
             markOnlineOnConnect: true,
             syncFullHistory: false,
             retryRequestDelayMs: 5000,
-            qrTimeout: 40000,
-            version: [2, 3000, 1015901307]
+            qrTimeout: 40000
         });
         
         sock.ev.on('creds.update', saveCreds);
