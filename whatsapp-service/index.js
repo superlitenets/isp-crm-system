@@ -139,8 +139,18 @@ function initializeClient() {
                 '--no-first-run',
                 '--no-zygote',
                 '--disable-gpu',
-                '--single-process'
-            ]
+                '--disable-software-rasterizer',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--disable-translate',
+                '--metrics-recording-only',
+                '--mute-audio',
+                '--no-default-browser-check',
+                '--safebrowsing-disable-auto-update'
+            ],
+            timeout: 120000
         }
     });
 
@@ -157,6 +167,20 @@ function initializeClient() {
         qrCodeData = null;
         qrCodeString = null;
         clientInfo = client.info;
+        
+        // Wait for WhatsApp to fully sync before accessing data
+        console.log('Waiting 5 seconds for WhatsApp to sync...');
+        await new Promise(r => setTimeout(r, 5000));
+        
+        // Force sync by fetching initial data
+        try {
+            await client.getState();
+            const chats = await client.getChats();
+            const groups = chats.filter(c => c.isGroup);
+            console.log(`Synced ${chats.length} chats, ${groups.length} groups`);
+        } catch (e) {
+            console.warn('Initial sync warning:', e.message);
+        }
         
         // Monkey-patch sendSeen to fix markedUnread error (WhatsApp Web API change)
         try {
@@ -607,9 +631,40 @@ app.post('/chat/:chatId/read', async (req, res) => {
     }
 });
 
-if (fs.existsSync(SESSION_PATH)) {
-    console.log('Session found, auto-initializing...');
+function hasValidSession() {
+    const sessionDir = path.join(SESSION_PATH, 'session');
+    if (!fs.existsSync(sessionDir)) return false;
+    
+    try {
+        const files = fs.readdirSync(sessionDir);
+        const lockFiles = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
+        const meaningfulFiles = files.filter(f => !lockFiles.includes(f) && !f.startsWith('.'));
+        
+        if (meaningfulFiles.length < 3) {
+            console.log('Session directory exists but appears incomplete, clearing...');
+            fs.rmSync(SESSION_PATH, { recursive: true, force: true });
+            return false;
+        }
+        
+        const hasLocalStorage = fs.existsSync(path.join(sessionDir, 'Default', 'Local Storage'));
+        if (!hasLocalStorage) {
+            console.log('Session missing Local Storage, clearing...');
+            fs.rmSync(SESSION_PATH, { recursive: true, force: true });
+            return false;
+        }
+        
+        return true;
+    } catch (e) {
+        console.warn('Error checking session validity:', e.message);
+        return false;
+    }
+}
+
+if (hasValidSession()) {
+    console.log('Valid session found, auto-initializing...');
     initializeClient();
+} else {
+    console.log('No valid session, waiting for /initialize call...');
 }
 
 app.listen(PORT, BIND_HOST, () => {
