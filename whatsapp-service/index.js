@@ -200,25 +200,72 @@ function initializeClient() {
         console.log('WhatsApp authenticated');
         connectionStatus = 'authenticated';
         
-        // Fallback: If ready event doesn't fire within 30 seconds, check manually
+        // Fallback: If ready event doesn't fire within 15 seconds, check manually
         setTimeout(async () => {
             if (connectionStatus === 'authenticated') {
-                console.log('Ready event not fired, checking client state manually...');
+                console.log('Ready event not fired after 15s, checking client state manually...');
                 try {
                     const state = await client.getState();
                     console.log('Client state:', state);
                     if (state === 'CONNECTED') {
-                        console.log('Client is connected, setting status manually');
+                        console.log('Client is connected, performing manual initialization...');
                         connectionStatus = 'connected';
                         clientInfo = client.info;
                         qrCodeData = null;
                         qrCodeString = null;
+                        
+                        // Do the same sync that ready event would do
+                        console.log('Waiting 3 seconds for WhatsApp to sync...');
+                        await new Promise(r => setTimeout(r, 3000));
+                        
+                        try {
+                            const chats = await client.getChats();
+                            const groups = chats.filter(c => c.isGroup);
+                            console.log(`Manual sync: ${chats.length} chats, ${groups.length} groups`);
+                        } catch (syncErr) {
+                            console.warn('Manual sync warning:', syncErr.message);
+                        }
+                        
+                        // Apply sendSeen patch
+                        try {
+                            await client.pupPage.evaluate(() => {
+                                if (window.WWebJS && window.WWebJS.sendSeen) {
+                                    window.WWebJS.sendSeen = async () => true;
+                                }
+                            });
+                            console.log('Applied sendSeen patch (manual init)');
+                        } catch (patchErr) {
+                            console.warn('Could not patch sendSeen:', patchErr.message);
+                        }
                     }
                 } catch (e) {
                     console.warn('Manual state check failed:', e.message);
                 }
             }
-        }, 30000);
+        }, 15000);
+        
+        // Also check at 5 seconds for faster recovery
+        setTimeout(async () => {
+            if (connectionStatus === 'authenticated') {
+                try {
+                    const state = await client.getState();
+                    if (state === 'CONNECTED') {
+                        console.log('Early check: Client connected at 5s, triggering manual init...');
+                        connectionStatus = 'connected';
+                        clientInfo = client.info;
+                        qrCodeData = null;
+                        qrCodeString = null;
+                        
+                        await new Promise(r => setTimeout(r, 2000));
+                        const chats = await client.getChats();
+                        const groups = chats.filter(c => c.isGroup);
+                        console.log(`Early sync: ${chats.length} chats, ${groups.length} groups`);
+                    }
+                } catch (e) {
+                    // Will retry at 15s
+                }
+            }
+        }, 5000);
     });
 
     client.on('auth_failure', (msg) => {
