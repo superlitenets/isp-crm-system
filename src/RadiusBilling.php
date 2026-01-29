@@ -2247,15 +2247,28 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Package not found'];
         }
         
-        $packagePrice = (float)$package['price'];
+        $packagePrice = (float)($package['price'] ?? 0);
         $currentBalance = (float)($sub['credit_balance'] ?? 0);
         
-        // Record the payment transaction first
-        $stmt = $this->db->prepare("
-            INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, transaction_ref, created_at)
-            VALUES (?, 'payment', ?, 'M-Pesa payment', ?, NOW())
-        ");
-        $stmt->execute([$sub['id'], $amount, $transactionId]);
+        // Safety check: package must have a valid price > 0
+        if ($packagePrice <= 0) {
+            error_log("RADIUS ERROR: Package ID {$sub['package_id']} has invalid price: {$packagePrice}");
+            return ['success' => false, 'error' => 'Package has no price configured'];
+        }
+        
+        error_log("RADIUS Payment: amount={$amount}, packagePrice={$packagePrice}, currentBalance={$currentBalance}, subscriptionId={$sub['id']}");
+        
+        // Record the payment transaction first (if table exists)
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_billing_history (subscription_id, transaction_type, amount, description, transaction_ref, created_at)
+                VALUES (?, 'payment', ?, 'M-Pesa payment', ?, NOW())
+            ");
+            $stmt->execute([$sub['id'], $amount, $transactionId]);
+        } catch (\Exception $e) {
+            // Table might not exist - continue without recording
+            error_log("RADIUS: billing_history insert failed: " . $e->getMessage());
+        }
         
         // If amount exactly equals package price, renew immediately
         if (abs($amount - $packagePrice) < 0.01) {
