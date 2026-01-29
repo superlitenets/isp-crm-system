@@ -4719,6 +4719,9 @@ try {
                                     <td>
                                         <i class="bi bi-arrow-down text-success"></i> <?= $pkg['download_speed'] ?>
                                         <i class="bi bi-arrow-up text-primary ms-2"></i> <?= $pkg['upload_speed'] ?>
+                                        <?php if (!empty($pkg['burst_download']) || !empty($pkg['burst_upload'])): ?>
+                                        <br><small class="text-info"><i class="bi bi-lightning"></i> Burst: <?= $pkg['burst_download'] ?? '-' ?>/<?= $pkg['burst_upload'] ?? '-' ?></small>
+                                        <?php endif; ?>
                                         <?php if ($pkg['fup_enabled']): ?>
                                         <br><small class="text-warning"><i class="bi bi-exclamation-triangle"></i> FUP: <?= $pkg['fup_download_speed'] ?>/<?= $pkg['fup_upload_speed'] ?></small>
                                         <?php endif; ?>
@@ -4738,6 +4741,9 @@ try {
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-secondary" title="Edit Package" onclick="editPackage(<?= htmlspecialchars(json_encode($pkg)) ?>)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
                                             <a href="?page=isp&view=package_schedules&package_id=<?= $pkg['id'] ?>" class="btn btn-outline-primary" title="Speed Schedules">
                                                 <i class="bi bi-clock-history"></i>
                                                 <?php if ($scheduleCount > 0): ?>
@@ -4820,10 +4826,46 @@ try {
                                         <label class="form-label">Simultaneous Sessions</label>
                                         <input type="number" name="simultaneous_sessions" class="form-control" value="1" min="1">
                                     </div>
+                                </div>
+                                <div class="row">
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Max Devices (MACs)</label>
                                         <input type="number" name="max_devices" class="form-control" value="1" min="1" max="10">
                                         <small class="text-muted">For hotspot multi-device sharing</small>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Download</label>
+                                        <input type="text" name="burst_download" class="form-control" placeholder="e.g., 20M">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Upload</label>
+                                        <input type="text" name="burst_upload" class="form-control" placeholder="e.g., 10M">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Threshold</label>
+                                        <input type="text" name="burst_threshold" class="form-control" placeholder="e.g., 5M/2M">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Time (seconds)</label>
+                                        <input type="number" name="burst_time" class="form-control" value="10" min="1">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Address Pool</label>
+                                        <input type="text" name="address_pool" class="form-control" placeholder="e.g., pool1">
+                                    </div>
+                                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="ip_binding" class="form-check-input" id="ipBindingNew">
+                                            <label class="form-check-label" for="ipBindingNew">IP Binding</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="is_active" class="form-check-input" id="isActiveNew" checked>
+                                            <label class="form-check-label" for="isActiveNew">Active</label>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="mb-3">
@@ -4839,6 +4881,155 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- Edit Package Modal -->
+            <div class="modal fade" id="editPackageModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_package">
+                            <input type="hidden" name="id" id="editPkgId">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Package</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Package Name</label>
+                                        <input type="text" name="name" id="editPkgName" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Type</label>
+                                        <select name="package_type" id="editPkgType" class="form-select">
+                                            <option value="pppoe">PPPoE</option>
+                                            <option value="hotspot">Hotspot</option>
+                                            <option value="static">Static IP</option>
+                                            <option value="dhcp">DHCP</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Billing Cycle</label>
+                                        <select name="billing_type" id="editPkgBilling" class="form-select">
+                                            <option value="daily">Daily</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="monthly">Monthly</option>
+                                            <option value="quarterly">Quarterly</option>
+                                            <option value="yearly">Yearly</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Price (KES)</label>
+                                        <input type="number" name="price" id="editPkgPrice" class="form-control" step="0.01" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Validity (Days)</label>
+                                        <input type="number" name="validity_days" id="editPkgValidity" class="form-control">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Data Quota (MB)</label>
+                                        <input type="number" name="data_quota_mb" id="editPkgQuota" class="form-control" placeholder="Leave empty for unlimited">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Download Speed</label>
+                                        <input type="text" name="download_speed" id="editPkgDownload" class="form-control" placeholder="e.g., 10M">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Upload Speed</label>
+                                        <input type="text" name="upload_speed" id="editPkgUpload" class="form-control" placeholder="e.g., 5M">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Priority (1-8)</label>
+                                        <input type="number" name="priority" id="editPkgPriority" class="form-control" min="1" max="8">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Simultaneous Sessions</label>
+                                        <input type="number" name="simultaneous_sessions" id="editPkgSessions" class="form-control" min="1">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Max Devices</label>
+                                        <input type="number" name="max_devices" id="editPkgDevices" class="form-control" min="1" max="10">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Download</label>
+                                        <input type="text" name="burst_download" id="editPkgBurstDown" class="form-control" placeholder="e.g., 20M">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Upload</label>
+                                        <input type="text" name="burst_upload" id="editPkgBurstUp" class="form-control" placeholder="e.g., 10M">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Threshold</label>
+                                        <input type="text" name="burst_threshold" id="editPkgBurstThreshold" class="form-control" placeholder="e.g., 5M/2M">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Burst Time (s)</label>
+                                        <input type="number" name="burst_time" id="editPkgBurstTime" class="form-control" min="1">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Address Pool</label>
+                                        <input type="text" name="address_pool" id="editPkgPool" class="form-control">
+                                    </div>
+                                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="ip_binding" class="form-check-input" id="editPkgIpBinding">
+                                            <label class="form-check-label" for="editPkgIpBinding">IP Binding</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="is_active" class="form-check-input" id="editPkgActive">
+                                            <label class="form-check-label" for="editPkgActive">Active</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="editPkgDesc" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Update Package</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function editPackage(pkg) {
+                document.getElementById('editPkgId').value = pkg.id;
+                document.getElementById('editPkgName').value = pkg.name || '';
+                document.getElementById('editPkgType').value = pkg.package_type || 'pppoe';
+                document.getElementById('editPkgBilling').value = pkg.billing_type || 'monthly';
+                document.getElementById('editPkgPrice').value = pkg.price || '';
+                document.getElementById('editPkgValidity').value = pkg.validity_days || 30;
+                document.getElementById('editPkgQuota').value = pkg.data_quota_mb || '';
+                document.getElementById('editPkgDownload').value = pkg.download_speed || '';
+                document.getElementById('editPkgUpload').value = pkg.upload_speed || '';
+                document.getElementById('editPkgPriority').value = pkg.priority || 8;
+                document.getElementById('editPkgSessions').value = pkg.simultaneous_sessions || 1;
+                document.getElementById('editPkgDevices').value = pkg.max_devices || 1;
+                document.getElementById('editPkgBurstDown').value = pkg.burst_download || '';
+                document.getElementById('editPkgBurstUp').value = pkg.burst_upload || '';
+                document.getElementById('editPkgBurstThreshold').value = pkg.burst_threshold || '';
+                document.getElementById('editPkgBurstTime').value = pkg.burst_time || 10;
+                document.getElementById('editPkgPool').value = pkg.address_pool || '';
+                document.getElementById('editPkgIpBinding').checked = pkg.ip_binding == true || pkg.ip_binding == 't';
+                document.getElementById('editPkgActive').checked = pkg.is_active == true || pkg.is_active == 't';
+                document.getElementById('editPkgDesc').value = pkg.description || '';
+                new bootstrap.Modal(document.getElementById('editPackageModal')).show();
+            }
+            </script>
 
             <?php elseif ($view === 'package_schedules'): ?>
             <?php 
