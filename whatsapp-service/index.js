@@ -161,6 +161,20 @@ async function initializeClient() {
             
             console.log('Incoming message from:', msg.key.remoteJid, 'Body:', textContent?.substring(0, 50));
             
+            // Send webhook to PHP
+            try {
+                const domain = process.env.REPL_SLUG + '.' + process.env.REPL_OWNER + '.repl.co';
+                const webhookUrl = `https://${domain}/webhooks/whatsapp.php`;
+                
+                fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(msg)
+                }).catch(err => console.error('Webhook fetch error:', err.message));
+            } catch (webhookErr) {
+                console.error('Webhook preparation error:', webhookErr.message);
+            }
+            
             const messageData = {
                 event: 'message_received',
                 from: msg.key.remoteJid,
@@ -403,19 +417,27 @@ app.get('/chats', async (req, res) => {
     }
     
     try {
-        const store = sock.store || {};
-        const chats = store.chats?.all() || [];
-        
-        const chatList = chats.slice(0, 50).map(chat => ({
-            id: chat.id,
-            name: chat.name || chat.subject || chat.id.split('@')[0],
-            isGroup: chat.id.endsWith('@g.us'),
-            unreadCount: chat.unreadCount || 0,
-            lastMessageAt: chat.conversationTimestamp || null,
-            phone: chat.id.split('@')[0]
+        const groups = await sock.groupFetchAllParticipating();
+        const groupList = Object.values(groups).map(group => ({
+            id: group.id,
+            name: group.subject,
+            isGroup: true,
+            unreadCount: 0,
+            lastMessageAt: null,
+            phone: group.id.split('@')[0]
         }));
         
-        res.json({ chats: chatList });
+        const uniqueContacts = [...new Set(recentMessages.map(m => m.from).filter(id => id && !id.endsWith('@g.us')))];
+        const contactList = uniqueContacts.slice(0, 30).map(id => ({
+            id: id,
+            name: recentMessages.find(m => m.from === id)?.senderName || id.split('@')[0],
+            isGroup: false,
+            unreadCount: 0,
+            lastMessageAt: null,
+            phone: id.split('@')[0]
+        }));
+        
+        res.json({ chats: [...groupList, ...contactList].slice(0, 50) });
     } catch (error) {
         console.error('Get chats error:', error);
         res.status(500).json({ error: error.message });
@@ -431,9 +453,8 @@ app.get('/chat/:chatId/messages', async (req, res) => {
     }
     
     try {
-        const messages = recentMessages.filter(m => m.from === chatId || m.to === chatId).slice(-parseInt(limit));
-        
-        res.json({ messages, chatId });
+        const messageList = recentMessages.filter(m => m.from === chatId || m.to === chatId).slice(-parseInt(limit));
+        res.json({ messages: messageList, chatId });
     } catch (error) {
         console.error('Get messages error:', error);
         res.status(500).json({ error: error.message });
@@ -505,7 +526,12 @@ app.post('/chat/:chatId/read', async (req, res) => {
     }
     
     try {
-        await sock.readMessages([{ remoteJid: chatId, id: undefined, participant: undefined }]);
+        const chatMessages = recentMessages.filter(m => m.from === chatId);
+        if (chatMessages.length > 0) {
+            const lastMsg = chatMessages[chatMessages.length - 1];
+            const participant = chatId.endsWith('@g.us') ? lastMsg.participant : undefined;
+            await sock.readMessages([{ remoteJid: chatId, id: lastMsg.messageId, participant }]);
+        }
         res.json({ success: true, chatId });
     } catch (error) {
         console.error('Mark read error:', error);

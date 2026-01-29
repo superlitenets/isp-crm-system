@@ -48,7 +48,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd whatsapp-service && node index.js"
+args = "cd whatsapp-service && npm start"
 waitForPort = 3001
 
 [[workflows.workflow]]
@@ -82,7 +82,7 @@ exposeLocalhost = true
 
 [[ports]]
 localPort = 3002
-externalPort = 80
+externalPort = 3002
 
 [[ports]]
 localPort = 5000
