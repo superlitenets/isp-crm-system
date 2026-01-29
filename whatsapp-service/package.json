@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-service",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -9,13 +9,14 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "WhatsApp service using Baileys (lightweight, no Chromium)",
   "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
     "body-parser": "^2.2.1",
     "cors": "^2.8.5",
     "express": "^5.2.1",
+    "pino": "^9.6.0",
     "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.34.4"
+    "qrcode-terminal": "^0.12.0"
   }
 }

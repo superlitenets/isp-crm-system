@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage, getContentType } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode');
 const express = require('express');
 const cors = require('cors');
@@ -6,64 +6,18 @@ const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const pino = require('pino');
 
 const app = express();
 app.use(cors({ origin: true }));
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
 
 const PORT = process.env.WA_PORT || 3001;
 const BIND_HOST = process.env.WA_HOST || (process.env.DOCKER_ENV ? '0.0.0.0' : '127.0.0.1');
-const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
+const SESSION_PATH = path.join(__dirname, '.baileys_auth');
 
-function cleanupChromeLocks() {
-    const sessionDir = path.join(SESSION_PATH, 'session');
-    const chromiumDirs = [
-        path.join(sessionDir, 'Default'),
-        sessionDir
-    ];
-    
-    for (const dir of chromiumDirs) {
-        if (!fs.existsSync(dir)) continue;
-        
-        const lockFiles = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
-        for (const lockFile of lockFiles) {
-            const lockPath = path.join(dir, lockFile);
-            if (fs.existsSync(lockPath)) {
-                try {
-                    fs.unlinkSync(lockPath);
-                    console.log(`Removed stale lock file: ${lockPath}`);
-                } catch (e) {
-                    console.warn(`Could not remove lock file ${lockPath}:`, e.message);
-                }
-            }
-        }
-    }
-    
-    try {
-        const walkDir = (dir, depth = 0) => {
-            if (depth > 3 || !fs.existsSync(dir)) return;
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
-            for (const entry of entries) {
-                if (entry.name === 'SingletonLock' || entry.name === 'SingletonSocket') {
-                    const lockPath = path.join(dir, entry.name);
-                    try {
-                        fs.unlinkSync(lockPath);
-                        console.log(`Removed nested lock file: ${lockPath}`);
-                    } catch (e) {}
-                } else if (entry.isDirectory()) {
-                    walkDir(path.join(dir, entry.name), depth + 1);
-                }
-            }
-        };
-        if (fs.existsSync(SESSION_PATH)) {
-            walkDir(SESSION_PATH);
-        }
-    } catch (e) {
-        console.warn('Error walking session directory:', e.message);
-    }
-}
+const logger = pino({ level: 'warn' });
 
-cleanupChromeLocks();
 const API_SECRET_DIR = path.join(__dirname, '.api_secret_dir');
 const API_SECRET_FILE = fs.existsSync(API_SECRET_DIR) && fs.statSync(API_SECRET_DIR).isDirectory() 
     ? path.join(API_SECRET_DIR, 'secret') 
@@ -108,174 +62,176 @@ function authMiddleware(req, res, next) {
 
 app.use(authMiddleware);
 
-let client = null;
+let sock = null;
 let qrCodeData = null;
 let qrCodeString = null;
 let connectionStatus = 'disconnected';
 let clientInfo = null;
+let saveCreds = null;
 
-function initializeClient() {
-    if (client) {
-        client.destroy();
+let recentMessages = [];
+let messageCallbacks = [];
+
+async function initializeClient() {
+    if (sock) {
+        try {
+            sock.end();
+        } catch (e) {}
+        sock = null;
     }
     
-    cleanupChromeLocks();
+    connectionStatus = 'initializing';
     
-    const chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium';
-    console.log('Using Chromium at:', chromiumPath);
+    if (!fs.existsSync(SESSION_PATH)) {
+        fs.mkdirSync(SESSION_PATH, { recursive: true });
+    }
     
-    client = new Client({
-        authStrategy: new LocalAuth({
-            dataPath: SESSION_PATH
-        }),
-        puppeteer: {
-            headless: true,
-            executablePath: chromiumPath,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--single-process'
-            ]
+    const { state, saveCreds: saveCredsFunc } = await useMultiFileAuthState(SESSION_PATH);
+    saveCreds = saveCredsFunc;
+    
+    sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true,
+        logger: logger,
+        browser: ['ISP CRM', 'Chrome', '120.0.0'],
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 25000,
+        markOnlineOnConnect: true,
+        syncFullHistory: false
+    });
+    
+    sock.ev.on('creds.update', saveCreds);
+    
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        
+        if (qr) {
+            console.log('QR Code received');
+            connectionStatus = 'qr_ready';
+            qrCodeString = qr;
+            qrCodeData = await qrcode.toDataURL(qr);
+        }
+        
+        if (connection === 'close') {
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            
+            console.log('Connection closed:', lastDisconnect?.error?.message, 'Reconnecting:', shouldReconnect);
+            connectionStatus = 'disconnected';
+            clientInfo = null;
+            qrCodeData = null;
+            qrCodeString = null;
+            
+            if (shouldReconnect) {
+                setTimeout(() => {
+                    console.log('Attempting to reconnect...');
+                    initializeClient();
+                }, 5000);
+            }
+        } else if (connection === 'open') {
+            console.log('WhatsApp client is ready!');
+            connectionStatus = 'connected';
+            qrCodeData = null;
+            qrCodeString = null;
+            
+            if (sock.user) {
+                clientInfo = {
+                    id: sock.user.id,
+                    name: sock.user.name || sock.user.verifiedName,
+                    phone: sock.user.id.split(':')[0].split('@')[0]
+                };
+                console.log('Connected as:', clientInfo.name, clientInfo.phone);
+            }
         }
     });
-
-    client.on('qr', async (qr) => {
-        console.log('QR Code received');
-        connectionStatus = 'qr_ready';
-        qrCodeString = qr;
-        qrCodeData = await qrcode.toDataURL(qr);
-    });
-
-    client.on('ready', async () => {
-        console.log('WhatsApp client is ready!');
-        connectionStatus = 'connected';
-        qrCodeData = null;
-        qrCodeString = null;
-        clientInfo = client.info;
+    
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+        if (type !== 'notify') return;
         
-        // Monkey-patch sendSeen to fix markedUnread error (WhatsApp Web API change)
-        try {
-            await client.pupPage.evaluate(() => {
-                if (window.WWebJS && window.WWebJS.sendSeen) {
-                    window.WWebJS.sendSeen = async () => true;
-                    console.log('Patched WWebJS.sendSeen');
-                }
-            });
-            console.log('Applied sendSeen patch for group messages');
-        } catch (e) {
-            console.warn('Could not patch sendSeen:', e.message);
-        }
-    });
-
-    client.on('authenticated', () => {
-        console.log('WhatsApp authenticated');
-        connectionStatus = 'authenticated';
-    });
-
-    client.on('auth_failure', (msg) => {
-        console.error('Authentication failed:', msg);
-        connectionStatus = 'auth_failed';
-        qrCodeData = null;
-        qrCodeString = null;
-    });
-
-    client.on('disconnected', (reason) => {
-        console.log('WhatsApp disconnected:', reason);
-        connectionStatus = 'disconnected';
-        clientInfo = null;
-        qrCodeData = null;
-        qrCodeString = null;
-    });
-
-    // Listen for incoming messages
-    client.on('message', async (msg) => {
-        console.log('Incoming message from:', msg.from, 'Body:', msg.body?.substring(0, 50));
-        
-        // Store message in database via webhook
-        try {
+        for (const msg of messages) {
+            if (msg.key.fromMe) continue;
+            
+            const messageType = getContentType(msg.message);
+            const textContent = msg.message?.conversation || 
+                               msg.message?.extendedTextMessage?.text || 
+                               msg.message?.imageMessage?.caption ||
+                               msg.message?.videoMessage?.caption ||
+                               '';
+            
+            console.log('Incoming message from:', msg.key.remoteJid, 'Body:', textContent?.substring(0, 50));
+            
             const messageData = {
                 event: 'message_received',
-                from: msg.from,
-                to: msg.to,
-                body: msg.body,
-                type: msg.type,
-                timestamp: msg.timestamp,
-                messageId: msg.id._serialized,
-                isGroup: msg.from.endsWith('@g.us'),
-                senderName: msg._data?.notifyName || null,
-                hasMedia: msg.hasMedia,
+                from: msg.key.remoteJid,
+                to: sock.user?.id || '',
+                body: textContent,
+                type: messageType || 'text',
+                timestamp: msg.messageTimestamp,
+                messageId: msg.key.id,
+                isGroup: msg.key.remoteJid.endsWith('@g.us'),
+                senderName: msg.pushName || null,
+                hasMedia: ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'].includes(messageType),
                 mediaData: null,
                 mimetype: null,
                 filename: null
             };
             
-            // Download media if present
-            if (msg.hasMedia) {
+            if (messageData.hasMedia) {
                 try {
-                    const media = await msg.downloadMedia();
-                    if (media) {
-                        messageData.mediaData = media.data; // base64
-                        messageData.mimetype = media.mimetype;
-                        messageData.filename = media.filename || null;
-                        console.log('Media downloaded:', media.mimetype, media.filename || 'no filename');
+                    const buffer = await downloadMediaMessage(msg, 'buffer', {});
+                    if (buffer) {
+                        messageData.mediaData = buffer.toString('base64');
+                        messageData.mimetype = msg.message[messageType]?.mimetype || null;
+                        messageData.filename = msg.message[messageType]?.fileName || null;
+                        console.log('Media downloaded:', messageData.mimetype, messageData.filename || 'no filename');
                     }
                 } catch (mediaErr) {
                     console.error('Failed to download media:', mediaErr.message);
                 }
             }
             
-            // Store in messages array for polling
             recentMessages.push(messageData);
             if (recentMessages.length > 100) recentMessages.shift();
             
-            // Emit to connected clients
             messageCallbacks.forEach(cb => cb(messageData));
-        } catch (error) {
-            console.error('Error processing incoming message:', error);
         }
     });
-
-    // Listen for message acknowledgments (delivery, read receipts)
-    client.on('message_ack', (msg, ack) => {
-        const ackStatus = {
-            '-1': 'error',
-            '0': 'pending',
-            '1': 'sent',
-            '2': 'delivered',
-            '3': 'read',
-            '4': 'played'
-        };
-        console.log('Message ack:', msg.id._serialized, ackStatus[ack] || ack);
-        
-        // Notify callbacks
-        messageCallbacks.forEach(cb => cb({
-            event: 'message_ack',
-            messageId: msg.id._serialized,
-            ack: ack,
-            status: ackStatus[ack] || 'unknown'
-        }));
+    
+    sock.ev.on('messages.update', (updates) => {
+        for (const update of updates) {
+            if (update.update?.status) {
+                const ackStatus = {
+                    0: 'error',
+                    1: 'pending',
+                    2: 'sent',
+                    3: 'delivered',
+                    4: 'read',
+                    5: 'played'
+                };
+                console.log('Message ack:', update.key.id, ackStatus[update.update.status] || update.update.status);
+                
+                messageCallbacks.forEach(cb => cb({
+                    event: 'message_ack',
+                    messageId: update.key.id,
+                    ack: update.update.status,
+                    status: ackStatus[update.update.status] || 'unknown'
+                }));
+            }
+        }
     });
-
-    client.initialize();
+    
+    console.log('Baileys client initializing...');
 }
-
-// Store recent messages for polling
-let recentMessages = [];
-let messageCallbacks = [];
 
 app.get('/status', (req, res) => {
     res.json({
         status: connectionStatus,
         hasQR: !!qrCodeData,
         info: clientInfo ? {
-            pushname: clientInfo.pushname,
-            phone: clientInfo.wid?.user,
-            platform: clientInfo.platform
+            pushname: clientInfo.name,
+            phone: clientInfo.phone,
+            platform: 'Baileys'
         } : null
     });
 });
@@ -317,10 +273,10 @@ app.post('/initialize', (req, res) => {
 
 app.post('/logout', async (req, res) => {
     try {
-        if (client) {
-            await client.logout();
-            await client.destroy();
-            client = null;
+        if (sock) {
+            await sock.logout();
+            sock.end();
+            sock = null;
         }
         if (fs.existsSync(SESSION_PATH)) {
             fs.rmSync(SESSION_PATH, { recursive: true, force: true });
@@ -343,20 +299,20 @@ app.post('/send', async (req, res) => {
         return res.status(400).json({ error: 'Phone and message are required' });
     }
     
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     try {
         const formattedPhone = phone.replace(/[^0-9]/g, '');
-        const chatId = formattedPhone.includes('@') ? formattedPhone : `${formattedPhone}@c.us`;
+        const jid = formattedPhone.includes('@') ? formattedPhone : `${formattedPhone}@s.whatsapp.net`;
         
-        const result = await client.sendMessage(chatId, message);
+        const result = await sock.sendMessage(jid, { text: message });
         console.log(`Message sent to ${phone}`);
         res.json({ 
             success: true, 
-            messageId: result.id._serialized,
-            timestamp: result.timestamp
+            messageId: result.key.id,
+            timestamp: Math.floor(Date.now() / 1000)
         });
     } catch (error) {
         console.error('Send error:', error);
@@ -371,20 +327,19 @@ app.post('/send-group', async (req, res) => {
         return res.status(400).json({ error: 'Group ID and message are required' });
     }
     
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     try {
-        const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
+        const jid = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
         
-        // Use standard sendMessage (sendSeen is patched on ready)
-        const result = await client.sendMessage(chatId, message);
+        const result = await sock.sendMessage(jid, { text: message });
         console.log(`Message sent to group ${groupId}`);
         res.json({ 
             success: true, 
-            messageId: result.id._serialized,
-            timestamp: result.timestamp
+            messageId: result.key.id,
+            timestamp: Math.floor(Date.now() / 1000)
         });
     } catch (error) {
         console.error('Send group error:', error);
@@ -393,20 +348,18 @@ app.post('/send-group', async (req, res) => {
 });
 
 app.get('/groups', async (req, res) => {
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     try {
-        const chats = await client.getChats();
-        const groups = chats
-            .filter(chat => chat.isGroup)
-            .map(group => ({
-                id: group.id._serialized,
-                name: group.name,
-                participantsCount: group.participants?.length || 0
-            }));
-        res.json({ groups });
+        const groups = await sock.groupFetchAllParticipating();
+        const groupList = Object.values(groups).map(group => ({
+            id: group.id,
+            name: group.subject,
+            participantsCount: group.participants?.length || 0
+        }));
+        res.json({ groups: groupList });
     } catch (error) {
         console.error('Get groups error:', error);
         res.status(500).json({ error: error.message });
@@ -420,7 +373,7 @@ app.post('/send-bulk', async (req, res) => {
         return res.status(400).json({ error: 'Phones array and message are required' });
     }
     
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
@@ -429,9 +382,9 @@ app.post('/send-bulk', async (req, res) => {
     for (const phone of phones) {
         try {
             const formattedPhone = phone.replace(/[^0-9]/g, '');
-            const chatId = `${formattedPhone}@c.us`;
-            const result = await client.sendMessage(chatId, message);
-            results.push({ phone, success: true, messageId: result.id._serialized });
+            const jid = `${formattedPhone}@s.whatsapp.net`;
+            const result = await sock.sendMessage(jid, { text: message });
+            results.push({ phone, success: true, messageId: result.key.id });
             
             if (delay > 0) {
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -444,33 +397,24 @@ app.post('/send-bulk', async (req, res) => {
     res.json({ results, total: phones.length, sent: results.filter(r => r.success).length });
 });
 
-// Get all chats/conversations
 app.get('/chats', async (req, res) => {
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     try {
-        const chats = await client.getChats();
-        const chatList = await Promise.all(chats.slice(0, 50).map(async chat => {
-            let contactName = null;
-            if (!chat.isGroup) {
-                try {
-                    const contact = await chat.getContact();
-                    contactName = contact?.pushname || contact?.name || null;
-                } catch (e) {
-                    // Contact lookup may fail on newer WhatsApp versions
-                }
-            }
-            return {
-                id: chat.id._serialized,
-                name: chat.name || contactName || chat.id.user,
-                isGroup: chat.isGroup,
-                unreadCount: chat.unreadCount,
-                lastMessageAt: chat.timestamp,
-                phone: chat.id.user
-            };
+        const store = sock.store || {};
+        const chats = store.chats?.all() || [];
+        
+        const chatList = chats.slice(0, 50).map(chat => ({
+            id: chat.id,
+            name: chat.name || chat.subject || chat.id.split('@')[0],
+            isGroup: chat.id.endsWith('@g.us'),
+            unreadCount: chat.unreadCount || 0,
+            lastMessageAt: chat.conversationTimestamp || null,
+            phone: chat.id.split('@')[0]
         }));
+        
         res.json({ chats: chatList });
     } catch (error) {
         console.error('Get chats error:', error);
@@ -478,58 +422,24 @@ app.get('/chats', async (req, res) => {
     }
 });
 
-// Get chat history for a specific chat
 app.get('/chat/:chatId/messages', async (req, res) => {
     const { chatId } = req.params;
     const { limit = 50, includeMedia = 'false' } = req.query;
     
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     try {
-        const chat = await client.getChatById(chatId);
-        const messages = await chat.fetchMessages({ limit: parseInt(limit) });
+        const messages = recentMessages.filter(m => m.from === chatId || m.to === chatId).slice(-parseInt(limit));
         
-        const messageList = await Promise.all(messages.map(async msg => {
-            const msgData = {
-                id: msg.id._serialized,
-                body: msg.body,
-                type: msg.type,
-                fromMe: msg.fromMe,
-                timestamp: msg.timestamp,
-                senderName: msg._data?.notifyName,
-                hasMedia: msg.hasMedia,
-                mediaData: null,
-                mimetype: null,
-                filename: null
-            };
-            
-            // Download media if requested and message has media
-            if (includeMedia === 'true' && msg.hasMedia) {
-                try {
-                    const media = await msg.downloadMedia();
-                    if (media) {
-                        msgData.mediaData = media.data;
-                        msgData.mimetype = media.mimetype;
-                        msgData.filename = media.filename || null;
-                    }
-                } catch (e) {
-                    console.error('Failed to download media for message:', e.message);
-                }
-            }
-            
-            return msgData;
-        }));
-        
-        res.json({ messages: messageList, chatId });
+        res.json({ messages, chatId });
     } catch (error) {
         console.error('Get messages error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Get recent incoming messages
 app.get('/messages/recent', (req, res) => {
     const { since } = req.query;
     let messages = recentMessages;
@@ -542,7 +452,6 @@ app.get('/messages/recent', (req, res) => {
     res.json({ messages });
 });
 
-// SSE endpoint for real-time message updates
 app.get('/messages/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -562,7 +471,6 @@ app.get('/messages/stream', (req, res) => {
     });
 });
 
-// Send message to a chat and get the sent message info
 app.post('/chat/:chatId/send', async (req, res) => {
     const { chatId } = req.params;
     const { message } = req.body;
@@ -571,16 +479,16 @@ app.post('/chat/:chatId/send', async (req, res) => {
         return res.status(400).json({ error: 'Message is required' });
     }
     
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     try {
-        const result = await client.sendMessage(chatId, message);
+        const result = await sock.sendMessage(chatId, { text: message });
         res.json({ 
             success: true, 
-            messageId: result.id._serialized,
-            timestamp: result.timestamp,
+            messageId: result.key.id,
+            timestamp: Math.floor(Date.now() / 1000),
             chatId
         });
     } catch (error) {
@@ -589,17 +497,15 @@ app.post('/chat/:chatId/send', async (req, res) => {
     }
 });
 
-// Mark chat as read
 app.post('/chat/:chatId/read', async (req, res) => {
     const { chatId } = req.params;
     
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'connected' || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     try {
-        const chat = await client.getChatById(chatId);
-        await chat.sendSeen();
+        await sock.readMessages([{ remoteJid: chatId, id: undefined, participant: undefined }]);
         res.json({ success: true, chatId });
     } catch (error) {
         console.error('Mark read error:', error);
@@ -613,6 +519,7 @@ if (fs.existsSync(SESSION_PATH)) {
 }
 
 app.listen(PORT, BIND_HOST, () => {
-    console.log(`WhatsApp service running on ${BIND_HOST}:${PORT}`);
+    console.log(`WhatsApp service (Baileys) running on ${BIND_HOST}:${PORT}`);
     console.log('API Secret:', API_SECRET ? 'Configured' : 'Not set (local-only access)');
+    console.log('Benefits: No Chromium, No Puppeteer, Direct WebSocket, ~50-100MB RAM');
 });
