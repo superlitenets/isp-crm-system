@@ -115,11 +115,46 @@ let connectionStatus = 'disconnected';
 let clientInfo = null;
 let readyTimeout = null;
 let authTime = null;
+let isInitializing = false;
 
-function initializeClient() {
-    if (client) {
-        client.destroy();
+async function initializeClient() {
+    // Prevent concurrent initializations
+    if (isInitializing) {
+        console.log('Already initializing, skipping duplicate request');
+        return;
     }
+    isInitializing = true;
+    
+    // Clear any pending timeouts
+    if (readyTimeout) {
+        clearTimeout(readyTimeout);
+        readyTimeout = null;
+    }
+    authTime = null;
+    
+    // Destroy existing client properly
+    if (client) {
+        try {
+            console.log('Destroying existing client...');
+            await client.destroy();
+            console.log('Client destroyed');
+        } catch (e) {
+            console.warn('Error destroying client:', e.message);
+        }
+        client = null;
+    }
+    
+    // Kill any orphaned chromium processes
+    try {
+        const { execSync } = require('child_process');
+        execSync('pkill -f chromium || true', { timeout: 5000 });
+        console.log('Killed orphaned chromium processes');
+    } catch (e) {
+        // Ignore errors
+    }
+    
+    // Wait a moment for cleanup
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     cleanupChromeLocks();
     
@@ -159,6 +194,7 @@ function initializeClient() {
         qrCodeData = null;
         qrCodeString = null;
         clientInfo = client.info;
+        isInitializing = false; // Reset flag
         
         // Clear the ready timeout since we're now connected
         if (readyTimeout) {
@@ -185,29 +221,25 @@ function initializeClient() {
         console.log('WhatsApp authenticated');
         connectionStatus = 'authenticated';
         authTime = Date.now();
+        isInitializing = false; // Allow new initializations after auth
         
         // Set a timeout - if ready doesn't fire within 90 seconds, reinitialize
         if (readyTimeout) {
             clearTimeout(readyTimeout);
         }
-        readyTimeout = setTimeout(() => {
+        readyTimeout = setTimeout(async () => {
             if (connectionStatus === 'authenticated') {
                 console.log('WARNING: Authenticated but ready event never fired after 90s. Reinitializing...');
-                // Clear session and reinitialize
-                const sessionDir = path.join(SESSION_PATH, 'session');
-                if (fs.existsSync(sessionDir)) {
-                    try {
-                        fs.rmSync(sessionDir, { recursive: true, force: true });
-                        console.log('Cleared stale session directory');
-                    } catch (e) {
-                        console.error('Failed to clear session:', e.message);
-                    }
+                connectionStatus = 'disconnected';
+                
+                // Use initializeClient which now handles everything properly
+                await initializeClient();
+                if (client) {
+                    client.initialize().catch(err => {
+                        console.error('Reinit failed:', err.message);
+                        isInitializing = false;
+                    });
                 }
-                setTimeout(() => {
-                    connectionStatus = 'disconnected';
-                    initializeClient();
-                    client.initialize();
-                }, 2000);
             }
         }, 90000);
     });
@@ -217,6 +249,7 @@ function initializeClient() {
         connectionStatus = 'auth_failed';
         qrCodeData = null;
         qrCodeString = null;
+        isInitializing = false;
     });
 
     client.on('disconnected', (reason) => {
@@ -225,6 +258,7 @@ function initializeClient() {
         clientInfo = null;
         qrCodeData = null;
         qrCodeString = null;
+        isInitializing = false;
     });
 
     // Listen for incoming messages
@@ -352,10 +386,19 @@ app.get('/qr-terminal', async (req, res) => {
     }
 });
 
-app.post('/initialize', (req, res) => {
+app.post('/initialize', async (req, res) => {
+    if (isInitializing) {
+        return res.json({ message: 'Already initializing, please wait...', status: connectionStatus });
+    }
     console.log('Initializing WhatsApp client...');
     connectionStatus = 'initializing';
-    initializeClient();
+    await initializeClient();
+    if (client) {
+        client.initialize().catch(err => {
+            console.error('Init error:', err.message);
+            isInitializing = false;
+        });
+    }
     res.json({ message: 'Initializing...', status: connectionStatus });
 });
 
@@ -363,28 +406,18 @@ app.post('/initialize', (req, res) => {
 app.post('/force-reinit', async (req, res) => {
     console.log('Force reinitializing WhatsApp client - clearing session...');
     try {
-        // Clear any pending timeouts
-        if (readyTimeout) {
-            clearTimeout(readyTimeout);
-            readyTimeout = null;
-        }
-        authTime = null;
+        // Reset the lock to allow force reinit
+        isInitializing = false;
         
-        // Destroy existing client
-        if (client) {
-            try {
-                await client.destroy();
-            } catch (e) {
-                console.warn('Client destroy error:', e.message);
-            }
-            client = null;
-        }
-        
-        // Clear session directory
+        // Clear session directory before reinit
         const sessionDir = path.join(SESSION_PATH, 'session');
         if (fs.existsSync(sessionDir)) {
-            fs.rmSync(sessionDir, { recursive: true, force: true });
-            console.log('Cleared session directory');
+            try {
+                fs.rmSync(sessionDir, { recursive: true, force: true });
+                console.log('Cleared session directory');
+            } catch (e) {
+                console.warn('Could not clear session:', e.message);
+            }
         }
         
         // Reset state
@@ -393,15 +426,19 @@ app.post('/force-reinit', async (req, res) => {
         qrCodeData = null;
         qrCodeString = null;
         
-        // Reinitialize after a short delay
-        setTimeout(() => {
-            initializeClient();
-            client.initialize();
-        }, 1000);
+        // Reinitialize (initializeClient now handles cleanup properly)
+        await initializeClient();
+        if (client) {
+            client.initialize().catch(err => {
+                console.error('Force reinit init error:', err.message);
+                isInitializing = false;
+            });
+        }
         
         res.json({ message: 'Force reinitialization started. Scan new QR code to connect.', status: 'reinitializing' });
     } catch (error) {
         console.error('Force reinit error:', error);
+        isInitializing = false;
         res.status(500).json({ error: error.message });
     }
 });
@@ -698,12 +735,20 @@ app.post('/chat/:chatId/read', async (req, res) => {
     }
 });
 
-if (fs.existsSync(SESSION_PATH)) {
-    console.log('Session found, auto-initializing...');
-    initializeClient();
-}
-
-app.listen(PORT, BIND_HOST, () => {
+// Start server first, then auto-initialize
+app.listen(PORT, BIND_HOST, async () => {
     console.log(`WhatsApp service running on ${BIND_HOST}:${PORT}`);
     console.log('API Secret:', API_SECRET ? 'Configured' : 'Not set (local-only access)');
+    
+    // Auto-initialize if session exists
+    if (fs.existsSync(SESSION_PATH)) {
+        console.log('Session found, auto-initializing...');
+        await initializeClient();
+        if (client) {
+            client.initialize().catch(err => {
+                console.error('Auto-init error:', err.message);
+                isInitializing = false;
+            });
+        }
+    }
 });
