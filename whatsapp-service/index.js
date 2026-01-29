@@ -13,7 +13,7 @@ app.use(cors({ origin: true }));
 app.use(bodyParser.json({ limit: '50mb' }));
 
 const PORT = process.env.WA_PORT || 3001;
-const BIND_HOST = process.env.WA_HOST || (process.env.DOCKER_ENV ? '0.0.0.0' : '127.0.0.1');
+const BIND_HOST = process.env.WA_HOST || '0.0.0.0';
 const SESSION_PATH = path.join(__dirname, '.baileys_auth');
 
 const logger = pino({ level: 'warn' });
