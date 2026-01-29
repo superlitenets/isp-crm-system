@@ -740,9 +740,13 @@ app.listen(PORT, BIND_HOST, async () => {
     console.log(`WhatsApp service running on ${BIND_HOST}:${PORT}`);
     console.log('API Secret:', API_SECRET ? 'Configured' : 'Not set (local-only access)');
     
-    // Auto-initialize if session exists
-    if (fs.existsSync(SESSION_PATH)) {
-        console.log('Session found, auto-initializing...');
+    // Auto-initialize only if actual session data exists (not just empty directory)
+    const sessionDataPath = path.join(SESSION_PATH, 'session');
+    const hasRealSession = fs.existsSync(sessionDataPath) && 
+        fs.readdirSync(sessionDataPath).some(f => !['SingletonLock', 'SingletonSocket', 'SingletonCookie'].includes(f));
+    
+    if (hasRealSession) {
+        console.log('Valid session found, auto-initializing...');
         await initializeClient();
         if (client) {
             client.initialize().catch(err => {
@@ -750,5 +754,7 @@ app.listen(PORT, BIND_HOST, async () => {
                 isInitializing = false;
             });
         }
+    } else {
+        console.log('No valid session found. Visit /qr-terminal or POST /initialize to connect.');
     }
 });
