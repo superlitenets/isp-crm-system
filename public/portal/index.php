@@ -283,6 +283,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 session_destroy();
                 header('Location: ?');
                 exit;
+            
+            case 'add_device':
+                if (!isset($_SESSION['portal_subscription_id'])) {
+                    $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
+                    $message = 'Invalid request';
+                    $messageType = 'danger';
+                    break;
+                }
+                $mac = trim($_POST['mac_address'] ?? '');
+                $deviceName = trim($_POST['device_name'] ?? '');
+                if (empty($mac)) {
+                    $message = 'Please enter a MAC address';
+                    $messageType = 'danger';
+                    break;
+                }
+                $result = $radiusBilling->addSubscriptionMAC(
+                    $_SESSION['portal_subscription_id'],
+                    $mac,
+                    $deviceName ?: null,
+                    false
+                );
+                if ($result['success']) {
+                    $message = 'Device added successfully! MAC: ' . $result['mac'];
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to add device: ' . ($result['error'] ?? 'Unknown error');
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'remove_device':
+                if (!isset($_SESSION['portal_subscription_id'])) {
+                    $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
+                    $message = 'Invalid request';
+                    $messageType = 'danger';
+                    break;
+                }
+                $macId = (int)($_POST['mac_id'] ?? 0);
+                if ($macId <= 0) {
+                    $message = 'Invalid device';
+                    $messageType = 'danger';
+                    break;
+                }
+                $result = $radiusBilling->removeSubscriptionMAC($_SESSION['portal_subscription_id'], $macId);
+                if ($result['success']) {
+                    $message = 'Device removed successfully';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to remove device: ' . ($result['error'] ?? 'Unknown error');
+                    $messageType = 'danger';
+                }
+                break;
                 
             case 'pay':
                 $phone = $_POST['phone'] ?? '';
@@ -834,9 +894,22 @@ if (isset($_SESSION['portal_subscription_id'])) {
         </div>
         <?php endif; ?>
         
+        <?php 
+        $maxDevices = $package['max_devices'] ?? 1;
+        $registeredMacs = $radiusBilling->getSubscriptionMACs($_SESSION['portal_subscription_id']);
+        $canAddDevice = count($registeredMacs) < $maxDevices;
+        ?>
         <ul class="nav nav-pills mb-4 flex-wrap">
             <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#overview">Overview</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#usage"><i class="bi bi-graph-up me-1"></i>Usage</a></li>
+            <?php if ($maxDevices > 1): ?>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="pill" href="#devices">
+                    <i class="bi bi-phone me-1"></i>Devices
+                    <span class="badge bg-secondary"><?= count($registeredMacs) ?>/<?= $maxDevices ?></span>
+                </a>
+            </li>
+            <?php endif; ?>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sessions">Sessions</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#invoices">Invoices</a></li>
             <li class="nav-item">
@@ -948,6 +1021,138 @@ if (isset($_SESSION['portal_subscription_id'])) {
                     </div>
                 </div>
             </div>
+            
+            <?php if ($maxDevices > 1): ?>
+            <div class="tab-pane fade" id="devices">
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <div class="portal-card p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0"><i class="bi bi-phone me-2"></i>Registered Devices</h6>
+                                <span class="badge bg-primary"><?= count($registeredMacs) ?> of <?= $maxDevices ?> devices</span>
+                            </div>
+                            
+                            <?php if (empty($registeredMacs)): ?>
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-phone fs-1 d-block mb-2"></i>
+                                <p class="mb-0">No devices registered yet. Your first device will be added automatically when you connect.</p>
+                            </div>
+                            <?php else: ?>
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($registeredMacs as $macRecord): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-<?= $macRecord['is_primary'] ? 'phone-fill text-primary' : 'phone' ?> me-2 fs-5"></i>
+                                            <div>
+                                                <code class="fw-bold"><?= htmlspecialchars($macRecord['mac_address']) ?></code>
+                                                <?php if ($macRecord['is_primary']): ?>
+                                                <span class="badge bg-primary ms-2">Primary</span>
+                                                <?php endif; ?>
+                                                <?php if ($macRecord['auto_captured']): ?>
+                                                <span class="badge bg-secondary ms-1">Auto</span>
+                                                <?php endif; ?>
+                                                <br>
+                                                <small class="text-muted"><?= $macRecord['device_name'] ?: 'Unknown device' ?></small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted me-3"><?= date('M j, Y', strtotime($macRecord['created_at'])) ?></small>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Remove this device?');">
+                                            <input type="hidden" name="action" value="remove_device">
+                                            <input type="hidden" name="mac_id" value="<?= $macRecord['id'] ?>">
+                                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove device">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-5">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-plus-circle me-2"></i>Add New Device</h6>
+                            
+                            <?php if ($canAddDevice): ?>
+                            <p class="text-muted small">Enter the MAC address of your device to register it. You can find this in your device's network settings.</p>
+                            <form method="post">
+                                <input type="hidden" name="action" value="add_device">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <div class="mb-3">
+                                    <label class="form-label">MAC Address</label>
+                                    <input type="text" name="mac_address" class="form-control" 
+                                           placeholder="AA:BB:CC:DD:EE:FF" 
+                                           pattern="([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})|([0-9A-Fa-f]{12})"
+                                           required>
+                                    <small class="text-muted">Format: AA:BB:CC:DD:EE:FF or AABBCCDDEEFF</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Device Name (Optional)</label>
+                                    <input type="text" name="device_name" class="form-control" placeholder="e.g., My Phone, Laptop">
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Device
+                                </button>
+                            </form>
+                            <?php else: ?>
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                You have reached the maximum number of devices (<?= $maxDevices ?>). Remove an existing device to add a new one.
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="portal-card p-4 mt-4">
+                            <h6 class="mb-3"><i class="bi bi-question-circle me-2"></i>How to Find Your MAC Address</h6>
+                            <div class="accordion accordion-flush" id="macHelp">
+                                <div class="accordion-item border-0">
+                                    <h6 class="accordion-header">
+                                        <button class="accordion-button collapsed px-0 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#macAndroid">
+                                            <i class="bi bi-android2 me-2"></i> Android
+                                        </button>
+                                    </h6>
+                                    <div id="macAndroid" class="accordion-collapse collapse" data-bs-parent="#macHelp">
+                                        <div class="accordion-body px-0 small text-muted">
+                                            Settings > About Phone > Status > WiFi MAC address
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="accordion-item border-0">
+                                    <h6 class="accordion-header">
+                                        <button class="accordion-button collapsed px-0 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#macIphone">
+                                            <i class="bi bi-apple me-2"></i> iPhone
+                                        </button>
+                                    </h6>
+                                    <div id="macIphone" class="accordion-collapse collapse" data-bs-parent="#macHelp">
+                                        <div class="accordion-body px-0 small text-muted">
+                                            Settings > General > About > WiFi Address
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="accordion-item border-0">
+                                    <h6 class="accordion-header">
+                                        <button class="accordion-button collapsed px-0 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#macWindows">
+                                            <i class="bi bi-windows me-2"></i> Windows
+                                        </button>
+                                    </h6>
+                                    <div id="macWindows" class="accordion-collapse collapse" data-bs-parent="#macHelp">
+                                        <div class="accordion-body px-0 small text-muted">
+                                            Run: cmd > ipconfig /all > Physical Address
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <div class="tab-pane fade" id="sessions">
                 <div class="portal-card p-4">

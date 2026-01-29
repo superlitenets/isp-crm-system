@@ -304,3 +304,21 @@ CREATE TABLE IF NOT EXISTS radius_package_schedules (
 );
 CREATE INDEX IF NOT EXISTS idx_package_schedules_package ON radius_package_schedules(package_id);
 CREATE INDEX IF NOT EXISTS idx_package_schedules_active ON radius_package_schedules(is_active) WHERE is_active = TRUE;
+
+-- Multi-device MAC support for hotspot packages
+ALTER TABLE radius_packages ADD COLUMN IF NOT EXISTS max_devices INTEGER DEFAULT 1;
+
+-- Store multiple MAC addresses per subscription
+CREATE TABLE IF NOT EXISTS radius_subscription_macs (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE CASCADE,
+    mac_address VARCHAR(17) NOT NULL UNIQUE,
+    device_name VARCHAR(100),
+    is_primary BOOLEAN DEFAULT FALSE,
+    auto_captured BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_subscription_macs_mac ON radius_subscription_macs(mac_address);
+CREATE INDEX IF NOT EXISTS idx_subscription_macs_sub_id ON radius_subscription_macs(subscription_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_macs_single_primary ON radius_subscription_macs(subscription_id) WHERE is_primary = TRUE;
