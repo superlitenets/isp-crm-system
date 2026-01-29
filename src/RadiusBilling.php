@@ -3411,13 +3411,66 @@ class RadiusBilling {
     
     // ==================== Credit/Debt Management ====================
     
-    public function addCredit(int $subscriptionId, float $amount, string $reason = ''): array {
+    public function addCredit(int $subscriptionId, float $amount, string $reason = '', bool $autoRenew = true): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        $package = $this->getPackage($sub['package_id']);
+        $packagePrice = (float)($package['price'] ?? 0);
+        $currentBalance = (float)($sub['credit_balance'] ?? 0);
+        $newBalance = $currentBalance + $amount;
+        
+        // Add credit to wallet
         $stmt = $this->db->prepare("
             UPDATE radius_subscriptions SET credit_balance = credit_balance + ? WHERE id = ?
         ");
         $stmt->execute([$amount, $subscriptionId]);
         
-        return ['success' => true, 'added' => $amount];
+        // Check if subscription is expired or inactive
+        $isExpired = ($sub['status'] !== 'active') || 
+                     (isset($sub['expiry_date']) && !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time());
+        
+        // Auto-renew if expired and wallet has enough
+        if ($autoRenew && $isExpired && $packagePrice > 0 && $newBalance >= $packagePrice) {
+            // Deduct package price from wallet
+            $remainingBalance = $newBalance - $packagePrice;
+            $stmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
+            $stmt->execute([$remainingBalance, $subscriptionId]);
+            
+            $result = $this->renewSubscription($subscriptionId);
+            
+            if ($result['success']) {
+                // Record billing record
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
+                        period_start, period_end, status, payment_method, transaction_ref)
+                    VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'wallet', ?)
+                ");
+                $stmt->execute([
+                    $subscriptionId, 
+                    $sub['package_id'], 
+                    $packagePrice, 
+                    $result['expiry_date'],
+                    'manual_credit_' . time()
+                ]);
+                
+                // Disconnect user so they reconnect with new settings
+                $disconnectResult = $this->disconnectSubscription($subscriptionId);
+                
+                return [
+                    'success' => true, 
+                    'added' => $amount,
+                    'renewed' => true,
+                    'expiry_date' => $result['expiry_date'],
+                    'wallet_remaining' => $remainingBalance,
+                    'disconnected' => $disconnectResult['disconnected'] ?? 0
+                ];
+            }
+        }
+        
+        return ['success' => true, 'added' => $amount, 'new_balance' => $newBalance];
     }
     
     public function useCredit(int $subscriptionId, float $amount): array {
