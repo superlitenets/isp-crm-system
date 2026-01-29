@@ -462,8 +462,8 @@ class RadiusBilling {
                 INSERT INTO radius_packages (name, description, package_type, billing_type, price, validity_days,
                     data_quota_mb, download_speed, upload_speed, burst_download, burst_upload,
                     burst_threshold, burst_time, priority, address_pool, ip_binding,
-                    simultaneous_sessions, max_devices, fup_enabled, fup_quota_mb, fup_download_speed, fup_upload_speed, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?::boolean, ?, ?, ?, ?::boolean)
+                    simultaneous_sessions, fup_enabled, fup_quota_mb, fup_download_speed, fup_upload_speed, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?, ?::boolean, ?, ?, ?, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -483,7 +483,6 @@ class RadiusBilling {
                 $data['address_pool'] ?? '',
                 $this->castBoolean($data['ip_binding'] ?? false),
                 $data['simultaneous_sessions'] ?? 1,
-                $data['max_devices'] ?? 1,
                 $this->castBoolean($data['fup_enabled'] ?? false),
                 $data['fup_quota_mb'] ?: null,
                 $data['fup_download_speed'] ?? '',
@@ -509,7 +508,7 @@ class RadiusBilling {
                     validity_days = ?, data_quota_mb = ?, download_speed = ?, upload_speed = ?,
                     burst_download = ?, burst_upload = ?, burst_threshold = ?, burst_time = ?,
                     priority = ?, address_pool = ?, ip_binding = ?::boolean, simultaneous_sessions = ?,
-                    max_devices = ?, fup_enabled = ?::boolean, fup_quota_mb = ?, fup_download_speed = ?, fup_upload_speed = ?,
+                    fup_enabled = ?::boolean, fup_quota_mb = ?, fup_download_speed = ?, fup_upload_speed = ?,
                     is_active = ?::boolean, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
@@ -531,7 +530,6 @@ class RadiusBilling {
                 $data['address_pool'] ?? '',
                 $this->castBoolean($data['ip_binding'] ?? false),
                 $data['simultaneous_sessions'] ?? 1,
-                $data['max_devices'] ?? 1,
                 $this->castBoolean($data['fup_enabled'] ?? false),
                 $data['fup_quota_mb'] ?: null,
                 $data['fup_download_speed'] ?? '',
@@ -2782,191 +2780,6 @@ class RadiusBilling {
         
         $mac = strtoupper(preg_replace('/[^A-Fa-f0-9:]/', '', $mac));
         return $sub['mac_address'] === $mac;
-    }
-    
-    // ==================== Multi-Device MAC Management ====================
-    
-    public function normalizeMAC(string $mac): string {
-        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
-        if (strlen($mac) !== 12) {
-            return '';
-        }
-        return implode(':', str_split($mac, 2));
-    }
-    
-    public function getSubscriptionMACs(int $subscriptionId): array {
-        $stmt = $this->db->prepare("
-            SELECT * FROM radius_subscription_macs 
-            WHERE subscription_id = ? 
-            ORDER BY is_primary DESC, created_at ASC
-        ");
-        $stmt->execute([$subscriptionId]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-    }
-    
-    public function getSubscriptionMACCount(int $subscriptionId): int {
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM radius_subscription_macs WHERE subscription_id = ?");
-        $stmt->execute([$subscriptionId]);
-        return (int) $stmt->fetchColumn();
-    }
-    
-    public function getMaxDevicesForSubscription(int $subscriptionId): int {
-        $stmt = $this->db->prepare("
-            SELECT COALESCE(p.max_devices, 1) as max_devices
-            FROM radius_subscriptions s
-            LEFT JOIN radius_packages p ON s.package_id = p.id
-            WHERE s.id = ?
-        ");
-        $stmt->execute([$subscriptionId]);
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        return $row ? (int)$row['max_devices'] : 1;
-    }
-    
-    public function addSubscriptionMAC(int $subscriptionId, string $mac, ?string $deviceName = null, bool $autoCaptured = false): array {
-        $mac = $this->normalizeMAC($mac);
-        if (empty($mac)) {
-            return ['success' => false, 'error' => 'Invalid MAC address format'];
-        }
-        
-        $maxDevices = $this->getMaxDevicesForSubscription($subscriptionId);
-        $currentCount = $this->getSubscriptionMACCount($subscriptionId);
-        
-        if ($currentCount >= $maxDevices) {
-            return ['success' => false, 'error' => "Device limit reached ({$maxDevices} devices allowed)"];
-        }
-        
-        $stmt = $this->db->prepare("SELECT id FROM radius_subscription_macs WHERE mac_address = ?");
-        $stmt->execute([$mac]);
-        if ($stmt->fetch()) {
-            return ['success' => false, 'error' => 'This MAC address is already registered'];
-        }
-        
-        try {
-            $this->db->beginTransaction();
-            
-            $isPrimary = ($currentCount === 0);
-            
-            if ($isPrimary) {
-                $this->db->prepare("UPDATE radius_subscription_macs SET is_primary = FALSE WHERE subscription_id = ?")
-                    ->execute([$subscriptionId]);
-            }
-            
-            $stmt = $this->db->prepare("
-                INSERT INTO radius_subscription_macs (subscription_id, mac_address, device_name, is_primary, auto_captured)
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([$subscriptionId, $mac, $deviceName, $isPrimary, $autoCaptured]);
-            
-            if ($isPrimary) {
-                $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-                    ->execute([$mac, $subscriptionId]);
-            }
-            
-            $this->db->commit();
-            return ['success' => true, 'mac' => $mac, 'is_primary' => $isPrimary];
-        } catch (\Exception $e) {
-            $this->db->rollBack();
-            if (strpos($e->getMessage(), 'duplicate key') !== false || strpos($e->getMessage(), 'unique constraint') !== false) {
-                return ['success' => false, 'error' => 'This MAC address is already registered to another account'];
-            }
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-    
-    public function removeSubscriptionMAC(int $subscriptionId, int $macId): array {
-        $stmt = $this->db->prepare("SELECT * FROM radius_subscription_macs WHERE id = ? AND subscription_id = ?");
-        $stmt->execute([$macId, $subscriptionId]);
-        $macRecord = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        if (!$macRecord) {
-            return ['success' => false, 'error' => 'MAC address not found'];
-        }
-        
-        $stmt = $this->db->prepare("DELETE FROM radius_subscription_macs WHERE id = ?");
-        $stmt->execute([$macId]);
-        
-        if ($macRecord['is_primary']) {
-            $stmt = $this->db->prepare("
-                SELECT mac_address FROM radius_subscription_macs 
-                WHERE subscription_id = ? 
-                ORDER BY created_at ASC 
-                LIMIT 1
-            ");
-            $stmt->execute([$subscriptionId]);
-            $nextMac = $stmt->fetchColumn();
-            
-            if ($nextMac) {
-                $this->db->prepare("UPDATE radius_subscription_macs SET is_primary = TRUE WHERE subscription_id = ? AND mac_address = ?")
-                    ->execute([$subscriptionId, $nextMac]);
-                $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-                    ->execute([$nextMac, $subscriptionId]);
-            } else {
-                $this->db->prepare("UPDATE radius_subscriptions SET mac_address = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-                    ->execute([$subscriptionId]);
-            }
-        }
-        
-        return ['success' => true];
-    }
-    
-    public function findSubscriptionByMAC(string $mac): ?array {
-        $mac = $this->normalizeMAC($mac);
-        if (empty($mac)) {
-            return null;
-        }
-        
-        $stmt = $this->db->prepare("
-            SELECT s.*, c.name as customer_name, c.phone as customer_phone,
-                   p.name as package_name, p.download_speed, p.upload_speed, p.max_devices
-            FROM radius_subscription_macs m
-            JOIN radius_subscriptions s ON m.subscription_id = s.id
-            LEFT JOIN customers c ON s.customer_id = c.id
-            LEFT JOIN radius_packages p ON s.package_id = p.id
-            WHERE m.mac_address = ? AND s.status = 'active'
-            LIMIT 1
-        ");
-        $stmt->execute([$mac]);
-        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
-    }
-    
-    public function isMACAUthenticated(int $subscriptionId, string $mac): bool {
-        $mac = $this->normalizeMAC($mac);
-        if (empty($mac)) {
-            return false;
-        }
-        
-        $stmt = $this->db->prepare("
-            SELECT COUNT(*) FROM radius_subscription_macs 
-            WHERE subscription_id = ? AND mac_address = ?
-        ");
-        $stmt->execute([$subscriptionId, $mac]);
-        return (int)$stmt->fetchColumn() > 0;
-    }
-    
-    public function autoCaptureMACIfAllowed(int $subscriptionId, string $mac): array {
-        $mac = $this->normalizeMAC($mac);
-        if (empty($mac)) {
-            return ['success' => false, 'error' => 'Invalid MAC'];
-        }
-        
-        $sub = $this->getSubscription($subscriptionId);
-        if (!$sub) {
-            return ['success' => false, 'error' => 'Subscription not found'];
-        }
-        
-        $existingMACs = $this->getSubscriptionMACs($subscriptionId);
-        foreach ($existingMACs as $existing) {
-            if ($existing['mac_address'] === $mac) {
-                return ['success' => true, 'already_exists' => true];
-            }
-        }
-        
-        $maxDevices = $this->getMaxDevicesForSubscription($subscriptionId);
-        if (count($existingMACs) >= $maxDevices) {
-            return ['success' => false, 'error' => 'Device limit reached'];
-        }
-        
-        return $this->addSubscriptionMAC($subscriptionId, $mac, 'Auto-detected device', true);
     }
     
     // ==================== IP Pool Management ====================

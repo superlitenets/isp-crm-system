@@ -183,622 +183,369 @@ if ($subscription && $subscription['expiry_date']) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --primary: <?= $isSuspended ? '#f59e0b' : '#ef4444' ?>;
-            --primary-dark: <?= $isSuspended ? '#d97706' : '#dc2626' ?>;
-            --success: #10b981;
-            --success-dark: #059669;
-            --bg-dark: #0f172a;
-            --bg-card: rgba(255, 255, 255, 0.95);
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border-light: rgba(255, 255, 255, 0.1);
+            --primary-color: <?= $isSuspended ? '#fd7e14' : '#dc3545' ?>;
+            --primary-dark: <?= $isSuspended ? '#e55a00' : '#c82333' ?>;
+            --success-color: #198754;
         }
         
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; }
         
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             padding: 20px;
-            position: relative;
-            overflow-x: hidden;
+            margin: 0;
         }
         
-        body::before {
-            content: '';
-            position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                        radial-gradient(circle at 70% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 50%);
-            animation: float 20s ease-in-out infinite;
-            z-index: 0;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            50% { transform: translate(-2%, 2%) rotate(5deg); }
-        }
-        
-        .page-wrapper {
-            position: relative;
-            z-index: 1;
+        .page-container {
             width: 100%;
-            max-width: 420px;
-        }
-        
-        .logo-section {
-            text-align: center;
-            margin-bottom: 24px;
-            animation: fadeDown 0.6s ease-out;
-        }
-        
-        @keyframes fadeDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .logo-img {
-            max-width: 180px;
-            max-height: 60px;
-            object-fit: contain;
-            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
-        }
-        
-        .isp-name-header {
-            color: white;
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        
-        .main-card {
-            background: var(--bg-card);
-            border-radius: 28px;
-            box-shadow: 0 25px 100px rgba(0, 0, 0, 0.4),
-                        0 0 0 1px rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-            animation: slideUp 0.5s ease-out 0.1s both;
-            backdrop-filter: blur(20px);
+            max-width: 440px;
+            animation: slideUp 0.5s ease-out;
         }
         
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px); }
+            from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
         }
         
-        .status-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            padding: 40px 30px;
-            text-align: center;
-            position: relative;
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .expired-card {
+            background: #fff;
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.4);
             overflow: hidden;
         }
         
-        .status-header::before {
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 35px 25px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .card-header::before {
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.5;
         }
         
-        .status-header > * {
+        .header-content {
             position: relative;
             z-index: 1;
         }
         
-        .days-pill {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: rgba(0, 0, 0, 0.25);
-            backdrop-filter: blur(10px);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            color: white;
-            font-weight: 500;
-        }
-        
-        .status-icon-wrap {
-            width: 90px;
-            height: 90px;
-            margin: 0 auto 20px;
-            position: relative;
-        }
-        
-        .status-icon-bg {
-            position: absolute;
-            inset: 0;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            animation: pulse-ring 2s ease-out infinite;
-        }
-        
-        @keyframes pulse-ring {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.4); opacity: 0; }
-        }
-        
         .status-icon {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 42px;
-            color: white;
+            margin: 0 auto 20px;
+            font-size: 40px;
+            animation: <?= $isSuspended ? 'pulse 2s infinite' : 'shake 0.5s ease-in-out' ?>;
         }
         
-        .status-title {
-            color: white;
+        .header-title {
             font-size: 1.75rem;
-            font-weight: 800;
+            font-weight: 700;
             margin-bottom: 8px;
-            letter-spacing: -0.5px;
         }
         
-        .status-subtitle {
-            color: rgba(255, 255, 255, 0.9);
+        .header-subtitle {
+            opacity: 0.9;
             font-size: 0.95rem;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         
-        .package-badge {
+        .package-pill {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            background: rgba(255, 255, 255, 0.2);
+            gap: 8px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-size: 0.9rem;
             backdrop-filter: blur(10px);
-            padding: 10px 20px;
-            border-radius: 30px;
-            color: white;
-            font-weight: 600;
-            font-size: 0.9rem;
         }
         
-        .package-badge i {
-            font-size: 1.1rem;
+        .days-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            backdrop-filter: blur(5px);
         }
         
-        .card-content {
-            padding: 28px;
+        .card-body {
+            padding: 25px;
         }
         
-        .alert-box {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 16px;
-            border-radius: 14px;
-            margin-bottom: 24px;
-            font-size: 0.9rem;
+        .info-grid {
+            display: grid;
+            gap: 0;
         }
         
-        .alert-box.success {
-            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-            color: #065f46;
-        }
-        
-        .alert-box.danger {
-            background: linear-gradient(135deg, #fee2e2, #fecaca);
-            color: #991b1b;
-        }
-        
-        .alert-box.warning {
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
-            color: #92400e;
-        }
-        
-        .alert-box.info {
-            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-            color: #1e40af;
-        }
-        
-        .alert-icon {
-            font-size: 1.25rem;
-            flex-shrink: 0;
-        }
-        
-        .account-info {
-            background: #f8fafc;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 24px;
-        }
-        
-        .info-row {
+        .info-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #e2e8f0;
+            padding: 14px 0;
+            border-bottom: 1px solid #f0f0f0;
         }
         
-        .info-row:last-child {
+        .info-item:last-child {
             border-bottom: none;
         }
         
         .info-label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: var(--text-secondary);
+            color: #6c757d;
             font-size: 0.875rem;
-        }
-        
-        .info-label i {
-            width: 20px;
-            text-align: center;
-        }
-        
-        .info-value {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        
-        .info-value.expired {
-            color: var(--primary);
-        }
-        
-        .info-value.suspended {
-            color: #f59e0b;
-        }
-        
-        .suspended-box {
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
-            border-left: 4px solid #f59e0b;
-            border-radius: 0 16px 16px 0;
-            padding: 20px;
-            margin-bottom: 24px;
-        }
-        
-        .suspended-box h4 {
-            color: #92400e;
-            font-size: 1rem;
-            margin-bottom: 8px;
             display: flex;
             align-items: center;
             gap: 8px;
         }
         
-        .suspended-box p {
-            color: #a16207;
-            font-size: 0.875rem;
-            margin: 0;
-            line-height: 1.5;
+        .info-value {
+            font-weight: 600;
+            color: #1a1a2e;
+            text-align: right;
         }
         
-        .wallet-box {
-            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        .wallet-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border-radius: 16px;
             padding: 20px;
+            margin: 20px 0;
             text-align: center;
-            margin-bottom: 20px;
-            border: 1px solid #bbf7d0;
+        }
+        
+        .wallet-balance {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--success-color);
         }
         
         .wallet-label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: #166534;
-            margin-bottom: 4px;
-        }
-        
-        .wallet-amount {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #15803d;
-        }
-        
-        .wallet-status {
             font-size: 0.8rem;
-            color: #16a34a;
-            margin-top: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
-        .payment-box {
-            background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
-            border-radius: 20px;
-            padding: 24px;
-            text-align: center;
+        .amount-needed {
+            background: linear-gradient(135deg, var(--success-color), #157347);
             color: white;
-            margin-bottom: 24px;
-            position: relative;
-            overflow: hidden;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            margin: 20px 0;
         }
         
-        .payment-box::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+        .amount-value {
+            font-size: 2.5rem;
+            font-weight: 700;
         }
         
-        .payment-box > * {
-            position: relative;
-            z-index: 1;
-        }
-        
-        .payment-label {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            opacity: 0.9;
-            margin-bottom: 4px;
-        }
-        
-        .payment-amount {
-            font-size: 3rem;
-            font-weight: 800;
-            letter-spacing: -2px;
-            line-height: 1;
-            margin-bottom: 8px;
-        }
-        
-        .payment-validity {
+        .amount-label {
             font-size: 0.85rem;
             opacity: 0.9;
         }
         
-        .waiting-section {
-            text-align: center;
-            padding: 30px 0;
+        .payment-section {
+            margin-top: 25px;
         }
         
-        .waiting-spinner {
-            width: 70px;
-            height: 70px;
-            margin: 0 auto 24px;
+        .phone-input-group {
             position: relative;
-        }
-        
-        .waiting-spinner::before,
-        .waiting-spinner::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 4px solid transparent;
-        }
-        
-        .waiting-spinner::before {
-            border-top-color: var(--success);
-            animation: spin 1s linear infinite;
-        }
-        
-        .waiting-spinner::after {
-            border-right-color: var(--success);
-            animation: spin 1.5s linear infinite reverse;
-            inset: 8px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .waiting-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-        }
-        
-        .waiting-text {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-        
-        .check-btn {
-            margin-top: 20px;
-            padding: 12px 28px;
-            border: 2px solid var(--success);
-            background: transparent;
-            color: var(--success);
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .check-btn:hover {
-            background: var(--success);
-            color: white;
-        }
-        
-        .phone-field {
-            position: relative;
-            margin-bottom: 16px;
-        }
-        
-        .phone-icon {
-            position: absolute;
-            left: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-secondary);
-            font-size: 1.25rem;
         }
         
         .phone-input {
             width: 100%;
-            padding: 18px 20px 18px 52px;
+            padding: 16px 20px;
+            padding-left: 50px;
             font-size: 1.1rem;
-            font-weight: 500;
-            border: 2px solid #e2e8f0;
-            border-radius: 16px;
-            transition: all 0.2s;
-            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 14px;
+            transition: all 0.3s ease;
         }
         
         .phone-input:focus {
             outline: none;
-            border-color: var(--success);
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+            border-color: var(--success-color);
+            box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.1);
         }
         
-        .pay-button {
+        .phone-prefix {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+        
+        .pay-btn {
             width: 100%;
-            padding: 20px;
-            border: none;
-            border-radius: 16px;
-            background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
-            color: white;
+            padding: 18px;
             font-size: 1.15rem;
-            font-weight: 700;
+            font-weight: 600;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--success-color), #157347);
+            color: white;
+            margin-top: 15px;
             cursor: pointer;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            transition: all 0.3s;
-            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.3);
+            gap: 10px;
         }
         
-        .pay-button:hover {
+        .pay-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 12px 40px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 8px 25px rgba(25, 135, 84, 0.3);
         }
         
-        .pay-button:active {
+        .pay-btn:active {
             transform: translateY(0);
         }
         
-        .mpesa-badge {
+        .mpesa-icon {
+            width: 28px;
+            height: 28px;
             background: white;
-            color: #00a650;
-            padding: 6px 10px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 800;
-            letter-spacing: 0.5px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--success-color);
+            font-weight: 700;
+            font-size: 0.7rem;
         }
         
-        .paybill-section {
-            background: #f8fafc;
-            border-radius: 16px;
+        .paybill-info {
+            background: #f8f9fa;
+            border-radius: 14px;
             padding: 20px;
             margin-top: 20px;
         }
         
-        .paybill-header {
+        .paybill-title {
+            font-weight: 600;
+            margin-bottom: 15px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            color: var(--text-primary);
-            font-weight: 600;
-            margin-bottom: 16px;
-            font-size: 0.95rem;
+            gap: 8px;
         }
         
         .paybill-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px dashed #e2e8f0;
+            padding: 10px 0;
+            border-bottom: 1px dashed #dee2e6;
         }
         
         .paybill-row:last-child {
             border-bottom: none;
         }
         
-        .paybill-label {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-        
-        .paybill-value {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        
         .copy-btn {
-            background: transparent;
+            background: none;
             border: none;
-            color: var(--success);
+            color: var(--success-color);
             cursor: pointer;
-            padding: 6px 10px;
-            border-radius: 8px;
-            transition: all 0.2s;
-            font-size: 1rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
         }
         
         .copy-btn:hover {
-            background: rgba(16, 185, 129, 0.1);
+            background: rgba(25, 135, 84, 0.1);
         }
         
-        .copy-btn.copied {
-            color: #059669;
+        .waiting-payment {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        
+        .waiting-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e9ecef;
+            border-top-color: var(--success-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .suspended-notice {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            border-left: 4px solid #fd7e14;
+            padding: 20px;
+            border-radius: 0 14px 14px 0;
+            margin: 20px 0;
         }
         
         .contact-section {
             text-align: center;
-            padding-top: 24px;
-            border-top: 1px solid #e2e8f0;
-            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+            margin-top: 20px;
         }
         
-        .contact-text {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-bottom: 16px;
-        }
-        
-        .contact-buttons {
+        .contact-btns {
             display: flex;
             gap: 12px;
             justify-content: center;
-            flex-wrap: wrap;
+            margin-top: 15px;
         }
         
         .contact-btn {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 14px 24px;
-            border-radius: 12px;
+            padding: 12px 20px;
+            border-radius: 10px;
             text-decoration: none;
-            font-weight: 600;
-            font-size: 0.9rem;
+            font-weight: 500;
             transition: all 0.2s;
         }
         
         .contact-btn-call {
-            background: #f1f5f9;
-            color: #475569;
+            background: #e9ecef;
+            color: #495057;
         }
         
         .contact-btn-call:hover {
-            background: #e2e8f0;
-            color: #1e293b;
+            background: #dee2e6;
+            color: #212529;
         }
         
         .contact-btn-whatsapp {
@@ -807,11 +554,11 @@ if ($subscription && $subscription['expiry_date']) {
         }
         
         .contact-btn-whatsapp:hover {
-            background: #1ebe57;
+            background: #1da851;
             color: white;
         }
         
-        .not-found-section {
+        .not-found-card {
             text-align: center;
             padding: 50px 30px;
         }
@@ -819,207 +566,144 @@ if ($subscription && $subscription['expiry_date']) {
         .not-found-icon {
             width: 100px;
             height: 100px;
-            margin: 0 auto 24px;
-            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            background: linear-gradient(135deg, #ffc107, #ff9800);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            margin: 0 auto 25px;
             font-size: 50px;
             color: white;
-            box-shadow: 0 15px 40px rgba(245, 158, 11, 0.3);
-        }
-        
-        .not-found-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 12px;
-        }
-        
-        .not-found-text {
-            color: var(--text-secondary);
-            margin-bottom: 30px;
-            line-height: 1.6;
         }
         
         .search-form {
+            margin-top: 30px;
+        }
+        
+        .search-input-group {
             display: flex;
             gap: 10px;
         }
         
         .search-input {
             flex: 1;
-            padding: 16px 20px;
+            padding: 14px 18px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
             font-size: 1rem;
-            border: 2px solid #e2e8f0;
-            border-radius: 14px;
-            transition: all 0.2s;
-        }
-        
-        .search-input:focus {
-            outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
         }
         
         .search-btn {
-            padding: 16px 24px;
-            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            padding: 14px 24px;
+            background: #1a1a2e;
             color: white;
             border: none;
-            border-radius: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .search-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
-        }
-        
-        .ip-info {
-            margin-top: 30px;
-            padding: 12px 20px;
-            background: #f1f5f9;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .footer {
-            text-align: center;
-            margin-top: 28px;
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 0.85rem;
-            animation: fadeIn 0.5s ease-out 0.3s both;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        .footer strong {
-            color: rgba(255, 255, 255, 0.9);
-        }
-        
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: #1e293b;
-            color: white;
-            padding: 14px 28px;
             border-radius: 12px;
-            font-weight: 500;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            z-index: 1000;
-            opacity: 0;
-            transition: all 0.3s ease;
+            cursor: pointer;
         }
         
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
+        .isp-footer {
+            text-align: center;
+            margin-top: 25px;
+            color: rgba(255,255,255,0.6);
+            font-size: 0.85rem;
         }
         
-        .toast.success {
-            background: var(--success);
+        .alert {
+            border-radius: 12px;
+            border: none;
+            padding: 15px 20px;
+        }
+        
+        .alert-success {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #842029;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #664d03;
         }
         
         @media (max-width: 480px) {
-            body { padding: 16px; }
-            .status-header { padding: 32px 24px; }
-            .card-content { padding: 24px; }
-            .status-title { font-size: 1.5rem; }
-            .payment-amount { font-size: 2.5rem; }
-            .contact-buttons { flex-direction: column; }
+            body { padding: 15px; }
+            .card-header { padding: 30px 20px; }
+            .card-body { padding: 20px; }
+            .header-title { font-size: 1.5rem; }
+            .amount-value { font-size: 2rem; }
+            .contact-btns { flex-direction: column; }
             .contact-btn { justify-content: center; }
-            .search-form { flex-direction: column; }
-            .search-btn { width: 100%; }
         }
     </style>
 </head>
 <body>
-    <div class="page-wrapper">
-        <div class="logo-section">
-            <?php if ($ispLogo): ?>
-                <img src="<?= htmlspecialchars($ispLogo) ?>" alt="<?= htmlspecialchars($ispName) ?>" class="logo-img">
-            <?php else: ?>
-                <div class="isp-name-header"><?= htmlspecialchars($ispName) ?></div>
-            <?php endif; ?>
-        </div>
-        
-        <div class="main-card">
+    <div class="page-container">
+        <div class="expired-card">
             <?php if ($subscription): ?>
-            <div class="status-header">
-                <?php if ($daysExpired > 0 && !$isSuspended): ?>
-                <div class="days-pill">
-                    <i class="bi bi-clock-history me-1"></i>
-                    <?= $daysExpired ?> day<?= $daysExpired > 1 ? 's' : '' ?> ago
-                </div>
-                <?php endif; ?>
-                
-                <div class="status-icon-wrap">
-                    <div class="status-icon-bg"></div>
+            <div class="card-header">
+                <div class="header-content">
+                    <?php if ($daysExpired > 0 && !$isSuspended): ?>
+                    <div class="days-badge">
+                        <i class="bi bi-calendar-x me-1"></i>
+                        <?= $daysExpired ?> day<?= $daysExpired > 1 ? 's' : '' ?> ago
+                    </div>
+                    <?php endif; ?>
+                    
                     <div class="status-icon">
                         <i class="bi <?= $isSuspended ? 'bi-pause-circle-fill' : 'bi-wifi-off' ?>"></i>
                     </div>
-                </div>
-                
-                <h1 class="status-title">
-                    <?= $isSuspended ? 'Account Suspended' : 'Subscription Expired' ?>
-                </h1>
-                <p class="status-subtitle">
-                    <?= $isSuspended ? 'Your account has been temporarily suspended' : 'Renew now to restore your internet connection' ?>
-                </p>
-                
-                <div class="package-badge">
-                    <i class="bi bi-speedometer2"></i>
-                    <?= htmlspecialchars($subscription['package_name'] ?? 'Package') ?>
-                    <?php if (!empty($subscription['download_speed'])): ?>
-                    <span style="opacity:0.6">|</span>
-                    <?= htmlspecialchars($subscription['download_speed']) ?>
-                    <?php endif; ?>
+                    
+                    <h1 class="header-title">
+                        <?= $isSuspended ? 'Account Suspended' : 'Subscription Expired' ?>
+                    </h1>
+                    <p class="header-subtitle">
+                        <?= $isSuspended ? 'Your account has been suspended' : 'Renew now to restore your internet' ?>
+                    </p>
+                    
+                    <div class="package-pill">
+                        <i class="bi bi-speedometer2"></i>
+                        <?= htmlspecialchars($subscription['package_name'] ?? 'Package') ?>
+                        <?php if ($subscription['download_speed']): ?>
+                        <span style="opacity:0.7">|</span>
+                        <?= htmlspecialchars($subscription['download_speed']) ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
             
-            <div class="card-content">
+            <div class="card-body">
                 <?php if ($message): ?>
-                <div class="alert-box <?= $messageType ?>">
-                    <i class="bi bi-<?= $messageType === 'success' ? 'check-circle-fill' : ($messageType === 'danger' ? 'exclamation-circle-fill' : ($messageType === 'warning' ? 'exclamation-triangle-fill' : 'info-circle-fill')) ?> alert-icon"></i>
-                    <span><?= htmlspecialchars($message) ?></span>
+                <div class="alert alert-<?= $messageType ?> mb-4">
+                    <i class="bi bi-<?= $messageType === 'success' ? 'check-circle' : ($messageType === 'danger' ? 'exclamation-circle' : 'info-circle') ?> me-2"></i>
+                    <?= htmlspecialchars($message) ?>
                 </div>
                 <?php endif; ?>
                 
-                <div class="account-info">
-                    <div class="info-row">
-                        <span class="info-label"><i class="bi bi-person-fill"></i> Account Holder</span>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-person"></i> Account</span>
                         <span class="info-value"><?= htmlspecialchars($subscription['customer_name'] ?? 'N/A') ?></span>
                     </div>
-                    <div class="info-row">
-                        <span class="info-label"><i class="bi bi-key-fill"></i> Username</span>
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-key"></i> Username</span>
                         <span class="info-value"><?= htmlspecialchars($subscription['username']) ?></span>
                     </div>
                     <?php if (!$isSuspended): ?>
-                    <div class="info-row">
-                        <span class="info-label"><i class="bi bi-calendar-x-fill"></i> Expired On</span>
-                        <span class="info-value expired">
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-calendar-x"></i> Expired</span>
+                        <span class="info-value text-danger">
                             <?= $subscription['expiry_date'] ? date('M j, Y', strtotime($subscription['expiry_date'])) : 'N/A' ?>
                         </span>
                     </div>
                     <?php else: ?>
-                    <div class="info-row">
-                        <span class="info-label"><i class="bi bi-shield-x-fill"></i> Status</span>
-                        <span class="info-value suspended">
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-shield-x"></i> Status</span>
+                        <span class="info-value" style="color: var(--primary-color);">
                             <i class="bi bi-pause-circle-fill me-1"></i> Suspended
                         </span>
                     </div>
@@ -1027,103 +711,107 @@ if ($subscription && $subscription['expiry_date']) {
                 </div>
                 
                 <?php if ($isSuspended): ?>
-                <div class="suspended-box">
-                    <h4><i class="bi bi-exclamation-triangle-fill"></i> Account Suspended</h4>
-                    <p>Your account has been suspended. Please contact <?= htmlspecialchars($ispName) ?> support to resolve this issue and reactivate your service.</p>
+                <div class="suspended-notice">
+                    <strong><i class="bi bi-exclamation-triangle me-2"></i>Account Suspended</strong>
+                    <p class="mb-0 mt-2" style="font-size: 0.9rem;">
+                        Your account has been suspended. Please contact <?= htmlspecialchars($ispName) ?> support to resolve this issue and reactivate your service.
+                    </p>
                 </div>
                 <?php else: ?>
                 
                 <?php if ($walletBalance > 0): ?>
-                <div class="wallet-box">
+                <div class="wallet-card">
                     <div class="wallet-label">Wallet Balance</div>
-                    <div class="wallet-amount">KES <?= number_format($walletBalance, 0) ?></div>
+                    <div class="wallet-balance">KES <?= number_format($walletBalance, 0) ?></div>
                     <?php if ($walletBalance >= $packagePrice): ?>
-                    <div class="wallet-status"><i class="bi bi-check-circle-fill"></i> Sufficient for renewal!</div>
+                    <div class="text-success mt-2"><i class="bi bi-check-circle me-1"></i> Sufficient for renewal!</div>
                     <?php else: ?>
-                    <div class="wallet-status" style="color: #f59e0b;"><i class="bi bi-info-circle-fill"></i> Need KES <?= number_format($amountNeeded, 0) ?> more</div>
+                    <div class="text-muted mt-2">Need KES <?= number_format($amountNeeded, 0) ?> more</div>
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>
                 
-                <div class="payment-box">
-                    <div class="payment-label">Amount to Pay</div>
-                    <div class="payment-amount">KES <?= number_format($amountNeeded, 0) ?></div>
-                    <?php if ($subscription['validity_days']): ?>
-                    <div class="payment-validity"><i class="bi bi-calendar-check me-1"></i> <?= $subscription['validity_days'] ?> days validity</div>
-                    <?php endif; ?>
+                <div class="amount-needed">
+                    <div class="amount-label">Amount to Pay</div>
+                    <div class="amount-value">KES <?= number_format($amountNeeded, 0) ?></div>
+                    <div class="amount-label" style="margin-top:5px;">
+                        <?= $subscription['validity_days'] ? $subscription['validity_days'] . ' days validity' : '' ?>
+                    </div>
                 </div>
                 
                 <?php if ($stkPushSent): ?>
-                <div class="waiting-section">
+                <div class="waiting-payment">
                     <div class="waiting-spinner"></div>
-                    <h3 class="waiting-title">Waiting for Payment</h3>
-                    <p class="waiting-text">Check your phone for the M-Pesa prompt<br>and enter your PIN to complete payment</p>
-                    <button onclick="location.reload()" class="check-btn">
-                        <i class="bi bi-arrow-clockwise me-2"></i>Check Payment Status
+                    <h5>Waiting for Payment</h5>
+                    <p class="text-muted">Check your phone for the M-Pesa prompt<br>and enter your PIN to complete</p>
+                    <button onclick="location.reload()" class="btn btn-outline-secondary mt-3">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Check Status
                     </button>
                 </div>
-                <script>setTimeout(function() { location.reload(); }, 30000);</script>
+                <script>
+                    setTimeout(function() { location.reload(); }, 30000);
+                </script>
                 <?php else: ?>
-                <form method="post">
-                    <input type="hidden" name="action" value="stk_push">
-                    <div class="phone-field">
-                        <i class="bi bi-phone-fill phone-icon"></i>
-                        <input type="tel" name="phone" class="phone-input" 
-                               value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" 
-                               placeholder="0712 345 678" required
-                               pattern="^(07|01|2547|2541)[0-9]{7,8}$">
+                <div class="payment-section">
+                    <form method="post">
+                        <input type="hidden" name="action" value="stk_push">
+                        <div class="phone-input-group">
+                            <i class="bi bi-phone phone-prefix"></i>
+                            <input type="tel" name="phone" class="phone-input" 
+                                   value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" 
+                                   placeholder="0712 345 678" required
+                                   pattern="^(07|01|2547|2541)[0-9]{8}$">
+                        </div>
+                        <button type="submit" class="pay-btn">
+                            <span class="mpesa-icon">M</span>
+                            Pay KES <?= number_format($amountNeeded, 0) ?> with M-Pesa
+                        </button>
+                    </form>
+                    
+                    <?php if ($mpesaPaybill): ?>
+                    <div class="paybill-info">
+                        <div class="paybill-title">
+                            <i class="bi bi-info-circle"></i> Or Pay via Paybill
+                        </div>
+                        <div class="paybill-row">
+                            <span class="text-muted">Paybill Number</span>
+                            <span>
+                                <strong><?= htmlspecialchars($mpesaPaybill) ?></strong>
+                                <button class="copy-btn" onclick="copyText('<?= htmlspecialchars($mpesaPaybill) ?>')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </span>
+                        </div>
+                        <div class="paybill-row">
+                            <span class="text-muted">Account Number</span>
+                            <span>
+                                <strong><?= htmlspecialchars($subscription['username']) ?></strong>
+                                <button class="copy-btn" onclick="copyText('<?= htmlspecialchars($subscription['username']) ?>')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </span>
+                        </div>
+                        <div class="paybill-row">
+                            <span class="text-muted">Amount</span>
+                            <span><strong>KES <?= number_format($amountNeeded, 0) ?></strong></span>
+                        </div>
                     </div>
-                    <button type="submit" class="pay-button">
-                        <span class="mpesa-badge">M-PESA</span>
-                        Pay KES <?= number_format($amountNeeded, 0) ?> Now
-                        <i class="bi bi-arrow-right"></i>
-                    </button>
-                </form>
-                
-                <?php if ($mpesaPaybill): ?>
-                <div class="paybill-section">
-                    <div class="paybill-header">
-                        <i class="bi bi-credit-card-2-front"></i>
-                        Or pay manually via Paybill
-                    </div>
-                    <div class="paybill-row">
-                        <span class="paybill-label">Paybill Number</span>
-                        <span class="paybill-value">
-                            <?= htmlspecialchars($mpesaPaybill) ?>
-                            <button class="copy-btn" onclick="copyToClipboard('<?= htmlspecialchars($mpesaPaybill) ?>', this)" title="Copy">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                        </span>
-                    </div>
-                    <div class="paybill-row">
-                        <span class="paybill-label">Account Number</span>
-                        <span class="paybill-value">
-                            <?= htmlspecialchars($subscription['username']) ?>
-                            <button class="copy-btn" onclick="copyToClipboard('<?= htmlspecialchars($subscription['username']) ?>', this)" title="Copy">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                        </span>
-                    </div>
-                    <div class="paybill-row">
-                        <span class="paybill-label">Amount</span>
-                        <span class="paybill-value">KES <?= number_format($amountNeeded, 0) ?></span>
-                    </div>
+                    <?php endif; ?>
                 </div>
-                <?php endif; ?>
                 <?php endif; ?>
                 <?php endif; ?>
                 
                 <?php if ($ispPhone): ?>
                 <div class="contact-section">
-                    <p class="contact-text">Need assistance? We're here to help!</p>
-                    <div class="contact-buttons">
+                    <p class="text-muted mb-0">Need help?</p>
+                    <div class="contact-btns">
                         <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="contact-btn contact-btn-call">
-                            <i class="bi bi-telephone-fill"></i>
-                            Call Us
+                            <i class="bi bi-telephone"></i>
+                            <?= htmlspecialchars($ispPhone) ?>
                         </a>
                         <?php if ($ispWhatsApp): ?>
                         <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account%20(<?= urlencode($subscription['username']) ?>)" 
-                           class="contact-btn contact-btn-whatsapp" target="_blank">
+                           class="contact-btn contact-btn-whatsapp">
                             <i class="bi bi-whatsapp"></i>
                             WhatsApp
                         </a>
@@ -1134,40 +822,41 @@ if ($subscription && $subscription['expiry_date']) {
             </div>
             
             <?php else: ?>
-            <div class="not-found-section">
+            <div class="not-found-card">
                 <div class="not-found-icon">
                     <i class="bi bi-question-lg"></i>
                 </div>
-                <h2 class="not-found-title">Account Not Found</h2>
-                <p class="not-found-text">We couldn't automatically identify your account.<br>Please enter your details below to find it.</p>
+                <h3>Account Not Found</h3>
+                <p class="text-muted">We couldn't identify your account.<br>Please search using your details below.</p>
                 
                 <?php if ($message): ?>
-                <div class="alert-box <?= $messageType ?>" style="text-align: left; margin-bottom: 24px;">
-                    <i class="bi bi-exclamation-circle-fill alert-icon"></i>
-                    <span><?= htmlspecialchars($message) ?></span>
+                <div class="alert alert-<?= $messageType ?> text-start mb-4">
+                    <?= htmlspecialchars($message) ?>
                 </div>
                 <?php endif; ?>
                 
                 <form method="post" class="search-form">
                     <input type="hidden" name="action" value="lookup">
-                    <input type="text" name="lookup_value" class="search-input" 
-                           placeholder="Username or phone number" required
-                           value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
-                    <button type="submit" class="search-btn">
-                        <i class="bi bi-search"></i>
-                    </button>
+                    <div class="search-input-group">
+                        <input type="text" name="lookup_value" class="search-input" 
+                               placeholder="Username or phone number" required
+                               value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
+                        <button type="submit" class="search-btn">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
                 </form>
                 
                 <?php if ($ispPhone): ?>
-                <div class="contact-section" style="border-top: none; margin-top: 32px; padding-top: 0;">
-                    <p class="contact-text">Can't find your account? Contact us</p>
-                    <div class="contact-buttons">
+                <div class="contact-section" style="border-top: none; margin-top: 30px;">
+                    <p class="text-muted mb-0">Contact <?= htmlspecialchars($ispName) ?></p>
+                    <div class="contact-btns">
                         <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="contact-btn contact-btn-call">
-                            <i class="bi bi-telephone-fill"></i> Call
+                            <i class="bi bi-telephone"></i> Call
                         </a>
                         <?php if ($ispWhatsApp): ?>
-                        <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20finding%20my%20internet%20account" 
-                           class="contact-btn contact-btn-whatsapp" target="_blank">
+                        <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account" 
+                           class="contact-btn contact-btn-whatsapp">
                             <i class="bi bi-whatsapp"></i> WhatsApp
                         </a>
                         <?php endif; ?>
@@ -1175,49 +864,23 @@ if ($subscription && $subscription['expiry_date']) {
                 </div>
                 <?php endif; ?>
                 
-                <div class="ip-info">
-                    <i class="bi bi-geo-alt-fill"></i>
-                    Your IP: <?= htmlspecialchars($clientIP) ?>
+                <div class="text-muted mt-4" style="font-size: 0.8rem;">
+                    <i class="bi bi-geo-alt me-1"></i> Your IP: <?= htmlspecialchars($clientIP) ?>
                 </div>
             </div>
             <?php endif; ?>
         </div>
         
-        <div class="footer">
+        <div class="isp-footer">
             <strong><?= htmlspecialchars($ispName) ?></strong>
         </div>
     </div>
     
-    <div class="toast" id="toast">
-        <i class="bi bi-check-circle-fill"></i>
-        <span id="toast-message">Copied!</span>
-    </div>
-    
     <script>
-        function copyToClipboard(text, btn) {
+        function copyText(text) {
             navigator.clipboard.writeText(text).then(function() {
-                const icon = btn.querySelector('i');
-                icon.className = 'bi bi-check-lg';
-                btn.classList.add('copied');
-                
-                showToast('Copied: ' + text);
-                
-                setTimeout(function() {
-                    icon.className = 'bi bi-clipboard';
-                    btn.classList.remove('copied');
-                }, 2000);
+                alert('Copied: ' + text);
             });
-        }
-        
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toast-message');
-            toastMessage.textContent = message;
-            toast.classList.add('show', 'success');
-            
-            setTimeout(function() {
-                toast.classList.remove('show', 'success');
-            }, 2500);
         }
     </script>
 </body>

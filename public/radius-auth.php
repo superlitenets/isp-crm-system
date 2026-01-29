@@ -4,7 +4,7 @@ require_once __DIR__ . '/../src/RadiusBilling.php';
 
 header('Content-Type: application/json');
 
-$db = Database::getConnection();
+$db = getDbConnection();
 $radiusBilling = new \App\RadiusBilling($db);
 
 $input = file_get_contents('php://input');
