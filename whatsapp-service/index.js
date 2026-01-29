@@ -111,9 +111,7 @@ async function initializeClient() {
             syncFullHistory: false,
             retryRequestDelayMs: 5000,
             qrTimeout: 40000,
-            version: [2, 3000, 1015901307],
-            linkPreviewImageThumbnailWidth: 192,
-            generateHighQualityLinkPreview: true
+            version: [2, 3000, 1015901307]
         });
         
         sock.ev.on('creds.update', saveCreds);
