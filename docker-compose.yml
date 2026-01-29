@@ -16,6 +16,7 @@ services:
     networks:
       - crm_network
 
+  # Baileys WhatsApp Service
   whatsapp:
     build:
       context: ./whatsapp-service
@@ -24,11 +25,11 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Africa/Nairobi
+      - PORT=3001
     ports:
       - "3001:3001"
     volumes:
-      - whatsapp_session:/app/.wwebjs_auth
-      - whatsapp_secret:/app/.api_secret_dir
+      - whatsapp_session:/app/auth_info_baileys
     networks:
       - crm_network
 
