@@ -3221,6 +3221,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'export_payroll_excel':
+                try {
+                    $month = $_POST['month'] ?? date('Y-m');
+                    $payrollRecords = $employee->getPayrollByMonth($month);
+                    
+                    if (empty($payrollRecords)) {
+                        $message = 'No payroll records found for the selected month.';
+                        $messageType = 'warning';
+                    } else {
+                        $payrollIds = array_column($payrollRecords, 'id');
+                        $exportData = $employee->exportPayrollForBankPayment($payrollIds);
+                        
+                        header('Content-Type: text/csv; charset=utf-8');
+                        header('Content-Disposition: attachment; filename="payroll_bank_export_' . $month . '.csv"');
+                        header('Pragma: no-cache');
+                        header('Expires: 0');
+                        
+                        $output = fopen('php://output', 'w');
+                        
+                        if (!empty($exportData)) {
+                            fputcsv($output, array_keys($exportData[0]));
+                            foreach ($exportData as $row) {
+                                fputcsv($output, $row);
+                            }
+                        }
+                        
+                        fclose($output);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error exporting payroll: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'export_single_payroll':
+                try {
+                    $payrollId = (int)$_POST['payroll_id'];
+                    $exportData = $employee->exportPayrollForBankPayment([$payrollId]);
+                    
+                    if (empty($exportData)) {
+                        $message = 'Payroll record not found.';
+                        $messageType = 'warning';
+                    } else {
+                        header('Content-Type: text/csv; charset=utf-8');
+                        header('Content-Disposition: attachment; filename="payroll_' . $payrollId . '_bank_export.csv"');
+                        header('Pragma: no-cache');
+                        header('Expires: 0');
+                        
+                        $output = fopen('php://output', 'w');
+                        fputcsv($output, array_keys($exportData[0]));
+                        foreach ($exportData as $row) {
+                            fputcsv($output, $row);
+                        }
+                        fclose($output);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error exporting payroll: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_performance':
                 try {
                     $employee->createPerformanceReview($_POST);
