@@ -91,7 +91,7 @@ async function initializeClient() {
     
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
+        printQRInTerminal: false,
         logger: logger,
         browser: ['ISP CRM', 'Chrome', '120.0.0'],
         connectTimeoutMs: 60000,
