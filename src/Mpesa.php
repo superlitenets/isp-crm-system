@@ -462,6 +462,7 @@ class Mpesa {
             
             $accountRef = $trans['account_reference'];
             
+            // Find subscription by username or phone
             $stmt = $this->db->prepare("
                 SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
                 FROM radius_subscriptions s
@@ -474,34 +475,60 @@ class Mpesa {
             $stmt->execute([$accountRef, $phoneSearch]);
             $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
             
-            $packagePrice = $subscription['price'] ?? 0;
-            if ($subscription && $amount >= $packagePrice && $packagePrice > 0) {
-                require_once __DIR__ . '/RadiusBilling.php';
-                $radiusBilling = new RadiusBilling($this->db);
-                
-                // Check if subscription was expired/inactive before renewal
-                $wasExpired = $subscription['status'] === 'expired' || $subscription['status'] === 'inactive' ||
-                              ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
-                
-                $renewResult = $radiusBilling->renewSubscription($subscription['id']);
-                
-                if ($renewResult['success']) {
+            if (!$subscription) {
+                error_log("RADIUS: No subscription found for account_ref={$accountRef} or phone={$phoneNumber}");
+                return;
+            }
+            
+            require_once __DIR__ . '/RadiusBilling.php';
+            $radiusBilling = new RadiusBilling($this->db);
+            
+            // Use the proper processPayment method which handles wallet credits
+            $result = $radiusBilling->processPayment($receiptNumber ?? $checkoutRequestId, $phoneNumber ?? '', $amount, $accountRef);
+            
+            if ($result['success']) {
+                if (!empty($result['wallet_topup'])) {
+                    // Partial payment - credited to wallet
+                    error_log("RADIUS: KES {$amount} credited to wallet for {$subscription['username']}. Balance: KES {$result['new_balance']}. Ref: {$receiptNumber}");
+                    
+                    // Send SMS about wallet top-up
+                    if (!empty($subscription['phone'])) {
+                        try {
+                            require_once __DIR__ . '/SMSGateway.php';
+                            $sms = new SMSGateway();
+                            $message = "Payment of KES " . number_format($amount) . " received and credited to your wallet. " .
+                                       "Balance: KES " . number_format($result['new_balance'], 2) . ". " .
+                                       "Need KES " . number_format($result['needed_for_renewal'], 2) . " more to renew. " .
+                                       "Ref: {$receiptNumber}";
+                            $sms->send($subscription['phone'], $message);
+                        } catch (\Exception $e) {
+                            error_log("SMS wallet notification error: " . $e->getMessage());
+                        }
+                    }
+                } else {
+                    // Full renewal
                     error_log("RADIUS subscription renewed for {$subscription['username']} via M-Pesa {$receiptNumber}");
                     
-                    // Only disconnect if subscription was expired - allows subscriber to redial with new session
-                    if ($wasExpired) {
+                    // Disconnect expired users so they can reconnect with new session
+                    $wasExpired = $subscription['status'] === 'expired' || $subscription['status'] === 'inactive' ||
+                                  ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
+                    
+                    if ($wasExpired && empty($result['disconnected'])) {
                         $disconnectResult = $radiusBilling->disconnectSubscription($subscription['id']);
                         if ($disconnectResult['success']) {
                             error_log("Disconnected expired {$subscription['username']} after STK payment for session refresh");
                         }
                     }
                     
+                    // Send SMS confirmation
                     if (!empty($subscription['phone'])) {
                         try {
                             require_once __DIR__ . '/SMSGateway.php';
                             $sms = new SMSGateway();
+                            $expiryDate = $result['expiry_date'] ?? date('Y-m-d', strtotime('+30 days'));
+                            $walletMsg = !empty($result['wallet_remaining']) ? " Wallet balance: KES " . number_format($result['wallet_remaining'], 2) . "." : "";
                             $message = "Payment received! Your {$subscription['package_name']} subscription has been renewed until " . 
-                                       date('M j, Y', strtotime($renewResult['expiry_date'])) . ". " .
+                                       date('M j, Y', strtotime($expiryDate)) . ".{$walletMsg} " .
                                        "Ref: {$receiptNumber}. Thank you!";
                             $sms->send($subscription['phone'], $message);
                         } catch (\Exception $e) {
@@ -509,6 +536,8 @@ class Mpesa {
                         }
                     }
                 }
+            } else {
+                error_log("RADIUS payment processing failed: " . ($result['error'] ?? 'Unknown error'));
             }
         } catch (\Exception $e) {
             error_log("RADIUS payment processing error: " . $e->getMessage());
