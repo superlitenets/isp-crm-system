@@ -656,62 +656,84 @@ class Mpesa {
     
     private function processRadiusC2BPayment(string $accountRef, float $amount, string $transId, string $phone): void {
         try {
-            // Normalize phone and account reference for matching
-            $normalizedPhone = preg_replace('/[^0-9]/', '', $phone);
-            $normalizedAccountRef = preg_replace('/[^0-9]/', '', $accountRef);
-            $phoneSearch = '%' . substr($normalizedPhone, -9);
-            $accountRefSearch = '%' . substr($normalizedAccountRef, -9);
+            require_once __DIR__ . '/RadiusBilling.php';
+            $radiusBilling = new RadiusBilling($this->db);
             
-            // Match by: 1) Username, 2) Account ref as phone, 3) Sender phone number
-            // The account reference (BillRefNumber) is expected to be customer's phone number
-            $stmt = $this->db->prepare("
-                SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
-                FROM radius_subscriptions s
-                LEFT JOIN customers c ON s.customer_id = c.id
-                LEFT JOIN radius_packages p ON s.package_id = p.id
-                WHERE s.username = ? 
-                   OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
-                   OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
-                ORDER BY s.id DESC LIMIT 1
-            ");
-            $stmt->execute([$accountRef, $accountRefSearch, $phoneSearch]);
-            $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $subscription = null;
+            $subscriptionId = null;
             
-            $packagePrice = $subscription['price'] ?? 0;
-            if ($subscription && $amount >= $packagePrice && $packagePrice > 0) {
-                require_once __DIR__ . '/RadiusBilling.php';
-                $radiusBilling = new RadiusBilling($this->db);
-                
-                // Check if subscription was expired/inactive before renewal
-                $wasExpired = $subscription['status'] === 'expired' || $subscription['status'] === 'inactive' ||
-                              ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
-                
-                $renewResult = $radiusBilling->renewSubscription($subscription['id']);
-                
-                if ($renewResult['success']) {
-                    error_log("RADIUS subscription renewed for {$subscription['username']} via C2B {$transId}");
-                    
-                    // Only disconnect if subscription was expired - allows subscriber to redial with new session
-                    if ($wasExpired) {
-                        $disconnectResult = $radiusBilling->disconnectSubscription($subscription['id']);
-                        if ($disconnectResult['success']) {
-                            error_log("Disconnected expired {$subscription['username']} after C2B payment for session refresh");
-                        }
-                    }
-                    
-                    if (!empty($subscription['phone'])) {
-                        try {
-                            require_once __DIR__ . '/SMSGateway.php';
-                            $sms = new SMSGateway();
-                            $message = "Payment received! Your {$subscription['package_name']} subscription has been renewed until " . 
-                                       date('M j, Y', strtotime($renewResult['expiry_date'])) . ". " .
-                                       "Ref: {$transId}. Thank you!";
-                            $sms->send($subscription['phone'], $message);
-                        } catch (\Exception $e) {
-                            error_log("SMS confirmation error: " . $e->getMessage());
-                        }
-                    }
+            // Priority 1: Check if accountRef is in "radius_X" format (subscription ID)
+            if (preg_match('/^radius_(\d+)$/i', $accountRef, $matches)) {
+                $subscriptionId = (int)$matches[1];
+                $stmt = $this->db->prepare("
+                    SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                    FROM radius_subscriptions s
+                    LEFT JOIN customers c ON s.customer_id = c.id
+                    LEFT JOIN radius_packages p ON s.package_id = p.id
+                    WHERE s.id = ?
+                ");
+                $stmt->execute([$subscriptionId]);
+                $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($subscription) {
+                    error_log("C2B: Found subscription by ID={$subscriptionId} (username: {$subscription['username']})");
                 }
+            }
+            
+            // Priority 2: Check if accountRef is a username (like SFL001)
+            if (!$subscription && preg_match('/^[A-Za-z]/', $accountRef)) {
+                $stmt = $this->db->prepare("
+                    SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                    FROM radius_subscriptions s
+                    LEFT JOIN customers c ON s.customer_id = c.id
+                    LEFT JOIN radius_packages p ON s.package_id = p.id
+                    WHERE s.username = ?
+                ");
+                $stmt->execute([$accountRef]);
+                $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($subscription) {
+                    error_log("C2B: Found subscription by username={$accountRef}");
+                }
+            }
+            
+            // Priority 3: Match by phone number (accountRef as phone or sender's phone)
+            if (!$subscription) {
+                $normalizedPhone = preg_replace('/[^0-9]/', '', $phone);
+                $normalizedAccountRef = preg_replace('/[^0-9]/', '', $accountRef);
+                $phoneSearch = '%' . substr($normalizedPhone, -9);
+                $accountRefSearch = '%' . substr($normalizedAccountRef, -9);
+                
+                $stmt = $this->db->prepare("
+                    SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                    FROM radius_subscriptions s
+                    LEFT JOIN customers c ON s.customer_id = c.id
+                    LEFT JOIN radius_packages p ON s.package_id = p.id
+                    WHERE REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
+                       OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
+                    ORDER BY s.id DESC LIMIT 1
+                ");
+                $stmt->execute([$accountRefSearch, $phoneSearch]);
+                $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($subscription) {
+                    error_log("C2B: Found subscription by phone (accountRef or sender). Username: {$subscription['username']}");
+                }
+            }
+            
+            if (!$subscription) {
+                error_log("C2B: No subscription found for accountRef={$accountRef}, phone={$phone}");
+                return;
+            }
+            
+            // Use the unified processPayment method which handles wallet credits properly
+            $result = $radiusBilling->processPayment($transId, $phone, $amount, $accountRef, $subscription['id']);
+            
+            if ($result['success']) {
+                if (!empty($result['renewed'])) {
+                    error_log("C2B: Subscription {$subscription['username']} renewed. Ref: {$transId}");
+                } elseif (!empty($result['wallet_topup'])) {
+                    error_log("C2B: KES {$amount} credited to wallet for {$subscription['username']}. Balance: KES {$result['new_balance']}. Ref: {$transId}");
+                }
+            } else {
+                error_log("C2B: Payment processing failed for {$subscription['username']}: " . ($result['error'] ?? 'Unknown error'));
             }
         } catch (\Exception $e) {
             error_log("RADIUS C2B payment processing error: " . $e->getMessage());
