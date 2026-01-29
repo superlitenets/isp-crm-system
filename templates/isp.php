@@ -2726,6 +2726,29 @@ try {
                 $stmt->execute([$subId]);
                 $billingHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
+                // Get M-Pesa payment records for this subscription
+                $mpesaPayments = [];
+                try {
+                    $stmt = $db->prepare("
+                        SELECT t.*, 'stk' as source FROM mpesa_transactions t 
+                        WHERE t.account_reference LIKE ? AND t.status = 'completed'
+                        UNION ALL
+                        SELECT c.id, 'c2b' as transaction_type, c.trans_id as merchant_request_id, 
+                               c.trans_id as checkout_request_id, c.msisdn as phone_number,
+                               c.trans_amount as amount, c.bill_ref_number as account_reference,
+                               'C2B Payment' as transaction_desc, c.customer_id, 'completed' as status,
+                               c.trans_id as mpesa_receipt_number, NULL as result_code, NULL as result_desc,
+                               c.trans_time as created_at, c.trans_time as updated_at, 'c2b' as source
+                        FROM mpesa_c2b_transactions c
+                        WHERE c.bill_ref_number = ? OR c.bill_ref_number LIKE ?
+                        ORDER BY created_at DESC LIMIT 30
+                    ");
+                    $stmt->execute(['radius_' . $subId, $subscriber['username'], '%' . substr(preg_replace('/[^0-9]/', '', $customer['phone'] ?? ''), -9)]);
+                    $mpesaPayments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                } catch (Exception $e) {
+                    // Tables might not exist
+                }
+                
                 // Get session history (limit to 3 for display, but get more for stats)
                 $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? ORDER BY session_start DESC LIMIT 20");
                 $stmt->execute([$subId]);
@@ -3425,6 +3448,48 @@ try {
                                                 <?php endforeach; ?>
                                                 <?php if (empty($billingHistory)): ?>
                                                 <tr><td colspan="6" class="text-center text-muted py-4">No billing history</td></tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- M-Pesa Payment Records -->
+                            <div class="card shadow-sm mt-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-phone text-success me-2"></i>M-Pesa Payment Records</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Type</th>
+                                                    <th>Amount</th>
+                                                    <th>Phone</th>
+                                                    <th>Receipt</th>
+                                                    <th>Account Ref</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($mpesaPayments as $payment): ?>
+                                                <tr>
+                                                    <td><?= $payment['created_at'] ? date('M j, Y H:i', strtotime($payment['created_at'])) : '-' ?></td>
+                                                    <td>
+                                                        <span class="badge bg-<?= ($payment['source'] ?? '') === 'c2b' ? 'info' : 'success' ?>">
+                                                            <?= strtoupper($payment['source'] ?? 'STK') ?>
+                                                        </span>
+                                                    </td>
+                                                    <td><strong>KES <?= number_format($payment['amount'] ?? 0) ?></strong></td>
+                                                    <td><small><?= htmlspecialchars($payment['phone_number'] ?? '-') ?></small></td>
+                                                    <td><small class="text-success"><?= htmlspecialchars($payment['mpesa_receipt_number'] ?? '-') ?></small></td>
+                                                    <td><small><?= htmlspecialchars($payment['account_reference'] ?? '-') ?></small></td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                                <?php if (empty($mpesaPayments)): ?>
+                                                <tr><td colspan="6" class="text-center text-muted py-4">No M-Pesa payments found</td></tr>
                                                 <?php endif; ?>
                                             </tbody>
                                         </table>
