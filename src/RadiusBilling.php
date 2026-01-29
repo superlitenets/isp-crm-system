@@ -2298,12 +2298,18 @@ class RadiusBilling {
         $stmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
         $stmt->execute([$newBalance, $sub['id']]);
         
-        // Check if wallet now has enough to renew
-        if ($newBalance >= $packagePrice) {
+        // Check if subscription is expired or inactive (needs renewal)
+        $isExpired = ($sub['status'] !== 'active') || 
+                     (isset($sub['expiry_date']) && !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time());
+        
+        // Only auto-renew from wallet if subscription is EXPIRED and wallet has enough
+        if ($isExpired && $newBalance >= $packagePrice) {
             // Deduct package price from wallet and renew
             $remainingBalance = $newBalance - $packagePrice;
             $stmt = $this->db->prepare("UPDATE radius_subscriptions SET credit_balance = ? WHERE id = ?");
             $stmt->execute([$remainingBalance, $sub['id']]);
+            
+            error_log("RADIUS: Auto-renewing expired subscription {$sub['id']} from wallet. Balance: {$newBalance} -> {$remainingBalance}");
             
             $result = $this->renewSubscription($sub['id']);
             
@@ -2331,6 +2337,11 @@ class RadiusBilling {
             }
             
             return $result;
+        }
+        
+        // Account is still active - just credit the wallet, don't renew yet
+        if (!$isExpired) {
+            error_log("RADIUS: Account {$sub['id']} still active (expires: {$sub['expiry_date']}). Wallet topped up to {$newBalance}");
         }
         
         // Not enough for renewal, just topped up wallet
