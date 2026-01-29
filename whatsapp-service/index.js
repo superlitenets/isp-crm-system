@@ -124,10 +124,11 @@ async function initializeClient() {
             qrCodeString = null;
             
             if (shouldReconnect) {
+                const delay = Math.min(30000, 5000 * Math.pow(2, recentMessages.length % 5)); // Exponential backoff
                 setTimeout(() => {
-                    console.log('Attempting to reconnect...');
+                    console.log(`Attempting to reconnect in ${delay/1000}s...`);
                     initializeClient();
-                }, 5000);
+                }, delay);
             }
         } else if (connection === 'open') {
             console.log('WhatsApp client is ready!');
