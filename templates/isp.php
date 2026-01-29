@@ -4632,6 +4632,7 @@ try {
                                     <th>Speed</th>
                                     <th>Quota</th>
                                     <th>Sessions</th>
+                                    <th>Devices</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -4659,6 +4660,10 @@ try {
                                     </td>
                                     <td><?= $pkg['data_quota_mb'] ? number_format($pkg['data_quota_mb'] / 1024) . ' GB' : 'Unlimited' ?></td>
                                     <td><?= $pkg['simultaneous_sessions'] ?></td>
+                                    <td>
+                                        <?php $maxDevices = $pkg['max_devices'] ?? 1; ?>
+                                        <?= $maxDevices ?><?php if ($maxDevices > 1): ?> <i class="bi bi-people-fill text-info" title="Multi-device"></i><?php endif; ?>
+                                    </td>
                                     <td>
                                         <?php if ($pkg['is_active']): ?>
                                         <span class="badge bg-success">Active</span>
@@ -4749,6 +4754,11 @@ try {
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Simultaneous Sessions</label>
                                         <input type="number" name="simultaneous_sessions" class="form-control" value="1" min="1">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Max Devices (MACs)</label>
+                                        <input type="number" name="max_devices" class="form-control" value="1" min="1" max="10">
+                                        <small class="text-muted">For hotspot multi-device sharing</small>
                                     </div>
                                 </div>
                                 <div class="mb-3">

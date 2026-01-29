@@ -192,8 +192,8 @@ class Employee {
         }
         
         $stmt = $this->db->prepare("
-            INSERT INTO employees (employee_id, user_id, name, email, phone, office_phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes, passport_photo, id_number, passport_number, next_of_kin_name, next_of_kin_phone, next_of_kin_relationship, date_of_birth, gender, nationality, marital_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO employees (employee_id, user_id, name, email, phone, office_phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes, passport_photo, id_number, passport_number, next_of_kin_name, next_of_kin_phone, next_of_kin_relationship, date_of_birth, gender, nationality, marital_status, payment_method, bank_name, bank_account_no)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -221,7 +221,10 @@ class Employee {
             $data['date_of_birth'] ?: null,
             $data['gender'] ?? null,
             $data['nationality'] ?? null,
-            $data['marital_status'] ?? null
+            $data['marital_status'] ?? null,
+            $data['payment_method'] ?? 'mpesa',
+            $data['bank_name'] ?? null,
+            $data['bank_account_no'] ?? null
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -246,7 +249,7 @@ class Employee {
             $this->updateUserRole((int)$data['user_id'], (int)$data['new_user_role_id']);
         }
         
-        $allowedFields = ['name', 'email', 'phone', 'office_phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id', 'passport_photo', 'id_number', 'passport_number', 'next_of_kin_name', 'next_of_kin_phone', 'next_of_kin_relationship', 'date_of_birth', 'gender', 'nationality', 'marital_status'];
+        $allowedFields = ['name', 'email', 'phone', 'office_phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id', 'passport_photo', 'id_number', 'passport_number', 'next_of_kin_name', 'next_of_kin_phone', 'next_of_kin_relationship', 'date_of_birth', 'gender', 'nationality', 'marital_status', 'payment_method', 'bank_name', 'bank_account_no'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
@@ -797,7 +800,7 @@ class Employee {
 
     public function generateBulkPayroll(string $payPeriodStart, string $payPeriodEnd, array $options = []): array {
         $stmt = $this->db->prepare("
-            SELECT e.id, e.name, e.salary, e.employee_id as emp_code
+            SELECT e.id, e.name, e.salary, e.employee_id as emp_code, e.user_id
             FROM employees e
             WHERE e.employment_status = 'active' AND e.salary > 0
             ORDER BY e.name
@@ -830,8 +833,12 @@ class Employee {
             try {
                 $baseSalary = (float)$emp['salary'];
                 $overtimePay = 0;
-                $bonuses = 0;
-                $deductions = 0;
+                
+                $advanceDeduction = $this->calculateAdvanceDeduction($emp['id']);
+                $commissions = $this->calculatePendingCommissions($emp['id'], $emp['user_id'] ?? null, $payPeriodStart, $payPeriodEnd);
+                
+                $bonuses = $commissions;
+                $deductions = $advanceDeduction;
                 $tax = 0;
                 $netPay = $baseSalary + $overtimePay + $bonuses - $deductions - $tax;
 
@@ -858,6 +865,14 @@ class Employee {
                 $payrollId = (int)$this->db->lastInsertId();
                 $results['payroll_ids'][$emp['id']] = $payrollId;
                 $results['success']++;
+                
+                if ($advanceDeduction > 0) {
+                    $this->applyAdvanceDeductions($emp['id'], $payrollId, $advanceDeduction);
+                }
+                
+                if ($commissions > 0) {
+                    $this->linkCommissionsToPayroll($emp['id'], $emp['user_id'] ?? null, $payrollId, $payPeriodStart, $payPeriodEnd);
+                }
 
             } catch (\Exception $e) {
                 $results['errors'][] = $emp['name'] . ': ' . $e->getMessage();
@@ -865,6 +880,56 @@ class Employee {
         }
 
         return $results;
+    }
+    
+    private function calculatePendingCommissions(int $employeeId, ?int $userId, string $periodStart, string $periodEnd): float {
+        $total = 0;
+        
+        if ($userId) {
+            $stmt = $this->db->prepare("
+                SELECT COALESCE(SUM(sc.commission_amount), 0) as total
+                FROM sales_commissions sc
+                INNER JOIN salespersons sp ON sc.salesperson_id = sp.id
+                WHERE sp.user_id = ?
+                  AND sc.status = 'pending'
+                  AND sc.created_at BETWEEN ? AND ?
+            ");
+            $stmt->execute([$userId, $periodStart, $periodEnd . ' 23:59:59']);
+            $total = (float)$stmt->fetchColumn();
+        }
+        
+        return $total;
+    }
+    
+    private function linkCommissionsToPayroll(int $employeeId, ?int $userId, int $payrollId, string $periodStart, string $periodEnd): void {
+        if (!$userId) return;
+        
+        $stmt = $this->db->prepare("
+            SELECT sc.id, sc.commission_amount, sc.commission_type, sc.notes
+            FROM sales_commissions sc
+            INNER JOIN salespersons sp ON sc.salesperson_id = sp.id
+            WHERE sp.user_id = ?
+              AND sc.status = 'pending'
+              AND sc.created_at BETWEEN ? AND ?
+        ");
+        $stmt->execute([$userId, $periodStart, $periodEnd . ' 23:59:59']);
+        $commissions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        foreach ($commissions as $comm) {
+            $this->db->prepare("
+                INSERT INTO payroll_commissions (payroll_id, employee_id, commission_type, description, amount, details, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ")->execute([
+                $payrollId,
+                $employeeId,
+                $comm['commission_type'] ?? 'sales',
+                $comm['notes'] ?? 'Sales commission',
+                $comm['commission_amount'],
+                json_encode(['source_id' => $comm['id']])
+            ]);
+            
+            $this->db->prepare("UPDATE sales_commissions SET status = 'paid', paid_at = NOW() WHERE id = ?")->execute([$comm['id']]);
+        }
     }
 
     public function createPerformanceReview(array $data): int {
@@ -1124,5 +1189,66 @@ class Employee {
             'contract' => 'Employment Contract',
             'other' => 'Other Document'
         ];
+    }
+    
+    public function exportPayrollForBankPayment(array $payrollIds): array {
+        if (empty($payrollIds)) {
+            return [];
+        }
+        
+        $placeholders = implode(',', array_fill(0, count($payrollIds), '?'));
+        $stmt = $this->db->prepare("
+            SELECT p.id, p.net_pay, p.status,
+                   e.name, e.id_number, e.phone, e.bank_name, e.bank_account_no, e.payment_method
+            FROM payroll p
+            INNER JOIN employees e ON p.employee_id = e.id
+            WHERE p.id IN ($placeholders)
+            ORDER BY e.name
+        ");
+        $stmt->execute($payrollIds);
+        $payrolls = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $rows = [];
+        foreach ($payrolls as $p) {
+            $phone = preg_replace('/[^0-9]/', '', $p['phone'] ?? '');
+            if (strlen($phone) === 10 && substr($phone, 0, 1) === '0') {
+                $phone = '254' . substr($phone, 1);
+            }
+            
+            $paymentMode = strtoupper($p['payment_method'] ?? 'MPESA');
+            if ($paymentMode === 'BANK' && empty($p['bank_account_no'])) {
+                $paymentMode = 'MPESA';
+            }
+            
+            $rows[] = [
+                'NAME' => $p['name'],
+                'ID NUMBER' => $p['id_number'] ?? '',
+                'PHONE NUMBER' => $phone,
+                'AMOUNT' => (int)$p['net_pay'],
+                'PAYMENT MODE' => $paymentMode,
+                'BANK (Optional)' => $paymentMode === 'BANK' ? ($p['bank_name'] ?? '') : '',
+                'BANK ACCOUNT NO (Optional)' => $paymentMode === 'BANK' ? ($p['bank_account_no'] ?? '') : '',
+                'PAYBILL BUSINESS NO (Optional)' => '',
+                'PAYBILL ACCOUNT NO (Optional)' => '',
+                'BUY GOODS TILL NO (Optional)' => '',
+                'BILL PAYMENT BILLER CODE (Optional)' => '',
+                'BILL PAYMENT ACCOUNT NO (Optional)' => '',
+                'NARRATION (OPTIONAL)' => 'Salary Payment'
+            ];
+        }
+        
+        return $rows;
+    }
+    
+    public function getPayrollByMonth(string $month): array {
+        $stmt = $this->db->prepare("
+            SELECT p.*, e.name as employee_name, e.phone, e.bank_name, e.bank_account_no, e.payment_method, e.id_number
+            FROM payroll p
+            INNER JOIN employees e ON p.employee_id = e.id
+            WHERE TO_CHAR(p.pay_period_start, 'YYYY-MM') = ?
+            ORDER BY e.name
+        ");
+        $stmt->execute([$month]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 }
