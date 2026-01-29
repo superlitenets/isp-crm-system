@@ -43,13 +43,13 @@ waitForPort = 5000
 name = "WhatsApp Service"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd whatsapp-service && npm start"
-waitForPort = 3001
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd whatsapp-service && node index.js"
+waitForPort = 3001
 
 [[workflows.workflow]]
 name = "OLT Session Manager"
@@ -74,6 +74,11 @@ waitForPort = 8080
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[ports]]
+localPort = 3001
+externalPort = 3001
+exposeLocalhost = true
 
 [[ports]]
 localPort = 3002
