@@ -94,11 +94,12 @@ async function initializeClient() {
         printQRInTerminal: false,
         logger: logger,
         browser: ['ISP CRM', 'Chrome', '120.0.0'],
-        connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: 60000,
+        connectTimeoutMs: 120000,
+        defaultQueryTimeoutMs: 120000,
         keepAliveIntervalMs: 25000,
         markOnlineOnConnect: true,
-        syncFullHistory: false
+        syncFullHistory: false,
+        retryRequestDelayMs: 5000
     });
     
     sock.ev.on('creds.update', saveCreds);
