@@ -49,10 +49,10 @@ $mpesaPaybill = $radiusBilling->getSetting('mpesa_paybill') ?: '';
 $mpesa = new \App\Mpesa();
 $mpesaEnabled = $mpesa->isConfigured();
 
-// Get available packages for purchase
+// Get available packages for purchase (hotspot only)
 $packages = [];
 if ($mpesaEnabled) {
-    $stmt = $db->query("SELECT * FROM radius_packages WHERE is_active = true ORDER BY price ASC");
+    $stmt = $db->query("SELECT * FROM radius_packages WHERE is_active = true AND package_type = 'hotspot' ORDER BY price ASC");
     $packages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
