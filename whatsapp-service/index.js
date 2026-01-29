@@ -113,48 +113,11 @@ let qrCodeData = null;
 let qrCodeString = null;
 let connectionStatus = 'disconnected';
 let clientInfo = null;
-let readyTimeout = null;
-let authTime = null;
-let isInitializing = false;
 
-async function initializeClient() {
-    // Prevent concurrent initializations
-    if (isInitializing) {
-        console.log('Already initializing, skipping duplicate request');
-        return;
-    }
-    isInitializing = true;
-    
-    // Clear any pending timeouts
-    if (readyTimeout) {
-        clearTimeout(readyTimeout);
-        readyTimeout = null;
-    }
-    authTime = null;
-    
-    // Destroy existing client properly
+function initializeClient() {
     if (client) {
-        try {
-            console.log('Destroying existing client...');
-            await client.destroy();
-            console.log('Client destroyed');
-        } catch (e) {
-            console.warn('Error destroying client:', e.message);
-        }
-        client = null;
+        client.destroy();
     }
-    
-    // Kill any orphaned chromium processes
-    try {
-        const { execSync } = require('child_process');
-        execSync('pkill -f chromium || true', { timeout: 5000 });
-        console.log('Killed orphaned chromium processes');
-    } catch (e) {
-        // Ignore errors
-    }
-    
-    // Wait a moment for cleanup
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
     cleanupChromeLocks();
     
@@ -194,14 +157,6 @@ async function initializeClient() {
         qrCodeData = null;
         qrCodeString = null;
         clientInfo = client.info;
-        isInitializing = false; // Reset flag
-        
-        // Clear the ready timeout since we're now connected
-        if (readyTimeout) {
-            clearTimeout(readyTimeout);
-            readyTimeout = null;
-        }
-        authTime = null;
         
         // Monkey-patch sendSeen to fix markedUnread error (WhatsApp Web API change)
         try {
@@ -220,28 +175,6 @@ async function initializeClient() {
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated');
         connectionStatus = 'authenticated';
-        authTime = Date.now();
-        isInitializing = false; // Allow new initializations after auth
-        
-        // Set a timeout - if ready doesn't fire within 90 seconds, reinitialize
-        if (readyTimeout) {
-            clearTimeout(readyTimeout);
-        }
-        readyTimeout = setTimeout(async () => {
-            if (connectionStatus === 'authenticated') {
-                console.log('WARNING: Authenticated but ready event never fired after 90s. Reinitializing...');
-                connectionStatus = 'disconnected';
-                
-                // Use initializeClient which now handles everything properly
-                await initializeClient();
-                if (client) {
-                    client.initialize().catch(err => {
-                        console.error('Reinit failed:', err.message);
-                        isInitializing = false;
-                    });
-                }
-            }
-        }, 90000);
     });
 
     client.on('auth_failure', (msg) => {
@@ -249,7 +182,6 @@ async function initializeClient() {
         connectionStatus = 'auth_failed';
         qrCodeData = null;
         qrCodeString = null;
-        isInitializing = false;
     });
 
     client.on('disconnected', (reason) => {
@@ -258,7 +190,6 @@ async function initializeClient() {
         clientInfo = null;
         qrCodeData = null;
         qrCodeString = null;
-        isInitializing = false;
     });
 
     // Listen for incoming messages
@@ -338,7 +269,7 @@ let recentMessages = [];
 let messageCallbacks = [];
 
 app.get('/status', (req, res) => {
-    const response = {
+    res.json({
         status: connectionStatus,
         hasQR: !!qrCodeData,
         info: clientInfo ? {
@@ -346,16 +277,7 @@ app.get('/status', (req, res) => {
             phone: clientInfo.wid?.user,
             platform: clientInfo.platform
         } : null
-    };
-    
-    // Add diagnostic info if stuck in authenticated state
-    if (connectionStatus === 'authenticated' && authTime) {
-        response.authenticatedSince = authTime;
-        response.stuckSeconds = Math.floor((Date.now() - authTime) / 1000);
-        response.message = 'Client authenticated but waiting for ready event. Will auto-reinitialize after 90s.';
-    }
-    
-    res.json(response);
+    });
 });
 
 app.get('/qr', (req, res) => {
@@ -386,61 +308,11 @@ app.get('/qr-terminal', async (req, res) => {
     }
 });
 
-app.post('/initialize', async (req, res) => {
-    if (isInitializing) {
-        return res.json({ message: 'Already initializing, please wait...', status: connectionStatus });
-    }
+app.post('/initialize', (req, res) => {
     console.log('Initializing WhatsApp client...');
     connectionStatus = 'initializing';
-    await initializeClient();
-    if (client) {
-        client.initialize().catch(err => {
-            console.error('Init error:', err.message);
-            isInitializing = false;
-        });
-    }
+    initializeClient();
     res.json({ message: 'Initializing...', status: connectionStatus });
-});
-
-// Force reinitialize - clears session and starts fresh (requires new QR scan)
-app.post('/force-reinit', async (req, res) => {
-    console.log('Force reinitializing WhatsApp client - clearing session...');
-    try {
-        // Reset the lock to allow force reinit
-        isInitializing = false;
-        
-        // Clear session directory before reinit
-        const sessionDir = path.join(SESSION_PATH, 'session');
-        if (fs.existsSync(sessionDir)) {
-            try {
-                fs.rmSync(sessionDir, { recursive: true, force: true });
-                console.log('Cleared session directory');
-            } catch (e) {
-                console.warn('Could not clear session:', e.message);
-            }
-        }
-        
-        // Reset state
-        connectionStatus = 'disconnected';
-        clientInfo = null;
-        qrCodeData = null;
-        qrCodeString = null;
-        
-        // Reinitialize (initializeClient now handles cleanup properly)
-        await initializeClient();
-        if (client) {
-            client.initialize().catch(err => {
-                console.error('Force reinit init error:', err.message);
-                isInitializing = false;
-            });
-        }
-        
-        res.json({ message: 'Force reinitialization started. Scan new QR code to connect.', status: 'reinitializing' });
-    } catch (error) {
-        console.error('Force reinit error:', error);
-        isInitializing = false;
-        res.status(500).json({ error: error.message });
-    }
 });
 
 app.post('/logout', async (req, res) => {
@@ -735,26 +607,12 @@ app.post('/chat/:chatId/read', async (req, res) => {
     }
 });
 
-// Start server first, then auto-initialize
-app.listen(PORT, BIND_HOST, async () => {
+if (fs.existsSync(SESSION_PATH)) {
+    console.log('Session found, auto-initializing...');
+    initializeClient();
+}
+
+app.listen(PORT, BIND_HOST, () => {
     console.log(`WhatsApp service running on ${BIND_HOST}:${PORT}`);
     console.log('API Secret:', API_SECRET ? 'Configured' : 'Not set (local-only access)');
-    
-    // Auto-initialize only if actual session data exists (not just empty directory)
-    const sessionDataPath = path.join(SESSION_PATH, 'session');
-    const hasRealSession = fs.existsSync(sessionDataPath) && 
-        fs.readdirSync(sessionDataPath).some(f => !['SingletonLock', 'SingletonSocket', 'SingletonCookie'].includes(f));
-    
-    if (hasRealSession) {
-        console.log('Valid session found, auto-initializing...');
-        await initializeClient();
-        if (client) {
-            client.initialize().catch(err => {
-                console.error('Auto-init error:', err.message);
-                isInitializing = false;
-            });
-        }
-    } else {
-        console.log('No valid session found. Visit /qr-terminal or POST /initialize to connect.');
-    }
 });

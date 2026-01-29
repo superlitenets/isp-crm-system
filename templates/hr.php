@@ -286,34 +286,6 @@ $allRoles = $roleManager->getAllRoles();
                     <label class="form-label">Emergency Contact Phone</label>
                     <input type="tel" class="form-control" name="emergency_phone" value="<?= htmlspecialchars($employeeData['emergency_phone'] ?? '') ?>">
                 </div>
-                
-                <div class="col-12 mt-3">
-                    <h6 class="text-primary border-bottom pb-2"><i class="bi bi-bank"></i> Payment Details</h6>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Payment Method</label>
-                    <select class="form-select" name="payment_method" id="paymentMethod" onchange="toggleBankFields()">
-                        <option value="mpesa" <?= ($employeeData['payment_method'] ?? 'mpesa') === 'mpesa' ? 'selected' : '' ?>>M-Pesa</option>
-                        <option value="bank" <?= ($employeeData['payment_method'] ?? '') === 'bank' ? 'selected' : '' ?>>Bank Transfer</option>
-                    </select>
-                </div>
-                <div class="col-md-4 bank-fields" style="<?= ($employeeData['payment_method'] ?? '') !== 'bank' ? 'display:none;' : '' ?>">
-                    <label class="form-label">Bank Name</label>
-                    <input type="text" class="form-control" name="bank_name" value="<?= htmlspecialchars($employeeData['bank_name'] ?? '') ?>" placeholder="e.g. Equity Bank">
-                </div>
-                <div class="col-md-4 bank-fields" style="<?= ($employeeData['payment_method'] ?? '') !== 'bank' ? 'display:none;' : '' ?>">
-                    <label class="form-label">Bank Account Number</label>
-                    <input type="text" class="form-control" name="bank_account_no" value="<?= htmlspecialchars($employeeData['bank_account_no'] ?? '') ?>" placeholder="e.g. 1234567890">
-                </div>
-                <script>
-                function toggleBankFields() {
-                    const method = document.getElementById('paymentMethod').value;
-                    document.querySelectorAll('.bank-fields').forEach(el => {
-                        el.style.display = method === 'bank' ? 'block' : 'none';
-                    });
-                }
-                </script>
-                
                 <div class="col-12">
                     <label class="form-label">Notes</label>
                     <textarea class="form-control" name="notes" rows="2"><?= htmlspecialchars($employeeData['notes'] ?? '') ?></textarea>
@@ -1467,20 +1439,10 @@ function syncAllEmployeesToDevice(deviceId) {
                 </button>
             </div>
             <div class="col-md-6 text-end">
-                <?php if (!empty($payrollRecords)): ?>
-                <form method="POST" class="d-inline">
-                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                    <input type="hidden" name="action" value="export_payroll_excel">
-                    <input type="hidden" name="month" value="<?= htmlspecialchars($filterMonth ?? date('Y-m')) ?>">
-                    <button type="submit" class="btn btn-success me-2">
-                        <i class="bi bi-file-earmark-excel"></i> Export for Bank
-                    </button>
-                </form>
-                <?php endif; ?>
                 <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#bulkPayrollModal">
                     <i class="bi bi-people-fill"></i> Generate All
                 </button>
-                <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#payrollModal">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#payrollModal">
                     <i class="bi bi-plus-circle"></i> Create Payroll
                 </button>
             </div>
@@ -1524,14 +1486,6 @@ function syncAllEmployeesToDevice(deviceId) {
                             </span>
                         </td>
                         <td>
-                            <form method="POST" class="d-inline">
-                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                                <input type="hidden" name="action" value="export_single_payroll">
-                                <input type="hidden" name="payroll_id" value="<?= $pay['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Download Excel">
-                                    <i class="bi bi-file-earmark-excel"></i>
-                                </button>
-                            </form>
                             <?php if (\App\Auth::isAdmin()): ?>
                             <form method="POST" class="d-inline" onsubmit="return confirm('Delete this payroll record?')">
                                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
