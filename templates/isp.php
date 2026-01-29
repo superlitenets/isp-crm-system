@@ -406,6 +406,18 @@ if ($action === 'ajax_suspend') {
     exit;
 }
 
+if ($action === 'ajax_unsuspend') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $result = $radiusBilling->unsuspendSubscription($id);
+        echo json_encode($result);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription ID']);
+    }
+    exit;
+}
+
 if ($action === 'ajax_renew') {
     header('Content-Type: application/json');
     $id = (int)($_GET['id'] ?? 0);
@@ -1032,11 +1044,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $radiusBilling->suspendSubscription((int)$_POST['id'], $_POST['reason'] ?? '');
             if ($result['success']) {
                 $msg = 'Subscription suspended';
-                if (!empty($result['sessions_disconnected'])) {
-                    $msg .= ' (' . $result['sessions_disconnected'] . ' session(s) disconnected)';
+                if (!empty($result['days_remaining'])) {
+                    $msg .= ' (' . $result['days_remaining'] . ' days saved for restoration)';
                 }
                 if (!empty($result['coa_errors'])) {
                     $msg .= ' - CoA warnings: ' . implode('; ', array_slice($result['coa_errors'], 0, 2));
+                }
+                $message = $msg;
+                $messageType = 'success';
+            } else {
+                $message = 'Error: ' . ($result['error'] ?? 'Unknown error');
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'unsuspend_subscription':
+            $result = $radiusBilling->unsuspendSubscription((int)$_POST['id']);
+            if ($result['success']) {
+                $msg = 'Subscription reactivated';
+                if (!empty($result['days_restored'])) {
+                    $msg .= ' (' . $result['days_restored'] . ' days restored, new expiry: ' . date('M j, Y', strtotime($result['new_expiry'])) . ')';
                 }
                 $message = $msg;
                 $messageType = 'success';
@@ -2468,6 +2495,10 @@ try {
                                             <button type="button" class="btn btn-outline-warning" title="Suspend" onclick="quickAction('suspend', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
                                                 <i class="bi bi-pause-fill"></i>
                                             </button>
+                                            <?php elseif ($sub['status'] === 'suspended'): ?>
+                                            <button type="button" class="btn btn-outline-success" title="Unsuspend (restore days)" onclick="quickAction('unsuspend', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
+                                                <i class="bi bi-play-fill"></i>
+                                            </button>
                                             <?php else: ?>
                                             <button type="button" class="btn btn-outline-success" title="Activate" onclick="quickAction('activate', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
                                                 <i class="bi bi-play-fill"></i>
@@ -2970,6 +3001,13 @@ try {
                         <input type="hidden" name="return_to" value="subscriber">
                         <button type="submit" class="btn btn-warning"><i class="bi bi-pause-fill me-1"></i> Suspend</button>
                     </form>
+                    <?php elseif ($subscriber['status'] === 'suspended'): ?>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="unsuspend_subscription">
+                        <input type="hidden" name="id" value="<?= $subId ?>">
+                        <input type="hidden" name="return_to" value="subscriber">
+                        <button type="submit" class="btn btn-success"><i class="bi bi-play-fill me-1"></i> Unsuspend</button>
+                    </form>
                     <?php else: ?>
                     <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="activate_subscription">
@@ -3207,6 +3245,26 @@ try {
                                                     <button class="btn btn-sm btn-link p-0 ms-2" data-bs-toggle="modal" data-bs-target="#changeExpiryModal" title="Change Expiry"><i class="bi bi-calendar-event"></i></button>
                                                 </td>
                                             </tr>
+                                            <?php if ($subscriber['status'] === 'suspended' && $subscriber['suspended_at']): ?>
+                                            <tr class="table-warning">
+                                                <td class="text-muted">Suspended On</td>
+                                                <td>
+                                                    <span class="text-warning fw-bold"><?= date('M j, Y', strtotime($subscriber['suspended_at'])) ?></span>
+                                                    <?php 
+                                                    $daysSuspended = ceil((time() - strtotime($subscriber['suspended_at'])) / 86400);
+                                                    $savedDays = $subscriber['days_remaining_at_suspension'] ?? 0;
+                                                    ?>
+                                                    <span class="badge bg-warning text-dark ms-1"><?= $daysSuspended ?> day(s) ago</span>
+                                                </td>
+                                            </tr>
+                                            <tr class="table-success">
+                                                <td class="text-muted">Days Saved</td>
+                                                <td>
+                                                    <span class="text-success fw-bold"><?= $savedDays ?> days</span>
+                                                    <small class="text-muted ms-2">(will be restored on unsuspend)</small>
+                                                </td>
+                                            </tr>
+                                            <?php endif; ?>
                                             <tr>
                                                 <td class="text-muted">Auto-Renew</td>
                                                 <td>
@@ -7467,6 +7525,7 @@ try {
     function quickAction(action, subId, username) {
         const messages = {
             'suspend': `Suspend subscriber ${username}?`,
+            'unsuspend': `Reactivate subscriber ${username}? Remaining days will be restored.`,
             'activate': `Activate subscriber ${username}?`,
             'renew': `Renew subscription for ${username}?`,
             'disconnect': `Disconnect active sessions for ${username}?`,
@@ -7477,7 +7536,7 @@ try {
         if (!confirm(messages[action] || `Perform ${action} on ${username}?`)) return;
         
         // Use AJAX for real-time actions
-        const ajaxActions = ['activate', 'suspend', 'renew', 'disconnect', 'speed_update'];
+        const ajaxActions = ['activate', 'suspend', 'unsuspend', 'renew', 'disconnect', 'speed_update'];
         if (ajaxActions.includes(action)) {
             performCoAAction(action, subId, username);
             return;
@@ -7506,6 +7565,7 @@ try {
             const actionMap = {
                 'activate': 'ajax_activate',
                 'suspend': 'ajax_suspend',
+                'unsuspend': 'ajax_unsuspend',
                 'renew': 'ajax_renew',
                 'disconnect': 'ajax_disconnect',
                 'speed_update': 'ajax_speed_update'

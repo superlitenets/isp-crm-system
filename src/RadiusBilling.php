@@ -868,18 +868,91 @@ class RadiusBilling {
     
     public function suspendSubscription(int $id, string $reason = ''): array {
         try {
+            // Get current subscription to calculate days remaining
+            $stmt = $this->db->prepare("SELECT expiry_date, status FROM radius_subscriptions WHERE id = ?");
+            $stmt->execute([$id]);
+            $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            // Calculate days remaining at suspension
+            $daysRemaining = 0;
+            if ($sub['expiry_date']) {
+                $expiryTime = strtotime($sub['expiry_date']);
+                $daysRemaining = max(0, ceil(($expiryTime - time()) / 86400));
+            }
+            
             $stmt = $this->db->prepare("
-                UPDATE radius_subscriptions SET status = 'suspended', notes = COALESCE(notes, '') || ?::text, updated_at = CURRENT_TIMESTAMP
+                UPDATE radius_subscriptions 
+                SET status = 'suspended', 
+                    suspended_at = CURRENT_TIMESTAMP,
+                    days_remaining_at_suspension = ?,
+                    notes = COALESCE(notes, '') || ?::text, 
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
-            $stmt->execute(["\nSuspended: $reason (" . date('Y-m-d H:i') . ")", $id]);
+            $stmt->execute([$daysRemaining, "\nSuspended: $reason (" . date('Y-m-d H:i') . ")", $id]);
             
             // Disconnect active sessions via CoA
             $disconnectResult = $this->sendCoAForSubscription($id);
             
             return [
                 'success' => true, 
+                'days_remaining' => $daysRemaining,
                 'coa_result' => $disconnectResult
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function unsuspendSubscription(int $id): array {
+        try {
+            // Get subscription to restore days
+            $stmt = $this->db->prepare("
+                SELECT suspended_at, days_remaining_at_suspension, expiry_date 
+                FROM radius_subscriptions WHERE id = ?
+            ");
+            $stmt->execute([$id]);
+            $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            // Calculate new expiry: today + days remaining at suspension
+            $daysRemaining = (int)($sub['days_remaining_at_suspension'] ?? 0);
+            $newExpiry = date('Y-m-d H:i:s', strtotime("+{$daysRemaining} days"));
+            
+            // Calculate suspended duration for logging
+            $suspendedDays = 0;
+            if ($sub['suspended_at']) {
+                $suspendedDays = ceil((time() - strtotime($sub['suspended_at'])) / 86400);
+            }
+            
+            $stmt = $this->db->prepare("
+                UPDATE radius_subscriptions 
+                SET status = 'active', 
+                    expiry_date = ?,
+                    suspended_at = NULL,
+                    days_remaining_at_suspension = NULL,
+                    notes = COALESCE(notes, '') || ?::text, 
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $newExpiry, 
+                "\nReactivated after {$suspendedDays} days suspension (" . date('Y-m-d H:i') . ")", 
+                $id
+            ]);
+            
+            return [
+                'success' => true, 
+                'new_expiry' => $newExpiry,
+                'days_restored' => $daysRemaining,
+                'suspended_days' => $suspendedDays
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
