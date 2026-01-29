@@ -461,19 +461,40 @@ class Mpesa {
             if (!$trans) return;
             
             $accountRef = $trans['account_reference'];
+            $subscription = null;
             
-            // Find subscription by username or phone
-            $stmt = $this->db->prepare("
-                SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
-                FROM radius_subscriptions s
-                LEFT JOIN customers c ON s.customer_id = c.id
-                LEFT JOIN radius_packages p ON s.package_id = p.id
-                WHERE s.username = ? OR c.phone LIKE ?
-                ORDER BY s.id DESC LIMIT 1
-            ");
-            $phoneSearch = '%' . substr(preg_replace('/[^0-9]/', '', $phoneNumber ?? ''), -9);
-            $stmt->execute([$accountRef, $phoneSearch]);
-            $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+            // Check if account_reference is in format "radius_X" where X is subscription ID
+            if (preg_match('/^radius_(\d+)$/i', $accountRef, $matches)) {
+                $subscriptionId = (int)$matches[1];
+                $stmt = $this->db->prepare("
+                    SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                    FROM radius_subscriptions s
+                    LEFT JOIN customers c ON s.customer_id = c.id
+                    LEFT JOIN radius_packages p ON s.package_id = p.id
+                    WHERE s.id = ?
+                ");
+                $stmt->execute([$subscriptionId]);
+                $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if ($subscription) {
+                    error_log("RADIUS: Found subscription by ID={$subscriptionId} (username: {$subscription['username']})");
+                }
+            }
+            
+            // Fallback: Find subscription by username or phone if not found by ID
+            if (!$subscription) {
+                $stmt = $this->db->prepare("
+                    SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                    FROM radius_subscriptions s
+                    LEFT JOIN customers c ON s.customer_id = c.id
+                    LEFT JOIN radius_packages p ON s.package_id = p.id
+                    WHERE s.username = ? OR c.phone LIKE ?
+                    ORDER BY s.id DESC LIMIT 1
+                ");
+                $phoneSearch = '%' . substr(preg_replace('/[^0-9]/', '', $phoneNumber ?? ''), -9);
+                $stmt->execute([$accountRef, $phoneSearch]);
+                $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+            }
             
             if (!$subscription) {
                 error_log("RADIUS: No subscription found for account_ref={$accountRef} or phone={$phoneNumber}");

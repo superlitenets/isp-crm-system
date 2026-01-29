@@ -2199,7 +2199,7 @@ class RadiusBilling {
     
     // ==================== M-Pesa Integration ====================
     
-    public function processPayment(string $transactionId, string $phone, float $amount, string $accountRef = ''): array {
+    public function processPayment(string $transactionId, string $phone, float $amount, string $accountRef = '', ?int $subscriptionId = null): array {
         // Idempotency check - prevent duplicate processing of same transaction
         $checkStmt = $this->db->prepare("SELECT id FROM radius_billing_history WHERE transaction_ref = ? LIMIT 1");
         $checkStmt->execute([$transactionId]);
@@ -2208,16 +2208,35 @@ class RadiusBilling {
             return ['success' => true, 'duplicate' => true, 'message' => 'Payment already processed'];
         }
         
-        // Find subscription by phone or account reference
-        $stmt = $this->db->prepare("
-            SELECT s.* FROM radius_subscriptions s
-            LEFT JOIN customers c ON s.customer_id = c.id
-            WHERE c.phone LIKE ? OR s.username = ?
-            LIMIT 1
-        ");
-        $phoneClean = preg_replace('/^254/', '0', $phone);
-        $stmt->execute(['%' . $phoneClean, $accountRef]);
-        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $sub = null;
+        
+        // First: Try to find by subscription ID if provided
+        if ($subscriptionId) {
+            $stmt = $this->db->prepare("SELECT * FROM radius_subscriptions WHERE id = ?");
+            $stmt->execute([$subscriptionId]);
+            $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        // Second: Try to extract subscription ID from account reference (format: radius_X)
+        if (!$sub && preg_match('/^radius_(\d+)$/i', $accountRef, $matches)) {
+            $extractedId = (int)$matches[1];
+            $stmt = $this->db->prepare("SELECT * FROM radius_subscriptions WHERE id = ?");
+            $stmt->execute([$extractedId]);
+            $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        // Third: Fallback to phone or username matching
+        if (!$sub) {
+            $stmt = $this->db->prepare("
+                SELECT s.* FROM radius_subscriptions s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE c.phone LIKE ? OR s.username = ?
+                LIMIT 1
+            ");
+            $phoneClean = preg_replace('/^254/', '0', $phone);
+            $stmt->execute(['%' . $phoneClean, $accountRef]);
+            $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
         
         if (!$sub) {
             return ['success' => false, 'error' => 'Subscription not found for phone: ' . $phone];
