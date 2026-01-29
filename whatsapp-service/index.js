@@ -113,6 +113,8 @@ let qrCodeData = null;
 let qrCodeString = null;
 let connectionStatus = 'disconnected';
 let clientInfo = null;
+let readyTimeout = null;
+let authTime = null;
 
 function initializeClient() {
     if (client) {
@@ -158,6 +160,13 @@ function initializeClient() {
         qrCodeString = null;
         clientInfo = client.info;
         
+        // Clear the ready timeout since we're now connected
+        if (readyTimeout) {
+            clearTimeout(readyTimeout);
+            readyTimeout = null;
+        }
+        authTime = null;
+        
         // Monkey-patch sendSeen to fix markedUnread error (WhatsApp Web API change)
         try {
             await client.pupPage.evaluate(() => {
@@ -175,6 +184,32 @@ function initializeClient() {
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated');
         connectionStatus = 'authenticated';
+        authTime = Date.now();
+        
+        // Set a timeout - if ready doesn't fire within 90 seconds, reinitialize
+        if (readyTimeout) {
+            clearTimeout(readyTimeout);
+        }
+        readyTimeout = setTimeout(() => {
+            if (connectionStatus === 'authenticated') {
+                console.log('WARNING: Authenticated but ready event never fired after 90s. Reinitializing...');
+                // Clear session and reinitialize
+                const sessionDir = path.join(SESSION_PATH, 'session');
+                if (fs.existsSync(sessionDir)) {
+                    try {
+                        fs.rmSync(sessionDir, { recursive: true, force: true });
+                        console.log('Cleared stale session directory');
+                    } catch (e) {
+                        console.error('Failed to clear session:', e.message);
+                    }
+                }
+                setTimeout(() => {
+                    connectionStatus = 'disconnected';
+                    initializeClient();
+                    client.initialize();
+                }, 2000);
+            }
+        }, 90000);
     });
 
     client.on('auth_failure', (msg) => {
@@ -269,7 +304,7 @@ let recentMessages = [];
 let messageCallbacks = [];
 
 app.get('/status', (req, res) => {
-    res.json({
+    const response = {
         status: connectionStatus,
         hasQR: !!qrCodeData,
         info: clientInfo ? {
@@ -277,7 +312,16 @@ app.get('/status', (req, res) => {
             phone: clientInfo.wid?.user,
             platform: clientInfo.platform
         } : null
-    });
+    };
+    
+    // Add diagnostic info if stuck in authenticated state
+    if (connectionStatus === 'authenticated' && authTime) {
+        response.authenticatedSince = authTime;
+        response.stuckSeconds = Math.floor((Date.now() - authTime) / 1000);
+        response.message = 'Client authenticated but waiting for ready event. Will auto-reinitialize after 90s.';
+    }
+    
+    res.json(response);
 });
 
 app.get('/qr', (req, res) => {
@@ -313,6 +357,53 @@ app.post('/initialize', (req, res) => {
     connectionStatus = 'initializing';
     initializeClient();
     res.json({ message: 'Initializing...', status: connectionStatus });
+});
+
+// Force reinitialize - clears session and starts fresh (requires new QR scan)
+app.post('/force-reinit', async (req, res) => {
+    console.log('Force reinitializing WhatsApp client - clearing session...');
+    try {
+        // Clear any pending timeouts
+        if (readyTimeout) {
+            clearTimeout(readyTimeout);
+            readyTimeout = null;
+        }
+        authTime = null;
+        
+        // Destroy existing client
+        if (client) {
+            try {
+                await client.destroy();
+            } catch (e) {
+                console.warn('Client destroy error:', e.message);
+            }
+            client = null;
+        }
+        
+        // Clear session directory
+        const sessionDir = path.join(SESSION_PATH, 'session');
+        if (fs.existsSync(sessionDir)) {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+            console.log('Cleared session directory');
+        }
+        
+        // Reset state
+        connectionStatus = 'disconnected';
+        clientInfo = null;
+        qrCodeData = null;
+        qrCodeString = null;
+        
+        // Reinitialize after a short delay
+        setTimeout(() => {
+            initializeClient();
+            client.initialize();
+        }, 1000);
+        
+        res.json({ message: 'Force reinitialization started. Scan new QR code to connect.', status: 'reinitializing' });
+    } catch (error) {
+        console.error('Force reinit error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/logout', async (req, res) => {
