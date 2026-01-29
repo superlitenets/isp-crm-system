@@ -1,0 +1,30 @@
+isp_crm_php  |   thrown in /var/www/html/src/RadiusBilling.php on line 1637
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:14 +0300 "GET /index.php" 200
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_package_schedules" does not exist
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:23 +0300 "GET /index.php" 500
+isp_crm_php  | LINE 2:             SELECT * FROM radius_package_schedules
+isp_crm_php  |                                   ^ in /var/www/html/src/RadiusBilling.php:1637
+isp_crm_php  | Stack trace:
+isp_crm_php  | #0 /var/www/html/src/RadiusBilling.php(1637): PDOStatement->execute()
+isp_crm_php  | #1 /var/www/html/templates/isp.php(4642): App\RadiusBilling->getPackageSchedules()
+isp_crm_php  | #2 /var/www/html/public/index.php(2235): include('...')
+isp_crm_php  | #3 {main}
+isp_crm_php  |   thrown in /var/www/html/src/RadiusBilling.php on line 1637
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:25 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:28 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:30 +0300 "GET /index.php" 200
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to undefined function exec() in /var/www/html/src/RadiusBilling.php:3083
+isp_crm_php  | Stack trace:
+isp_crm_php  | #0 /var/www/html/templates/isp.php(6200): App\RadiusBilling->getNASStatus()
+isp_crm_php  | #1 /var/www/html/public/index.php(2235): include('...')
+isp_crm_php  | #2 {main}
+isp_crm_php  |   thrown in /var/www/html/src/RadiusBilling.php on line 3083
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:31 +0300 "GET /index.php" 500
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:32 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:49:55 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:50:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:50:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  29/Jan/2026:20:50:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "radius_package_schedules" does not exist
+isp_crm_php  | LINE 2:             SELECT * FROM radius_package_schedules
+isp_crm_php  |                                   ^ in /var/www/html/src/RadiusBilling.php:1637
