@@ -199,6 +199,26 @@ function initializeClient() {
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated');
         connectionStatus = 'authenticated';
+        
+        // Fallback: If ready event doesn't fire within 30 seconds, check manually
+        setTimeout(async () => {
+            if (connectionStatus === 'authenticated') {
+                console.log('Ready event not fired, checking client state manually...');
+                try {
+                    const state = await client.getState();
+                    console.log('Client state:', state);
+                    if (state === 'CONNECTED') {
+                        console.log('Client is connected, setting status manually');
+                        connectionStatus = 'connected';
+                        clientInfo = client.info;
+                        qrCodeData = null;
+                        qrCodeString = null;
+                    }
+                } catch (e) {
+                    console.warn('Manual state check failed:', e.message);
+                }
+            }
+        }, 30000);
     });
 
     client.on('auth_failure', (msg) => {
