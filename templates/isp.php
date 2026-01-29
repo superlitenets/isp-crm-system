@@ -4822,16 +4822,17 @@ try {
                                         <label class="form-label">Priority (1-8)</label>
                                         <input type="number" name="priority" class="form-control" value="8" min="1" max="8">
                                     </div>
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-3 mb-3 hotspot-only-field" style="display:none;">
                                         <label class="form-label">Simultaneous Sessions</label>
                                         <input type="number" name="simultaneous_sessions" class="form-control" value="1" min="1">
+                                        <small class="text-muted">Hotspot only</small>
                                     </div>
                                 </div>
                                 <div class="row">
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-3 mb-3 hotspot-only-field" style="display:none;">
                                         <label class="form-label">Max Devices (MACs)</label>
                                         <input type="number" name="max_devices" class="form-control" value="1" min="1" max="10">
-                                        <small class="text-muted">For hotspot multi-device sharing</small>
+                                        <small class="text-muted">Hotspot only</small>
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Burst Download</label>
@@ -4881,6 +4882,16 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <script>
+            // Toggle hotspot-only fields based on package type
+            document.querySelector('#addPackageModal select[name="package_type"]').addEventListener('change', function() {
+                const isHotspot = this.value === 'hotspot';
+                document.querySelectorAll('#addPackageModal .hotspot-only-field').forEach(el => {
+                    el.style.display = isHotspot ? 'block' : 'none';
+                });
+            });
+            </script>
             
             <!-- Edit Package Modal -->
             <div class="modal fade" id="editPackageModal" tabindex="-1">
@@ -4946,15 +4957,17 @@ try {
                                         <label class="form-label">Priority (1-8)</label>
                                         <input type="number" name="priority" id="editPkgPriority" class="form-control" min="1" max="8">
                                     </div>
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-3 mb-3 edit-hotspot-only-field" style="display:none;">
                                         <label class="form-label">Simultaneous Sessions</label>
                                         <input type="number" name="simultaneous_sessions" id="editPkgSessions" class="form-control" min="1">
+                                        <small class="text-muted">Hotspot only</small>
                                     </div>
                                 </div>
                                 <div class="row">
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-3 mb-3 edit-hotspot-only-field" style="display:none;">
                                         <label class="form-label">Max Devices</label>
                                         <input type="number" name="max_devices" id="editPkgDevices" class="form-control" min="1" max="10">
+                                        <small class="text-muted">Hotspot only</small>
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Burst Download</label>
@@ -5027,8 +5040,23 @@ try {
                 document.getElementById('editPkgIpBinding').checked = pkg.ip_binding == true || pkg.ip_binding == 't';
                 document.getElementById('editPkgActive').checked = pkg.is_active == true || pkg.is_active == 't';
                 document.getElementById('editPkgDesc').value = pkg.description || '';
+                
+                // Toggle hotspot-only fields
+                const isHotspot = pkg.package_type === 'hotspot';
+                document.querySelectorAll('.edit-hotspot-only-field').forEach(el => {
+                    el.style.display = isHotspot ? 'block' : 'none';
+                });
+                
                 new bootstrap.Modal(document.getElementById('editPackageModal')).show();
             }
+            
+            // Toggle hotspot-only fields on type change in edit modal
+            document.getElementById('editPkgType').addEventListener('change', function() {
+                const isHotspot = this.value === 'hotspot';
+                document.querySelectorAll('.edit-hotspot-only-field').forEach(el => {
+                    el.style.display = isHotspot ? 'block' : 'none';
+                });
+            });
             </script>
 
             <?php elseif ($view === 'package_schedules'): ?>
