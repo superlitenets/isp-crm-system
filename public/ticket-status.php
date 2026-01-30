@@ -385,6 +385,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                         
                         <div class="mb-3">
                             <label class="form-label small">Additional Notes</label>
+                            <textarea class="form-control form-control-sm" name="additional_notes" rows="1" placeholder="Any other details about the resolution..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small">Comment (visible in ticket)</label>
                             <textarea class="form-control form-control-sm" name="comment" rows="1" placeholder="Any follow-up needed..."></textarea>
                         </div>
                         
