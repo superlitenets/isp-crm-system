@@ -132,6 +132,92 @@ if ($action === 'stk_push') {
     exit;
 }
 
+if ($action === 'get_live_traffic') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $subscriptionId = (int)($_GET['subscription_id'] ?? 0);
+    
+    $stmt = $db->prepare("
+        SELECT s.*, n.ip_address as nas_ip, n.api_port, n.api_username, n.api_password_encrypted
+        FROM radius_subscriptions s 
+        LEFT JOIN radius_nas n ON s.nas_id = n.id
+        WHERE s.id = ?
+    ");
+    $stmt->execute([$subscriptionId]);
+    $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$sub) {
+        echo json_encode(['success' => false, 'error' => 'Subscription not found']);
+        exit;
+    }
+    
+    if (!$sub['nas_ip']) {
+        echo json_encode(['success' => false, 'error' => 'No NAS device configured']);
+        exit;
+    }
+    
+    try {
+        require_once __DIR__ . '/../src/MikroTikAPI.php';
+        
+        $apiPassword = '';
+        if (!empty($sub['api_password_encrypted'])) {
+            $encKey = getenv('ENCRYPTION_KEY') ?: 'default_key_change_me';
+            $decoded = base64_decode($sub['api_password_encrypted']);
+            if ($decoded !== false && strlen($decoded) > 16) {
+                $iv = substr($decoded, 0, 16);
+                $encrypted = substr($decoded, 16);
+                $apiPassword = openssl_decrypt($encrypted, 'aes-256-cbc', $encKey, 0, $iv) ?: '';
+            }
+        }
+        
+        $api = new \App\MikroTikAPI(
+            $sub['nas_ip'],
+            (int)($sub['api_port'] ?? 8728),
+            $sub['api_username'] ?? 'admin',
+            $apiPassword
+        );
+        $api->connect();
+        
+        $accessType = strtolower($sub['access_type'] ?? 'pppoe');
+        
+        if ($accessType === 'pppoe') {
+            $trafficData = $api->getPPPoESessionTraffic($sub['username']);
+        } elseif ($accessType === 'dhcp' && !empty($sub['mac_address'])) {
+            $trafficData = $api->getDHCPLeaseTraffic($sub['mac_address']);
+        } elseif (!empty($sub['static_ip'])) {
+            $queues = $api->command('/queue/simple/print', ['?target' => $sub['static_ip'] . '/32']);
+            if (!empty($queues)) {
+                $queue = $queues[0];
+                $bytesStr = $queue['bytes'] ?? '0/0';
+                $parts = explode('/', $bytesStr);
+                $trafficData = [
+                    'online' => true,
+                    'ip' => $sub['static_ip'],
+                    'rx_bytes' => (int)($parts[0] ?? 0),
+                    'tx_bytes' => (int)($parts[1] ?? 0),
+                    'timestamp' => time() * 1000
+                ];
+            } else {
+                $trafficData = ['online' => false, 'error' => 'No queue found for static IP'];
+            }
+        } else {
+            $trafficData = ['online' => false, 'error' => 'Unknown access type or missing configuration'];
+        }
+        
+        $api->disconnect();
+        
+        echo json_encode(['success' => true, 'data' => $trafficData]);
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($action === 'get_wifi_config') {
     header('Content-Type: application/json');
     
@@ -3104,8 +3190,13 @@ try {
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3" id="speed-tab" data-bs-toggle="tab" data-bs-target="#speedOverridesTab" type="button">
+                            <button class="nav-link rounded-0 py-3 border-end" id="speed-tab" data-bs-toggle="tab" data-bs-target="#speedOverridesTab" type="button">
                                 <i class="bi bi-speedometer2 me-2"></i>Speed
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3" id="traffic-tab" data-bs-toggle="tab" data-bs-target="#liveTrafficTab" type="button">
+                                <i class="bi bi-graph-up me-2"></i>Live Traffic
                             </button>
                         </li>
                     </ul>
@@ -3913,9 +4004,246 @@ try {
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Live Traffic Tab -->
+                        <div class="tab-pane fade" id="liveTrafficTab">
+                            <div class="card shadow-sm">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="bi bi-activity me-2"></i>Live Traffic Monitor</h6>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span id="trafficStatus" class="badge bg-secondary">Stopped</span>
+                                        <button type="button" class="btn btn-success btn-sm" id="startTrafficBtn" onclick="startTrafficMonitor()">
+                                            <i class="bi bi-play-fill me-1"></i> Start
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm d-none" id="stopTrafficBtn" onclick="stopTrafficMonitor()">
+                                            <i class="bi bi-stop-fill me-1"></i> Stop
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 text-center">
+                                                <div class="text-muted small">Status</div>
+                                                <div id="sessionStatus" class="fw-bold text-secondary">--</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 text-center">
+                                                <div class="text-muted small">Download</div>
+                                                <div id="currentDownload" class="fw-bold text-success fs-5">0 Kbps</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 text-center">
+                                                <div class="text-muted small">Upload</div>
+                                                <div id="currentUpload" class="fw-bold text-primary fs-5">0 Kbps</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 text-center">
+                                                <div class="text-muted small">Total Data</div>
+                                                <div id="totalData" class="fw-bold text-dark">0 MB</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="position-relative" style="height: 300px;">
+                                        <canvas id="trafficChart"></canvas>
+                                    </div>
+                                    
+                                    <div class="mt-3 text-muted small text-center">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Traffic data is polled every 2 seconds from MikroTik router. Click "Start" to begin monitoring.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+            <script>
+            let trafficChart = null;
+            let trafficInterval = null;
+            let previousRx = 0;
+            let previousTx = 0;
+            let previousTime = 0;
+            const maxDataPoints = 60;
+            const subscriptionId = <?= $subId ?>;
+            
+            function initTrafficChart() {
+                const ctx = document.getElementById('trafficChart').getContext('2d');
+                trafficChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Download (Kbps)',
+                                data: [],
+                                borderColor: 'rgb(25, 135, 84)',
+                                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 0
+                            },
+                            {
+                                label: 'Upload (Kbps)',
+                                data: [],
+                                borderColor: 'rgb(13, 110, 253)',
+                                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: { display: false }
+                            },
+                            y: {
+                                display: true,
+                                beginAtZero: true,
+                                title: { display: true, text: 'Kbps' }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'top' }
+                        },
+                        animation: { duration: 0 }
+                    }
+                });
+            }
+            
+            function formatSpeed(bytesPerSec) {
+                const kbps = (bytesPerSec * 8) / 1000;
+                if (kbps >= 1000) {
+                    return (kbps / 1000).toFixed(2) + ' Mbps';
+                }
+                return kbps.toFixed(1) + ' Kbps';
+            }
+            
+            function formatBytes(bytes) {
+                if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+                if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+                if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+                return bytes + ' B';
+            }
+            
+            async function fetchTrafficData() {
+                try {
+                    const response = await fetch(`/index.php?page=isp&action=get_live_traffic&subscription_id=${subscriptionId}`);
+                    const result = await response.json();
+                    
+                    if (!result.success) {
+                        document.getElementById('sessionStatus').textContent = result.error || 'Error';
+                        document.getElementById('sessionStatus').className = 'fw-bold text-danger';
+                        return;
+                    }
+                    
+                    const data = result.data;
+                    const now = Date.now();
+                    
+                    if (!data.online) {
+                        document.getElementById('sessionStatus').textContent = 'Offline';
+                        document.getElementById('sessionStatus').className = 'fw-bold text-danger';
+                        return;
+                    }
+                    
+                    document.getElementById('sessionStatus').textContent = 'Online';
+                    document.getElementById('sessionStatus').className = 'fw-bold text-success';
+                    
+                    if (previousTime > 0) {
+                        const timeDiff = (now - previousTime) / 1000;
+                        const rxDiff = Math.max(0, data.rx_bytes - previousRx);
+                        const txDiff = Math.max(0, data.tx_bytes - previousTx);
+                        
+                        const rxSpeed = rxDiff / timeDiff;
+                        const txSpeed = txDiff / timeDiff;
+                        
+                        const rxKbps = (rxSpeed * 8) / 1000;
+                        const txKbps = (txSpeed * 8) / 1000;
+                        
+                        document.getElementById('currentDownload').textContent = formatSpeed(rxSpeed);
+                        document.getElementById('currentUpload').textContent = formatSpeed(txSpeed);
+                        
+                        const timeLabel = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        
+                        trafficChart.data.labels.push(timeLabel);
+                        trafficChart.data.datasets[0].data.push(rxKbps.toFixed(1));
+                        trafficChart.data.datasets[1].data.push(txKbps.toFixed(1));
+                        
+                        if (trafficChart.data.labels.length > maxDataPoints) {
+                            trafficChart.data.labels.shift();
+                            trafficChart.data.datasets[0].data.shift();
+                            trafficChart.data.datasets[1].data.shift();
+                        }
+                        
+                        trafficChart.update('none');
+                    }
+                    
+                    previousRx = data.rx_bytes;
+                    previousTx = data.tx_bytes;
+                    previousTime = now;
+                    
+                    document.getElementById('totalData').textContent = formatBytes(data.rx_bytes + data.tx_bytes);
+                    
+                } catch (error) {
+                    console.error('Traffic fetch error:', error);
+                    document.getElementById('sessionStatus').textContent = 'Error';
+                    document.getElementById('sessionStatus').className = 'fw-bold text-danger';
+                }
+            }
+            
+            function startTrafficMonitor() {
+                if (!trafficChart) {
+                    initTrafficChart();
+                }
+                
+                previousRx = 0;
+                previousTx = 0;
+                previousTime = 0;
+                trafficChart.data.labels = [];
+                trafficChart.data.datasets[0].data = [];
+                trafficChart.data.datasets[1].data = [];
+                trafficChart.update();
+                
+                document.getElementById('trafficStatus').textContent = 'Running';
+                document.getElementById('trafficStatus').className = 'badge bg-success';
+                document.getElementById('startTrafficBtn').classList.add('d-none');
+                document.getElementById('stopTrafficBtn').classList.remove('d-none');
+                
+                fetchTrafficData();
+                trafficInterval = setInterval(fetchTrafficData, 2000);
+            }
+            
+            function stopTrafficMonitor() {
+                if (trafficInterval) {
+                    clearInterval(trafficInterval);
+                    trafficInterval = null;
+                }
+                
+                document.getElementById('trafficStatus').textContent = 'Stopped';
+                document.getElementById('trafficStatus').className = 'badge bg-secondary';
+                document.getElementById('startTrafficBtn').classList.remove('d-none');
+                document.getElementById('stopTrafficBtn').classList.add('d-none');
+            }
+            
+            document.getElementById('traffic-tab')?.addEventListener('hidden.bs.tab', function() {
+                stopTrafficMonitor();
+            });
+            </script>
             
             <!-- Renew Modal -->
             <div class="modal fade" id="renewModal" tabindex="-1">

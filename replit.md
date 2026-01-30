@@ -54,6 +54,7 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **VLAN Management**: Define VLANs per NAS and sync to MikroTik via RouterOS API.
   - **Static IP Provisioning**: Provision static IPs and manage DHCP leases on MikroTik.
   - **MikroTik API Integration**: Full RouterOS API support for network configuration.
+  - **Live Traffic Monitoring**: Real-time traffic graph for PPPoE, DHCP, and Static IP subscribers with on-demand Chart.js visualization polling MikroTik every 2 seconds.
 - **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers) with environment variable configuration.
 
 ## External Dependencies

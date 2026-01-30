@@ -240,6 +240,95 @@ class MikroTikAPI {
         return $this->command('/interface/print');
     }
     
+    public function getInterfaceStats(string $interface): array {
+        $result = $this->command('/interface/print', [
+            '?name' => $interface,
+            '.proplist' => '.id,name,type,rx-byte,tx-byte,rx-packet,tx-packet,running'
+        ]);
+        return $result[0] ?? [];
+    }
+    
+    public function getPPPoESessionTraffic(string $username): array {
+        $interfaceName = '<pppoe-' . $username . '>';
+        $sessions = $this->command('/ppp/active/print', ['?name' => $username]);
+        
+        if (empty($sessions)) {
+            return ['error' => 'Session not found', 'online' => false];
+        }
+        
+        $session = $sessions[0];
+        $interfaceStats = $this->command('/interface/print', [
+            '?name' => $interfaceName
+        ]);
+        
+        if (!empty($interfaceStats)) {
+            $stats = $interfaceStats[0];
+            return [
+                'online' => true,
+                'username' => $username,
+                'uptime' => $session['uptime'] ?? '0s',
+                'caller_id' => $session['caller-id'] ?? '',
+                'address' => $session['address'] ?? '',
+                'rx_bytes' => (int)($stats['rx-byte'] ?? 0),
+                'tx_bytes' => (int)($stats['tx-byte'] ?? 0),
+                'rx_packets' => (int)($stats['rx-packet'] ?? 0),
+                'tx_packets' => (int)($stats['tx-packet'] ?? 0),
+                'timestamp' => time() * 1000
+            ];
+        }
+        
+        return [
+            'online' => true,
+            'username' => $username,
+            'uptime' => $session['uptime'] ?? '0s',
+            'caller_id' => $session['caller-id'] ?? '',
+            'address' => $session['address'] ?? '',
+            'rx_bytes' => 0,
+            'tx_bytes' => 0,
+            'timestamp' => time() * 1000
+        ];
+    }
+    
+    public function getDHCPLeaseTraffic(string $macAddress): array {
+        $leases = $this->command('/ip/dhcp-server/lease/print', ['?mac-address' => strtoupper($macAddress)]);
+        
+        if (empty($leases)) {
+            return ['error' => 'DHCP lease not found', 'online' => false];
+        }
+        
+        $lease = $leases[0];
+        $ip = $lease['address'] ?? '';
+        
+        if (!$ip) {
+            return ['error' => 'No IP assigned', 'online' => false];
+        }
+        
+        $queues = $this->command('/queue/simple/print', ['?target' => $ip . '/32']);
+        
+        if (!empty($queues)) {
+            $queue = $queues[0];
+            $bytesStr = $queue['bytes'] ?? '0/0';
+            $parts = explode('/', $bytesStr);
+            return [
+                'online' => true,
+                'ip' => $ip,
+                'mac' => $macAddress,
+                'rx_bytes' => (int)($parts[0] ?? 0),
+                'tx_bytes' => (int)($parts[1] ?? 0),
+                'timestamp' => time() * 1000
+            ];
+        }
+        
+        return [
+            'online' => true,
+            'ip' => $ip,
+            'mac' => $macAddress,
+            'rx_bytes' => 0,
+            'tx_bytes' => 0,
+            'timestamp' => time() * 1000
+        ];
+    }
+    
     public function getHotspotUsers(): array {
         return $this->command('/ip/hotspot/user/print');
     }
