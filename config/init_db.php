@@ -2371,6 +2371,26 @@ function runMigrations(PDO $db): void {
         error_log("MikroTik provisioned IPs table error: " . $e->getMessage());
     }
     
+    // VLAN Traffic History for graphs
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS vlan_traffic_history (
+            id SERIAL PRIMARY KEY,
+            vlan_id INTEGER REFERENCES mikrotik_vlans(id) ON DELETE CASCADE,
+            rx_bytes BIGINT NOT NULL DEFAULT 0,
+            tx_bytes BIGINT NOT NULL DEFAULT 0,
+            rx_packets BIGINT NOT NULL DEFAULT 0,
+            tx_packets BIGINT NOT NULL DEFAULT 0,
+            rx_rate DECIMAL(12,2) DEFAULT 0,
+            tx_rate DECIMAL(12,2) DEFAULT 0,
+            is_running BOOLEAN DEFAULT FALSE,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_vlan_traffic_vlan_id ON vlan_traffic_history(vlan_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_vlan_traffic_recorded_at ON vlan_traffic_history(recorded_at)");
+    } catch (PDOException $e) {
+        error_log("VLAN traffic history table error: " . $e->getMessage());
+    }
+    
     // Huawei DBA Profiles
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS huawei_dba_profiles (

@@ -2382,7 +2382,7 @@ if ($page === 'isp') {
             }
             
             require_once __DIR__ . '/../src/MikroTikAPI.php';
-            $api = new \App\MikroTikAPI($nas['ip_address'], $nas['api_port'] ?: 8728, $nas['api_username'], $radiusBilling->decryptPassword($nas['api_password']));
+            $api = new \App\MikroTikAPI($nas['ip_address'], $nas['api_port'] ?: 8728, $nas['api_username'], $radiusBilling->decryptPassword($nas['api_password_encrypted']));
             $api->connect();
             
             // Get interface traffic statistics for the VLAN interface
@@ -2442,7 +2442,7 @@ if ($page === 'isp') {
             }
             
             require_once __DIR__ . '/../src/MikroTikAPI.php';
-            $api = new \App\MikroTikAPI($nas['ip_address'], $nas['api_port'] ?: 8728, $nas['api_username'], $radiusBilling->decryptPassword($nas['api_password']));
+            $api = new \App\MikroTikAPI($nas['ip_address'], $nas['api_port'] ?: 8728, $nas['api_username'], $radiusBilling->decryptPassword($nas['api_password_encrypted']));
             $api->connect();
             
             $stats = $api->command('/interface/vlan/print', ['?name' => $vlan['name']]);
@@ -2464,6 +2464,152 @@ if ($page === 'isp') {
             } else {
                 echo json_encode(['success' => false, 'error' => 'VLAN not found on device']);
             }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
+    // Get VLAN traffic history for graphs
+    if ($action === 'vlan_traffic_history') {
+        header('Content-Type: application/json');
+        $vlanId = (int)($_GET['vlan_id'] ?? 0);
+        $range = $_GET['range'] ?? '1h';
+        
+        if (!$vlanId) {
+            echo json_encode(['success' => false, 'error' => 'VLAN ID required']);
+            exit;
+        }
+        
+        // Calculate time range
+        $intervals = [
+            '1h' => '1 hour',
+            '12h' => '12 hours',
+            '24h' => '24 hours',
+            '1w' => '7 days',
+            '1m' => '30 days'
+        ];
+        $interval = $intervals[$range] ?? '1 hour';
+        
+        try {
+            $stmt = $db->prepare("
+                SELECT rx_bytes, tx_bytes, rx_rate, tx_rate, is_running, recorded_at
+                FROM vlan_traffic_history 
+                WHERE vlan_id = ? AND recorded_at > NOW() - INTERVAL '$interval'
+                ORDER BY recorded_at ASC
+            ");
+            $stmt->execute([$vlanId]);
+            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            echo json_encode([
+                'success' => true,
+                'range' => $range,
+                'data' => $history
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
+    // Record VLAN traffic snapshot (for cron job)
+    if ($action === 'vlan_traffic_collect') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        
+        try {
+            // Get all active VLANs
+            $vlans = $radiusBilling->getVlans();
+            $collected = 0;
+            $errors = [];
+            
+            // Group VLANs by NAS to minimize connections
+            $vlansByNas = [];
+            foreach ($vlans as $vlan) {
+                if ($vlan['is_active'] && $vlan['nas_id']) {
+                    $vlansByNas[$vlan['nas_id']][] = $vlan;
+                }
+            }
+            
+            require_once __DIR__ . '/../src/MikroTikAPI.php';
+            
+            foreach ($vlansByNas as $nasId => $nasVlans) {
+                $nas = $radiusBilling->getNAS($nasId);
+                if (!$nas || !$nas['api_enabled'] || !$nas['api_password_encrypted']) {
+                    continue;
+                }
+                
+                try {
+                    $api = new \App\MikroTikAPI($nas['ip_address'], $nas['api_port'] ?: 8728, $nas['api_username'], $radiusBilling->decryptPassword($nas['api_password_encrypted']));
+                    $api->connect();
+                    
+                    // Get all interface stats in one call
+                    $allStats = $api->command('/interface/print');
+                    $statsMap = [];
+                    foreach ($allStats as $stat) {
+                        $statsMap[$stat['name'] ?? ''] = $stat;
+                    }
+                    
+                    $api->disconnect();
+                    
+                    // Get previous readings for rate calculation
+                    foreach ($nasVlans as $vlan) {
+                        $ifName = $vlan['name'];
+                        if (!isset($statsMap[$ifName])) continue;
+                        
+                        $stat = $statsMap[$ifName];
+                        $rxBytes = (int)($stat['rx-byte'] ?? 0);
+                        $txBytes = (int)($stat['tx-byte'] ?? 0);
+                        
+                        // Get last reading to calculate rate
+                        $stmt = $db->prepare("SELECT rx_bytes, tx_bytes, recorded_at FROM vlan_traffic_history WHERE vlan_id = ? ORDER BY recorded_at DESC LIMIT 1");
+                        $stmt->execute([$vlan['id']]);
+                        $last = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        $rxRate = 0;
+                        $txRate = 0;
+                        if ($last) {
+                            $timeDiff = time() - strtotime($last['recorded_at']);
+                            if ($timeDiff > 0) {
+                                $rxDiff = $rxBytes - (int)$last['rx_bytes'];
+                                $txDiff = $txBytes - (int)$last['tx_bytes'];
+                                if ($rxDiff >= 0 && $txDiff >= 0) {
+                                    $rxRate = ($rxDiff * 8) / ($timeDiff * 1000000); // Mbps
+                                    $txRate = ($txDiff * 8) / ($timeDiff * 1000000);
+                                }
+                            }
+                        }
+                        
+                        // Insert new reading
+                        $stmt = $db->prepare("
+                            INSERT INTO vlan_traffic_history (vlan_id, rx_bytes, tx_bytes, rx_packets, tx_packets, rx_rate, tx_rate, is_running)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ");
+                        $stmt->execute([
+                            $vlan['id'],
+                            $rxBytes,
+                            $txBytes,
+                            (int)($stat['rx-packet'] ?? 0),
+                            (int)($stat['tx-packet'] ?? 0),
+                            round($rxRate, 2),
+                            round($txRate, 2),
+                            ($stat['running'] ?? 'false') === 'true'
+                        ]);
+                        $collected++;
+                    }
+                } catch (Exception $e) {
+                    $errors[] = $nas['name'] . ': ' . $e->getMessage();
+                }
+            }
+            
+            // Cleanup old data (keep 30 days)
+            $db->exec("DELETE FROM vlan_traffic_history WHERE recorded_at < NOW() - INTERVAL '30 days'");
+            
+            echo json_encode([
+                'success' => true,
+                'collected' => $collected,
+                'errors' => $errors
+            ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }

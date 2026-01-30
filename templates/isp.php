@@ -7663,6 +7663,62 @@ try {
                 </div>
             </div>
             
+            <!-- Historical Traffic Graph -->
+            <div class="card mt-4">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Historical Traffic</h6>
+                    <div class="btn-group btn-group-sm" role="group" id="historyRangeGroup">
+                        <button type="button" class="btn btn-outline-light active" data-range="1h">1H</button>
+                        <button type="button" class="btn btn-outline-light" data-range="12h">12H</button>
+                        <button type="button" class="btn btn-outline-light" data-range="24h">24H</button>
+                        <button type="button" class="btn btn-outline-light" data-range="1w">1W</button>
+                        <button type="button" class="btn btn-outline-light" data-range="1m">1M</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="historyLoading" class="text-center py-4">
+                        <div class="spinner-border text-secondary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading historical data...</p>
+                    </div>
+                    <div id="historyNoData" class="text-center py-4 d-none">
+                        <i class="bi bi-database-x text-muted" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-2">No historical data available yet.<br>
+                        <small>Data is collected every 5 minutes. Check back later.</small></p>
+                    </div>
+                    <div id="historyChartContainer" style="height: 300px; display: none;">
+                        <canvas id="historyChart"></canvas>
+                    </div>
+                    <div class="mt-3 row g-3" id="historyStats" style="display: none;">
+                        <div class="col-md-3">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Avg Download:</span>
+                                <strong id="avgDownload">-</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Avg Upload:</span>
+                                <strong id="avgUpload">-</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Peak Download:</span>
+                                <strong id="peakDownload">-</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Peak Upload:</span>
+                                <strong id="peakUpload">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Subscribers using this VLAN -->
             <?php if (!empty($vlanSubscriptions)): ?>
             <div class="card mt-4">
@@ -7931,6 +7987,126 @@ try {
             function editVlanDetail(id) {
                 window.location.href = `?page=isp&view=vlans&edit=${id}`;
             }
+            
+            // Historical Traffic Chart
+            let historyChart = null;
+            let currentHistoryRange = '1h';
+            
+            function loadHistoricalData(range) {
+                currentHistoryRange = range;
+                
+                // Update button states
+                document.querySelectorAll('#historyRangeGroup button').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.range === range) btn.classList.add('active');
+                });
+                
+                document.getElementById('historyLoading').classList.remove('d-none');
+                document.getElementById('historyNoData').classList.add('d-none');
+                document.getElementById('historyChartContainer').style.display = 'none';
+                document.getElementById('historyStats').style.display = 'none';
+                
+                fetch(`/index.php?page=isp&action=vlan_traffic_history&vlan_id=${currentVlanId}&range=${range}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('historyLoading').classList.add('d-none');
+                        
+                        if (data.success && data.data && data.data.length > 0) {
+                            renderHistoryChart(data.data);
+                            document.getElementById('historyChartContainer').style.display = 'block';
+                            document.getElementById('historyStats').style.display = 'flex';
+                        } else {
+                            document.getElementById('historyNoData').classList.remove('d-none');
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById('historyLoading').classList.add('d-none');
+                        document.getElementById('historyNoData').classList.remove('d-none');
+                    });
+            }
+            
+            function renderHistoryChart(data) {
+                const ctx = document.getElementById('historyChart').getContext('2d');
+                
+                if (historyChart) historyChart.destroy();
+                
+                const labels = data.map(d => {
+                    const date = new Date(d.recorded_at);
+                    if (currentHistoryRange === '1h' || currentHistoryRange === '12h') {
+                        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    } else if (currentHistoryRange === '24h') {
+                        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    } else {
+                        return date.toLocaleDateString([], {month:'short', day:'numeric', hour:'2-digit'});
+                    }
+                });
+                const rxRates = data.map(d => parseFloat(d.rx_rate) || 0);
+                const txRates = data.map(d => parseFloat(d.tx_rate) || 0);
+                
+                historyChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Download (Mbps)',
+                                data: rxRates,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: currentHistoryRange === '1m' ? 0 : 2
+                            },
+                            {
+                                label: 'Upload (Mbps)',
+                                data: txRates,
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: currentHistoryRange === '1m' ? 0 : 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Speed (Mbps)' }
+                            },
+                            x: {
+                                ticks: { maxTicksLimit: 12 }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'top' }
+                        }
+                    }
+                });
+                
+                // Calculate stats
+                const avgRx = rxRates.reduce((a, b) => a + b, 0) / rxRates.length;
+                const avgTx = txRates.reduce((a, b) => a + b, 0) / txRates.length;
+                const peakRx = Math.max(...rxRates);
+                const peakTx = Math.max(...txRates);
+                
+                document.getElementById('avgDownload').textContent = avgRx.toFixed(2) + ' Mbps';
+                document.getElementById('avgUpload').textContent = avgTx.toFixed(2) + ' Mbps';
+                document.getElementById('peakDownload').textContent = peakRx.toFixed(2) + ' Mbps';
+                document.getElementById('peakUpload').textContent = peakTx.toFixed(2) + ' Mbps';
+            }
+            
+            // Setup history range buttons
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('#historyRangeGroup button').forEach(btn => {
+                    btn.addEventListener('click', () => loadHistoricalData(btn.dataset.range));
+                });
+                // Load initial history
+                loadHistoricalData('1h');
+            });
             </script>
             <?php } ?>
 
