@@ -4439,6 +4439,9 @@ class RadiusBilling {
                 return ['success' => false, 'error' => 'Failed to connect to MikroTik'];
             }
             
+            // Try a simple identity command first to verify API is working
+            $identity = $mikrotik->command('/system/identity/print');
+            
             $interfaces = $mikrotik->getInterfaces();
             $vlans = $mikrotik->getVlans();
             $bridges = $mikrotik->getBridges();
@@ -4446,11 +4449,17 @@ class RadiusBilling {
             
             $mikrotik->disconnect();
             
-            // If all are empty, connection may have issues
+            // If all are empty but identity worked, might be a parsing issue
             if (empty($interfaces) && empty($vlans) && empty($bridges) && empty($ethernet)) {
+                $identityName = $identity[0]['name'] ?? 'unknown';
                 return [
                     'success' => false, 
-                    'error' => 'Connected but received no data. Check MikroTik API permissions for user: ' . $nas['api_username']
+                    'error' => "Connected to '{$identityName}' but no interfaces found. API user: " . $nas['api_username'],
+                    'debug' => [
+                        'identity' => $identity,
+                        'interfaces_raw' => $interfaces,
+                        'vlans_raw' => $vlans
+                    ]
                 ];
             }
             

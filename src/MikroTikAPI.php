@@ -130,8 +130,18 @@ class MikroTikAPI {
         
         if ($len === 0) return '';
         
-        $data = @fread($this->socket, $len);
-        return $data !== false ? $data : '';
+        // Read exactly $len bytes, handling chunked data
+        $data = '';
+        $remaining = $len;
+        while ($remaining > 0) {
+            $chunk = @fread($this->socket, $remaining);
+            if ($chunk === false || $chunk === '') {
+                break;
+            }
+            $data .= $chunk;
+            $remaining -= strlen($chunk);
+        }
+        return $data;
     }
     
     public function command(string $cmd, array $params = []): array {
