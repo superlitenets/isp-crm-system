@@ -2191,11 +2191,21 @@ function runMigrations(PDO $db): void {
             data_used BIGINT DEFAULT 0,
             is_postpaid BOOLEAN DEFAULT FALSE,
             auto_renew BOOLEAN DEFAULT FALSE,
+            suspended_at TIMESTAMP,
+            days_remaining_at_suspension INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_radius_subscriptions_username ON radius_subscriptions(username)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_radius_subscriptions_status ON radius_subscriptions(status)");
+        
+        // Add suspension tracking columns if missing
+        try {
+            $db->exec("ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP");
+            $db->exec("ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS days_remaining_at_suspension INTEGER");
+        } catch (PDOException $e) {
+            // Columns may already exist
+        }
     } catch (PDOException $e) {
         error_log("RADIUS subscriptions table error: " . $e->getMessage());
     }
