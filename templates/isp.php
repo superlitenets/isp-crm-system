@@ -7465,10 +7465,12 @@ try {
             } else {
                 $nas = $radiusBilling->getNAS($vlan['nas_id']);
                 
-                // Get subscriptions using this VLAN
-                $stmt = $db->prepare("SELECT s.*, p.name as package_name FROM radius_subscriptions s 
+                // Get subscriptions using this VLAN (via provisioned IPs)
+                $stmt = $db->prepare("SELECT DISTINCT s.*, p.name as package_name, mpi.ip_address as provisioned_ip 
+                    FROM radius_subscriptions s 
                     LEFT JOIN radius_packages p ON s.package_id = p.id 
-                    WHERE s.vlan_id = ? ORDER BY s.username");
+                    LEFT JOIN mikrotik_provisioned_ips mpi ON mpi.subscription_id = s.id
+                    WHERE mpi.vlan_id = ? ORDER BY s.username");
                 $stmt->execute([$vlanId]);
                 $vlanSubscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
             ?>
@@ -7693,7 +7695,7 @@ try {
                                             <?= ucfirst($sub['status']) ?>
                                         </span>
                                     </td>
-                                    <td><code><?= htmlspecialchars($sub['static_ip'] ?: '-') ?></code></td>
+                                    <td><code><?= htmlspecialchars($sub['provisioned_ip'] ?: $sub['static_ip'] ?: '-') ?></code></td>
                                     <td>
                                         <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye"></i>
