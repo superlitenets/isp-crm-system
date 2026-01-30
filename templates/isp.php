@@ -6984,7 +6984,8 @@ try {
                                 }
                             });
                         } else {
-                            alert('Failed to fetch interfaces: ' + (data.error || 'Unknown error'));
+                            console.log('MikroTik API Debug:', data.debug || 'No debug data');
+                            alert('Failed to fetch interfaces: ' + (data.error || 'Unknown error') + '\n\nCheck browser console (F12) for debug data.');
                         }
                     })
                     .catch(err => alert('Error: ' + err.message));
