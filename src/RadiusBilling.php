@@ -1382,28 +1382,10 @@ class RadiusBilling {
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
         $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
         
-        // Suspended users authenticate but go to same pool as expired for captive portal
-        // The captive portal page checks status and shows appropriate message
+        // Suspended accounts are always rejected - no authentication allowed
         if ($sub['status'] === 'suspended') {
-            if ($useExpiredPool) {
-                $attrs = [
-                    'Framed-Pool' => $expiredPoolName,
-                    'Mikrotik-Rate-Limit' => $expiredRateLimit,
-                    'Session-Timeout' => 300,
-                    'Acct-Interim-Interval' => 60
-                ];
-                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Suspended - expired pool', null, $attrs);
-                return [
-                    'success' => true,
-                    'reply' => 'Access-Accept',
-                    'suspended' => true,
-                    'attributes' => $attrs,
-                    'subscription' => $sub
-                ];
-            } else {
-                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Account suspended');
-                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
-            }
+            $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Account suspended');
+            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
         }
         
         // Check if expired

@@ -156,9 +156,33 @@ if ($action === 'get_live_traffic') {
         exit;
     }
     
+    // Auto-detect NAS if not explicitly assigned
     if (!$sub['nas_ip']) {
-        echo json_encode(['success' => false, 'error' => 'No NAS device configured']);
-        exit;
+        // Count active API-enabled NAS devices
+        $countStmt = $db->query("SELECT COUNT(*) FROM radius_nas WHERE is_active = TRUE AND api_enabled = TRUE");
+        $nasCount = (int)$countStmt->fetchColumn();
+        
+        if ($nasCount === 0) {
+            echo json_encode(['success' => false, 'error' => 'No NAS device with API enabled. Please add a NAS device and enable API access.']);
+            exit;
+        } elseif ($nasCount === 1) {
+            // Only one NAS - safe to use automatically
+            $nasStmt = $db->query("
+                SELECT ip_address as nas_ip, api_port, api_username, api_password_encrypted 
+                FROM radius_nas 
+                WHERE is_active = TRUE AND api_enabled = TRUE 
+                LIMIT 1
+            ");
+            $autoNas = $nasStmt->fetch(PDO::FETCH_ASSOC);
+            $sub['nas_ip'] = $autoNas['nas_ip'];
+            $sub['api_port'] = $autoNas['api_port'];
+            $sub['api_username'] = $autoNas['api_username'];
+            $sub['api_password_encrypted'] = $autoNas['api_password_encrypted'];
+        } else {
+            // Multiple NAS devices - require explicit assignment
+            echo json_encode(['success' => false, 'error' => 'Multiple NAS devices found. Please assign a specific NAS to this subscription.']);
+            exit;
+        }
     }
     
     try {
