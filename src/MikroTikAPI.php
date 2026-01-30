@@ -384,6 +384,255 @@ class MikroTikAPI {
         return $results;
     }
     
+    // ==================== VLAN Management ====================
+    
+    public function getVlans(): array {
+        return $this->command('/interface/vlan/print');
+    }
+    
+    public function getVlan(int $vlanId): ?array {
+        $vlans = $this->command('/interface/vlan/print', ['?vlan-id=' . $vlanId]);
+        return $vlans[0] ?? null;
+    }
+    
+    public function createVlan(string $name, int $vlanId, string $interface, ?string $comment = null): array {
+        $params = [
+            '=name=' . $name,
+            '=vlan-id=' . $vlanId,
+            '=interface=' . $interface
+        ];
+        if ($comment) {
+            $params[] = '=comment=' . $comment;
+        }
+        return $this->command('/interface/vlan/add', $params);
+    }
+    
+    public function removeVlan(string $name): bool {
+        $vlans = $this->command('/interface/vlan/print', ['?name=' . $name]);
+        if (empty($vlans) || !isset($vlans[0]['.id'])) {
+            return false;
+        }
+        $this->command('/interface/vlan/remove', ['=.id=' . $vlans[0]['.id']]);
+        return true;
+    }
+    
+    public function setVlanDisabled(string $name, bool $disabled): bool {
+        $vlans = $this->command('/interface/vlan/print', ['?name=' . $name]);
+        if (empty($vlans) || !isset($vlans[0]['.id'])) {
+            return false;
+        }
+        $this->command('/interface/vlan/set', [
+            '=.id=' . $vlans[0]['.id'],
+            '=disabled=' . ($disabled ? 'yes' : 'no')
+        ]);
+        return true;
+    }
+    
+    // ==================== IP Address Management ====================
+    
+    public function getIpAddresses(?string $interface = null): array {
+        $params = $interface ? ['?interface=' . $interface] : [];
+        return $this->command('/ip/address/print', $params);
+    }
+    
+    public function addIpAddress(string $address, string $interface, ?string $comment = null, bool $disabled = false): array {
+        $params = [
+            '=address=' . $address,
+            '=interface=' . $interface,
+            '=disabled=' . ($disabled ? 'yes' : 'no')
+        ];
+        if ($comment) {
+            $params[] = '=comment=' . $comment;
+        }
+        return $this->command('/ip/address/add', $params);
+    }
+    
+    public function removeIpAddress(string $address): bool {
+        $addresses = $this->command('/ip/address/print', ['?address=' . $address]);
+        if (empty($addresses) || !isset($addresses[0]['.id'])) {
+            return false;
+        }
+        $this->command('/ip/address/remove', ['=.id=' . $addresses[0]['.id']]);
+        return true;
+    }
+    
+    // ==================== DHCP Server Management ====================
+    
+    public function getDhcpServers(): array {
+        return $this->command('/ip/dhcp-server/print');
+    }
+    
+    public function createDhcpServer(string $name, string $interface, string $addressPool, ?string $leaseTime = '1d'): array {
+        return $this->command('/ip/dhcp-server/add', [
+            '=name=' . $name,
+            '=interface=' . $interface,
+            '=address-pool=' . $addressPool,
+            '=lease-time=' . $leaseTime,
+            '=disabled=no'
+        ]);
+    }
+    
+    public function removeDhcpServer(string $name): bool {
+        $servers = $this->command('/ip/dhcp-server/print', ['?name=' . $name]);
+        if (empty($servers) || !isset($servers[0]['.id'])) {
+            return false;
+        }
+        $this->command('/ip/dhcp-server/remove', ['=.id=' . $servers[0]['.id']]);
+        return true;
+    }
+    
+    // ==================== DHCP Network ====================
+    
+    public function getDhcpNetworks(): array {
+        return $this->command('/ip/dhcp-server/network/print');
+    }
+    
+    public function addDhcpNetwork(string $address, string $gateway, ?string $dnsServer = null, ?string $comment = null): array {
+        $params = [
+            '=address=' . $address,
+            '=gateway=' . $gateway
+        ];
+        if ($dnsServer) {
+            $params[] = '=dns-server=' . $dnsServer;
+        }
+        if ($comment) {
+            $params[] = '=comment=' . $comment;
+        }
+        return $this->command('/ip/dhcp-server/network/add', $params);
+    }
+    
+    public function removeDhcpNetwork(string $address): bool {
+        $networks = $this->command('/ip/dhcp-server/network/print', ['?address=' . $address]);
+        if (empty($networks) || !isset($networks[0]['.id'])) {
+            return false;
+        }
+        $this->command('/ip/dhcp-server/network/remove', ['=.id=' . $networks[0]['.id']]);
+        return true;
+    }
+    
+    // ==================== IP Pool Management ====================
+    
+    public function getIpPools(): array {
+        return $this->command('/ip/pool/print');
+    }
+    
+    public function createIpPool(string $name, string $ranges, ?string $comment = null): array {
+        $params = [
+            '=name=' . $name,
+            '=ranges=' . $ranges
+        ];
+        if ($comment) {
+            $params[] = '=comment=' . $comment;
+        }
+        return $this->command('/ip/pool/add', $params);
+    }
+    
+    public function removeIpPool(string $name): bool {
+        $pools = $this->command('/ip/pool/print', ['?name=' . $name]);
+        if (empty($pools) || !isset($pools[0]['.id'])) {
+            return false;
+        }
+        $this->command('/ip/pool/remove', ['=.id=' . $pools[0]['.id']]);
+        return true;
+    }
+    
+    // ==================== DHCP Lease Management ====================
+    
+    public function getDhcpLeases(?string $server = null): array {
+        $params = $server ? ['?server=' . $server] : [];
+        return $this->command('/ip/dhcp-server/lease/print', $params);
+    }
+    
+    public function getDhcpLeaseByMac(string $macAddress): ?array {
+        $leases = $this->command('/ip/dhcp-server/lease/print', ['?mac-address=' . strtoupper($macAddress)]);
+        return $leases[0] ?? null;
+    }
+    
+    public function getDhcpLeaseByIp(string $ipAddress): ?array {
+        $leases = $this->command('/ip/dhcp-server/lease/print', ['?address=' . $ipAddress]);
+        return $leases[0] ?? null;
+    }
+    
+    public function createDhcpLease(string $ipAddress, string $macAddress, string $server, ?string $comment = null): array {
+        $params = [
+            '=address=' . $ipAddress,
+            '=mac-address=' . strtoupper($macAddress),
+            '=server=' . $server
+        ];
+        if ($comment) {
+            $params[] = '=comment=' . $comment;
+        }
+        return $this->command('/ip/dhcp-server/lease/add', $params);
+    }
+    
+    public function updateDhcpLease(string $id, array $updates): array {
+        $params = ['=.id=' . $id];
+        foreach ($updates as $key => $value) {
+            $params[] = '=' . $key . '=' . $value;
+        }
+        return $this->command('/ip/dhcp-server/lease/set', $params);
+    }
+    
+    public function removeDhcpLease(string $ipAddress): bool {
+        $leases = $this->command('/ip/dhcp-server/lease/print', ['?address=' . $ipAddress]);
+        if (empty($leases) || !isset($leases[0]['.id'])) {
+            return false;
+        }
+        $this->command('/ip/dhcp-server/lease/remove', ['=.id=' . $leases[0]['.id']]);
+        return true;
+    }
+    
+    public function removeDhcpLeaseByMac(string $macAddress): bool {
+        $leases = $this->command('/ip/dhcp-server/lease/print', ['?mac-address=' . strtoupper($macAddress)]);
+        if (empty($leases) || !isset($leases[0]['.id'])) {
+            return false;
+        }
+        $this->command('/ip/dhcp-server/lease/remove', ['=.id=' . $leases[0]['.id']]);
+        return true;
+    }
+    
+    // ==================== Static ARP Management ====================
+    
+    public function getArpEntries(?string $interface = null): array {
+        $params = $interface ? ['?interface=' . $interface] : [];
+        return $this->command('/ip/arp/print', $params);
+    }
+    
+    public function addStaticArp(string $ipAddress, string $macAddress, string $interface, ?string $comment = null): array {
+        $params = [
+            '=address=' . $ipAddress,
+            '=mac-address=' . strtoupper($macAddress),
+            '=interface=' . $interface
+        ];
+        if ($comment) {
+            $params[] = '=comment=' . $comment;
+        }
+        return $this->command('/ip/arp/add', $params);
+    }
+    
+    public function removeArpEntry(string $ipAddress): bool {
+        $entries = $this->command('/ip/arp/print', ['?address=' . $ipAddress]);
+        if (empty($entries) || !isset($entries[0]['.id'])) {
+            return false;
+        }
+        $this->command('/ip/arp/remove', ['=.id=' . $entries[0]['.id']]);
+        return true;
+    }
+    
+    // ==================== Interface Info ====================
+    
+    public function getInterfaces(): array {
+        return $this->command('/interface/print');
+    }
+    
+    public function getEthernetInterfaces(): array {
+        return $this->command('/interface/ethernet/print');
+    }
+    
+    public function getBridges(): array {
+        return $this->command('/interface/bridge/print');
+    }
+    
     public function __destruct() {
         $this->disconnect();
     }
