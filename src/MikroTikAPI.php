@@ -45,10 +45,11 @@ class MikroTikAPI {
     }
     
     public function disconnect(): void {
-        if ($this->socket) {
-            fclose($this->socket);
-            $this->connected = false;
+        if ($this->socket && is_resource($this->socket)) {
+            @fclose($this->socket);
+            $this->socket = null;
         }
+        $this->connected = false;
     }
     
     private function write(string $word, bool $end = true): void {
