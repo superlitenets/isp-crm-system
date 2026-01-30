@@ -682,6 +682,14 @@ class MikroTikAPI {
         return true;
     }
     
+    public function getEthernetInterfaces(): array {
+        return $this->command('/interface/ethernet/print');
+    }
+    
+    public function getBridges(): array {
+        return $this->command('/interface/bridge/print');
+    }
+    
     public function __destruct() {
         $this->disconnect();
     }
