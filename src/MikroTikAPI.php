@@ -53,24 +53,28 @@ class MikroTikAPI {
     }
     
     private function write(string $word, bool $end = true): void {
+        if (!$this->socket || !is_resource($this->socket)) {
+            throw new \Exception('Not connected to MikroTik');
+        }
+        
         $len = strlen($word);
         
         if ($len < 0x80) {
-            fwrite($this->socket, chr($len));
+            @fwrite($this->socket, chr($len));
         } elseif ($len < 0x4000) {
-            fwrite($this->socket, chr(($len >> 8) | 0x80) . chr($len & 0xFF));
+            @fwrite($this->socket, chr(($len >> 8) | 0x80) . chr($len & 0xFF));
         } elseif ($len < 0x200000) {
-            fwrite($this->socket, chr(($len >> 16) | 0xC0) . chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
+            @fwrite($this->socket, chr(($len >> 16) | 0xC0) . chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
         } elseif ($len < 0x10000000) {
-            fwrite($this->socket, chr(($len >> 24) | 0xE0) . chr(($len >> 16) & 0xFF) . chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
+            @fwrite($this->socket, chr(($len >> 24) | 0xE0) . chr(($len >> 16) & 0xFF) . chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
         } else {
-            fwrite($this->socket, chr(0xF0) . chr(($len >> 24) & 0xFF) . chr(($len >> 16) & 0xFF) . chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
+            @fwrite($this->socket, chr(0xF0) . chr(($len >> 24) & 0xFF) . chr(($len >> 16) & 0xFF) . chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
         }
         
-        fwrite($this->socket, $word);
+        @fwrite($this->socket, $word);
         
         if ($end) {
-            fwrite($this->socket, chr(0));
+            @fwrite($this->socket, chr(0));
         }
     }
     
@@ -96,25 +100,30 @@ class MikroTikAPI {
     }
     
     private function readWord(): string|false {
-        $byte = fread($this->socket, 1);
+        if (!$this->socket || !is_resource($this->socket)) {
+            return false;
+        }
+        
+        $byte = @fread($this->socket, 1);
         if ($byte === false || $byte === '') return false;
         
         $len = ord($byte);
         
         if ($len < 0x80) {
         } elseif ($len < 0xC0) {
-            $len = (($len & 0x3F) << 8) + ord(fread($this->socket, 1));
+            $len = (($len & 0x3F) << 8) + ord(@fread($this->socket, 1));
         } elseif ($len < 0xE0) {
-            $len = (($len & 0x1F) << 16) + (ord(fread($this->socket, 1)) << 8) + ord(fread($this->socket, 1));
+            $len = (($len & 0x1F) << 16) + (ord(@fread($this->socket, 1)) << 8) + ord(@fread($this->socket, 1));
         } elseif ($len < 0xF0) {
-            $len = (($len & 0x0F) << 24) + (ord(fread($this->socket, 1)) << 16) + (ord(fread($this->socket, 1)) << 8) + ord(fread($this->socket, 1));
+            $len = (($len & 0x0F) << 24) + (ord(@fread($this->socket, 1)) << 16) + (ord(@fread($this->socket, 1)) << 8) + ord(@fread($this->socket, 1));
         } else {
-            $len = (ord(fread($this->socket, 1)) << 24) + (ord(fread($this->socket, 1)) << 16) + (ord(fread($this->socket, 1)) << 8) + ord(fread($this->socket, 1));
+            $len = (ord(@fread($this->socket, 1)) << 24) + (ord(@fread($this->socket, 1)) << 16) + (ord(@fread($this->socket, 1)) << 8) + ord(@fread($this->socket, 1));
         }
         
         if ($len === 0) return '';
         
-        return fread($this->socket, $len);
+        $data = @fread($this->socket, $len);
+        return $data !== false ? $data : '';
     }
     
     public function command(string $cmd, array $params = []): array {
