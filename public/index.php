@@ -2375,7 +2375,7 @@ if ($page === 'isp') {
         }
         
         try {
-            $nas = $radiusBilling->getNASDevice($vlan['nas_id']);
+            $nas = $radiusBilling->getNAS($vlan['nas_id']);
             if (!$nas || !$nas['api_enabled']) {
                 echo json_encode(['success' => false, 'error' => 'NAS device not configured for API']);
                 exit;
@@ -2435,7 +2435,7 @@ if ($page === 'isp') {
         }
         
         try {
-            $nas = $radiusBilling->getNASDevice($vlan['nas_id']);
+            $nas = $radiusBilling->getNAS($vlan['nas_id']);
             if (!$nas || !$nas['api_enabled']) {
                 echo json_encode(['success' => false, 'error' => 'NAS not configured']);
                 exit;

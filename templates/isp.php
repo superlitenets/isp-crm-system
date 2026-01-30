@@ -7463,7 +7463,7 @@ try {
             if (!$vlan) {
                 echo '<div class="alert alert-danger">VLAN not found. <a href="?page=isp&view=vlans">Back to VLANs</a></div>';
             } else {
-                $nas = $radiusBilling->getNASDevice($vlan['nas_id']);
+                $nas = $radiusBilling->getNAS($vlan['nas_id']);
                 
                 // Get subscriptions using this VLAN
                 $stmt = $db->prepare("SELECT s.*, p.name as package_name FROM radius_subscriptions s 
