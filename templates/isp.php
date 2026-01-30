@@ -6714,13 +6714,21 @@ try {
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-diagram-3"></i> VLAN Management</h4>
-                <div class="btn-group">
-                    <button class="btn btn-outline-secondary" onclick="importVlans()">
-                        <i class="bi bi-download me-1"></i> Import from MikroTik
-                    </button>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVlanModal">
-                        <i class="bi bi-plus-lg me-1"></i> Add VLAN
-                    </button>
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm" id="nasFilter" onchange="filterVlansByNas()" style="width: auto;">
+                        <option value="">All NAS Devices</option>
+                        <?php foreach ($nasDevices as $nas): ?>
+                        <option value="<?= $nas['id'] ?>"><?= htmlspecialchars($nas['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-secondary" onclick="importVlans()">
+                            <i class="bi bi-download me-1"></i> Import from MikroTik
+                        </button>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVlanModal">
+                            <i class="bi bi-plus-lg me-1"></i> Add VLAN
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -6748,7 +6756,7 @@ try {
                             </thead>
                             <tbody>
                                 <?php foreach ($vlans as $vlan): ?>
-                                <tr>
+                                <tr data-nas-id="<?= $vlan['nas_id'] ?>">
                                     <td>
                                         <strong><?= htmlspecialchars($vlan['name']) ?></strong>
                                         <br><small class="text-muted">ID: <?= $vlan['vlan_id'] ?></small>
@@ -7003,15 +7011,32 @@ try {
                     .catch(err => alert('Error: ' + err.message));
             }
             
+            function filterVlansByNas() {
+                const nasId = document.getElementById('nasFilter').value;
+                const rows = document.querySelectorAll('tbody tr[data-nas-id]');
+                rows.forEach(row => {
+                    if (!nasId || row.dataset.nasId === nasId) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+            
             function importVlans() {
-                if (!confirm('Import VLANs from all active NAS devices?')) return;
+                const nasId = document.getElementById('nasFilter').value;
+                const msg = nasId ? 'Import VLANs from selected NAS device?' : 'Import VLANs from all active NAS devices?';
+                if (!confirm(msg)) return;
                 
                 const btn = event.target.closest('button');
                 const originalHtml = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Importing...';
                 
-                fetch('/index.php?page=isp&action=import_vlans')
+                let url = '/index.php?page=isp&action=import_vlans';
+                if (nasId) url += '&nas_id=' + nasId;
+                
+                fetch(url)
                     .then(r => r.json())
                     .then(data => {
                         btn.disabled = false;
