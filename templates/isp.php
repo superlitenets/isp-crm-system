@@ -3342,7 +3342,7 @@ try {
                                                     <button class="btn btn-sm btn-link p-0 ms-2" data-bs-toggle="modal" data-bs-target="#changeExpiryModal" title="Change Expiry"><i class="bi bi-calendar-event"></i></button>
                                                 </td>
                                             </tr>
-                                            <?php if ($subscriber['status'] === 'suspended' && $subscriber['suspended_at']): ?>
+                                            <?php if ($subscriber['status'] === 'suspended' && !empty($subscriber['suspended_at'] ?? null)): ?>
                                             <tr class="table-warning">
                                                 <td class="text-muted">Suspended On</td>
                                                 <td>
