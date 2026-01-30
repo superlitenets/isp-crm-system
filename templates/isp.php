@@ -158,30 +158,58 @@ if ($action === 'get_live_traffic') {
     
     // Auto-detect NAS if not explicitly assigned
     if (!$sub['nas_ip']) {
-        // Count active API-enabled NAS devices
-        $countStmt = $db->query("SELECT COUNT(*) FROM radius_nas WHERE is_active = TRUE AND api_enabled = TRUE");
-        $nasCount = (int)$countStmt->fetchColumn();
+        // First try to find NAS from active session
+        $sessionStmt = $db->prepare("
+            SELECT rn.id as nas_id, rn.ip_address as nas_ip, rn.api_port, rn.api_username, rn.api_password_encrypted
+            FROM radius_sessions rs
+            JOIN radius_nas rn ON rs.nas_ip_address = rn.ip_address OR rs.nas_id = rn.id
+            WHERE rs.subscription_id = ? AND rs.acct_stop_time IS NULL AND rn.api_enabled = TRUE
+            ORDER BY rs.acct_start_time DESC
+            LIMIT 1
+        ");
+        $sessionStmt->execute([$subscriptionId]);
+        $sessionNas = $sessionStmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($nasCount === 0) {
-            echo json_encode(['success' => false, 'error' => 'No NAS device with API enabled. Please add a NAS device and enable API access.']);
-            exit;
-        } elseif ($nasCount === 1) {
-            // Only one NAS - safe to use automatically
-            $nasStmt = $db->query("
-                SELECT ip_address as nas_ip, api_port, api_username, api_password_encrypted 
-                FROM radius_nas 
-                WHERE is_active = TRUE AND api_enabled = TRUE 
-                LIMIT 1
-            ");
-            $autoNas = $nasStmt->fetch(PDO::FETCH_ASSOC);
-            $sub['nas_ip'] = $autoNas['nas_ip'];
-            $sub['api_port'] = $autoNas['api_port'];
-            $sub['api_username'] = $autoNas['api_username'];
-            $sub['api_password_encrypted'] = $autoNas['api_password_encrypted'];
+        if ($sessionNas) {
+            // Found NAS from active session - use it and update subscription
+            $sub['nas_ip'] = $sessionNas['nas_ip'];
+            $sub['api_port'] = $sessionNas['api_port'];
+            $sub['api_username'] = $sessionNas['api_username'];
+            $sub['api_password_encrypted'] = $sessionNas['api_password_encrypted'];
+            
+            // Auto-assign NAS to subscription for future
+            $updateStmt = $db->prepare("UPDATE radius_subscriptions SET nas_id = ? WHERE id = ? AND (nas_id IS NULL OR nas_id != ?)");
+            $updateStmt->execute([$sessionNas['nas_id'], $subscriptionId, $sessionNas['nas_id']]);
         } else {
-            // Multiple NAS devices - require explicit assignment
-            echo json_encode(['success' => false, 'error' => 'Multiple NAS devices found. Please assign a specific NAS to this subscription.']);
-            exit;
+            // No active session - try auto-detect from NAS count
+            $countStmt = $db->query("SELECT COUNT(*) FROM radius_nas WHERE is_active = TRUE AND api_enabled = TRUE");
+            $nasCount = (int)$countStmt->fetchColumn();
+            
+            if ($nasCount === 0) {
+                echo json_encode(['success' => false, 'error' => 'No NAS device with API enabled. Please add a NAS device and enable API access.']);
+                exit;
+            } elseif ($nasCount === 1) {
+                // Only one NAS - safe to use automatically
+                $nasStmt = $db->query("
+                    SELECT id as nas_id, ip_address as nas_ip, api_port, api_username, api_password_encrypted 
+                    FROM radius_nas 
+                    WHERE is_active = TRUE AND api_enabled = TRUE 
+                    LIMIT 1
+                ");
+                $autoNas = $nasStmt->fetch(PDO::FETCH_ASSOC);
+                $sub['nas_ip'] = $autoNas['nas_ip'];
+                $sub['api_port'] = $autoNas['api_port'];
+                $sub['api_username'] = $autoNas['api_username'];
+                $sub['api_password_encrypted'] = $autoNas['api_password_encrypted'];
+                
+                // Auto-assign NAS to subscription
+                $updateStmt = $db->prepare("UPDATE radius_subscriptions SET nas_id = ? WHERE id = ? AND nas_id IS NULL");
+                $updateStmt->execute([$autoNas['nas_id'], $subscriptionId]);
+            } else {
+                // Multiple NAS devices and no active session - require explicit assignment
+                echo json_encode(['success' => false, 'error' => 'Multiple NAS devices found and no active session. Please assign a specific NAS to this subscription.']);
+                exit;
+            }
         }
     }
     
