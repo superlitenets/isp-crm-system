@@ -8,13 +8,21 @@ class MikroTikAPI {
     private string $password;
     private $socket;
     private bool $connected = false;
-    private int $timeout = 10;
+    private int $timeout = 30;
     
-    public function __construct(string $host, int $port = 8728, string $username = 'admin', string $password = '') {
+    public function __construct(string $host, int $port = 8728, string $username = 'admin', string $password = '', int $timeout = 30) {
         $this->host = $host;
         $this->port = $port;
         $this->username = $username;
         $this->password = $password;
+        $this->timeout = $timeout;
+    }
+    
+    public function setTimeout(int $seconds): void {
+        $this->timeout = $seconds;
+        if ($this->socket && is_resource($this->socket)) {
+            stream_set_timeout($this->socket, $seconds);
+        }
     }
     
     public function connect(): bool {

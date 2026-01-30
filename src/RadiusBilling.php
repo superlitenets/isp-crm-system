@@ -4434,19 +4434,32 @@ class RadiusBilling {
                 $nas['api_username'],
                 $apiPassword
             );
-            $mikrotik->connect();
+            
+            if (!$mikrotik->connect()) {
+                return ['success' => false, 'error' => 'Failed to connect to MikroTik'];
+            }
             
             $interfaces = $mikrotik->getInterfaces();
             $vlans = $mikrotik->getVlans();
             $bridges = $mikrotik->getBridges();
+            $ethernet = $mikrotik->getEthernetInterfaces();
             
             $mikrotik->disconnect();
+            
+            // If all are empty, connection may have issues
+            if (empty($interfaces) && empty($vlans) && empty($bridges) && empty($ethernet)) {
+                return [
+                    'success' => false, 
+                    'error' => 'Connected but received no data. Check MikroTik API permissions for user: ' . $nas['api_username']
+                ];
+            }
             
             return [
                 'success' => true,
                 'interfaces' => $interfaces,
                 'vlans' => $vlans,
-                'bridges' => $bridges
+                'bridges' => $bridges,
+                'ethernet' => $ethernet
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
