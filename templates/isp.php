@@ -6714,9 +6714,14 @@ try {
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-diagram-3"></i> VLAN Management</h4>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVlanModal">
-                    <i class="bi bi-plus-lg me-1"></i> Add VLAN
-                </button>
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary" onclick="importVlans()">
+                        <i class="bi bi-download me-1"></i> Import from MikroTik
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVlanModal">
+                        <i class="bi bi-plus-lg me-1"></i> Add VLAN
+                    </button>
+                </div>
             </div>
             
             <div class="card shadow-sm">
@@ -6996,6 +7001,41 @@ try {
                         }
                     })
                     .catch(err => alert('Error: ' + err.message));
+            }
+            
+            function importVlans() {
+                if (!confirm('Import VLANs from all active NAS devices?')) return;
+                
+                const btn = event.target.closest('button');
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Importing...';
+                
+                fetch('/index.php?page=isp&action=import_vlans')
+                    .then(r => r.json())
+                    .then(data => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                        console.log('Import VLANs response:', data);
+                        
+                        if (data.success) {
+                            let msg = `Import completed!\n\nImported: ${data.imported}\nSkipped (existing): ${data.skipped}`;
+                            if (data.errors && data.errors.length > 0) {
+                                msg += '\n\nWarnings:\n' + data.errors.join('\n');
+                            }
+                            alert(msg);
+                            if (data.imported > 0) {
+                                window.location.reload();
+                            }
+                        } else {
+                            alert('Import failed: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                        alert('Error: ' + err.message);
+                    });
             }
             
             function saveVlan(syncAfter = false) {

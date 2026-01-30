@@ -4252,6 +4252,100 @@ class RadiusBilling {
         }
     }
     
+    public function importVlansFromMikroTik(?int $nasId = null): array {
+        try {
+            $imported = 0;
+            $skipped = 0;
+            $errors = [];
+            $nasList = [];
+            
+            if ($nasId) {
+                $nas = $this->getNAS($nasId);
+                if ($nas && $nas['api_enabled']) {
+                    $nasList[] = $nas;
+                }
+            } else {
+                $stmt = $this->db->query("SELECT * FROM radius_nas WHERE is_active = TRUE AND api_enabled = TRUE");
+                $nasList = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            }
+            
+            if (empty($nasList)) {
+                return ['success' => false, 'error' => 'No NAS devices with API enabled'];
+            }
+            
+            foreach ($nasList as $nas) {
+                $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+                if (!$apiPassword) {
+                    $errors[] = $nas['name'] . ': Failed to decrypt API password';
+                    continue;
+                }
+                
+                try {
+                    $mikrotik = new \App\MikroTikAPI(
+                        $nas['ip_address'],
+                        (int)($nas['api_port'] ?? 8728),
+                        $nas['api_username'],
+                        $apiPassword
+                    );
+                    $mikrotik->connect();
+                    
+                    $vlans = $mikrotik->getVlans();
+                    $mikrotik->disconnect();
+                    
+                    if (empty($vlans)) {
+                        $errors[] = $nas['name'] . ': No VLANs found or API returned empty';
+                        continue;
+                    }
+                    
+                    foreach ($vlans as $vlan) {
+                        $vlanId = (int)($vlan['vlan-id'] ?? 0);
+                        $name = $vlan['name'] ?? '';
+                        $interface = $vlan['interface'] ?? '';
+                        
+                        if (!$vlanId || !$name) continue;
+                        
+                        // Check if already exists
+                        $existingStmt = $this->db->prepare("
+                            SELECT id FROM mikrotik_vlans 
+                            WHERE nas_id = ? AND (vlan_id = ? OR name = ?)
+                        ");
+                        $existingStmt->execute([$nas['id'], $vlanId, $name]);
+                        
+                        if ($existingStmt->fetch()) {
+                            $skipped++;
+                            continue;
+                        }
+                        
+                        // Import the VLAN
+                        $insertStmt = $this->db->prepare("
+                            INSERT INTO mikrotik_vlans (nas_id, name, vlan_id, interface, description, is_synced, created_at)
+                            VALUES (?, ?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP)
+                        ");
+                        $insertStmt->execute([
+                            $nas['id'],
+                            $name,
+                            $vlanId,
+                            $interface,
+                            'Imported from ' . $nas['name']
+                        ]);
+                        $imported++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = $nas['name'] . ': ' . $e->getMessage();
+                }
+            }
+            
+            return [
+                'success' => true,
+                'imported' => $imported,
+                'skipped' => $skipped,
+                'errors' => $errors
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
     // ==================== Static IP Provisioning ====================
     
     public function getProvisionedIps(?int $subscriptionId = null): array {

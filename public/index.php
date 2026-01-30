@@ -2316,6 +2316,15 @@ if ($page === 'isp') {
         exit;
     }
     
+    if ($action === 'import_vlans') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $nasId = isset($_GET['nas_id']) ? (int)$_GET['nas_id'] : null;
+        $result = $radiusBilling->importVlansFromMikroTik($nasId);
+        echo json_encode($result);
+        exit;
+    }
+    
     if ($action === 'fetch_interfaces') {
         header('Content-Type: application/json');
         $radiusBilling = new \App\RadiusBilling($db);
