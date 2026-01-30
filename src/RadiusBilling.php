@@ -7,7 +7,11 @@ class RadiusBilling {
     
     public function __construct(\PDO $db) {
         $this->db = $db;
-        $this->encryptionKey = $_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me';
+        $encKey = getenv('ENCRYPTION_KEY');
+        if (empty($encKey)) {
+            $encKey = $_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me';
+        }
+        $this->encryptionKey = $encKey;
         $this->ensureTablesExist();
     }
     
