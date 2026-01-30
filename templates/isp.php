@@ -162,9 +162,9 @@ if ($action === 'get_live_traffic') {
         $sessionStmt = $db->prepare("
             SELECT rn.id as nas_id, rn.ip_address as nas_ip, rn.api_port, rn.api_username, rn.api_password_encrypted
             FROM radius_sessions rs
-            JOIN radius_nas rn ON rs.nas_ip_address = rn.ip_address OR rs.nas_id = rn.id
-            WHERE rs.subscription_id = ? AND rs.acct_stop_time IS NULL AND rn.api_enabled = TRUE
-            ORDER BY rs.acct_start_time DESC
+            JOIN radius_nas rn ON rs.nas_id = rn.id
+            WHERE rs.subscription_id = ? AND rs.stop_time IS NULL AND rs.is_active = TRUE AND rn.api_enabled = TRUE
+            ORDER BY rs.start_time DESC
             LIMIT 1
         ");
         $sessionStmt->execute([$subscriptionId]);

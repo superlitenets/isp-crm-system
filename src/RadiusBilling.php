@@ -4440,7 +4440,11 @@ class RadiusBilling {
             }
             
             // Try a simple identity command first to verify API is working
+            $identityRaw = $mikrotik->commandRaw('/system/identity/print');
             $identity = $mikrotik->command('/system/identity/print');
+            
+            // Get raw interface response for debugging
+            $interfacesRaw = $mikrotik->commandRaw('/interface/print');
             
             $interfaces = $mikrotik->getInterfaces();
             $vlans = $mikrotik->getVlans();
@@ -4456,9 +4460,10 @@ class RadiusBilling {
                     'success' => false, 
                     'error' => "Connected to '{$identityName}' but no interfaces found. API user: " . $nas['api_username'],
                     'debug' => [
-                        'identity' => $identity,
-                        'interfaces_raw' => $interfaces,
-                        'vlans_raw' => $vlans
+                        'identity_raw' => $identityRaw,
+                        'identity_parsed' => $identity,
+                        'interfaces_raw' => $interfacesRaw,
+                        'interfaces_parsed' => $interfaces
                     ]
                 ];
             }

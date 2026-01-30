@@ -159,6 +159,21 @@ class MikroTikAPI {
         return $this->parseResponse($this->read());
     }
     
+    public function commandRaw(string $cmd, array $params = []): array {
+        if (!$this->connected) {
+            $this->connect();
+        }
+        
+        $this->write($cmd, empty($params));
+        
+        foreach ($params as $key => $value) {
+            $isLast = ($key === array_key_last($params));
+            $this->write('=' . $key . '=' . $value, $isLast);
+        }
+        
+        return $this->read();
+    }
+    
     private function parseResponse(array $raw): array {
         $result = [];
         $current = [];
