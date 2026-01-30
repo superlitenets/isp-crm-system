@@ -90,14 +90,24 @@ class MikroTikAPI {
         $response = [];
         $receivedDone = false;
         
+        // Wait for data to be available (up to timeout seconds)
+        $read = [$this->socket];
+        $write = null;
+        $except = null;
+        if (stream_select($read, $write, $except, $this->timeout) === 0) {
+            return $response; // Timeout, no data
+        }
+        
         while (!$receivedDone) {
             $word = $this->readWord();
             
-            if ($word === false || $word === '') {
+            if ($word === false) {
                 break;
             }
             
-            $response[] = $word;
+            if ($word !== '') {
+                $response[] = $word;
+            }
             
             if ($word === '!done' || $word === '!trap' || $word === '!fatal') {
                 $receivedDone = true;

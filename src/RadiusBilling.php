@@ -4439,31 +4439,33 @@ class RadiusBilling {
                 return ['success' => false, 'error' => 'Failed to connect to MikroTik'];
             }
             
-            // Try a simple identity command first to verify API is working
-            $identityRaw = $mikrotik->commandRaw('/system/identity/print');
-            $identity = $mikrotik->command('/system/identity/print');
-            
-            // Get raw interface response for debugging
+            // Test with a single command first - get interfaces directly
             $interfacesRaw = $mikrotik->commandRaw('/interface/print');
+            
+            // Reconnect to get parsed data cleanly
+            $mikrotik->disconnect();
+            $mikrotik->connect();
             
             $interfaces = $mikrotik->getInterfaces();
             $vlans = $mikrotik->getVlans();
             $bridges = $mikrotik->getBridges();
             $ethernet = $mikrotik->getEthernetInterfaces();
             
+            // Get identity last
+            $identity = $mikrotik->command('/system/identity/print');
+            
             $mikrotik->disconnect();
             
-            // If all are empty but identity worked, might be a parsing issue
+            // If all are empty, show debug info
             if (empty($interfaces) && empty($vlans) && empty($bridges) && empty($ethernet)) {
                 $identityName = $identity[0]['name'] ?? 'unknown';
                 return [
                     'success' => false, 
                     'error' => "Connected to '{$identityName}' but no interfaces found. API user: " . $nas['api_username'],
                     'debug' => [
-                        'identity_raw' => $identityRaw,
-                        'identity_parsed' => $identity,
                         'interfaces_raw' => $interfacesRaw,
-                        'interfaces_parsed' => $interfaces
+                        'interfaces_count' => count($interfacesRaw),
+                        'identity' => $identity
                     ]
                 ];
             }
