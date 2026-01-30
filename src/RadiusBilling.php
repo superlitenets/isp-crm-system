@@ -855,11 +855,15 @@ class RadiusBilling {
                 }
             }
             
+            // Unblock IP on MikroTik for static/DHCP accounts
+            $mikrotikResult = $this->updateMikroTikBlockedStatus($id, false);
+            
             return [
                 'success' => true, 
                 'expiry_date' => $expiryDate,
                 'disconnected' => $coaResult ? ($coaResult['disconnected'] ?? 0) : 0,
-                'coa_result' => $coaResult
+                'coa_result' => $coaResult,
+                'mikrotik_result' => $mikrotikResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
