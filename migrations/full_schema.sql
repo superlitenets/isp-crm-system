@@ -230,6 +230,34 @@ CREATE TABLE IF NOT EXISTS ticket_comments (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS ticket_resolutions (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER UNIQUE REFERENCES tickets(id) ON DELETE CASCADE,
+    resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    resolution_notes TEXT,
+    router_serial VARCHAR(100),
+    power_levels VARCHAR(100),
+    cable_used VARCHAR(100),
+    equipment_installed TEXT,
+    additional_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ticket_resolution_photos (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+    resolution_id INTEGER REFERENCES ticket_resolutions(id) ON DELETE CASCADE,
+    photo_type VARCHAR(50) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_name VARCHAR(255),
+    caption TEXT,
+    uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_resolution_photos_ticket ON ticket_resolution_photos(ticket_id);
+
 CREATE TABLE IF NOT EXISTS ticket_categories (
     id SERIAL PRIMARY KEY,
     key VARCHAR(50) NOT NULL UNIQUE,
