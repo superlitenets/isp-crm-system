@@ -3347,10 +3347,135 @@ try {
                                                 </button>
                                             </form>
                                         </div>
+                                        
+                                        <!-- Static IP Provisioning -->
+                                        <h6 class="text-muted mb-3 mt-4">Static IP Provisioning</h6>
+                                        <?php 
+                                        $provisionedIps = $radiusBilling->getProvisionedIps($subscriber['id']);
+                                        $vlans = $radiusBilling->getVlans();
+                                        ?>
+                                        <?php if (!empty($provisionedIps)): ?>
+                                        <div class="alert alert-info p-2 mb-2">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>Provisioned IP:</strong> <code><?= htmlspecialchars($provisionedIps[0]['ip_address']) ?></code>
+                                                    <br><small class="text-muted">VLAN: <?= htmlspecialchars($provisionedIps[0]['vlan_name'] ?? '-') ?> | MAC: <code><?= htmlspecialchars($provisionedIps[0]['mac_address']) ?></code></small>
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-danger" onclick="deprovisionStaticIp(<?= $subscriber['id'] ?>)">
+                                                    <i class="bi bi-trash"></i> Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <?php else: ?>
+                                        <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#provisionIpModal">
+                                            <i class="bi bi-plus-circle me-1"></i> Provision Static IP
+                                        </button>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Provision Static IP Modal -->
+                        <div class="modal fade" id="provisionIpModal" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><i class="bi bi-hdd-network me-2"></i>Provision Static IP</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form id="provisionIpForm">
+                                            <input type="hidden" name="subscription_id" value="<?= $subscriber['id'] ?>">
+                                            <div class="mb-3">
+                                                <label class="form-label">VLAN / Network *</label>
+                                                <select class="form-select" name="vlan_id" id="provisionVlanSelect" required>
+                                                    <option value="">Select VLAN...</option>
+                                                    <?php foreach ($vlans as $vlan): ?>
+                                                    <?php if ($vlan['is_active'] && $vlan['network_cidr']): ?>
+                                                    <option value="<?= $vlan['id'] ?>" data-network="<?= htmlspecialchars($vlan['network_cidr']) ?>" data-pool-start="<?= htmlspecialchars($vlan['dhcp_pool_start'] ?? '') ?>" data-pool-end="<?= htmlspecialchars($vlan['dhcp_pool_end'] ?? '') ?>">
+                                                        <?= htmlspecialchars($vlan['name']) ?> (<?= $vlan['network_cidr'] ?>) - <?= htmlspecialchars($vlan['nas_name'] ?? '') ?>
+                                                    </option>
+                                                    <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">IP Address *</label>
+                                                <input type="text" class="form-control" name="ip_address" id="provisionIpAddress" required placeholder="e.g., 10.40.0.100">
+                                                <div class="form-text" id="ipHint"></div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">MAC Address *</label>
+                                                <input type="text" class="form-control" name="mac_address" value="<?= htmlspecialchars($subscriber['mac_address'] ?? '') ?>" required placeholder="AA:BB:CC:DD:EE:FF">
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="button" class="btn btn-primary" onclick="provisionStaticIp()">
+                                            <i class="bi bi-check-lg me-1"></i> Provision
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <script>
+                        document.getElementById('provisionVlanSelect')?.addEventListener('change', function() {
+                            const opt = this.options[this.selectedIndex];
+                            const hint = document.getElementById('ipHint');
+                            const start = opt.dataset.poolStart;
+                            const end = opt.dataset.poolEnd;
+                            if (start && end) {
+                                hint.textContent = `Pool range: ${start} - ${end}`;
+                            } else {
+                                hint.textContent = '';
+                            }
+                        });
+                        
+                        function provisionStaticIp() {
+                            const form = document.getElementById('provisionIpForm');
+                            const formData = new FormData(form);
+                            const data = Object.fromEntries(formData.entries());
+                            
+                            if (!data.vlan_id || !data.ip_address || !data.mac_address) {
+                                alert('All fields are required');
+                                return;
+                            }
+                            
+                            fetch('/index.php?page=isp&action=provision_static_ip', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                            })
+                            .then(r => r.json())
+                            .then(result => {
+                                if (result.success) {
+                                    alert(`Static IP provisioned!\nIP: ${result.ip}\nMAC: ${result.mac}`);
+                                    window.location.reload();
+                                } else {
+                                    alert('Failed: ' + (result.error || 'Unknown error'));
+                                }
+                            })
+                            .catch(err => alert('Error: ' + err.message));
+                        }
+                        
+                        function deprovisionStaticIp(subscriptionId) {
+                            if (!confirm('Remove static IP provisioning? This will delete the DHCP lease from MikroTik.')) return;
+                            
+                            fetch(`/index.php?page=isp&action=deprovision_static_ip&subscription_id=${subscriptionId}`)
+                                .then(r => r.json())
+                                .then(result => {
+                                    if (result.success) {
+                                        alert('Static IP removed.');
+                                        window.location.reload();
+                                    } else {
+                                        alert('Failed: ' + (result.error || 'Unknown error'));
+                                    }
+                                });
+                        }
+                        </script>
                         
                         <!-- Sessions Tab -->
                         <div class="tab-pane fade show active" id="sessionsTab" role="tabpanel">
