@@ -225,12 +225,12 @@ if ($action === 'get_live_traffic') {
         
         $apiPassword = '';
         if (!empty($sub['api_password_encrypted'])) {
-            $encKey = getenv('ENCRYPTION_KEY') ?: 'default_key_change_me';
+            $encKey = $_ENV['ENCRYPTION_KEY'] ?? getenv('ENCRYPTION_KEY') ?: 'default-radius-key-change-me';
             $decoded = base64_decode($sub['api_password_encrypted']);
             if ($decoded !== false && strlen($decoded) > 16) {
                 $iv = substr($decoded, 0, 16);
                 $encrypted = substr($decoded, 16);
-                $apiPassword = openssl_decrypt($encrypted, 'aes-256-cbc', $encKey, 0, $iv) ?: '';
+                $apiPassword = openssl_decrypt($encrypted, 'AES-256-CBC', $encKey, 0, $iv) ?: '';
             }
         }
         
