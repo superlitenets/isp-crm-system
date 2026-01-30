@@ -158,13 +158,13 @@ if ($action === 'get_live_traffic') {
     
     // Auto-detect NAS if not explicitly assigned
     if (!$sub['nas_ip']) {
-        // First try to find NAS from active session
+        // First try to find NAS from active session (using is_active flag only for compatibility)
         $sessionStmt = $db->prepare("
             SELECT rn.id as nas_id, rn.ip_address as nas_ip, rn.api_port, rn.api_username, rn.api_password_encrypted
             FROM radius_sessions rs
             JOIN radius_nas rn ON rs.nas_id = rn.id
-            WHERE rs.subscription_id = ? AND rs.stop_time IS NULL AND rs.is_active = TRUE AND rn.api_enabled = TRUE
-            ORDER BY rs.start_time DESC
+            WHERE rs.subscription_id = ? AND rs.is_active = TRUE AND rn.api_enabled = TRUE
+            ORDER BY rs.created_at DESC
             LIMIT 1
         ");
         $sessionStmt->execute([$subscriptionId]);
