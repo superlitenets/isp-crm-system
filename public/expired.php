@@ -168,6 +168,16 @@ $isDisabled = $subscriptionStatus === 'disabled';
 $isExpired = $subscriptionStatus === 'expired' || ($subscription && $subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
 
 $statusConfig = [
+    'unknown' => [
+        'icon' => 'bi-question-circle-fill',
+        'title' => 'Account Not Found',
+        'subtitle' => 'We could not identify your account',
+        'color' => '#17a2b8',
+        'colorDark' => '#138496',
+        'animation' => 'none',
+        'canPay' => false,
+        'notice' => 'Your account was not found in our system. This could mean you are not registered, or your device is not linked to any subscription. Please contact support for assistance.',
+    ],
     'suspended' => [
         'icon' => 'bi-pause-circle-fill',
         'title' => 'Account Suspended',
@@ -221,7 +231,9 @@ $statusConfig = [
 ];
 
 $reason = $_GET['reason'] ?? null;
-if ($reason === 'mac') {
+if ($reason === 'unknown' || (!$subscription && !$lookupMode)) {
+    $currentStatus = 'unknown';
+} elseif ($reason === 'mac') {
     $currentStatus = 'wrong_mac';
 } elseif ($reason === 'auth' || $reason === 'credentials') {
     $currentStatus = 'wrong_credentials';
@@ -930,37 +942,51 @@ if ($isSuspended && $subscription) {
             </div>
             
             <?php else: ?>
-            <div class="not-found-card">
-                <div class="not-found-icon">
-                    <i class="bi bi-question-lg"></i>
+            <?php $unknownInfo = $statusConfig['unknown']; ?>
+            <div class="card-header" style="background: linear-gradient(135deg, <?= $unknownInfo['color'] ?> 0%, <?= $unknownInfo['colorDark'] ?> 100%);">
+                <div class="header-content">
+                    <div class="status-icon">
+                        <i class="bi <?= $unknownInfo['icon'] ?>"></i>
+                    </div>
+                    <h1 class="header-title"><?= htmlspecialchars($unknownInfo['title']) ?></h1>
+                    <p class="header-subtitle"><?= htmlspecialchars($unknownInfo['subtitle']) ?></p>
                 </div>
-                <h3>Account Not Found</h3>
-                <p class="text-muted">We couldn't identify your account.<br>Please search using your details below.</p>
-                
+            </div>
+            <div class="card-body">
                 <?php if ($message): ?>
-                <div class="alert alert-<?= $messageType ?> text-start mb-4">
+                <div class="alert alert-<?= $messageType ?> mb-4">
                     <?= htmlspecialchars($message) ?>
                 </div>
                 <?php endif; ?>
                 
-                <form method="post" class="search-form">
-                    <input type="hidden" name="action" value="lookup">
-                    <div class="search-input-group">
-                        <input type="text" name="lookup_value" class="search-input" 
-                               placeholder="Username or phone number" required
-                               value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
-                        <button type="submit" class="search-btn">
-                            <i class="bi bi-search"></i>
-                        </button>
-                    </div>
-                </form>
+                <div class="suspended-notice" style="border-left-color: <?= $unknownInfo['color'] ?>; background: linear-gradient(135deg, #e3f2fd, #bbdefb);">
+                    <strong><i class="bi bi-info-circle me-2"></i>What happened?</strong>
+                    <p class="mb-0 mt-2" style="font-size: 0.9rem;">
+                        <?= htmlspecialchars($unknownInfo['notice']) ?>
+                    </p>
+                </div>
+                
+                <div class="mt-4">
+                    <p class="text-muted mb-2"><strong>Search for your account:</strong></p>
+                    <form method="post">
+                        <input type="hidden" name="action" value="lookup">
+                        <div class="search-input-group">
+                            <input type="text" name="lookup_value" class="search-input" 
+                                   placeholder="Username or phone number" required
+                                   value="<?= htmlspecialchars($_POST['lookup_value'] ?? '') ?>">
+                            <button type="submit" class="search-btn">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
                 
                 <?php if ($ispPhone): ?>
-                <div class="contact-section" style="border-top: none; margin-top: 30px;">
-                    <p class="text-muted mb-0">Contact <?= htmlspecialchars($ispName) ?></p>
+                <div class="contact-section">
+                    <p class="text-muted mb-0">Need help? Contact <?= htmlspecialchars($ispName) ?></p>
                     <div class="contact-btns">
                         <a href="tel:<?= htmlspecialchars($ispPhoneFormatted) ?>" class="contact-btn contact-btn-call">
-                            <i class="bi bi-telephone"></i> Call
+                            <i class="bi bi-telephone"></i> <?= htmlspecialchars($ispPhone) ?>
                         </a>
                         <?php if ($ispWhatsApp): ?>
                         <a href="https://wa.me/<?= htmlspecialchars($ispWhatsApp) ?>?text=Hi%2C%20I%20need%20help%20with%20my%20internet%20account" 
@@ -972,7 +998,7 @@ if ($isSuspended && $subscription) {
                 </div>
                 <?php endif; ?>
                 
-                <div class="text-muted mt-4" style="font-size: 0.8rem;">
+                <div class="text-center text-muted mt-4" style="font-size: 0.8rem;">
                     <i class="bi bi-geo-alt me-1"></i> Your IP: <?= htmlspecialchars($clientIP) ?>
                 </div>
             </div>
