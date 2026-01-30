@@ -898,10 +898,14 @@ class RadiusBilling {
             // Disconnect active sessions via CoA
             $disconnectResult = $this->sendCoAForSubscription($id);
             
+            // Block IP on MikroTik for static/DHCP accounts
+            $mikrotikResult = $this->updateMikroTikBlockedStatus($id, true, "Suspended: $reason");
+            
             return [
                 'success' => true, 
                 'days_remaining' => $daysRemaining,
-                'coa_result' => $disconnectResult
+                'coa_result' => $disconnectResult,
+                'mikrotik_result' => $mikrotikResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
@@ -948,11 +952,15 @@ class RadiusBilling {
                 $id
             ]);
             
+            // Unblock IP on MikroTik for static/DHCP accounts
+            $mikrotikResult = $this->updateMikroTikBlockedStatus($id, false);
+            
             return [
                 'success' => true, 
                 'new_expiry' => $newExpiry,
                 'days_restored' => $daysRemaining,
-                'suspended_days' => $suspendedDays
+                'suspended_days' => $suspendedDays,
+                'mikrotik_result' => $mikrotikResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
@@ -1973,6 +1981,9 @@ class RadiusBilling {
                     updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ?
             ")->execute([$sub['id']]);
+            
+            // Block IP on MikroTik for static/DHCP accounts
+            $this->updateMikroTikBlockedStatus($sub['id'], true, "Expired");
             
             if ($releaseIp) {
                 $ipsReleased++;
@@ -3832,5 +3843,207 @@ class RadiusBilling {
         $sms = new \App\SMS();
         $result = $sms->send($sub['customer_phone'], $message);
         return $result['success'] ?? false;
+    }
+    
+    // ==================== MikroTik Address List Management ====================
+    
+    public function updateMikroTikBlockedStatus(int $subscriptionId, bool $block, string $reason = ''): array {
+        try {
+            $sub = $this->getSubscription($subscriptionId);
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            // Only process static IP and DHCP access types
+            if (!in_array($sub['access_type'], ['static', 'dhcp'])) {
+                return ['success' => true, 'skipped' => true, 'reason' => 'Not a static/DHCP account'];
+            }
+            
+            // Get the IP address to block/unblock
+            $ipAddress = $sub['static_ip'] ?? null;
+            if (!$ipAddress) {
+                return ['success' => false, 'error' => 'No IP address assigned'];
+            }
+            
+            // Get NAS device with API enabled
+            $nas = null;
+            if (!empty($sub['nas_id'])) {
+                $stmt = $this->db->prepare("
+                    SELECT * FROM radius_nas 
+                    WHERE id = ? AND api_enabled = true AND is_active = true
+                ");
+                $stmt->execute([$sub['nas_id']]);
+                $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+            }
+            
+            if (!$nas) {
+                // Try to find any active NAS with API enabled
+                $stmt = $this->db->query("
+                    SELECT * FROM radius_nas 
+                    WHERE api_enabled = true AND is_active = true 
+                    ORDER BY id LIMIT 1
+                ");
+                $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+            }
+            
+            if (!$nas) {
+                return ['success' => false, 'error' => 'No NAS device with API enabled found'];
+            }
+            
+            // Decrypt API password
+            $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+            if (!$apiPassword) {
+                return ['success' => false, 'error' => 'Failed to decrypt API password'];
+            }
+            
+            // Connect to MikroTik
+            $mikrotik = new \App\MikroTikAPI(
+                $nas['ip_address'],
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
+            );
+            
+            $mikrotik->connect();
+            
+            $listName = $this->getSetting('mikrotik_blocked_list') ?: 'crm-blocked';
+            $comment = $sub['username'] . ' - ' . $reason . ' (' . date('Y-m-d H:i') . ')';
+            
+            if ($block) {
+                $result = $mikrotik->addToBlockedList($ipAddress, $comment, $listName);
+            } else {
+                $result = $mikrotik->removeFromBlockedList($ipAddress, $listName);
+            }
+            
+            $mikrotik->disconnect();
+            
+            return ['success' => $result, 'ip' => $ipAddress, 'action' => $block ? 'blocked' : 'unblocked'];
+            
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function syncMikroTikBlockedList(?int $nasId = null): array {
+        try {
+            // Get NAS device(s) with API enabled
+            if ($nasId) {
+                $stmt = $this->db->prepare("
+                    SELECT * FROM radius_nas 
+                    WHERE id = ? AND api_enabled = true AND is_active = true
+                ");
+                $stmt->execute([$nasId]);
+                $nasDevices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            } else {
+                $stmt = $this->db->query("
+                    SELECT * FROM radius_nas 
+                    WHERE api_enabled = true AND is_active = true
+                ");
+                $nasDevices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            }
+            
+            if (empty($nasDevices)) {
+                return ['success' => false, 'error' => 'No NAS devices with API enabled found'];
+            }
+            
+            // Get all blocked subscriptions (expired, suspended, disabled) with static IPs
+            $stmt = $this->db->query("
+                SELECT s.id, s.username, s.static_ip, s.status, c.name as customer_name
+                FROM radius_subscriptions s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE s.access_type IN ('static', 'dhcp')
+                AND s.static_ip IS NOT NULL
+                AND (
+                    s.status IN ('expired', 'suspended', 'disabled')
+                    OR (s.status = 'active' AND s.expiry_date < CURRENT_DATE)
+                )
+            ");
+            $blockedSubs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            $blockedAddresses = [];
+            foreach ($blockedSubs as $sub) {
+                $blockedAddresses[] = [
+                    'address' => $sub['static_ip'],
+                    'comment' => $sub['username'] . ' - ' . ucfirst($sub['status']) . ' (' . date('Y-m-d') . ')'
+                ];
+            }
+            
+            $listName = $this->getSetting('mikrotik_blocked_list') ?: 'crm-blocked';
+            $results = [];
+            
+            foreach ($nasDevices as $nas) {
+                $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+                if (!$apiPassword) {
+                    $results[$nas['name']] = ['success' => false, 'error' => 'Failed to decrypt API password'];
+                    continue;
+                }
+                
+                try {
+                    $mikrotik = new \App\MikroTikAPI(
+                        $nas['ip_address'],
+                        (int)($nas['api_port'] ?? 8728),
+                        $nas['api_username'],
+                        $apiPassword
+                    );
+                    
+                    $mikrotik->connect();
+                    $syncResult = $mikrotik->syncBlockedList($blockedAddresses, $listName);
+                    $mikrotik->disconnect();
+                    
+                    $results[$nas['name']] = [
+                        'success' => true,
+                        'added' => $syncResult['added'],
+                        'removed' => $syncResult['removed'],
+                        'errors' => $syncResult['errors']
+                    ];
+                } catch (\Exception $e) {
+                    $results[$nas['name']] = ['success' => false, 'error' => $e->getMessage()];
+                }
+            }
+            
+            return ['success' => true, 'results' => $results, 'blocked_count' => count($blockedAddresses)];
+            
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getBlockedSubscriptions(): array {
+        $stmt = $this->db->query("
+            SELECT s.id, s.username, s.static_ip, s.status, s.access_type,
+                   s.expiry_date, s.suspended_at, c.name as customer_name, c.phone as customer_phone,
+                   p.name as package_name, n.name as nas_name
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            LEFT JOIN radius_nas n ON s.nas_id = n.id
+            WHERE s.access_type IN ('static', 'dhcp')
+            AND s.static_ip IS NOT NULL
+            AND (
+                s.status IN ('expired', 'suspended', 'disabled')
+                OR (s.status = 'active' AND s.expiry_date < CURRENT_DATE)
+            )
+            ORDER BY s.status, s.expiry_date DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    private function decryptApiPassword(?string $encrypted): ?string {
+        if (!$encrypted) return null;
+        
+        $key = getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? 'default-key-change-me');
+        
+        $data = base64_decode($encrypted);
+        if ($data === false) return null;
+        
+        $ivLength = openssl_cipher_iv_length('aes-256-cbc');
+        if (strlen($data) < $ivLength) return null;
+        
+        $iv = substr($data, 0, $ivLength);
+        $ciphertext = substr($data, $ivLength);
+        
+        $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        
+        return $decrypted !== false ? $decrypted : null;
     }
 }
