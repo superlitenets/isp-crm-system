@@ -7042,7 +7042,11 @@ try {
                             alert(msg);
                             window.location.reload();
                         } else {
-                            alert('Sync failed: ' + (data.error || 'Unknown error'));
+                            let errorMsg = data.error || '';
+                            if (data.errors && data.errors.length > 0) {
+                                errorMsg = data.errors.join('\n');
+                            }
+                            alert('Sync failed: ' + (errorMsg || 'Unknown error'));
                             if (btn) {
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
