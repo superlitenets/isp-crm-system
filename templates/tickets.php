@@ -706,8 +706,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
             $statusActions = [
                 'open' => ['icon' => 'folder2-open', 'color' => 'secondary'],
                 'in_progress' => ['icon' => 'play-circle', 'color' => 'info'],
-                'pending' => ['icon' => 'pause-circle', 'color' => 'warning'],
-                'resolved' => ['icon' => 'check-circle', 'color' => 'success']
+                'pending' => ['icon' => 'pause-circle', 'color' => 'warning']
             ];
             foreach ($statusActions as $status => $config): 
                 if ($status !== $ticketData['status']):
@@ -722,6 +721,9 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                 </button>
             </form>
             <?php endif; endforeach; ?>
+            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#resolveTicketModal">
+                <i class="bi bi-check-circle"></i> Resolve Ticket
+            </button>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#escalateModal">
@@ -1379,6 +1381,141 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
     </div>
 </div>
 <?php endif; ?>
+
+<div class="modal fade" id="resolveTicketModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data" id="resolveTicketForm">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="resolve_ticket">
+                <input type="hidden" name="ticket_id" value="<?= $ticketData['id'] ?>">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-check-circle"></i> Resolve Ticket #<?= htmlspecialchars($ticketData['ticket_number']) ?></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Please provide resolution details and upload photos of the completed work.
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Router Serial Number</label>
+                            <input type="text" class="form-control" name="router_serial" placeholder="e.g., SN123456789">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Power Levels (dBm)</label>
+                            <input type="text" class="form-control" name="power_levels" placeholder="e.g., TX: -3.2 / RX: -18.5">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Cable Used</label>
+                            <input type="text" class="form-control" name="cable_used" placeholder="e.g., 50m CAT6, Fiber patch">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Equipment Installed</label>
+                            <input type="text" class="form-control" name="equipment_installed" placeholder="e.g., ONU, Router, Switch">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Resolution Notes *</label>
+                        <textarea class="form-control" name="resolution_notes" rows="3" required placeholder="Describe what was done to resolve this ticket..."></textarea>
+                    </div>
+                    
+                    <hr>
+                    <h6 class="mb-3"><i class="bi bi-camera"></i> Resolution Photos (Required)</h6>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-upc-scan"></i> Router Serial Photo *
+                                    </label>
+                                    <input type="file" class="form-control" name="photo_serial" accept="image/*" required>
+                                    <small class="text-muted">Photo showing router serial number sticker</small>
+                                    <div class="preview-container mt-2" id="preview_serial"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-graph-up"></i> Power Levels Photo *
+                                    </label>
+                                    <input type="file" class="form-control" name="photo_power" accept="image/*" required>
+                                    <small class="text-muted">Screenshot of ONU power levels</small>
+                                    <div class="preview-container mt-2" id="preview_power"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-ethernet"></i> Cables/Installation Photo *
+                                    </label>
+                                    <input type="file" class="form-control" name="photo_cables" accept="image/*" required>
+                                    <small class="text-muted">Photo of cables and installation work</small>
+                                    <div class="preview-container mt-2" id="preview_cables"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-image"></i> Additional Photo (Optional)
+                                    </label>
+                                    <input type="file" class="form-control" name="photo_additional" accept="image/*">
+                                    <small class="text-muted">Any additional documentation</small>
+                                    <div class="preview-container mt-2" id="preview_additional"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Additional Notes</label>
+                        <textarea class="form-control" name="additional_notes" rows="2" placeholder="Any additional comments..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="resolveSubmitBtn">
+                        <i class="bi bi-check-circle"></i> Complete Resolution
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('#resolveTicketForm input[type="file"]').forEach(input => {
+    input.addEventListener('change', function(e) {
+        const previewId = 'preview_' + this.name.replace('photo_', '');
+        const previewContainer = document.getElementById(previewId);
+        if (previewContainer && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewContainer.innerHTML = '<img src="' + e.target.result + '" class="img-thumbnail" style="max-height: 80px;">';
+            };
+            reader.readAsDataURL(this.files[0]);
+        }
+    });
+});
+
+document.getElementById('resolveTicketForm').addEventListener('submit', function() {
+    const btn = document.getElementById('resolveSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...';
+});
+</script>
 
 <div class="modal fade" id="escalateModal" tabindex="-1">
     <div class="modal-dialog">
