@@ -5339,9 +5339,14 @@ try {
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-hdd-network"></i> NAS Devices (MikroTik Routers)</h4>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNASModal">
-                    <i class="bi bi-plus-lg me-1"></i> Add NAS
-                </button>
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary" onclick="syncMikroTikBlocked()" id="syncBlockedBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i> Sync Blocked List
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNASModal">
+                        <i class="bi bi-plus-lg me-1"></i> Add NAS
+                    </button>
+                </div>
             </div>
             
             <div class="card shadow-sm">
@@ -7290,6 +7295,45 @@ try {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Create';
         });
+    }
+    
+    function syncMikroTikBlocked(nasId = null) {
+        const btn = document.getElementById('syncBlockedBtn');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Syncing...';
+        
+        let url = '/index.php?page=isp&action=sync_mikrotik_blocked';
+        if (nasId) url += '&nas_id=' + nasId;
+        
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                
+                if (data.success) {
+                    let msg = `Sync completed!\n\nBlocked IPs: ${data.blocked_count}\n`;
+                    if (data.results) {
+                        for (const [nasName, result] of Object.entries(data.results)) {
+                            if (result.success) {
+                                msg += `\n${nasName}: Added ${result.added}, Removed ${result.removed}`;
+                                if (result.errors > 0) msg += ` (${result.errors} errors)`;
+                            } else {
+                                msg += `\n${nasName}: Failed - ${result.error}`;
+                            }
+                        }
+                    }
+                    alert(msg);
+                } else {
+                    alert('Sync failed: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                alert('Error: ' + err.message);
+            });
     }
     
     function testNAS(nasId, ipAddress) {

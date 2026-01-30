@@ -2232,6 +2232,34 @@ if ($page === 'isp') {
         exit;
     }
     
+    if ($action === 'sync_mikrotik_blocked') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $nasId = isset($_GET['nas_id']) && $_GET['nas_id'] !== '' ? (int)$_GET['nas_id'] : null;
+        $result = $radiusBilling->syncMikroTikBlockedList($nasId);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'block_ip' || $action === 'unblock_ip') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $subId = (int)($_GET['subscription_id'] ?? 0);
+        $block = $action === 'block_ip';
+        $reason = $block ? 'Manual block' : '';
+        $result = $radiusBilling->updateMikroTikBlockedStatus($subId, $block, $reason);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'get_blocked_list') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $subs = $radiusBilling->getBlockedSubscriptions();
+        echo json_encode(['success' => true, 'subscriptions' => $subs]);
+        exit;
+    }
+    
     include __DIR__ . '/../templates/isp.php';
     exit;
 }
