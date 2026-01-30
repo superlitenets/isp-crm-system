@@ -6758,7 +6758,9 @@ try {
                                 <?php foreach ($vlans as $vlan): ?>
                                 <tr data-nas-id="<?= $vlan['nas_id'] ?>">
                                     <td>
-                                        <strong><?= htmlspecialchars($vlan['name']) ?></strong>
+                                        <a href="?page=isp&view=vlan_detail&id=<?= $vlan['id'] ?>" class="text-decoration-none">
+                                            <strong><?= htmlspecialchars($vlan['name']) ?></strong>
+                                        </a>
                                         <br><small class="text-muted">ID: <?= $vlan['vlan_id'] ?></small>
                                     </td>
                                     <td><?= htmlspecialchars($vlan['nas_name'] ?? 'N/A') ?></td>
@@ -6790,9 +6792,9 @@ try {
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-info" onclick="viewVlanTraffic(<?= $vlan['id'] ?>, '<?= htmlspecialchars($vlan['name']) ?>')" title="Live Traffic">
-                                                <i class="bi bi-graph-up"></i>
-                                            </button>
+                                            <a href="?page=isp&view=vlan_detail&id=<?= $vlan['id'] ?>" class="btn btn-outline-info" title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
                                             <button class="btn btn-outline-primary" onclick="syncVlan(<?= $vlan['id'] ?>)" title="Sync to MikroTik">
                                                 <i class="bi bi-arrow-repeat"></i>
                                             </button>
@@ -7453,6 +7455,482 @@ try {
                     </div>
                 </div>
             </div>
+
+            <?php elseif ($view === 'vlan_detail'): ?>
+            <?php
+            $vlanId = (int)($_GET['id'] ?? 0);
+            $vlan = $radiusBilling->getVlan($vlanId);
+            if (!$vlan) {
+                echo '<div class="alert alert-danger">VLAN not found. <a href="?page=isp&view=vlans">Back to VLANs</a></div>';
+            } else {
+                $nas = $radiusBilling->getNASDevice($vlan['nas_id']);
+                
+                // Get subscriptions using this VLAN
+                $stmt = $db->prepare("SELECT s.*, p.name as package_name FROM radius_subscriptions s 
+                    LEFT JOIN radius_packages p ON s.package_id = p.id 
+                    WHERE s.vlan_id = ? ORDER BY s.username");
+                $stmt->execute([$vlanId]);
+                $vlanSubscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            ?>
+            
+            <!-- VLAN Detail Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <a href="?page=isp&view=vlans" class="btn btn-outline-secondary btn-sm mb-2">
+                        <i class="bi bi-arrow-left me-1"></i> Back to VLANs
+                    </a>
+                    <h4 class="page-title mb-0">
+                        <i class="bi bi-diagram-3"></i> <?= htmlspecialchars($vlan['name']) ?>
+                        <span class="badge bg-<?= $vlan['is_synced'] ? 'success' : 'warning' ?> ms-2">
+                            <?= $vlan['is_synced'] ? 'Synced' : 'Not Synced' ?>
+                        </span>
+                        <?php if (!$vlan['is_active']): ?>
+                        <span class="badge bg-secondary ms-1">Disabled</span>
+                        <?php endif; ?>
+                    </h4>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="syncVlanDetail(<?= $vlan['id'] ?>)">
+                        <i class="bi bi-arrow-repeat me-1"></i> Sync to MikroTik
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="editVlanDetail(<?= $vlan['id'] ?>)">
+                        <i class="bi bi-pencil me-1"></i> Edit
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row g-4">
+                <!-- VLAN Info Card -->
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>VLAN Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <th class="text-muted" style="width:40%">VLAN ID</th>
+                                    <td><strong><?= $vlan['vlan_id'] ?></strong></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Name</th>
+                                    <td><code><?= htmlspecialchars($vlan['name']) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Interface</th>
+                                    <td><code><?= htmlspecialchars($vlan['interface']) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">NAS Device</th>
+                                    <td><?= htmlspecialchars($nas['name'] ?? 'N/A') ?></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">NAS IP</th>
+                                    <td><code><?= htmlspecialchars($nas['ip_address'] ?? 'N/A') ?></code></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Network Config Card -->
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Network Configuration</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <th class="text-muted" style="width:40%">Network</th>
+                                    <td><code><?= htmlspecialchars($vlan['network_cidr'] ?: 'Not Set') ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Gateway</th>
+                                    <td><code><?= htmlspecialchars($vlan['gateway_ip'] ?: 'Not Set') ?></code></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">DHCP Pool</th>
+                                    <td>
+                                        <?php if ($vlan['dhcp_pool_start'] && $vlan['dhcp_pool_end']): ?>
+                                        <code><?= htmlspecialchars($vlan['dhcp_pool_start']) ?></code> -<br>
+                                        <code><?= htmlspecialchars($vlan['dhcp_pool_end']) ?></code>
+                                        <?php else: ?>
+                                        <span class="text-muted">Not Configured</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Subscribers</th>
+                                    <td><span class="badge bg-info"><?= count($vlanSubscriptions) ?></span></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Live Status Card -->
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-activity me-2"></i>Live Status</h6>
+                        </div>
+                        <div class="card-body" id="vlanStatusCard">
+                            <div class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="text-muted mt-2 mb-0">Fetching status...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Live Traffic Monitoring -->
+            <div class="card mt-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>Live Traffic Monitor</h6>
+                    <div>
+                        <span id="trafficStatus" class="badge bg-secondary me-2">Connecting...</span>
+                        <button class="btn btn-sm btn-outline-light" id="toggleTrafficBtn" onclick="toggleTrafficMonitor()">
+                            <i class="bi bi-pause-fill"></i> Pause
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0">
+                                <div class="card-body text-center py-3">
+                                    <h6 class="text-muted mb-1"><i class="bi bi-download text-success"></i> Download Speed</h6>
+                                    <h2 class="mb-0" id="downloadSpeed">0.00 <small class="fs-6">Mbps</small></h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0">
+                                <div class="card-body text-center py-3">
+                                    <h6 class="text-muted mb-1"><i class="bi bi-upload text-danger"></i> Upload Speed</h6>
+                                    <h2 class="mb-0" id="uploadSpeed">0.00 <small class="fs-6">Mbps</small></h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0">
+                                <div class="card-body text-center py-3">
+                                    <h6 class="text-muted mb-1">Total Downloaded</h6>
+                                    <h4 class="mb-0" id="totalDownload">0 B</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0">
+                                <div class="card-body text-center py-3">
+                                    <h6 class="text-muted mb-1">Total Uploaded</h6>
+                                    <h4 class="mb-0" id="totalUpload">0 B</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">RX Packets:</span>
+                                <strong id="rxPackets">0</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">TX Packets:</span>
+                                <strong id="txPackets">0</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Last Update:</span>
+                                <strong id="lastUpdate">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="height: 300px;">
+                        <canvas id="trafficChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Subscribers using this VLAN -->
+            <?php if (!empty($vlanSubscriptions)): ?>
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-people me-2"></i>Subscribers on this VLAN (<?= count($vlanSubscriptions) ?>)</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Package</th>
+                                    <th>Status</th>
+                                    <th>IP Address</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($vlanSubscriptions as $sub): ?>
+                                <tr>
+                                    <td>
+                                        <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="text-decoration-none">
+                                            <strong><?= htmlspecialchars($sub['username']) ?></strong>
+                                        </a>
+                                    </td>
+                                    <td><?= htmlspecialchars($sub['package_name'] ?? 'N/A') ?></td>
+                                    <td>
+                                        <span class="badge bg-<?= $sub['status'] === 'active' ? 'success' : ($sub['status'] === 'suspended' ? 'warning' : 'secondary') ?>">
+                                            <?= ucfirst($sub['status']) ?>
+                                        </span>
+                                    </td>
+                                    <td><code><?= htmlspecialchars($sub['static_ip'] ?: '-') ?></code></td>
+                                    <td>
+                                        <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <script>
+            const currentVlanId = <?= $vlanId ?>;
+            let trafficChart = null;
+            let trafficInterval = null;
+            let trafficPaused = false;
+            let lastTrafficData = { rx: 0, tx: 0, time: 0 };
+            let trafficHistory = { labels: [], rx: [], tx: [] };
+            
+            document.addEventListener('DOMContentLoaded', function() {
+                initTrafficChart();
+                fetchVlanStatus();
+                fetchVlanTraffic();
+                trafficInterval = setInterval(fetchVlanTraffic, 2000);
+            });
+            
+            function initTrafficChart() {
+                const ctx = document.getElementById('trafficChart').getContext('2d');
+                trafficChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Download (Mbps)',
+                                data: [],
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 2
+                            },
+                            {
+                                label: 'Upload (Mbps)',
+                                data: [],
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        interaction: { intersect: false, mode: 'index' },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Speed (Mbps)' }
+                            },
+                            x: {
+                                title: { display: true, text: 'Time' }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'top' }
+                        }
+                    }
+                });
+            }
+            
+            function fetchVlanStatus() {
+                fetch(`/index.php?page=isp&action=vlan_status&vlan_id=${currentVlanId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const card = document.getElementById('vlanStatusCard');
+                        if (data.success) {
+                            const s = data.status;
+                            card.innerHTML = `
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tr>
+                                        <th class="text-muted" style="width:40%">Interface</th>
+                                        <td><code>${s.name}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted">Status</th>
+                                        <td>
+                                            <span class="badge bg-${s.running ? 'success' : 'danger'}">
+                                                ${s.running ? 'Running' : 'Down'}
+                                            </span>
+                                            ${s.disabled ? '<span class="badge bg-secondary ms-1">Disabled</span>' : ''}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted">VLAN Tag</th>
+                                        <td>${s.vlan_id}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted">Parent</th>
+                                        <td><code>${s.interface}</code></td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted">MTU</th>
+                                        <td>${s.mtu}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-muted">MAC</th>
+                                        <td><code class="small">${s.mac_address}</code></td>
+                                    </tr>
+                                </table>
+                            `;
+                        } else {
+                            card.innerHTML = `<div class="alert alert-warning mb-0">
+                                <i class="bi bi-exclamation-triangle me-2"></i>${data.error}
+                            </div>`;
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById('vlanStatusCard').innerHTML = 
+                            `<div class="alert alert-danger mb-0">Failed to fetch status</div>`;
+                    });
+            }
+            
+            function fetchVlanTraffic() {
+                if (trafficPaused) return;
+                
+                fetch(`/index.php?page=isp&action=vlan_traffic&vlan_id=${currentVlanId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateTrafficDisplay(data.traffic, data.timestamp);
+                            document.getElementById('trafficStatus').className = 'badge bg-success me-2';
+                            document.getElementById('trafficStatus').textContent = 'Live';
+                        } else {
+                            document.getElementById('trafficStatus').className = 'badge bg-danger me-2';
+                            document.getElementById('trafficStatus').textContent = 'Error: ' + data.error;
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById('trafficStatus').className = 'badge bg-danger me-2';
+                        document.getElementById('trafficStatus').textContent = 'Connection Error';
+                    });
+            }
+            
+            function updateTrafficDisplay(traffic, timestamp) {
+                let rxMbps = 0, txMbps = 0;
+                
+                if (lastTrafficData.time > 0) {
+                    const timeDelta = (timestamp - lastTrafficData.time) / 1000;
+                    if (timeDelta > 0) {
+                        const rxDelta = traffic.rx_byte - lastTrafficData.rx;
+                        const txDelta = traffic.tx_byte - lastTrafficData.tx;
+                        
+                        if (rxDelta >= 0 && txDelta >= 0) {
+                            rxMbps = (rxDelta * 8) / (timeDelta * 1000000);
+                            txMbps = (txDelta * 8) / (timeDelta * 1000000);
+                        }
+                    }
+                }
+                
+                lastTrafficData = { rx: traffic.rx_byte, tx: traffic.tx_byte, time: timestamp };
+                
+                document.getElementById('downloadSpeed').innerHTML = rxMbps.toFixed(2) + ' <small class="fs-6">Mbps</small>';
+                document.getElementById('uploadSpeed').innerHTML = txMbps.toFixed(2) + ' <small class="fs-6">Mbps</small>';
+                document.getElementById('totalDownload').textContent = formatBytes(traffic.rx_byte);
+                document.getElementById('totalUpload').textContent = formatBytes(traffic.tx_byte);
+                document.getElementById('rxPackets').textContent = traffic.rx_packet.toLocaleString();
+                document.getElementById('txPackets').textContent = traffic.tx_packet.toLocaleString();
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                
+                // Update chart
+                const timeLabel = new Date().toLocaleTimeString();
+                trafficHistory.labels.push(timeLabel);
+                trafficHistory.rx.push(rxMbps);
+                trafficHistory.tx.push(txMbps);
+                
+                if (trafficHistory.labels.length > 30) {
+                    trafficHistory.labels.shift();
+                    trafficHistory.rx.shift();
+                    trafficHistory.tx.shift();
+                }
+                
+                trafficChart.data.labels = trafficHistory.labels;
+                trafficChart.data.datasets[0].data = trafficHistory.rx;
+                trafficChart.data.datasets[1].data = trafficHistory.tx;
+                trafficChart.update('none');
+            }
+            
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            function toggleTrafficMonitor() {
+                trafficPaused = !trafficPaused;
+                const btn = document.getElementById('toggleTrafficBtn');
+                const status = document.getElementById('trafficStatus');
+                
+                if (trafficPaused) {
+                    btn.innerHTML = '<i class="bi bi-play-fill"></i> Resume';
+                    status.className = 'badge bg-warning me-2';
+                    status.textContent = 'Paused';
+                } else {
+                    btn.innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
+                    fetchVlanTraffic();
+                }
+            }
+            
+            function syncVlanDetail(id) {
+                if (!confirm('Sync this VLAN configuration to MikroTik?')) return;
+                
+                fetch(`/index.php?page=isp&action=sync_vlan&id=${id}`)
+                    .then(r => r.json())
+                    .then(result => {
+                        if (result.success) {
+                            alert('VLAN synced successfully!');
+                            location.reload();
+                        } else {
+                            alert('Sync failed: ' + (result.error || 'Unknown error'));
+                        }
+                    });
+            }
+            
+            function editVlanDetail(id) {
+                window.location.href = `?page=isp&view=vlans&edit=${id}`;
+            }
+            </script>
+            <?php } ?>
 
             <?php elseif ($view === 'settings'): ?>
             <?php
