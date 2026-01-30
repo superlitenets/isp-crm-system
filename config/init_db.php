@@ -2285,6 +2285,54 @@ function runMigrations(PDO $db): void {
         error_log("RADIUS usage logs table error: " . $e->getMessage());
     }
     
+    // MikroTik VLANs for static IP provisioning
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS mikrotik_vlans (
+            id SERIAL PRIMARY KEY,
+            nas_id INTEGER REFERENCES radius_nas(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            vlan_id INTEGER NOT NULL,
+            interface VARCHAR(100) NOT NULL,
+            gateway_ip VARCHAR(45),
+            network_cidr VARCHAR(45),
+            dhcp_pool_start VARCHAR(45),
+            dhcp_pool_end VARCHAR(45),
+            dhcp_server_name VARCHAR(100),
+            dns_servers VARCHAR(255),
+            lease_time VARCHAR(20) DEFAULT '1d',
+            description TEXT,
+            is_synced BOOLEAN DEFAULT FALSE,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(nas_id, vlan_id)
+        )");
+    } catch (PDOException $e) {
+        error_log("MikroTik VLANs table error: " . $e->getMessage());
+    }
+    
+    // MikroTik Provisioned Static IPs
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS mikrotik_provisioned_ips (
+            id SERIAL PRIMARY KEY,
+            subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+            nas_id INTEGER REFERENCES radius_nas(id) ON DELETE CASCADE,
+            vlan_id INTEGER REFERENCES mikrotik_vlans(id) ON DELETE SET NULL,
+            ip_address VARCHAR(45) NOT NULL,
+            mac_address VARCHAR(17),
+            dhcp_lease_id VARCHAR(50),
+            arp_entry_id VARCHAR(50),
+            provision_type VARCHAR(20) DEFAULT 'dhcp_lease',
+            comment TEXT,
+            is_synced BOOLEAN DEFAULT FALSE,
+            synced_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+    } catch (PDOException $e) {
+        error_log("MikroTik provisioned IPs table error: " . $e->getMessage());
+    }
+    
     // Huawei DBA Profiles
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS huawei_dba_profiles (
