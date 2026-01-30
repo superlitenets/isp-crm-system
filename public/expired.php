@@ -181,12 +181,12 @@ $statusConfig = [
     'suspended' => [
         'icon' => 'bi-pause-circle-fill',
         'title' => 'Account Suspended',
-        'subtitle' => 'Your account has been temporarily suspended',
+        'subtitle' => 'Pay to reactivate your service',
         'color' => '#fd7e14',
         'colorDark' => '#e55a00',
         'animation' => 'pulse 2s infinite',
-        'canPay' => false,
-        'notice' => 'Your account has been suspended. Please contact support to resolve this issue and reactivate your service.',
+        'canPay' => true,
+        'notice' => 'Your account has been suspended. Pay now to reactivate your internet service.',
     ],
     'disabled' => [
         'icon' => 'bi-slash-circle-fill',
