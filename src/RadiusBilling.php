@@ -4050,4 +4050,422 @@ class RadiusBilling {
         
         return $decrypted !== false ? $decrypted : null;
     }
+    
+    // ==================== VLAN Management ====================
+    
+    public function getVlans(?int $nasId = null): array {
+        if ($nasId) {
+            $stmt = $this->db->prepare("
+                SELECT v.*, n.name as nas_name, n.ip_address as nas_ip
+                FROM mikrotik_vlans v
+                LEFT JOIN radius_nas n ON v.nas_id = n.id
+                WHERE v.nas_id = ?
+                ORDER BY v.vlan_id
+            ");
+            $stmt->execute([$nasId]);
+        } else {
+            $stmt = $this->db->query("
+                SELECT v.*, n.name as nas_name, n.ip_address as nas_ip
+                FROM mikrotik_vlans v
+                LEFT JOIN radius_nas n ON v.nas_id = n.id
+                ORDER BY n.name, v.vlan_id
+            ");
+        }
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getVlan(int $id): ?array {
+        $stmt = $this->db->prepare("
+            SELECT v.*, n.name as nas_name, n.ip_address as nas_ip
+            FROM mikrotik_vlans v
+            LEFT JOIN radius_nas n ON v.nas_id = n.id
+            WHERE v.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function createVlan(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO mikrotik_vlans 
+                (nas_id, name, vlan_id, interface, gateway_ip, network_cidr, 
+                 dhcp_pool_start, dhcp_pool_end, dhcp_server_name, dns_servers, lease_time, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+            ");
+            $stmt->execute([
+                $data['nas_id'],
+                $data['name'],
+                $data['vlan_id'],
+                $data['interface'],
+                $data['gateway_ip'] ?? null,
+                $data['network_cidr'] ?? null,
+                $data['dhcp_pool_start'] ?? null,
+                $data['dhcp_pool_end'] ?? null,
+                $data['dhcp_server_name'] ?? null,
+                $data['dns_servers'] ?? null,
+                $data['lease_time'] ?? '1d',
+                $data['description'] ?? null
+            ]);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return ['success' => true, 'id' => $result['id']];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function updateVlan(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE mikrotik_vlans SET
+                    name = ?, vlan_id = ?, interface = ?, gateway_ip = ?, network_cidr = ?,
+                    dhcp_pool_start = ?, dhcp_pool_end = ?, dhcp_server_name = ?, 
+                    dns_servers = ?, lease_time = ?, description = ?, is_active = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['vlan_id'],
+                $data['interface'],
+                $data['gateway_ip'] ?? null,
+                $data['network_cidr'] ?? null,
+                $data['dhcp_pool_start'] ?? null,
+                $data['dhcp_pool_end'] ?? null,
+                $data['dhcp_server_name'] ?? null,
+                $data['dns_servers'] ?? null,
+                $data['lease_time'] ?? '1d',
+                $data['description'] ?? null,
+                $data['is_active'] ?? true,
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteVlan(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM mikrotik_vlans WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function syncVlanToMikroTik(int $vlanId): array {
+        try {
+            $vlan = $this->getVlan($vlanId);
+            if (!$vlan) {
+                return ['success' => false, 'error' => 'VLAN not found'];
+            }
+            
+            $nas = $this->getNAS($vlan['nas_id']);
+            if (!$nas || !$nas['api_enabled']) {
+                return ['success' => false, 'error' => 'NAS device not found or API not enabled'];
+            }
+            
+            $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+            if (!$apiPassword) {
+                return ['success' => false, 'error' => 'Failed to decrypt API password'];
+            }
+            
+            $mikrotik = new \App\MikroTikAPI(
+                $nas['ip_address'],
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
+            );
+            $mikrotik->connect();
+            
+            $results = ['vlan' => false, 'ip' => false, 'pool' => false, 'network' => false, 'dhcp' => false];
+            $errors = [];
+            
+            // 1. Create VLAN interface
+            $existingVlan = $mikrotik->getVlan($vlan['vlan_id']);
+            if (!$existingVlan) {
+                $vlanResult = $mikrotik->createVlan(
+                    $vlan['name'],
+                    $vlan['vlan_id'],
+                    $vlan['interface'],
+                    $vlan['description']
+                );
+                $results['vlan'] = !isset($vlanResult['error']);
+                if (isset($vlanResult['error'])) $errors[] = 'VLAN: ' . $vlanResult['error'];
+            } else {
+                $results['vlan'] = true;
+            }
+            
+            // 2. Add IP address to VLAN interface
+            if ($vlan['gateway_ip'] && $vlan['network_cidr']) {
+                $ipResult = $mikrotik->addIpAddress(
+                    $vlan['gateway_ip'] . '/' . explode('/', $vlan['network_cidr'])[1],
+                    $vlan['name'],
+                    'CRM VLAN ' . $vlan['vlan_id']
+                );
+                $results['ip'] = !isset($ipResult['error']);
+                if (isset($ipResult['error'])) $errors[] = 'IP: ' . $ipResult['error'];
+            }
+            
+            // 3. Create IP Pool for DHCP
+            if ($vlan['dhcp_pool_start'] && $vlan['dhcp_pool_end']) {
+                $poolName = 'pool-vlan' . $vlan['vlan_id'];
+                $poolResult = $mikrotik->createIpPool(
+                    $poolName,
+                    $vlan['dhcp_pool_start'] . '-' . $vlan['dhcp_pool_end'],
+                    'CRM VLAN ' . $vlan['vlan_id']
+                );
+                $results['pool'] = !isset($poolResult['error']);
+                if (isset($poolResult['error'])) $errors[] = 'Pool: ' . $poolResult['error'];
+                
+                // 4. Add DHCP Network
+                if ($vlan['network_cidr'] && $vlan['gateway_ip']) {
+                    $networkResult = $mikrotik->addDhcpNetwork(
+                        $vlan['network_cidr'],
+                        $vlan['gateway_ip'],
+                        $vlan['dns_servers'],
+                        'CRM VLAN ' . $vlan['vlan_id']
+                    );
+                    $results['network'] = !isset($networkResult['error']);
+                    if (isset($networkResult['error'])) $errors[] = 'Network: ' . $networkResult['error'];
+                }
+                
+                // 5. Create DHCP Server
+                $dhcpName = $vlan['dhcp_server_name'] ?: 'dhcp-vlan' . $vlan['vlan_id'];
+                $dhcpResult = $mikrotik->createDhcpServer(
+                    $dhcpName,
+                    $vlan['name'],
+                    $poolName,
+                    $vlan['lease_time'] ?: '1d'
+                );
+                $results['dhcp'] = !isset($dhcpResult['error']);
+                if (isset($dhcpResult['error'])) $errors[] = 'DHCP: ' . $dhcpResult['error'];
+                
+                // Update DHCP server name in DB if we created it
+                if ($results['dhcp'] && !$vlan['dhcp_server_name']) {
+                    $this->db->prepare("UPDATE mikrotik_vlans SET dhcp_server_name = ? WHERE id = ?")
+                        ->execute([$dhcpName, $vlanId]);
+                }
+            }
+            
+            $mikrotik->disconnect();
+            
+            // Mark as synced
+            $this->db->prepare("UPDATE mikrotik_vlans SET is_synced = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                ->execute([$vlanId]);
+            
+            $allSuccess = !in_array(false, $results, true);
+            return [
+                'success' => $allSuccess,
+                'results' => $results,
+                'errors' => $errors
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    // ==================== Static IP Provisioning ====================
+    
+    public function getProvisionedIps(?int $subscriptionId = null): array {
+        if ($subscriptionId) {
+            $stmt = $this->db->prepare("
+                SELECT p.*, v.name as vlan_name, v.vlan_id, n.name as nas_name,
+                       s.username, c.name as customer_name
+                FROM mikrotik_provisioned_ips p
+                LEFT JOIN mikrotik_vlans v ON p.vlan_id = v.id
+                LEFT JOIN radius_nas n ON p.nas_id = n.id
+                LEFT JOIN radius_subscriptions s ON p.subscription_id = s.id
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE p.subscription_id = ?
+                ORDER BY p.created_at DESC
+            ");
+            $stmt->execute([$subscriptionId]);
+        } else {
+            $stmt = $this->db->query("
+                SELECT p.*, v.name as vlan_name, v.vlan_id, n.name as nas_name,
+                       s.username, c.name as customer_name
+                FROM mikrotik_provisioned_ips p
+                LEFT JOIN mikrotik_vlans v ON p.vlan_id = v.id
+                LEFT JOIN radius_nas n ON p.nas_id = n.id
+                LEFT JOIN radius_subscriptions s ON p.subscription_id = s.id
+                LEFT JOIN customers c ON s.customer_id = c.id
+                ORDER BY p.created_at DESC
+            ");
+        }
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function provisionStaticIp(int $subscriptionId, int $vlanId, string $ipAddress, string $macAddress): array {
+        try {
+            $sub = $this->getSubscription($subscriptionId);
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            $vlan = $this->getVlan($vlanId);
+            if (!$vlan) {
+                return ['success' => false, 'error' => 'VLAN not found'];
+            }
+            
+            $nas = $this->getNAS($vlan['nas_id']);
+            if (!$nas || !$nas['api_enabled']) {
+                return ['success' => false, 'error' => 'NAS device not found or API not enabled'];
+            }
+            
+            $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+            if (!$apiPassword) {
+                return ['success' => false, 'error' => 'Failed to decrypt API password'];
+            }
+            
+            // Format MAC address
+            $macFormatted = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $macAddress));
+            $macFormatted = implode(':', str_split($macFormatted, 2));
+            
+            $mikrotik = new \App\MikroTikAPI(
+                $nas['ip_address'],
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
+            );
+            $mikrotik->connect();
+            
+            $comment = $sub['username'] . ' - ' . ($sub['customer_name'] ?? 'Customer');
+            
+            // Create DHCP lease
+            $dhcpServer = $vlan['dhcp_server_name'] ?: 'dhcp-vlan' . $vlan['vlan_id'];
+            $leaseResult = $mikrotik->createDhcpLease($ipAddress, $macFormatted, $dhcpServer, $comment);
+            
+            $mikrotik->disconnect();
+            
+            if (isset($leaseResult['error'])) {
+                return ['success' => false, 'error' => 'Failed to create DHCP lease: ' . $leaseResult['error']];
+            }
+            
+            // Save to database
+            $stmt = $this->db->prepare("
+                INSERT INTO mikrotik_provisioned_ips 
+                (subscription_id, nas_id, vlan_id, ip_address, mac_address, provision_type, comment, is_synced, synced_at)
+                VALUES (?, ?, ?, ?, ?, 'dhcp_lease', ?, true, CURRENT_TIMESTAMP)
+                RETURNING id
+            ");
+            $stmt->execute([
+                $subscriptionId,
+                $nas['id'],
+                $vlanId,
+                $ipAddress,
+                $macFormatted,
+                $comment
+            ]);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // Update subscription with static IP
+            $this->db->prepare("
+                UPDATE radius_subscriptions SET 
+                    static_ip = ?, mac_address = ?, nas_id = ?, 
+                    access_type = 'static', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ")->execute([$ipAddress, $macFormatted, $nas['id'], $subscriptionId]);
+            
+            return ['success' => true, 'id' => $result['id'], 'ip' => $ipAddress, 'mac' => $macFormatted];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function deprovisionStaticIp(int $subscriptionId): array {
+        try {
+            $sub = $this->getSubscription($subscriptionId);
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            // Get provisioned IP record
+            $stmt = $this->db->prepare("SELECT * FROM mikrotik_provisioned_ips WHERE subscription_id = ?");
+            $stmt->execute([$subscriptionId]);
+            $provision = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($provision && $provision['nas_id']) {
+                $nas = $this->getNAS($provision['nas_id']);
+                if ($nas && $nas['api_enabled']) {
+                    $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+                    if ($apiPassword) {
+                        try {
+                            $mikrotik = new \App\MikroTikAPI(
+                                $nas['ip_address'],
+                                (int)($nas['api_port'] ?? 8728),
+                                $nas['api_username'],
+                                $apiPassword
+                            );
+                            $mikrotik->connect();
+                            
+                            // Remove DHCP lease
+                            if ($provision['ip_address']) {
+                                $mikrotik->removeDhcpLease($provision['ip_address']);
+                            }
+                            
+                            $mikrotik->disconnect();
+                        } catch (\Exception $e) {
+                            // Log but continue
+                        }
+                    }
+                }
+            }
+            
+            // Delete provision record
+            $this->db->prepare("DELETE FROM mikrotik_provisioned_ips WHERE subscription_id = ?")
+                ->execute([$subscriptionId]);
+            
+            // Clear static IP from subscription
+            $this->db->prepare("
+                UPDATE radius_subscriptions SET 
+                    static_ip = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ")->execute([$subscriptionId]);
+            
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function fetchMikroTikInterfaces(int $nasId): array {
+        try {
+            $nas = $this->getNAS($nasId);
+            if (!$nas || !$nas['api_enabled']) {
+                return ['success' => false, 'error' => 'NAS not found or API not enabled'];
+            }
+            
+            $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+            if (!$apiPassword) {
+                return ['success' => false, 'error' => 'Failed to decrypt API password'];
+            }
+            
+            $mikrotik = new \App\MikroTikAPI(
+                $nas['ip_address'],
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
+            );
+            $mikrotik->connect();
+            
+            $interfaces = $mikrotik->getInterfaces();
+            $vlans = $mikrotik->getVlans();
+            $bridges = $mikrotik->getBridges();
+            
+            $mikrotik->disconnect();
+            
+            return [
+                'success' => true,
+                'interfaces' => $interfaces,
+                'vlans' => $vlans,
+                'bridges' => $bridges
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
 }

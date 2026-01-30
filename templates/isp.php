@@ -1736,6 +1736,9 @@ try {
                 <a class="nav-link <?= $view === 'nas' ? 'active' : '' ?>" href="?page=isp&view=nas">
                     <i class="bi bi-hdd-network me-2"></i> NAS Devices
                 </a>
+                <a class="nav-link <?= $view === 'vlans' ? 'active' : '' ?>" href="?page=isp&view=vlans">
+                    <i class="bi bi-diagram-3 me-2"></i> VLANs
+                </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'vouchers' ? 'active' : '' ?>" href="?page=isp&view=vouchers">
                     <i class="bi bi-ticket me-2"></i> Vouchers
@@ -1796,6 +1799,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'nas' ? 'active' : '' ?>" href="?page=isp&view=nas">
                     <i class="bi bi-hdd-network me-2"></i> NAS Devices
+                </a>
+                <a class="nav-link <?= $view === 'vlans' ? 'active' : '' ?>" href="?page=isp&view=vlans">
+                    <i class="bi bi-diagram-3 me-2"></i> VLANs
                 </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'vouchers' ? 'active' : '' ?>" href="?page=isp&view=vouchers">
@@ -6188,6 +6194,428 @@ try {
                     </div>
                 </div>
             </div>
+
+            <?php elseif ($view === 'vlans'): ?>
+            <?php 
+            $vlans = $radiusBilling->getVlans();
+            $nasDevices = $radiusBilling->getNASDevices();
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-diagram-3"></i> VLAN Management</h4>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVlanModal">
+                    <i class="bi bi-plus-lg me-1"></i> Add VLAN
+                </button>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <?php if (empty($vlans)): ?>
+                    <div class="p-5 text-center text-muted">
+                        <i class="bi bi-diagram-3 fs-1 mb-3 d-block"></i>
+                        <h5>No VLANs Configured</h5>
+                        <p>Add VLANs to provision static IPs for subscribers.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>VLAN</th>
+                                    <th>NAS Device</th>
+                                    <th>Interface</th>
+                                    <th>Network</th>
+                                    <th>DHCP Pool</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($vlans as $vlan): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= htmlspecialchars($vlan['name']) ?></strong>
+                                        <br><small class="text-muted">ID: <?= $vlan['vlan_id'] ?></small>
+                                    </td>
+                                    <td><?= htmlspecialchars($vlan['nas_name'] ?? 'N/A') ?></td>
+                                    <td><code><?= htmlspecialchars($vlan['interface']) ?></code></td>
+                                    <td>
+                                        <?php if ($vlan['network_cidr']): ?>
+                                        <code><?= htmlspecialchars($vlan['network_cidr']) ?></code>
+                                        <br><small class="text-muted">GW: <?= htmlspecialchars($vlan['gateway_ip']) ?></small>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($vlan['dhcp_pool_start'] && $vlan['dhcp_pool_end']): ?>
+                                        <small><?= htmlspecialchars($vlan['dhcp_pool_start']) ?> - <?= htmlspecialchars($vlan['dhcp_pool_end']) ?></small>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($vlan['is_synced']): ?>
+                                        <span class="badge bg-success">Synced</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-warning">Not Synced</span>
+                                        <?php endif; ?>
+                                        <?php if (!$vlan['is_active']): ?>
+                                        <span class="badge bg-secondary">Disabled</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="syncVlan(<?= $vlan['id'] ?>)" title="Sync to MikroTik">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary" onclick="editVlan(<?= $vlan['id'] ?>)" title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" onclick="deleteVlan(<?= $vlan['id'] ?>, '<?= htmlspecialchars($vlan['name']) ?>')" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Add VLAN Modal -->
+            <div class="modal fade" id="addVlanModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Add VLAN</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="addVlanForm">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">NAS Device *</label>
+                                        <select class="form-select" name="nas_id" required onchange="fetchInterfaces(this.value)">
+                                            <option value="">Select NAS...</option>
+                                            <?php foreach ($nasDevices as $nas): ?>
+                                            <?php if ($nas['api_enabled']): ?>
+                                            <option value="<?= $nas['id'] ?>"><?= htmlspecialchars($nas['name']) ?> (<?= $nas['ip_address'] ?>)</option>
+                                            <?php endif; ?>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">VLAN Name *</label>
+                                        <input type="text" class="form-control" name="name" placeholder="e.g., vlan40-residential" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">VLAN ID *</label>
+                                        <input type="number" class="form-control" name="vlan_id" min="1" max="4094" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Parent Interface *</label>
+                                        <select class="form-select" name="interface" id="vlanInterface" required>
+                                            <option value="">Select interface...</option>
+                                            <option value="ether1">ether1</option>
+                                            <option value="ether2">ether2</option>
+                                            <option value="ether3">ether3</option>
+                                            <option value="ether4">ether4</option>
+                                            <option value="ether5">ether5</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Lease Time</label>
+                                        <input type="text" class="form-control" name="lease_time" value="1d" placeholder="1d">
+                                    </div>
+                                    <div class="col-12">
+                                        <hr>
+                                        <h6>Network Configuration</h6>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Gateway IP</label>
+                                        <input type="text" class="form-control" name="gateway_ip" placeholder="e.g., 10.40.0.1">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Network CIDR</label>
+                                        <input type="text" class="form-control" name="network_cidr" placeholder="e.g., 10.40.0.0/24">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DHCP Pool Start</label>
+                                        <input type="text" class="form-control" name="dhcp_pool_start" placeholder="e.g., 10.40.0.10">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DHCP Pool End</label>
+                                        <input type="text" class="form-control" name="dhcp_pool_end" placeholder="e.g., 10.40.0.254">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DNS Servers</label>
+                                        <input type="text" class="form-control" name="dns_servers" placeholder="e.g., 8.8.8.8,8.8.4.4">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DHCP Server Name</label>
+                                        <input type="text" class="form-control" name="dhcp_server_name" placeholder="Auto-generated if empty">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Description</label>
+                                        <textarea class="form-control" name="description" rows="2"></textarea>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-success" onclick="saveVlan(true)">
+                                <i class="bi bi-check-lg me-1"></i> Save & Sync to MikroTik
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="saveVlan(false)">
+                                <i class="bi bi-save me-1"></i> Save Only
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit VLAN Modal -->
+            <div class="modal fade" id="editVlanModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit VLAN</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="editVlanForm">
+                                <input type="hidden" name="id">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">NAS Device</label>
+                                        <input type="text" class="form-control" id="editNasName" disabled>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">VLAN Name *</label>
+                                        <input type="text" class="form-control" name="name" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">VLAN ID *</label>
+                                        <input type="number" class="form-control" name="vlan_id" min="1" max="4094" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Parent Interface *</label>
+                                        <input type="text" class="form-control" name="interface" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Lease Time</label>
+                                        <input type="text" class="form-control" name="lease_time">
+                                    </div>
+                                    <div class="col-12"><hr><h6>Network Configuration</h6></div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Gateway IP</label>
+                                        <input type="text" class="form-control" name="gateway_ip">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Network CIDR</label>
+                                        <input type="text" class="form-control" name="network_cidr">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DHCP Pool Start</label>
+                                        <input type="text" class="form-control" name="dhcp_pool_start">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DHCP Pool End</label>
+                                        <input type="text" class="form-control" name="dhcp_pool_end">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DNS Servers</label>
+                                        <input type="text" class="form-control" name="dns_servers">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">DHCP Server Name</label>
+                                        <input type="text" class="form-control" name="dhcp_server_name">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Description</label>
+                                        <textarea class="form-control" name="description" rows="2"></textarea>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Status</label>
+                                        <select class="form-select" name="is_active">
+                                            <option value="1">Active</option>
+                                            <option value="0">Disabled</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="updateVlan()">
+                                <i class="bi bi-save me-1"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function fetchInterfaces(nasId) {
+                if (!nasId) return;
+                const select = document.getElementById('vlanInterface');
+                select.innerHTML = '<option value="">Loading...</option>';
+                
+                fetch(`/index.php?page=isp&action=fetch_interfaces&nas_id=${nasId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            select.innerHTML = '<option value="">Select interface...</option>';
+                            data.interfaces.forEach(iface => {
+                                if (iface.name && iface.type !== 'vlan') {
+                                    const opt = document.createElement('option');
+                                    opt.value = iface.name;
+                                    opt.textContent = `${iface.name} (${iface.type || 'unknown'})`;
+                                    select.appendChild(opt);
+                                }
+                            });
+                        } else {
+                            alert('Failed to fetch interfaces: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => alert('Error: ' + err.message));
+            }
+            
+            function saveVlan(syncAfter = false) {
+                const form = document.getElementById('addVlanForm');
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                
+                fetch('/index.php?page=isp&action=create_vlan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(r => r.json())
+                .then(result => {
+                    if (result.success) {
+                        if (syncAfter) {
+                            syncVlan(result.id, true);
+                        } else {
+                            alert('VLAN created successfully!');
+                            window.location.reload();
+                        }
+                    } else {
+                        alert('Failed: ' + (result.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => alert('Error: ' + err.message));
+            }
+            
+            function syncVlan(id, isNew = false) {
+                const btn = event?.target?.closest('button');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                }
+                
+                fetch(`/index.php?page=isp&action=sync_vlan&id=${id}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            let msg = 'Sync completed!\n\n';
+                            if (data.results) {
+                                msg += `VLAN: ${data.results.vlan ? 'OK' : 'Failed'}\n`;
+                                msg += `IP Address: ${data.results.ip ? 'OK' : 'Skipped/Failed'}\n`;
+                                msg += `IP Pool: ${data.results.pool ? 'OK' : 'Skipped/Failed'}\n`;
+                                msg += `DHCP Network: ${data.results.network ? 'OK' : 'Skipped/Failed'}\n`;
+                                msg += `DHCP Server: ${data.results.dhcp ? 'OK' : 'Skipped/Failed'}\n`;
+                            }
+                            if (data.errors && data.errors.length > 0) {
+                                msg += '\nWarnings:\n' + data.errors.join('\n');
+                            }
+                            alert(msg);
+                            window.location.reload();
+                        } else {
+                            alert('Sync failed: ' + (data.error || 'Unknown error'));
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        alert('Error: ' + err.message);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+                        }
+                    });
+            }
+            
+            function editVlan(id) {
+                fetch(`/index.php?page=isp&action=get_vlan&id=${id}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.vlan) {
+                            const v = data.vlan;
+                            const form = document.getElementById('editVlanForm');
+                            form.querySelector('[name="id"]').value = v.id;
+                            form.querySelector('[name="name"]').value = v.name;
+                            form.querySelector('[name="vlan_id"]').value = v.vlan_id;
+                            form.querySelector('[name="interface"]').value = v.interface;
+                            form.querySelector('[name="gateway_ip"]').value = v.gateway_ip || '';
+                            form.querySelector('[name="network_cidr"]').value = v.network_cidr || '';
+                            form.querySelector('[name="dhcp_pool_start"]').value = v.dhcp_pool_start || '';
+                            form.querySelector('[name="dhcp_pool_end"]').value = v.dhcp_pool_end || '';
+                            form.querySelector('[name="dns_servers"]').value = v.dns_servers || '';
+                            form.querySelector('[name="dhcp_server_name"]').value = v.dhcp_server_name || '';
+                            form.querySelector('[name="lease_time"]').value = v.lease_time || '1d';
+                            form.querySelector('[name="description"]').value = v.description || '';
+                            form.querySelector('[name="is_active"]').value = v.is_active ? '1' : '0';
+                            document.getElementById('editNasName').value = v.nas_name || 'N/A';
+                            new bootstrap.Modal(document.getElementById('editVlanModal')).show();
+                        } else {
+                            alert('VLAN not found');
+                        }
+                    });
+            }
+            
+            function updateVlan() {
+                const form = document.getElementById('editVlanForm');
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                data.is_active = data.is_active === '1';
+                
+                fetch('/index.php?page=isp&action=update_vlan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(r => r.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('VLAN updated!');
+                        window.location.reload();
+                    } else {
+                        alert('Failed: ' + (result.error || 'Unknown error'));
+                    }
+                });
+            }
+            
+            function deleteVlan(id, name) {
+                if (!confirm(`Delete VLAN "${name}"?\n\nNote: This only removes from CRM database, not from MikroTik.`)) return;
+                
+                fetch(`/index.php?page=isp&action=delete_vlan&id=${id}`)
+                    .then(r => r.json())
+                    .then(result => {
+                        if (result.success) {
+                            window.location.reload();
+                        } else {
+                            alert('Failed: ' + (result.error || 'Unknown error'));
+                        }
+                    });
+            }
+            </script>
 
             <?php elseif ($view === 'settings'): ?>
             <?php

@@ -2260,6 +2260,94 @@ if ($page === 'isp') {
         exit;
     }
     
+    // VLAN Management API
+    if ($action === 'get_vlans') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $nasId = isset($_GET['nas_id']) && $_GET['nas_id'] !== '' ? (int)$_GET['nas_id'] : null;
+        $vlans = $radiusBilling->getVlans($nasId);
+        echo json_encode(['success' => true, 'vlans' => $vlans]);
+        exit;
+    }
+    
+    if ($action === 'get_vlan') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $id = (int)($_GET['id'] ?? 0);
+        $vlan = $radiusBilling->getVlan($id);
+        echo json_encode(['success' => true, 'vlan' => $vlan]);
+        exit;
+    }
+    
+    if ($action === 'create_vlan' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $data = json_decode(file_get_contents('php://input'), true);
+        $result = $radiusBilling->createVlan($data);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'update_vlan' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($data['id'] ?? 0);
+        $result = $radiusBilling->updateVlan($id, $data);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'delete_vlan') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $id = (int)($_GET['id'] ?? 0);
+        $result = $radiusBilling->deleteVlan($id);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'sync_vlan') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $id = (int)($_GET['id'] ?? 0);
+        $result = $radiusBilling->syncVlanToMikroTik($id);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'fetch_interfaces') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $nasId = (int)($_GET['nas_id'] ?? 0);
+        $result = $radiusBilling->fetchMikroTikInterfaces($nasId);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'provision_static_ip' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $data = json_decode(file_get_contents('php://input'), true);
+        $result = $radiusBilling->provisionStaticIp(
+            (int)$data['subscription_id'],
+            (int)$data['vlan_id'],
+            $data['ip_address'],
+            $data['mac_address']
+        );
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'deprovision_static_ip') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $subId = (int)($_GET['subscription_id'] ?? 0);
+        $result = $radiusBilling->deprovisionStaticIp($subId);
+        echo json_encode($result);
+        exit;
+    }
+    
     include __DIR__ . '/../templates/isp.php';
     exit;
 }
