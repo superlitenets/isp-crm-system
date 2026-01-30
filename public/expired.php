@@ -162,7 +162,80 @@ try {
     $mpesaConfigured = false;
 }
 
-$isSuspended = $subscription && ($subscription['status'] === 'suspended');
+$subscriptionStatus = $subscription ? $subscription['status'] : null;
+$isSuspended = $subscriptionStatus === 'suspended';
+$isDisabled = $subscriptionStatus === 'disabled';
+$isExpired = $subscriptionStatus === 'expired' || ($subscription && $subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
+
+$statusConfig = [
+    'suspended' => [
+        'icon' => 'bi-pause-circle-fill',
+        'title' => 'Account Suspended',
+        'subtitle' => 'Your account has been temporarily suspended',
+        'color' => '#fd7e14',
+        'colorDark' => '#e55a00',
+        'animation' => 'pulse 2s infinite',
+        'canPay' => false,
+        'notice' => 'Your account has been suspended. Please contact support to resolve this issue and reactivate your service.',
+    ],
+    'disabled' => [
+        'icon' => 'bi-slash-circle-fill',
+        'title' => 'Account Disabled',
+        'subtitle' => 'Your account has been disabled',
+        'color' => '#6c757d',
+        'colorDark' => '#495057',
+        'animation' => 'none',
+        'canPay' => false,
+        'notice' => 'Your account has been disabled by the administrator. Please contact support for assistance.',
+    ],
+    'wrong_mac' => [
+        'icon' => 'bi-hdd-network-fill',
+        'title' => 'Device Not Authorized',
+        'subtitle' => 'This device is not registered to your account',
+        'color' => '#6f42c1',
+        'colorDark' => '#5a32a3',
+        'animation' => 'shake 0.5s ease-in-out',
+        'canPay' => false,
+        'notice' => 'Your account is bound to a different device (MAC address). Please connect from your registered device or contact support to update your device registration.',
+    ],
+    'wrong_credentials' => [
+        'icon' => 'bi-key-fill',
+        'title' => 'Authentication Failed',
+        'subtitle' => 'Invalid username or password',
+        'color' => '#dc3545',
+        'colorDark' => '#c82333',
+        'animation' => 'shake 0.5s ease-in-out',
+        'canPay' => false,
+        'notice' => 'Your login credentials are incorrect. Please check your username and password, or contact support if you need help resetting your credentials.',
+    ],
+    'expired' => [
+        'icon' => 'bi-wifi-off',
+        'title' => 'Subscription Expired',
+        'subtitle' => 'Renew now to restore your internet',
+        'color' => '#dc3545',
+        'colorDark' => '#c82333',
+        'animation' => 'shake 0.5s ease-in-out',
+        'canPay' => true,
+        'notice' => null,
+    ],
+];
+
+$reason = $_GET['reason'] ?? null;
+if ($reason === 'mac') {
+    $currentStatus = 'wrong_mac';
+} elseif ($reason === 'auth' || $reason === 'credentials') {
+    $currentStatus = 'wrong_credentials';
+} elseif ($isDisabled) {
+    $currentStatus = 'disabled';
+} elseif ($isSuspended) {
+    $currentStatus = 'suspended';
+} else {
+    $currentStatus = 'expired';
+}
+
+$statusInfo = $statusConfig[$currentStatus];
+$canPay = $statusInfo['canPay'];
+
 $walletBalance = $subscription ? (float)($subscription['credit_balance'] ?? 0) : 0;
 $packagePrice = $subscription ? (float)($subscription['package_price'] ?? 0) : 0;
 $amountNeeded = max(0, $packagePrice - $walletBalance);
@@ -172,19 +245,28 @@ if ($subscription && $subscription['expiry_date']) {
     $expiryTime = strtotime($subscription['expiry_date']);
     $daysExpired = max(0, floor((time() - $expiryTime) / 86400));
 }
+
+$daysSuspended = 0;
+$savedDays = 0;
+if ($isSuspended && $subscription) {
+    if (!empty($subscription['suspended_at'])) {
+        $daysSuspended = ceil((time() - strtotime($subscription['suspended_at'])) / 86400);
+    }
+    $savedDays = (int)($subscription['days_remaining_at_suspension'] ?? 0);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title><?= $isSuspended ? 'Account Suspended' : 'Subscription Expired' ?> - <?= htmlspecialchars($ispName) ?></title>
+    <title><?= htmlspecialchars($statusInfo['title']) ?> - <?= htmlspecialchars($ispName) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --primary-color: <?= $isSuspended ? '#fd7e14' : '#dc3545' ?>;
-            --primary-dark: <?= $isSuspended ? '#e55a00' : '#c82333' ?>;
+            --primary-color: <?= $statusInfo['color'] ?>;
+            --primary-dark: <?= $statusInfo['colorDark'] ?>;
             --success-color: #198754;
         }
         
@@ -262,7 +344,7 @@ if ($subscription && $subscription['expiry_date']) {
             justify-content: center;
             margin: 0 auto 20px;
             font-size: 40px;
-            animation: <?= $isSuspended ? 'pulse 2s infinite' : 'shake 0.5s ease-in-out' ?>;
+            animation: <?= $statusInfo['animation'] ?>;
         }
         
         .header-title {
@@ -647,22 +729,27 @@ if ($subscription && $subscription['expiry_date']) {
             <?php if ($subscription): ?>
             <div class="card-header">
                 <div class="header-content">
-                    <?php if ($daysExpired > 0 && !$isSuspended): ?>
+                    <?php if ($currentStatus === 'expired' && $daysExpired > 0): ?>
                     <div class="days-badge">
                         <i class="bi bi-calendar-x me-1"></i>
                         <?= $daysExpired ?> day<?= $daysExpired > 1 ? 's' : '' ?> ago
                     </div>
+                    <?php elseif ($currentStatus === 'suspended' && $daysSuspended > 0): ?>
+                    <div class="days-badge">
+                        <i class="bi bi-pause-circle me-1"></i>
+                        Suspended <?= $daysSuspended ?> day<?= $daysSuspended > 1 ? 's' : '' ?> ago
+                    </div>
                     <?php endif; ?>
                     
                     <div class="status-icon">
-                        <i class="bi <?= $isSuspended ? 'bi-pause-circle-fill' : 'bi-wifi-off' ?>"></i>
+                        <i class="bi <?= $statusInfo['icon'] ?>"></i>
                     </div>
                     
                     <h1 class="header-title">
-                        <?= $isSuspended ? 'Account Suspended' : 'Subscription Expired' ?>
+                        <?= htmlspecialchars($statusInfo['title']) ?>
                     </h1>
                     <p class="header-subtitle">
-                        <?= $isSuspended ? 'Your account has been suspended' : 'Renew now to restore your internet' ?>
+                        <?= htmlspecialchars($statusInfo['subtitle']) ?>
                     </p>
                     
                     <div class="package-pill">
@@ -693,31 +780,52 @@ if ($subscription && $subscription['expiry_date']) {
                         <span class="info-label"><i class="bi bi-key"></i> Username</span>
                         <span class="info-value"><?= htmlspecialchars($subscription['username']) ?></span>
                     </div>
-                    <?php if (!$isSuspended): ?>
+                    <?php if ($currentStatus === 'expired'): ?>
                     <div class="info-item">
                         <span class="info-label"><i class="bi bi-calendar-x"></i> Expired</span>
                         <span class="info-value text-danger">
                             <?= $subscription['expiry_date'] ? date('M j, Y', strtotime($subscription['expiry_date'])) : 'N/A' ?>
                         </span>
                     </div>
-                    <?php else: ?>
+                    <?php elseif ($currentStatus === 'suspended'): ?>
                     <div class="info-item">
                         <span class="info-label"><i class="bi bi-shield-x"></i> Status</span>
                         <span class="info-value" style="color: var(--primary-color);">
                             <i class="bi bi-pause-circle-fill me-1"></i> Suspended
                         </span>
                     </div>
+                    <?php if ($savedDays > 0): ?>
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-hourglass-split"></i> Days Saved</span>
+                        <span class="info-value text-success">
+                            <i class="bi bi-check-circle me-1"></i> <?= $savedDays ?> days
+                        </span>
+                    </div>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <div class="info-item">
+                        <span class="info-label"><i class="bi bi-shield-x"></i> Status</span>
+                        <span class="info-value" style="color: var(--primary-color);">
+                            <i class="bi <?= $statusInfo['icon'] ?> me-1"></i> <?= htmlspecialchars($statusInfo['title']) ?>
+                        </span>
+                    </div>
                     <?php endif; ?>
                 </div>
                 
-                <?php if ($isSuspended): ?>
+                <?php if (!$canPay && $statusInfo['notice']): ?>
                 <div class="suspended-notice">
-                    <strong><i class="bi bi-exclamation-triangle me-2"></i>Account Suspended</strong>
+                    <strong><i class="bi bi-exclamation-triangle me-2"></i><?= htmlspecialchars($statusInfo['title']) ?></strong>
                     <p class="mb-0 mt-2" style="font-size: 0.9rem;">
-                        Your account has been suspended. Please contact <?= htmlspecialchars($ispName) ?> support to resolve this issue and reactivate your service.
+                        <?= htmlspecialchars($statusInfo['notice']) ?>
                     </p>
+                    <?php if ($currentStatus === 'suspended' && $savedDays > 0): ?>
+                    <p class="mb-0 mt-2 text-success" style="font-size: 0.9rem;">
+                        <i class="bi bi-check-circle me-1"></i>
+                        <strong><?= $savedDays ?> days</strong> will be restored when your account is reactivated.
+                    </p>
+                    <?php endif; ?>
                 </div>
-                <?php else: ?>
+                <?php elseif ($canPay): ?>
                 
                 <?php if ($walletBalance > 0): ?>
                 <div class="wallet-card">
