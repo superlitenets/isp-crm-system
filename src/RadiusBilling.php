@@ -4035,20 +4035,11 @@ class RadiusBilling {
     private function decryptApiPassword(?string $encrypted): ?string {
         if (!$encrypted) return null;
         
-        $key = getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? 'default-key-change-me');
-        
-        $data = base64_decode($encrypted);
-        if ($data === false) return null;
-        
-        $ivLength = openssl_cipher_iv_length('aes-256-cbc');
-        if (strlen($data) < $ivLength) return null;
-        
-        $iv = substr($data, 0, $ivLength);
-        $ciphertext = substr($data, $ivLength);
-        
-        $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-        
-        return $decrypted !== false ? $decrypted : null;
+        try {
+            return $this->decrypt($encrypted);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
     
     // ==================== VLAN Management ====================
