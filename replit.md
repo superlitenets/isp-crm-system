@@ -7,92 +7,64 @@ This project is a PHP-based Customer Relationship Management (CRM) and ticketing
 I prefer detailed explanations and expect the agent to ask for confirmation before making major changes. I appreciate clean, well-structured code.
 
 ## System Architecture
-The system is built on PHP, utilizing a modular architecture to separate concerns. Configuration is managed via a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes, and users/employees are unified with central role management via HR.
+The system is built on PHP with a modular architecture, separating concerns and managing configuration via a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes, unifying users/employees with central role management via HR.
 
 **UI/UX Decisions:**
-The system features a clean, responsive design, including a mobile PWA for field personnel. Both the main CRM and Huawei OLT modules feature fully responsive layouts with Bootstrap 5. Internal CRM interfaces prioritize clarity and ease of use.
+The system features a clean, responsive design, including a mobile PWA for field personnel. Both the main CRM and Huawei OLT modules feature fully responsive layouts with Bootstrap 5, prioritizing clarity and ease of use.
 
 **Technical Implementations:**
-- **Authentication**: Session-based with password hashing, CSRF/SQL injection/XSS protection, and granular role-based access control (RBAC).
+- **Authentication**: Session-based with password hashing, security protections (CSRF/SQL injection/XSS), and granular role-based access control (RBAC).
 - **Database**: PostgreSQL is the primary database.
-- **SMS & WhatsApp Integration**: Supports custom gateways (any POST/GET API) and Twilio for SMS; full-featured WhatsApp integration with real-time chat, automatic customer linking, and a Node.js Baileys service (direct WebSocket connection - no Chromium/Puppeteer required, ~50-100MB RAM vs 300-800MB).
-- **Template Engine**: A custom `TemplateEngine.php` class for dynamic content replacement.
-- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco, Hikvision, and BioTime Cloud.
-- **M-Pesa Integration**: Handles STK Push for payments, C2B payments, and real-time callback processing. Features robust network error handling with automatic retry logic (up to 3 attempts), detailed error messages for DNS/SSL/timeout issues, and graceful fallback mechanisms.
+- **SMS & WhatsApp Integration**: Supports custom gateways and Twilio for SMS; full-featured WhatsApp integration with real-time chat via a Node.js Baileys service.
+- **Template Engine**: Custom `TemplateEngine.php` for dynamic content.
+- **Biometric Integration**: Abstract `BiometricDevice.php` with implementations for ZKTeco, Hikvision, and BioTime Cloud.
+- **M-Pesa Integration**: Handles STK Push for payments, C2B, and real-time callback processing with robust error handling and retry logic.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
-- **Inventory Management**: Comprehensive warehouse and stock management with multi-warehouse support, stock intake, disbursement workflow, field usage tracking, returns/RMA, loss reporting, and audit trails.
+- **Inventory Management**: Comprehensive multi-warehouse stock management with intake, disbursement, field usage, returns, loss reporting, and audit trails.
 - **SLA Management**: Automatic policy application based on ticket priority and business hours.
 - **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning via SmartOLT cloud API.
-- **Huawei OLT Module**: Standalone direct management module for Huawei OLT devices (Telnet/SSH/SNMP). Features include device management, ONU inventory and status monitoring, service profile management, auto-provisioning, ONU operations, and a CLI terminal.
-  - **SNMP-First Architecture**: All read operations (ONU discovery, status polling, optical power) use SNMP as the primary method with CLI as fallback. This reduces OLT load, avoids command overlap issues, and ensures faster response times. CLI is reserved for write operations only (authorization, OMCI configuration, service-port creation).
-  - **Persistent Session Manager**: Node.js service for persistent Telnet/SSH sessions, command queuing, auto-reconnection, and HTTP API integration.
-  - **SSH Protocol Support**: SSH can be used instead of Telnet to fix space-stripping issues with certain OLT VTY configurations. Per-OLT protocol selection with legacy algorithm support (diffie-hellman-group1-sha1, aes128-cbc) for older Huawei OLTs. Database columns: `cli_protocol` (telnet/ssh) and `ssh_port`.
-  - **TR-069/GenieACS Integration**: Remote ONU configuration via TR-069 CWMP protocol with GenieACS ACS server integration for WiFi configuration, admin password change, device reboots, factory resets, and firmware upgrades. WiFi interfaces are dynamically detected from TR-069 data - single-band ONUs show only 2.4GHz tab, dual-band show both. Ethernet port configuration is done via OMCI through the OLT.
-  - **GenieACS Provisions for Huawei ONUs**: Pre-configured provisioning scripts (`scripts/setup-genieacs.sh`) that use forced object discovery to handle Huawei ONUs that hide TR-069 objects until explicitly declared. Key provisions:
-    - `wan-discover`: Forces WAN/LAN object tree discovery
-    - `wan-create`: Creates WANDevice/WANConnectionDevice/WANPPPConnection structure
-    - `huawei-wan-pppoe`: Complete PPPoE setup with VLAN support
-    - `full-refresh`: Complete device discovery with forced object creation
-    - `ntp-config`: Time server configuration for NTP gating
-  - **SmartOLT-style Internet WAN Configuration**: Internet WAN (PPPoE/DHCP/Static) is configured via TR-069/GenieACS instead of OMCI. This follows SmartOLT's approach where:
-    - **OMCI** handles service VLAN configuration only (service-ports, native VLAN on ETH)
-    - **TR-069** handles Internet WAN setup (PPPoE credentials, IPoE/DHCP, policy routes)
-    - Configuration sequence: Create WANConnectionDevice → Add WANPPPConnection/WANIPConnection → Set credentials and VLAN → Configure policy routes (bind LAN ports and WiFi to WAN) → Set default WAN
-    - Management WAN (VLAN 69) uses DHCP for TR-069 connectivity; Internet WAN (service VLAN) uses PPPoE/IPoE
-  - **TR-069 Auto-Provisioning via OMCI**: Automatic TR-069 configuration during ONU authorization. Auto-detects TR-069 VLAN, configures native VLAN on ETH port, sets DHCP mode, pushes ACS URL via OMCI, and enables periodic inform. Provides detailed success/failure notifications with manual fallback option.
-  - **Production Guardrails**: SmartOLT-grade protection mechanisms including:
-    - **NTP Gating**: Blocks provisioning if device time is invalid (year < 2020), pushes NTP config first
-    - **Cool-down/Debounce**: 5-minute minimum between provisioning attempts to prevent rapid re-provisioning
-    - **ConnectionRequestURL Validation**: Verifies device reachability before instant push attempts
-    - **Post-Provision Verification**: Checks WANPPPConnection.Status and ExternalIPAddress after config
-    - **Idempotent Object Handling**: Detects and reuses existing WAN objects instead of creating duplicates
-  - **OLT Profile Sync**: Sync line profiles and service profiles directly from OLT with caching in database for quick access.
-  - **SmartOLT Migration**: Toolkit for migrating from SmartOLT to direct OLT management.
+- **Huawei OLT Module**: Standalone direct management for Huawei OLT devices (Telnet/SSH/SNMP).
+  - **SNMP-First Architecture**: Prioritizes SNMP for read operations, with CLI for write operations.
+  - **Persistent Session Manager**: Node.js service for persistent Telnet/SSH sessions and API integration.
+  - **SSH Protocol Support**: Supports SSH for OLT communication, including legacy algorithms.
+  - **TR-069/GenieACS Integration**: Remote ONU configuration via TR-069 CWMP with GenieACS for WiFi, password changes, reboots, and firmware upgrades.
+  - **TR-069 Auto-Provisioning**: Automated TR-069 configuration during ONU authorization via OMCI.
+  - **Production Guardrails**: Includes NTP Gating, Cool-down/Debounce, ConnectionRequestURL Validation, and Post-Provision Verification.
+  - **OLT Profile Sync**: Syncs line and service profiles from OLT with database caching.
 - **Reporting & Activity Logs**: Comprehensive reports and detailed activity logging.
-- **Ticket Management**: Includes timeline/activity history, quick status changes, customer satisfaction ratings, escalation features, statistics dashboard, and secure status update links for technicians and customers via WhatsApp/SMS.
-- **Multi-Branch Support**: Manages operations across multiple physical locations with branch-specific assignments and daily reports.
-- **HR & Payroll**: Salary advance system, leave management system with accruals and approval workflows, and configurable HR notification system.
-- **Accounting Module**: Dashboard, Chart of Accounts, Products/Services, Customer Invoices, Vendors/Suppliers, Expense tracking, Quotes, Bills/Purchase Orders, and financial reports.
-- **Billing System Integration**: One-ISP API integration for customer data lookup and import.
-- **Database Backup System**: Built-in functionality for manual PostgreSQL backups (pg_dump).
-- **WireGuard VPN Integration**: Secure VPN connectivity management between VPS and OLT sites, including server/peer management, key generation (via `wg genkey`), configuration export, MikroTik script generation with auto-detected public IP, and real-time traffic statistics. OLT service uses host network mode to access VPN routes for ping functionality.
-- **ISP RADIUS Billing Module**: Comprehensive MikroTik RADIUS billing system with full AAA (Authentication, Authorization, Accounting) support. Features include:
-  - **NAS Device Management**: Register and manage MikroTik routers with RADIUS secret configuration and optional RouterOS API access. Real-time NAS status monitoring with ping checks and active session counts.
-  - **Service Packages**: Create packages with configurable speeds, data quotas, validity periods, billing cycles (daily/weekly/monthly/quarterly/yearly), and simultaneous session limits. FUP (Fair Usage Policy) support with automatic throttling when quota exceeded.
-  - **Package Speed Schedules**: Time-based speed rules for packages (e.g., slower speeds during peak hours 18:00-22:00). Supports overnight schedules, day-of-week filtering, and priority-based resolution for overlapping schedules.
-  - **Timed Speed Overrides**: Per-subscriber temporary speed overrides with configurable duration (1hr to 1 week or permanent). Overrides persist across reconnects and auto-expire. Applied via CoA for immediate effect.
-  - **Customer Subscriptions**: PPPoE, Hotspot, Static IP, and DHCP access types with encrypted password storage, automatic expiry handling, and suspension management. Auto-generated PPPoE credentials (username from customer name + 4 digits, 8-char random password).
-  - **Session Tracking**: Real-time active session monitoring with data usage tracking (upload/download octets).
-  - **Hotspot Vouchers**: Batch voucher generation for prepaid hotspot access with unique codes.
-  - **Billing History**: Invoice generation, payment tracking, and billing records with M-Pesa transaction references.
-  - **Dashboard**: Real-time statistics for active subscriptions, sessions, expiring accounts, monthly revenue, and data usage.
-  - **Expiring Subscriptions**: Dedicated view showing subscriptions expiring in the next 14 days with quick renewal actions and SMS alert functionality.
-  - **Revenue Reports**: Monthly revenue breakdown, package popularity analytics, and subscription statistics (active/suspended/expired).
-  - **Usage Analytics**: Top users by data consumption, peak usage hours heatmap, and bandwidth trends.
-  - **M-Pesa Integration**: Automatic subscription renewal on M-Pesa payment, matching by phone number or username.
-  - **Captive Portal Expiry Page**: Public `/expired.php` page for expired subscribers. Detects client IP via X-Forwarded-For/proxy headers, matches to subscription in database, shows account details and renewal amount. Includes M-Pesa STK Push for instant payment. MikroTik redirects expired users to this page via walled garden.
-  - **Customer Self-Service Portal**: Full-featured portal at `/portal` with phone number login and automatic IP-based authentication when connected to the ISP network. Features include usage viewing, session history, invoices, M-Pesa payments, and WiFi management. WiFi configuration via TR-069/GenieACS for supported devices, or embedded router web interface (via VPN proxy) for non-TR-069 routers.
-  - **CoA Support**: Change of Authorization for disconnecting users when package changes or subscription expires. CoA packets are routed through the OLT Session Manager service which has WireGuard VPN access, ensuring connectivity to MikroTik devices on private networks. Features automatic fallback to direct PHP client if the OLT service is unavailable.
-  - **MAC Binding**: Bind subscriptions to specific MAC addresses for security.
-  - **IP Pool Management**: Create and manage IP address pools for dynamic allocation.
-  - **Bulk Import**: CSV import for batch subscription creation with validation.
-  - **Package Upgrade/Downgrade**: Change packages with prorated billing calculations.
-- **Licensing System**: Standalone license server for redistributing the CRM to other ISPs. Features include:
-  - **License Server** (`license-server/`): Deployable standalone PHP app with admin dashboard, REST API, customer/license/activation management, usage analytics.
-  - **License Client** (`src/LicenseClient.php`, `src/LicenseMiddleware.php`): Integrated validation with 7-day grace period for offline operation.
-  - **Feature Gating**: Tier-based access control (Starter/Professional/Enterprise) with limits on users, customers, and ONUs.
-  - **Environment Variables**: `LICENSE_SERVER_URL`, `LICENSE_KEY` enable licensing; disabled by default for self-hosted use.
+- **Ticket Management**: Features timeline/activity, status changes, customer satisfaction, escalation, and secure status updates.
+- **Multi-Branch Support**: Manages operations across multiple physical locations.
+- **HR & Payroll**: Salary advance, leave management, and HR notification systems.
+- **Accounting Module**: Dashboard, Chart of Accounts, Invoices, Expenses, Quotes, Purchase Orders, and financial reports.
+- **Database Backup System**: Manual PostgreSQL backup functionality.
+- **WireGuard VPN Integration**: Secure VPN connectivity management (server/peer, key generation, MikroTik script generation, traffic statistics).
+- **ISP RADIUS Billing Module**: Comprehensive MikroTik RADIUS billing with AAA support.
+  - **NAS Device Management**: Register and manage MikroTik routers.
+  - **Service Packages**: Configurable speeds, data quotas, validity, billing cycles, and FUP.
+  - **Package Speed Schedules & Overrides**: Time-based and temporary speed adjustments.
+  - **Customer Subscriptions**: PPPoE, Hotspot, Static IP, DHCP access with automated expiry and suspension.
+  - **Session Tracking**: Real-time active session monitoring.
+  - **Hotspot Vouchers**: Batch generation for prepaid access.
+  - **Billing History & Dashboard**: Invoice generation, payment tracking, and statistics.
+  - **M-Pesa Integration**: Automatic subscription renewal.
+  - **Captive Portal Expiry Page**: Public page for expired subscribers with M-Pesa STK Push.
+  - **Customer Self-Service Portal**: Usage viewing, session history, invoices, payments, and WiFi management.
+  - **CoA Support**: Change of Authorization for immediate package changes or disconnections.
+  - **MAC Binding, IP Pool Management, Bulk Import**: For advanced subscription management.
+  - **VLAN Management**: Define VLANs per NAS and sync to MikroTik via RouterOS API.
+  - **Static IP Provisioning**: Provision static IPs and manage DHCP leases on MikroTik.
+  - **MikroTik API Integration**: Full RouterOS API support for network configuration.
+- **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers) with environment variable configuration.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Twilio**: Optional SMS gateway.
 - **Advanta SMS (Kenya)**: Recommended SMS gateway.
 - **Custom SMS Gateways**: For integrating any REST API for SMS.
-- **WhatsApp Web**: For direct messaging.
 - **ZKTeco Biometric Devices**: For attendance tracking.
 - **Hikvision Biometric Devices**: For attendance tracking and remote fingerprint enrollment.
 - **M-Pesa**: For mobile money payments.
 - **SmartOLT API**: For network monitoring and ONU management.
 - **One-ISP Billing API**: For customer data lookup and import.
-- **Huawei OLT Devices**: Direct Telnet/SSH/SNMP connectivity for fiber network provisioning and management.
-- **GenieACS**: Open-source TR-069 ACS server for remote ONU configuration.
+- **Huawei OLT Devices**: Direct Telnet/SSH/SNMP connectivity.
+- **GenieACS**: Open-source TR-069 ACS server.
