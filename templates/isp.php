@@ -7691,28 +7691,40 @@ try {
                         <canvas id="historyChart"></canvas>
                     </div>
                     <div class="mt-3 row g-3" id="historyStats" style="display: none;">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="d-flex justify-content-between">
-                                <span class="text-muted">Avg Download:</span>
+                                <span class="text-muted">Avg DL:</span>
                                 <strong id="avgDownload">-</strong>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="d-flex justify-content-between">
-                                <span class="text-muted">Avg Upload:</span>
+                                <span class="text-muted">Avg UL:</span>
                                 <strong id="avgUpload">-</strong>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="d-flex justify-content-between">
-                                <span class="text-muted">Peak Download:</span>
+                                <span class="text-muted">Peak DL:</span>
                                 <strong id="peakDownload">-</strong>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="d-flex justify-content-between">
-                                <span class="text-muted">Peak Upload:</span>
+                                <span class="text-muted">Peak UL:</span>
                                 <strong id="peakUpload">-</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted text-success">95th DL:</span>
+                                <strong id="p95Download" class="text-success">-</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted text-danger">95th UL:</span>
+                                <strong id="p95Upload" class="text-danger">-</strong>
                             </div>
                         </div>
                     </div>
@@ -7992,6 +8004,14 @@ try {
             let historyChart = null;
             let currentHistoryRange = '1h';
             
+            // Calculate percentile (for 95th percentile billing)
+            function percentile(arr, p) {
+                if (arr.length === 0) return 0;
+                const sorted = [...arr].sort((a, b) => a - b);
+                const idx = Math.ceil((p / 100) * sorted.length) - 1;
+                return sorted[Math.max(0, idx)];
+            }
+            
             function loadHistoricalData(range) {
                 currentHistoryRange = range;
                 
@@ -8093,10 +8113,16 @@ try {
                 const peakRx = Math.max(...rxRates);
                 const peakTx = Math.max(...txRates);
                 
+                // Calculate 95th percentile
+                const p95Rx = percentile(rxRates, 95);
+                const p95Tx = percentile(txRates, 95);
+                
                 document.getElementById('avgDownload').textContent = avgRx.toFixed(2) + ' Mbps';
                 document.getElementById('avgUpload').textContent = avgTx.toFixed(2) + ' Mbps';
                 document.getElementById('peakDownload').textContent = peakRx.toFixed(2) + ' Mbps';
                 document.getElementById('peakUpload').textContent = peakTx.toFixed(2) + ' Mbps';
+                document.getElementById('p95Download').textContent = p95Rx.toFixed(2) + ' Mbps';
+                document.getElementById('p95Upload').textContent = p95Tx.toFixed(2) + ' Mbps';
             }
             
             // Setup history range buttons
