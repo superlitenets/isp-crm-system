@@ -2835,6 +2835,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
             
+            case 'resolve_ticket':
+                $ticketId = (int)($_POST['ticket_id'] ?? 0);
+                $resolutionNotes = trim($_POST['resolution_notes'] ?? '');
+                
+                if ($ticketId && $resolutionNotes) {
+                    try {
+                        $pdo = getDbConnection();
+                        $pdo->beginTransaction();
+                        
+                        $stmt = $pdo->prepare("
+                            INSERT INTO ticket_resolutions 
+                            (ticket_id, resolved_by, resolution_notes, router_serial, power_levels, cable_used, equipment_installed, additional_notes)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT (ticket_id) DO UPDATE SET
+                                resolution_notes = EXCLUDED.resolution_notes,
+                                router_serial = EXCLUDED.router_serial,
+                                power_levels = EXCLUDED.power_levels,
+                                cable_used = EXCLUDED.cable_used,
+                                equipment_installed = EXCLUDED.equipment_installed,
+                                additional_notes = EXCLUDED.additional_notes,
+                                updated_at = CURRENT_TIMESTAMP
+                            RETURNING id
+                        ");
+                        $stmt->execute([
+                            $ticketId,
+                            $currentUser['id'],
+                            $resolutionNotes,
+                            trim($_POST['router_serial'] ?? ''),
+                            trim($_POST['power_levels'] ?? ''),
+                            trim($_POST['cable_used'] ?? ''),
+                            trim($_POST['equipment_installed'] ?? ''),
+                            trim($_POST['additional_notes'] ?? '')
+                        ]);
+                        $resolutionId = $stmt->fetchColumn();
+                        
+                        $uploadDir = __DIR__ . '/uploads/ticket_resolutions/';
+                        if (!is_dir($uploadDir)) {
+                            mkdir($uploadDir, 0755, true);
+                        }
+                        
+                        $photoTypes = ['photo_serial' => 'serial', 'photo_power' => 'power_levels', 'photo_cables' => 'cables', 'photo_additional' => 'additional'];
+                        
+                        foreach ($photoTypes as $fieldName => $photoType) {
+                            if (!empty($_FILES[$fieldName]['name']) && $_FILES[$fieldName]['error'] === UPLOAD_ERR_OK) {
+                                $ext = strtolower(pathinfo($_FILES[$fieldName]['name'], PATHINFO_EXTENSION));
+                                $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                                
+                                if (in_array($ext, $allowed)) {
+                                    $fileName = 'ticket_' . $ticketId . '_' . $photoType . '_' . time() . '.' . $ext;
+                                    $filePath = 'uploads/ticket_resolutions/' . $fileName;
+                                    
+                                    if (move_uploaded_file($_FILES[$fieldName]['tmp_name'], $uploadDir . $fileName)) {
+                                        $stmt = $pdo->prepare("
+                                            INSERT INTO ticket_resolution_photos 
+                                            (ticket_id, resolution_id, photo_type, file_path, file_name, uploaded_by)
+                                            VALUES (?, ?, ?, ?, ?, ?)
+                                        ");
+                                        $stmt->execute([$ticketId, $resolutionId, $photoType, $filePath, $_FILES[$fieldName]['name'], $currentUser['id']]);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        $ticket->quickStatusChange($ticketId, 'resolved', $currentUser['id']);
+                        
+                        $pdo->commit();
+                        \App\Auth::regenerateToken();
+                        
+                        $_SESSION['flash_message'] = 'Ticket resolved successfully with documentation!';
+                        $_SESSION['flash_type'] = 'success';
+                    } catch (Exception $e) {
+                        if (isset($pdo)) {
+                            $pdo->rollBack();
+                        }
+                        $_SESSION['flash_message'] = 'Error resolving ticket: ' . $e->getMessage();
+                        $_SESSION['flash_type'] = 'danger';
+                    }
+                    header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                    exit;
+                } else {
+                    $_SESSION['flash_message'] = 'Resolution notes are required.';
+                    $_SESSION['flash_type'] = 'danger';
+                    header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                    exit;
+                }
+                break;
+            
             case 'escalate_ticket':
                 $ticketId = (int)($_POST['ticket_id'] ?? 0);
                 $reason = trim($_POST['reason'] ?? '');
