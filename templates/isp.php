@@ -7010,6 +7010,7 @@ try {
                 })
                 .then(r => r.json())
                 .then(result => {
+                    console.log('Create VLAN response:', result);
                     if (result.success) {
                         if (syncAfter) {
                             syncVlan(result.id, true);
@@ -7018,7 +7019,11 @@ try {
                             window.location.reload();
                         }
                     } else {
-                        alert('Failed: ' + (result.error || 'Unknown error'));
+                        let errorMsg = result.error || '';
+                        if (result.errors && result.errors.length > 0) {
+                            errorMsg = result.errors.join('\n');
+                        }
+                        alert('Failed: ' + (errorMsg || 'Unknown error'));
                     }
                 })
                 .catch(err => alert('Error: ' + err.message));
