@@ -1357,14 +1357,36 @@ class RadiusBilling {
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'User not found'];
         }
         
-        // Check password
+        // Get expired/suspended pool settings
+        $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
+        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        
+        // Suspended accounts - bypass password check, just return expired pool
+        if ($sub['status'] === 'suspended') {
+            $attrs = [
+                'Framed-Pool' => $expiredPoolName,
+                'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                'Session-Timeout' => 300,
+                'Acct-Interim-Interval' => 60
+            ];
+            $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Suspended - expired pool', null, $attrs);
+            return [
+                'success' => true,
+                'reply' => 'Access-Accept',
+                'suspended' => true,
+                'attributes' => $attrs,
+                'subscription' => $sub
+            ];
+        }
+        
+        // Check password (only for non-suspended accounts)
         if ($this->decrypt($sub['password_encrypted']) !== $password) {
             $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Invalid password');
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
         }
         
         // Check MAC binding - only enforce for PPPoE if mac_binding is enabled
-        // Hotspot users can use any device (MAC is auto-updated on login)
         $enforceMacBinding = $this->getSetting('enforce_mac_binding') === 'true';
         $isHotspot = ($sub['access_type'] ?? '') === 'hotspot';
         
@@ -1374,34 +1396,6 @@ class RadiusBilling {
             if ($normalizedSubMac !== $normalizedCallingMac) {
                 $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'MAC address mismatch');
                 return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'MAC address mismatch'];
-            }
-        }
-        
-        // Get expired/suspended pool settings (same pool for both - redirect based on status check)
-        $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
-        $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
-        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
-        
-        // Suspended accounts authenticate but go to expired pool for captive portal redirect
-        if ($sub['status'] === 'suspended') {
-            if ($useExpiredPool) {
-                $attrs = [
-                    'Framed-Pool' => $expiredPoolName,
-                    'Mikrotik-Rate-Limit' => $expiredRateLimit,
-                    'Session-Timeout' => 300,
-                    'Acct-Interim-Interval' => 60
-                ];
-                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Suspended - expired pool', null, $attrs);
-                return [
-                    'success' => true,
-                    'reply' => 'Access-Accept',
-                    'suspended' => true,
-                    'attributes' => $attrs,
-                    'subscription' => $sub
-                ];
-            } else {
-                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Account suspended');
-                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
             }
         }
         
