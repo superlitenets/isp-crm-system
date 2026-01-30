@@ -1,9 +1,26 @@
 <?php
 $ticketData = null;
 $comments = [];
+$resolutionData = null;
+$resolutionPhotos = [];
 if (($action === 'edit' || $action === 'view') && $id) {
     $ticketData = $ticket->find($id);
     $comments = $ticket->getComments($id);
+    
+    $resStmt = $db->prepare("
+        SELECT tr.*, u.name as resolved_by_name 
+        FROM ticket_resolutions tr 
+        LEFT JOIN users u ON tr.resolved_by = u.id 
+        WHERE tr.ticket_id = ?
+    ");
+    $resStmt->execute([$id]);
+    $resolutionData = $resStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($resolutionData) {
+        $photoStmt = $db->prepare("SELECT * FROM ticket_resolution_photos WHERE resolution_id = ? ORDER BY created_at");
+        $photoStmt->execute([$resolutionData['id']]);
+        $resolutionPhotos = $photoStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 $preselectedCustomer = null;
@@ -793,6 +810,95 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                 <p><?= nl2br(htmlspecialchars($ticketData['description'])) ?></p>
             </div>
         </div>
+        
+        <?php if ($resolutionData): ?>
+        <div class="card mb-4 border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Resolution Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-person-check"></i> Resolved By:</strong>
+                        <p class="mb-1"><?= htmlspecialchars($resolutionData['resolved_by_name'] ?? 'Unknown') ?></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-calendar-check"></i> Resolved At:</strong>
+                        <p class="mb-1"><?= date('M j, Y g:i A', strtotime($resolutionData['created_at'])) ?></p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <?php if ($resolutionData['router_serial']): ?>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-upc-scan"></i> Router Serial:</strong>
+                        <p class="mb-1"><?= htmlspecialchars($resolutionData['router_serial']) ?></p>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($resolutionData['power_levels']): ?>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-graph-up"></i> Power Levels:</strong>
+                        <p class="mb-1"><?= htmlspecialchars($resolutionData['power_levels']) ?></p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="row mb-3">
+                    <?php if ($resolutionData['cable_used']): ?>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-ethernet"></i> Cable Used:</strong>
+                        <p class="mb-1"><?= htmlspecialchars($resolutionData['cable_used']) ?></p>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($resolutionData['equipment_installed']): ?>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-cpu"></i> Equipment Installed:</strong>
+                        <p class="mb-1"><?= htmlspecialchars($resolutionData['equipment_installed']) ?></p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="mb-3">
+                    <strong><i class="bi bi-chat-text"></i> Resolution Notes:</strong>
+                    <p class="mb-0"><?= nl2br(htmlspecialchars($resolutionData['resolution_notes'])) ?></p>
+                </div>
+                
+                <?php if ($resolutionData['additional_notes']): ?>
+                <div class="mb-3">
+                    <strong><i class="bi bi-sticky"></i> Additional Notes:</strong>
+                    <p class="mb-0"><?= nl2br(htmlspecialchars($resolutionData['additional_notes'])) ?></p>
+                </div>
+                <?php endif; ?>
+                
+                <?php if (!empty($resolutionPhotos)): ?>
+                <hr>
+                <h6 class="mb-3"><i class="bi bi-images"></i> Resolution Photos</h6>
+                <div class="row g-3">
+                    <?php 
+                    $photoLabels = [
+                        'serial' => 'Router Serial',
+                        'power_levels' => 'Power Levels',
+                        'cables' => 'Cables/Installation',
+                        'additional' => 'Additional'
+                    ];
+                    foreach ($resolutionPhotos as $photo): 
+                    ?>
+                    <div class="col-md-3 col-6">
+                        <div class="card h-100">
+                            <a href="<?= htmlspecialchars($photo['file_path']) ?>" target="_blank">
+                                <img src="<?= htmlspecialchars($photo['file_path']) ?>" class="card-img-top" alt="<?= $photoLabels[$photo['photo_type']] ?? 'Photo' ?>" style="height: 150px; object-fit: cover;">
+                            </a>
+                            <div class="card-body p-2 text-center">
+                                <small class="text-muted"><?= $photoLabels[$photo['photo_type']] ?? ucfirst($photo['photo_type']) ?></small>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <div class="card">
             <div class="card-header bg-white">

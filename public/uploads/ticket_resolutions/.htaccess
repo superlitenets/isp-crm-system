@@ -1,0 +1,10 @@
+# Prevent PHP execution in this directory
+<FilesMatch "\.php$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Disable script execution
+Options -ExecCGI
+RemoveHandler .php .php3 .php4 .php5 .phtml .pl .py .pyc .pyo .cgi
+AddHandler default-handler .php .php3 .php4 .php5 .phtml .pl .py .pyc .pyo .cgi

@@ -2877,23 +2877,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         $photoTypes = ['photo_serial' => 'serial', 'photo_power' => 'power_levels', 'photo_cables' => 'cables', 'photo_additional' => 'additional'];
                         
+                        $maxFileSize = 10 * 1024 * 1024; // 10MB limit
+                        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                        $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                        
                         foreach ($photoTypes as $fieldName => $photoType) {
                             if (!empty($_FILES[$fieldName]['name']) && $_FILES[$fieldName]['error'] === UPLOAD_ERR_OK) {
+                                $tmpFile = $_FILES[$fieldName]['tmp_name'];
+                                $fileSize = $_FILES[$fieldName]['size'];
                                 $ext = strtolower(pathinfo($_FILES[$fieldName]['name'], PATHINFO_EXTENSION));
-                                $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
                                 
-                                if (in_array($ext, $allowed)) {
-                                    $fileName = 'ticket_' . $ticketId . '_' . $photoType . '_' . time() . '.' . $ext;
-                                    $filePath = 'uploads/ticket_resolutions/' . $fileName;
-                                    
-                                    if (move_uploaded_file($_FILES[$fieldName]['tmp_name'], $uploadDir . $fileName)) {
-                                        $stmt = $pdo->prepare("
-                                            INSERT INTO ticket_resolution_photos 
-                                            (ticket_id, resolution_id, photo_type, file_path, file_name, uploaded_by)
-                                            VALUES (?, ?, ?, ?, ?, ?)
-                                        ");
-                                        $stmt->execute([$ticketId, $resolutionId, $photoType, $filePath, $_FILES[$fieldName]['name'], $currentUser['id']]);
-                                    }
+                                if ($fileSize > $maxFileSize) {
+                                    continue; // Skip files exceeding size limit
+                                }
+                                
+                                if (!in_array($ext, $allowedExts)) {
+                                    continue; // Skip invalid extensions
+                                }
+                                
+                                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                                $mimeType = finfo_file($finfo, $tmpFile);
+                                finfo_close($finfo);
+                                
+                                if (!in_array($mimeType, $allowedMimes)) {
+                                    continue; // Skip files with invalid MIME type
+                                }
+                                
+                                $safeExt = match($mimeType) {
+                                    'image/jpeg' => 'jpg',
+                                    'image/png' => 'png',
+                                    'image/gif' => 'gif',
+                                    'image/webp' => 'webp',
+                                    default => 'jpg'
+                                };
+                                
+                                $fileName = 'ticket_' . $ticketId . '_' . $photoType . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $safeExt;
+                                $filePath = 'uploads/ticket_resolutions/' . $fileName;
+                                
+                                if (move_uploaded_file($tmpFile, $uploadDir . $fileName)) {
+                                    $stmt = $pdo->prepare("
+                                        INSERT INTO ticket_resolution_photos 
+                                        (ticket_id, resolution_id, photo_type, file_path, file_name, uploaded_by)
+                                        VALUES (?, ?, ?, ?, ?, ?)
+                                    ");
+                                    $stmt->execute([$ticketId, $resolutionId, $photoType, $filePath, $_FILES[$fieldName]['name'], $currentUser['id']]);
                                 }
                             }
                         }
