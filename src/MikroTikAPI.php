@@ -599,32 +599,6 @@ class MikroTikAPI {
         return true;
     }
     
-    // ==================== IP Pool Management ====================
-    
-    public function getIpPools(): array {
-        return $this->command('/ip/pool/print');
-    }
-    
-    public function createIpPool(string $name, string $ranges, ?string $comment = null): array {
-        $params = [
-            '=name=' . $name,
-            '=ranges=' . $ranges
-        ];
-        if ($comment) {
-            $params[] = '=comment=' . $comment;
-        }
-        return $this->command('/ip/pool/add', $params);
-    }
-    
-    public function removeIpPool(string $name): bool {
-        $pools = $this->command('/ip/pool/print', ['?name=' . $name]);
-        if (empty($pools) || !isset($pools[0]['.id'])) {
-            return false;
-        }
-        $this->command('/ip/pool/remove', ['=.id=' . $pools[0]['.id']]);
-        return true;
-    }
-    
     // ==================== DHCP Lease Management ====================
     
     public function getDhcpLeases(?string $server = null): array {
@@ -706,20 +680,6 @@ class MikroTikAPI {
         }
         $this->command('/ip/arp/remove', ['=.id=' . $entries[0]['.id']]);
         return true;
-    }
-    
-    // ==================== Interface Info ====================
-    
-    public function getInterfaces(): array {
-        return $this->command('/interface/print');
-    }
-    
-    public function getEthernetInterfaces(): array {
-        return $this->command('/interface/ethernet/print');
-    }
-    
-    public function getBridges(): array {
-        return $this->command('/interface/bridge/print');
     }
     
     public function __destruct() {
