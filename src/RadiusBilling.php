@@ -3910,7 +3910,7 @@ class RadiusBilling {
             
             $mikrotik->connect();
             
-            $listName = $this->getSetting('mikrotik_blocked_list') ?: 'crm-blocked';
+            $listName = $this->getSetting('mikrotik_blocked_list') ?: 'DISABLED_USERS';
             $comment = $sub['username'] . ' - ' . $reason . ' (' . date('Y-m-d H:i') . ')';
             
             if ($block) {
@@ -3972,7 +3972,7 @@ class RadiusBilling {
                 ];
             }
             
-            $listName = $this->getSetting('mikrotik_blocked_list') ?: 'crm-blocked';
+            $listName = $this->getSetting('mikrotik_blocked_list') ?: 'DISABLED_USERS';
             $results = [];
             
             foreach ($nasDevices as $nas) {

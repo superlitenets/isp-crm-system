@@ -333,7 +333,7 @@ class MikroTikAPI {
         return true;
     }
     
-    public function addToBlockedList(string $address, string $comment = '', string $listName = 'crm-blocked'): bool {
+    public function addToBlockedList(string $address, string $comment = '', string $listName = 'DISABLED_USERS'): bool {
         if ($this->addressListEntryExists($listName, $address)) {
             return $this->setAddressListEntryDisabled($listName, $address, false);
         }
@@ -342,11 +342,11 @@ class MikroTikAPI {
         return !isset($result['error']);
     }
     
-    public function removeFromBlockedList(string $address, string $listName = 'crm-blocked'): bool {
+    public function removeFromBlockedList(string $address, string $listName = 'DISABLED_USERS'): bool {
         return $this->removeAddressListEntry($listName, $address);
     }
     
-    public function syncBlockedList(array $blockedAddresses, string $listName = 'crm-blocked'): array {
+    public function syncBlockedList(array $blockedAddresses, string $listName = 'DISABLED_USERS'): array {
         $results = ['added' => 0, 'removed' => 0, 'errors' => []];
         
         $currentEntries = $this->getAddressListEntries($listName);
