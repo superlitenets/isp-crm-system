@@ -262,6 +262,128 @@ class MikroTikAPI {
         return $this->command('/ip/hotspot/active/print');
     }
     
+    public function getAddressListEntries(string $list): array {
+        return $this->command('/ip/firewall/address-list/print', ['?list' => $list]);
+    }
+    
+    public function addAddressListEntry(string $list, string $address, ?string $comment = null, ?string $timeout = null): array {
+        $params = [
+            'list' => $list,
+            'address' => $address
+        ];
+        
+        if ($comment) {
+            $params['comment'] = $comment;
+        }
+        
+        if ($timeout) {
+            $params['timeout'] = $timeout;
+        }
+        
+        return $this->command('/ip/firewall/address-list/add', $params);
+    }
+    
+    public function removeAddressListEntry(string $list, string $address): bool {
+        $entries = $this->command('/ip/firewall/address-list/print', [
+            '?list' => $list,
+            '?address' => $address
+        ]);
+        
+        if (empty($entries)) {
+            return true;
+        }
+        
+        foreach ($entries as $entry) {
+            if (isset($entry['.id'])) {
+                $this->command('/ip/firewall/address-list/remove', ['.id' => $entry['.id']]);
+            }
+        }
+        
+        return true;
+    }
+    
+    public function addressListEntryExists(string $list, string $address): bool {
+        $entries = $this->command('/ip/firewall/address-list/print', [
+            '?list' => $list,
+            '?address' => $address
+        ]);
+        
+        return !empty($entries);
+    }
+    
+    public function setAddressListEntryDisabled(string $list, string $address, bool $disabled): bool {
+        $entries = $this->command('/ip/firewall/address-list/print', [
+            '?list' => $list,
+            '?address' => $address
+        ]);
+        
+        if (empty($entries)) {
+            return false;
+        }
+        
+        foreach ($entries as $entry) {
+            if (isset($entry['.id'])) {
+                $this->command('/ip/firewall/address-list/set', [
+                    '.id' => $entry['.id'],
+                    'disabled' => $disabled ? 'yes' : 'no'
+                ]);
+            }
+        }
+        
+        return true;
+    }
+    
+    public function addToBlockedList(string $address, string $comment = '', string $listName = 'crm-blocked'): bool {
+        if ($this->addressListEntryExists($listName, $address)) {
+            return $this->setAddressListEntryDisabled($listName, $address, false);
+        }
+        
+        $result = $this->addAddressListEntry($listName, $address, $comment);
+        return !isset($result['error']);
+    }
+    
+    public function removeFromBlockedList(string $address, string $listName = 'crm-blocked'): bool {
+        return $this->removeAddressListEntry($listName, $address);
+    }
+    
+    public function syncBlockedList(array $blockedAddresses, string $listName = 'crm-blocked'): array {
+        $results = ['added' => 0, 'removed' => 0, 'errors' => []];
+        
+        $currentEntries = $this->getAddressListEntries($listName);
+        $currentAddresses = [];
+        
+        foreach ($currentEntries as $entry) {
+            if (isset($entry['address'])) {
+                $currentAddresses[$entry['address']] = $entry['.id'] ?? null;
+            }
+        }
+        
+        foreach ($blockedAddresses as $item) {
+            $address = is_array($item) ? $item['address'] : $item;
+            $comment = is_array($item) ? ($item['comment'] ?? '') : '';
+            
+            if (!isset($currentAddresses[$address])) {
+                $result = $this->addAddressListEntry($listName, $address, $comment);
+                if (!isset($result['error'])) {
+                    $results['added']++;
+                } else {
+                    $results['errors'][] = "Failed to add: $address";
+                }
+            }
+            unset($currentAddresses[$address]);
+        }
+        
+        foreach ($currentAddresses as $address => $id) {
+            if ($this->removeAddressListEntry($listName, $address)) {
+                $results['removed']++;
+            } else {
+                $results['errors'][] = "Failed to remove: $address";
+            }
+        }
+        
+        return $results;
+    }
+    
     public function __destruct() {
         $this->disconnect();
     }
