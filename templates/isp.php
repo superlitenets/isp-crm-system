@@ -6790,6 +6790,9 @@ try {
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-info" onclick="viewVlanTraffic(<?= $vlan['id'] ?>, '<?= htmlspecialchars($vlan['name']) ?>')" title="Live Traffic">
+                                                <i class="bi bi-graph-up"></i>
+                                            </button>
                                             <button class="btn btn-outline-primary" onclick="syncVlan(<?= $vlan['id'] ?>)" title="Sync to MikroTik">
                                                 <i class="bi bi-arrow-repeat"></i>
                                             </button>
@@ -7202,7 +7205,254 @@ try {
                         }
                     });
             }
+            
+            // Live Traffic Monitoring
+            let trafficChart = null;
+            let trafficInterval = null;
+            let lastTrafficData = { rx: 0, tx: 0, time: 0 };
+            let trafficHistory = { labels: [], rx: [], tx: [] };
+            
+            function viewVlanTraffic(vlanId, vlanName) {
+                document.getElementById('trafficVlanName').textContent = vlanName;
+                document.getElementById('trafficVlanId').value = vlanId;
+                
+                // Reset data
+                lastTrafficData = { rx: 0, tx: 0, time: 0 };
+                trafficHistory = { labels: [], rx: [], tx: [] };
+                
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('trafficModal'));
+                modal.show();
+                
+                // Initialize chart
+                initTrafficChart();
+                
+                // Start polling
+                fetchVlanTraffic(vlanId);
+                trafficInterval = setInterval(() => fetchVlanTraffic(vlanId), 2000);
+            }
+            
+            function initTrafficChart() {
+                const ctx = document.getElementById('trafficChart').getContext('2d');
+                
+                if (trafficChart) {
+                    trafficChart.destroy();
+                }
+                
+                trafficChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Download (Mbps)',
+                                data: [],
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            },
+                            {
+                                label: 'Upload (Mbps)',
+                                data: [],
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Mbps' }
+                            },
+                            x: {
+                                title: { display: true, text: 'Time' }
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'top' }
+                        }
+                    }
+                });
+            }
+            
+            function fetchVlanTraffic(vlanId) {
+                fetch(`/index.php?page=isp&action=vlan_traffic&vlan_id=${vlanId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateTrafficDisplay(data.traffic, data.timestamp);
+                        } else {
+                            document.getElementById('trafficStatus').innerHTML = 
+                                `<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ${data.error}</span>`;
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Traffic fetch error:', err);
+                    });
+            }
+            
+            function updateTrafficDisplay(traffic, timestamp) {
+                const statusEl = document.getElementById('trafficStatus');
+                statusEl.innerHTML = traffic.running 
+                    ? '<span class="badge bg-success">Interface Running</span>' 
+                    : '<span class="badge bg-warning">Interface Down</span>';
+                
+                // Calculate speeds (bytes delta / time delta * 8 / 1000000 = Mbps)
+                let rxMbps = 0, txMbps = 0;
+                
+                if (lastTrafficData.time > 0) {
+                    const timeDelta = (timestamp - lastTrafficData.time) / 1000; // seconds
+                    if (timeDelta > 0) {
+                        const rxDelta = traffic.rx_byte - lastTrafficData.rx;
+                        const txDelta = traffic.tx_byte - lastTrafficData.tx;
+                        
+                        if (rxDelta >= 0 && txDelta >= 0) {
+                            rxMbps = (rxDelta * 8) / (timeDelta * 1000000);
+                            txMbps = (txDelta * 8) / (timeDelta * 1000000);
+                        }
+                    }
+                }
+                
+                lastTrafficData = { rx: traffic.rx_byte, tx: traffic.tx_byte, time: timestamp };
+                
+                // Update display
+                document.getElementById('downloadSpeed').textContent = rxMbps.toFixed(2) + ' Mbps';
+                document.getElementById('uploadSpeed').textContent = txMbps.toFixed(2) + ' Mbps';
+                document.getElementById('totalDownload').textContent = formatBytes(traffic.rx_byte);
+                document.getElementById('totalUpload').textContent = formatBytes(traffic.tx_byte);
+                document.getElementById('rxPackets').textContent = traffic.rx_packet.toLocaleString();
+                document.getElementById('txPackets').textContent = traffic.tx_packet.toLocaleString();
+                
+                // Update chart
+                const timeLabel = new Date().toLocaleTimeString();
+                trafficHistory.labels.push(timeLabel);
+                trafficHistory.rx.push(rxMbps);
+                trafficHistory.tx.push(txMbps);
+                
+                // Keep last 30 points
+                if (trafficHistory.labels.length > 30) {
+                    trafficHistory.labels.shift();
+                    trafficHistory.rx.shift();
+                    trafficHistory.tx.shift();
+                }
+                
+                if (trafficChart) {
+                    trafficChart.data.labels = trafficHistory.labels;
+                    trafficChart.data.datasets[0].data = trafficHistory.rx;
+                    trafficChart.data.datasets[1].data = trafficHistory.tx;
+                    trafficChart.update('none');
+                }
+            }
+            
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            function stopTrafficMonitoring() {
+                if (trafficInterval) {
+                    clearInterval(trafficInterval);
+                    trafficInterval = null;
+                }
+            }
+            
+            // Stop monitoring when modal closes
+            document.addEventListener('DOMContentLoaded', function() {
+                const trafficModal = document.getElementById('trafficModal');
+                if (trafficModal) {
+                    trafficModal.addEventListener('hidden.bs.modal', stopTrafficMonitoring);
+                }
+            });
             </script>
+            
+            <!-- Traffic Monitoring Modal -->
+            <div class="modal fade" id="trafficModal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header bg-info text-white">
+                            <h5 class="modal-title"><i class="bi bi-graph-up me-2"></i>Live Traffic: <span id="trafficVlanName"></span></h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="trafficVlanId">
+                            
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted mb-1"><i class="bi bi-download text-success"></i> Download</h6>
+                                            <h3 class="mb-0" id="downloadSpeed">0.00 Mbps</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted mb-1"><i class="bi bi-upload text-danger"></i> Upload</h6>
+                                            <h3 class="mb-0" id="uploadSpeed">0.00 Mbps</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted mb-1">Total Downloaded</h6>
+                                            <h5 class="mb-0" id="totalDownload">0 B</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted mb-1">Total Uploaded</h6>
+                                            <h5 class="mb-0" id="totalUpload">0 B</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-4">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">RX Packets:</span>
+                                        <strong id="rxPackets">0</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">TX Packets:</span>
+                                        <strong id="txPackets">0</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <span id="trafficStatus"><span class="badge bg-secondary">Connecting...</span></span>
+                                </div>
+                            </div>
+                            
+                            <div style="height: 300px;">
+                                <canvas id="trafficChart"></canvas>
+                            </div>
+                            
+                            <div class="mt-3 text-muted small text-center">
+                                <i class="bi bi-info-circle me-1"></i> Traffic data updates every 2 seconds
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <?php elseif ($view === 'settings'): ?>
             <?php

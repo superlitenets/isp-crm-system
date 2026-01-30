@@ -2357,6 +2357,119 @@ if ($page === 'isp') {
         exit;
     }
     
+    // VLAN Traffic Monitoring
+    if ($action === 'vlan_traffic') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $vlanId = (int)($_GET['vlan_id'] ?? 0);
+        
+        if (!$vlanId) {
+            echo json_encode(['success' => false, 'error' => 'VLAN ID required']);
+            exit;
+        }
+        
+        $vlan = $radiusBilling->getVlan($vlanId);
+        if (!$vlan) {
+            echo json_encode(['success' => false, 'error' => 'VLAN not found']);
+            exit;
+        }
+        
+        try {
+            $nas = $radiusBilling->getNASDevice($vlan['nas_id']);
+            if (!$nas || !$nas['api_enabled']) {
+                echo json_encode(['success' => false, 'error' => 'NAS device not configured for API']);
+                exit;
+            }
+            
+            require_once __DIR__ . '/../src/MikroTikAPI.php';
+            $api = new \App\MikroTikAPI($nas['ip_address'], $nas['api_port'] ?: 8728, $nas['api_username'], $radiusBilling->decryptPassword($nas['api_password']));
+            $api->connect();
+            
+            // Get interface traffic statistics for the VLAN interface
+            $interfaceName = $vlan['name'];
+            $stats = $api->command('/interface/print', ['?name' => $interfaceName]);
+            
+            $traffic = [
+                'name' => $interfaceName,
+                'rx_byte' => 0,
+                'tx_byte' => 0,
+                'rx_packet' => 0,
+                'tx_packet' => 0,
+                'running' => false
+            ];
+            
+            if (!empty($stats) && isset($stats[0])) {
+                $traffic = [
+                    'name' => $stats[0]['name'] ?? $interfaceName,
+                    'rx_byte' => (int)($stats[0]['rx-byte'] ?? 0),
+                    'tx_byte' => (int)($stats[0]['tx-byte'] ?? 0),
+                    'rx_packet' => (int)($stats[0]['rx-packet'] ?? 0),
+                    'tx_packet' => (int)($stats[0]['tx-packet'] ?? 0),
+                    'running' => ($stats[0]['running'] ?? 'false') === 'true'
+                ];
+            }
+            
+            $api->disconnect();
+            
+            echo json_encode([
+                'success' => true,
+                'traffic' => $traffic,
+                'timestamp' => time() * 1000
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
+    // VLAN Interface Status
+    if ($action === 'vlan_status') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $vlanId = (int)($_GET['vlan_id'] ?? 0);
+        
+        $vlan = $radiusBilling->getVlan($vlanId);
+        if (!$vlan) {
+            echo json_encode(['success' => false, 'error' => 'VLAN not found']);
+            exit;
+        }
+        
+        try {
+            $nas = $radiusBilling->getNASDevice($vlan['nas_id']);
+            if (!$nas || !$nas['api_enabled']) {
+                echo json_encode(['success' => false, 'error' => 'NAS not configured']);
+                exit;
+            }
+            
+            require_once __DIR__ . '/../src/MikroTikAPI.php';
+            $api = new \App\MikroTikAPI($nas['ip_address'], $nas['api_port'] ?: 8728, $nas['api_username'], $radiusBilling->decryptPassword($nas['api_password']));
+            $api->connect();
+            
+            $stats = $api->command('/interface/vlan/print', ['?name' => $vlan['name']]);
+            $api->disconnect();
+            
+            if (!empty($stats) && isset($stats[0])) {
+                echo json_encode([
+                    'success' => true,
+                    'status' => [
+                        'name' => $stats[0]['name'] ?? '',
+                        'vlan_id' => $stats[0]['vlan-id'] ?? '',
+                        'interface' => $stats[0]['interface'] ?? '',
+                        'running' => ($stats[0]['running'] ?? 'false') === 'true',
+                        'disabled' => ($stats[0]['disabled'] ?? 'false') === 'true',
+                        'mtu' => $stats[0]['mtu'] ?? '',
+                        'mac_address' => $stats[0]['mac-address'] ?? ''
+                    ]
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'VLAN not found on device']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
     include __DIR__ . '/../templates/isp.php';
     exit;
 }
