@@ -2455,6 +2455,18 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
+        // Get the subscription's NAS for fallback
+        $fallbackNas = null;
+        if (!empty($sub['nas_id'])) {
+            $fallbackNas = $this->getNAS($sub['nas_id']);
+        }
+        
+        // If no NAS assigned to subscription, try to find one
+        if (!$fallbackNas) {
+            $stmt = $this->db->query("SELECT * FROM radius_nas WHERE is_active = TRUE LIMIT 1");
+            $fallbackNas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
         // Get active sessions with subscription username and NAS ID for VPN lookup
         $stmt = $this->db->prepare("
             SELECT rs.id, rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
@@ -2467,9 +2479,33 @@ class RadiusBilling {
         $stmt->execute([$subscriptionId]);
         $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
+        // If no active sessions, try to disconnect by username using fallback NAS
+        if (empty($sessions) && $fallbackNas) {
+            $session = [
+                'username' => $sub['username'],
+                'nas_ip' => $fallbackNas['ip_address'],
+                'nas_secret' => $fallbackNas['secret'],
+                'acct_session_id' => null
+            ];
+            $result = $this->sendCoADisconnect($session);
+            return [
+                'success' => $result['success'],
+                'disconnected' => $result['success'] ? 1 : 0,
+                'total_sessions' => 0,
+                'message' => $result['success'] ? 'Disconnected by username' : $result['error'],
+                'errors' => $result['success'] ? [] : [$result['error']]
+            ];
+        }
+        
         $disconnected = 0;
         $errors = [];
         foreach ($sessions as $session) {
+            // Use fallback NAS if session doesn't have one
+            if (empty($session['nas_ip']) && $fallbackNas) {
+                $session['nas_ip'] = $fallbackNas['ip_address'];
+                $session['nas_secret'] = $fallbackNas['secret'];
+            }
+            
             $result = $this->sendCoADisconnect($session);
             if ($result['success']) {
                 $disconnected++;
