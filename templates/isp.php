@@ -3176,6 +3176,9 @@ try {
                     <button type="button" class="btn btn-info" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
                         <i class="bi bi-lightning me-1"></i> Ping
                     </button>
+                    <button type="button" class="btn btn-danger" onclick="disconnectSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
+                        <i class="bi bi-x-circle me-1"></i> Disconnect
+                    </button>
                     <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
                         <i class="bi bi-wifi me-1"></i> WiFi Config
                     </button>
@@ -9462,6 +9465,47 @@ try {
                     <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
                     <h5 class="mt-3 text-warning">Error</h5>
                     <p class="mb-0">Failed to ping subscriber</p>
+                `;
+            });
+    }
+    
+    function disconnectSubscriber(subId, username) {
+        if (!confirm(`Disconnect all active sessions for ${username}?`)) return;
+        
+        const modal = new bootstrap.Modal(document.getElementById('testNASModal'));
+        const resultDiv = document.getElementById('testNASResult');
+        
+        resultDiv.innerHTML = `
+            <div class="spinner-border text-warning" role="status">
+                <span class="visually-hidden">Disconnecting...</span>
+            </div>
+            <p class="mt-2">Disconnecting ${username}...</p>
+        `;
+        modal.show();
+        
+        fetch('/index.php?page=isp&action=ajax_disconnect&id=' + subId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                        <h5 class="mt-3 text-success">Disconnected</h5>
+                        <p class="mb-0">Disconnected ${data.disconnected || 0} session(s)</p>
+                    `;
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
+                        <h5 class="mt-3 text-warning">Warning</h5>
+                        <p class="mb-0">${data.message || 'Could not disconnect sessions'}</p>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <i class="bi bi-x-circle-fill text-danger fs-1"></i>
+                    <h5 class="mt-3 text-danger">Error</h5>
+                    <p class="mb-0">Failed to disconnect subscriber</p>
                 `;
             });
     }
