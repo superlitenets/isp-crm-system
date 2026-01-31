@@ -517,6 +517,68 @@ if ($action === 'get_online_subscribers') {
     exit;
 }
 
+if ($action === 'test_nas') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $nas = $radiusBilling->getNAS($id);
+        if ($nas) {
+            $result = ['success' => true, 'online' => false];
+            $ports = [$nas['api_port'] ?: 8728, 22, 80, 443];
+            foreach ($ports as $port) {
+                $socket = @fsockopen($nas['ip_address'], $port, $errno, $errstr, 2);
+                if ($socket) {
+                    fclose($socket);
+                    $result['online'] = true;
+                    $result['reachable_port'] = $port;
+                    $result['latency_ms'] = round((microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000, 1);
+                    break;
+                }
+            }
+            if ($result['online'] && $nas['api_enabled']) {
+                $api = new MikroTikAPI();
+                $start = microtime(true);
+                if ($api->connect($nas['ip_address'], $nas['api_username'], $nas['api_password'], $nas['api_port'] ?: 8728)) {
+                    $result['api_online'] = true;
+                    $result['api_latency_ms'] = round((microtime(true) - $start) * 1000, 1);
+                    $api->disconnect();
+                } else {
+                    $result['api_online'] = false;
+                }
+            }
+            echo json_encode($result);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'NAS not found']);
+        }
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid NAS ID']);
+    }
+    exit;
+}
+
+if ($action === 'reboot_nas') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        $nas = $radiusBilling->getNAS($id);
+        if ($nas && $nas['api_enabled']) {
+            $api = new MikroTikAPI();
+            if ($api->connect($nas['ip_address'], $nas['api_username'], $nas['api_password'], $nas['api_port'] ?: 8728)) {
+                $result = $api->sendCommand('/system/reboot');
+                $api->disconnect();
+                echo json_encode(['success' => true, 'message' => 'Reboot command sent']);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Failed to connect to MikroTik API']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'error' => 'NAS not found or API not enabled']);
+        }
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid NAS ID']);
+    }
+    exit;
+}
+
 // Real-time CoA AJAX endpoints
 if ($action === 'ajax_disconnect') {
     header('Content-Type: application/json');
@@ -5945,6 +6007,11 @@ try {
                                             <button type="button" class="btn btn-outline-success" onclick="testNAS(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['ip_address']) ?>')" title="Test Connectivity">
                                                 <i class="bi bi-lightning"></i>
                                             </button>
+                                            <?php if ($nas['api_enabled']): ?>
+                                            <button type="button" class="btn btn-outline-warning" onclick="rebootNAS(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['name']) ?>')" title="Reboot Router">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                            <?php endif; ?>
                                             <button type="button" class="btn btn-outline-primary" onclick="editNAS(<?= htmlspecialchars(json_encode($nas)) ?>)" title="Edit">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
@@ -9331,6 +9398,48 @@ try {
                     <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
                     <h5 class="mt-3 text-warning">Error</h5>
                     <p class="mb-0">Failed to test connectivity</p>
+                `;
+            });
+    }
+    
+    function rebootNAS(nasId, nasName) {
+        if (!confirm('Are you sure you want to reboot ' + nasName + '?\n\nThis will disconnect all active users temporarily.')) {
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('testNASModal'));
+        const resultDiv = document.getElementById('testNASResult');
+        
+        resultDiv.innerHTML = `
+            <div class="spinner-border text-warning" role="status">
+                <span class="visually-hidden">Rebooting...</span>
+            </div>
+            <p class="mt-2">Sending reboot command to ${nasName}...</p>
+        `;
+        modal.show();
+        
+        fetch('/index.php?page=isp&action=reboot_nas&id=' + nasId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                        <h5 class="mt-3 text-success">Reboot Command Sent</h5>
+                        <p class="mb-0">${nasName} is rebooting. It may take 1-2 minutes to come back online.</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-x-circle-fill text-danger fs-1"></i>
+                        <h5 class="mt-3 text-danger">Reboot Failed</h5>
+                        <p class="mb-0">${data.error || 'Failed to send reboot command'}</p>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
+                    <h5 class="mt-3 text-warning">Error</h5>
+                    <p class="mb-0">Failed to communicate with the server</p>
                 `;
             });
     }
