@@ -2455,14 +2455,16 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get active sessions with NAS info - use session's NAS first, then subscription's NAS as fallback
+        // Get active sessions with NAS info - use session's nas_ip_address to lookup NAS
         $stmt = $this->db->prepare("
             SELECT rs.id, rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
+                   rs.nas_ip_address,
                    sub.username, 
-                   COALESCE(rn.ip_address, sub_nas.ip_address) as nas_ip, 
-                   COALESCE(rn.secret, sub_nas.secret) as nas_secret
+                   COALESCE(rn.ip_address, nas_by_ip.ip_address, sub_nas.ip_address) as nas_ip, 
+                   COALESCE(rn.secret, nas_by_ip.secret, sub_nas.secret) as nas_secret
             FROM radius_sessions rs
             LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
+            LEFT JOIN radius_nas nas_by_ip ON rs.nas_ip_address = nas_by_ip.ip_address
             LEFT JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
             LEFT JOIN radius_nas sub_nas ON sub.nas_id = sub_nas.id
             WHERE rs.subscription_id = ? AND rs.session_end IS NULL
