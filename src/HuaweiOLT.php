@@ -8616,7 +8616,7 @@ class HuaweiOLT {
         // Step 2: Tag VLAN on ONU ETH port (only for line profile 1, not needed for SmartOLT profile 2)
         if ($servicePortSuccess && $needsPortVlanConfig) {
             // Enter GPON interface and add VLAN translation on ONU's ETH port 1
-            $portVlanCmd = "interface gpon {$frame}/{$slot}\nont port vlan {$port} {$onuId} eth 1 translation {$vlanId} user-vlan {$vlanId}\nquit";
+            $portVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port vlan {$port} {$onuId} eth 1 translation {$vlanId} user-vlan {$vlanId}\r\nquit";
             $portResult = $this->executeCommand($oltId, $portVlanCmd);
             $output .= "[ONU Port VLAN Tagging]\n" . ($portResult['output'] ?? '') . "\n";
             
