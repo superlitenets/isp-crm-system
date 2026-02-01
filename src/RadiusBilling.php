@@ -2619,17 +2619,18 @@ class RadiusBilling {
     private function removeDhcpLease(string $mac, ?int $nasId): void {
         if (!$nasId) return;
         
-        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE id = ?");
-        $stmt->execute([$nasId]);
-        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$nas || empty($nas['ip_address'])) return;
+        $nas = $this->getNAS($nasId);
+        if (!$nas || empty($nas['ip_address']) || !$nas['api_enabled']) return;
+        
+        $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+        if (!$apiPassword) return;
         
         try {
             $api = new MikroTikAPI(
                 $nas['ip_address'],
-                $nas['api_port'] ?? 8728,
-                $nas['api_username'] ?? 'admin',
-                $nas['api_password'] ?? ''
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
             );
             $api->connect();
             
@@ -2649,22 +2650,32 @@ class RadiusBilling {
     private function blockStaticIp(string $ip, ?int $nasId): void {
         if (!$nasId) return;
         
-        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE id = ?");
-        $stmt->execute([$nasId]);
-        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$nas || empty($nas['ip_address'])) return;
+        $nas = $this->getNAS($nasId);
+        if (!$nas || empty($nas['ip_address']) || !$nas['api_enabled']) return;
+        
+        $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+        if (!$apiPassword) return;
         
         try {
             $api = new MikroTikAPI(
                 $nas['ip_address'],
-                $nas['api_port'] ?? 8728,
-                $nas['api_username'] ?? 'admin',
-                $nas['api_password'] ?? ''
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
             );
             $api->connect();
             
-            // Add to address list for blocking
-            $api->addAddressListEntry('expired-addons', $ip, 'Addon service expired');
+            // Remove DHCP static lease by IP address
+            $leases = $api->command('/ip/dhcp-server/lease/print', ['?address=' . $ip]);
+            foreach ($leases as $lease) {
+                if (!empty($lease['.id'])) {
+                    $api->command('/ip/dhcp-server/lease/remove', ['=.id=' . $lease['.id']]);
+                }
+            }
+            
+            // Also add to blocked list to prevent reconnection
+            $api->addAddressListEntry('expired-addons', $ip, 'Addon static IP expired');
+            
             $api->disconnect();
         } catch (\Exception $e) {
             // Log error but don't fail
