@@ -3739,9 +3739,11 @@ try {
                                                     <td><?= $sess['session_end'] ? date('M j, H:i', strtotime($sess['session_end'])) : '<span class="badge bg-success">Active</span>' ?></td>
                                                     <td>
                                                         <?php 
-                                                        $start = strtotime($sess['session_start']);
-                                                        $end = $sess['session_end'] ? strtotime($sess['session_end']) : time();
-                                                        $dur = $end - $start;
+                                                        $tz = new DateTimeZone(date_default_timezone_get());
+                                                        $startDt = new DateTime($sess['session_start'], $tz);
+                                                        $endDt = $sess['session_end'] ? new DateTime($sess['session_end'], $tz) : new DateTime('now', $tz);
+                                                        $dur = $endDt->getTimestamp() - $startDt->getTimestamp();
+                                                        if ($dur < 0) $dur = 0;
                                                         echo floor($dur/3600) . 'h ' . floor(($dur%3600)/60) . 'm';
                                                         ?>
                                                     </td>
@@ -5299,7 +5301,11 @@ try {
                                     <td><?= date('M j, H:i', strtotime($session['session_start'])) ?></td>
                                     <td>
                                         <?php 
-                                        $dur = time() - strtotime($session['session_start']);
+                                        $tz = new DateTimeZone(date_default_timezone_get());
+                                        $startDt = new DateTime($session['session_start'], $tz);
+                                        $nowDt = new DateTime('now', $tz);
+                                        $dur = $nowDt->getTimestamp() - $startDt->getTimestamp();
+                                        if ($dur < 0) $dur = 0;
                                         $hours = floor($dur / 3600);
                                         $mins = floor(($dur % 3600) / 60);
                                         echo "{$hours}h {$mins}m";
