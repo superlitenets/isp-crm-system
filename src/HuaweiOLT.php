@@ -8573,18 +8573,31 @@ class HuaweiOLT {
         $resultOutput = $result['output'] ?? '';
         if (preg_match('/Failure|Error:|failed|Invalid parameter|Unknown command/i', $resultOutput) && 
             !preg_match('/already exist|Make configuration repeatedly/i', $resultOutput)) {
-            $errors[] = "Failed to create service-port";
+            // Extract actual error message from OLT response
+            $errorDetail = '';
+            if (preg_match('/Failure:\s*([^\n]+)/i', $resultOutput, $m)) {
+                $errorDetail = trim($m[1]);
+            } elseif (preg_match('/Error:\s*([^\n]+)/i', $resultOutput, $m)) {
+                $errorDetail = trim($m[1]);
+            }
+            $errors[] = "Failed to create service-port" . ($errorDetail ? ": {$errorDetail}" : "");
+        } elseif (empty($resultOutput) && !($result['success'] ?? false)) {
+            // No response from OLT - likely connection issue
+            $errors[] = "No response from OLT - connection may have timed out";
         }
         
-        // Update attached_vlans in database
-        $attachedVlans[] = $vlanId;
-        $stmt = $this->db->prepare("UPDATE huawei_onus SET attached_vlans = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        $stmt->execute([json_encode($attachedVlans), $onuDbId]);
-        
-        // If this is the first VLAN, also set it as the primary vlan_id
-        if (count($attachedVlans) === 1) {
-            $stmt = $this->db->prepare("UPDATE huawei_onus SET vlan_id = ? WHERE id = ?");
-            $stmt->execute([$vlanId, $onuDbId]);
+        // Only update database if OLT command succeeded
+        if (empty($errors)) {
+            // Update attached_vlans in database
+            $attachedVlans[] = $vlanId;
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET attached_vlans = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([json_encode($attachedVlans), $onuDbId]);
+            
+            // If this is the first VLAN, also set it as the primary vlan_id
+            if (count($attachedVlans) === 1) {
+                $stmt = $this->db->prepare("UPDATE huawei_onus SET vlan_id = ? WHERE id = ?");
+                $stmt->execute([$vlanId, $onuDbId]);
+            }
         }
         
         $this->addLog([
