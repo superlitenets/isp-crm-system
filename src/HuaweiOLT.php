@@ -6505,11 +6505,17 @@ class HuaweiOLT {
         
         // ==== STAGE 1C: BIND NATIVE VLAN TO ETH PORT (only for line profile 1) ====
         // SmartOLT profile (line profile 2) handles port VLAN config in the profile itself
-        $needsPortVlanConfig = ($lineProfileId != 2);
+        $needsPortVlanConfig = ((int)$lineProfileId !== 2);
         if ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
             $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
             $nativeResult = $this->executeCommand($oltId, $nativeVlanCmd);
             $output .= "\n[Native VLAN]\n" . ($nativeResult['output'] ?? '');
+            
+            // Check for errors in native VLAN binding
+            $nativeOutput = $nativeResult['output'] ?? '';
+            if (preg_match('/Failure|Error:/i', $nativeOutput) && !preg_match('/already exist/i', $nativeOutput)) {
+                $output .= "\n[Warning] Native VLAN binding may have failed";
+            }
         } elseif ($vlanId && !$needsPortVlanConfig) {
             $output .= "\n[Native VLAN] Skipped - SmartOLT profile handles port VLAN config";
         }
@@ -8546,11 +8552,18 @@ class HuaweiOLT {
         $slot = $onu['slot'];
         $port = $onu['port'];
         $onuId = $onu['onu_id'];
-        $lineProfile = $onu['line_profile'] ?? 1;
+        
+        // Get line profile - check ONU record first, then fall back to OLT default
+        $lineProfile = $onu['line_profile'] ?? null;
+        if ($lineProfile === null) {
+            // Fetch OLT default line profile if not stored on ONU
+            $oltProfile = $this->getDefaultOltLineProfile($oltId);
+            $lineProfile = $oltProfile['id'] ?? 1;
+        }
         
         // Line profile 2 (SmartOLT) doesn't need ont port vlan commands - just service-ports
         // Line profile 1 (one-isp-lp) requires explicit port VLAN configuration
-        $needsPortVlanConfig = ($lineProfile != 2);
+        $needsPortVlanConfig = ((int)$lineProfile !== 2);
         
         // Get current attached VLANs
         $attachedVlans = [];
