@@ -6214,7 +6214,7 @@ class HuaweiOLT {
         
         if ($tr069Vlan && $assignedOnuId !== null) {
             $tr069Priority = $options['tr069_priority'] ?? 2;
-            $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 2;
+            $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 1;  // Default to gemport 1
             $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
             
             // Enter interface context for TR-069 OMCI commands
@@ -6511,7 +6511,7 @@ class HuaweiOLT {
         if ($tr069Vlan && $assignedOnuId !== null) {
             $tr069ProfileId = $options['tr069_profile_id'] ?? $this->getTR069ProfileId();
             $tr069Priority = $options['tr069_priority'] ?? 2;
-            $tr069GemPort = $options['tr069_gem_port'] ?? 2;
+            $tr069GemPort = $options['tr069_gem_port'] ?? 1;  // Use gemport 1 (same as data) - gemport 2 may not exist in line profile
             $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
             
             // TR-069 OMCI config (ipconfig + tr069-server-config)
@@ -6684,7 +6684,7 @@ class HuaweiOLT {
         }
         
         // Step 3: Create service-port for TR-069 VLAN
-        $tr069GemPort = $options['tr069_gem_port'] ?? 2;
+        $tr069GemPort = $options['tr069_gem_port'] ?? 1;  // Use gemport 1 (same as data) - gemport 2 may not exist in line profile
         $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
         $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
         $result3 = $this->executeCommand($oltId, $cmd3);
