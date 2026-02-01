@@ -1,0 +1,27 @@
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont-srvprofile gpon all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont-srvprofile gpon all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "ont-srvprofile gpon profile-id 20 profile-name 546M"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info by-sn 4857544381CFE68D"
+isp_crm_olt_service  | [OLT 1] SSH multi-line command (3 lines)
+isp_crm_olt_service  | [OLT 1] SSH sending: "interface gpon 0/1"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service  | [OLT 1] SSH multi-line command (3 lines)
+isp_crm_olt_service  | [OLT 1] SSH sending: "interface gpon 0/1"
+isp_crm_olt_service  | [OLT 1] SSH sending: "ont add 0 2 sn-auth 4857544381CFE68D omci ont-lineprofile-id 1 ont-srvprofile-id 1 desc "Florence Wanjiku""
+isp_crm_olt_service  | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service  | [OLT 1] SSH sending: "service-port vlan 660 gpon 0/1/0 ont 2 gemport 1 multi-service user-vlan 660 tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9"
+isp_crm_olt_service  | [OLT 1] SSH multi-line command (3 lines)
+isp_crm_olt_service  | [OLT 1] SSH sending: "interface gpon 0/1"
+isp_crm_olt_service  | [OLT 1] SSH sending: "ont port native-vlan 0 2 eth 1 vlan 660 priority 0"
+isp_crm_olt_service  | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service  | [OLT 1] SSH sending: "service-port vlan 660 gpon 0/1/0 ont 2 gemport 1 multi-service user-vlan 660 tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9"
+isp_crm_olt_service  | [OLT 1] SSH multi-line command (3 lines)
+isp_crm_olt_service  | [OLT 1] SSH sending: "interface gpon 0/1"
+isp_crm_olt_service  | [OLT 1] SSH sending: "ont ipconfig 0 2 dhcp vlan 69 priority 2"
+isp_crm_olt_service  | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service  | [OLT 1] SSH multi-line command (3 lines)
+isp_crm_olt_service  | [OLT 1] SSH sending: "interface gpon 0/1"
+isp_crm_olt_service  | [OLT 1] SSH sending: "ont tr069-server-config 0 2 profile-id 3"
+isp_crm_olt_service  | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service  | [OLT 1] SSH sending: "service-port vlan 69 gpon 0/1/0 ont 2 gemport 2 multi-service user-vlan 69 tag-transform translate inbound traffic-table index 7 outbound traffic-table index 7"
