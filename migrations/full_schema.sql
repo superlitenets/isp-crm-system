@@ -1696,6 +1696,41 @@ CREATE TABLE IF NOT EXISTS mikrotik_provisioned_ips (
 );
 
 -- ==========================================
+-- RADIUS Addon Services (Internet Protocol Addons)
+-- ==========================================
+
+CREATE TABLE IF NOT EXISTS radius_addon_services (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0,
+    billing_type VARCHAR(50) NOT NULL DEFAULT 'monthly',
+    category VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    setup_fee DECIMAL(10,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS radius_subscription_addons (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER NOT NULL REFERENCES radius_subscriptions(id) ON DELETE CASCADE,
+    addon_id INTEGER NOT NULL REFERENCES radius_addon_services(id) ON DELETE CASCADE,
+    quantity INTEGER DEFAULT 1,
+    status VARCHAR(50) DEFAULT 'active',
+    activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    cancelled_at TIMESTAMP,
+    notes TEXT,
+    config_data JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_addons_subscription ON radius_subscription_addons(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_addons_addon ON radius_subscription_addons(addon_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_addons_status ON radius_subscription_addons(status);
+
+-- ==========================================
 -- Accounting Module
 -- ==========================================
 

@@ -1953,3 +1953,47 @@ COMMENT ON COLUMN radius_speed_overrides.priority IS 'Higher priority overrides 
 
 CREATE INDEX IF NOT EXISTS idx_speed_overrides_package ON radius_speed_overrides(package_id);
 CREATE INDEX IF NOT EXISTS idx_speed_overrides_time ON radius_speed_overrides(start_time, end_time);
+
+-- ============================================================
+-- RADIUS Addon Services (Internet Protocol Addons: PPPoE, Static IP, DHCP)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS radius_addon_services (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0,
+    billing_type VARCHAR(50) NOT NULL DEFAULT 'monthly',
+    category VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    setup_fee DECIMAL(10,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE radius_addon_services IS 'Catalog of addon services (Internet - PPPoE, Internet - Static IP, Internet - DHCP, IPTV, VoIP, etc.)';
+COMMENT ON COLUMN radius_addon_services.category IS 'Categories: Internet - PPPoE, Internet - Static IP, Internet - DHCP, IPTV, VoIP, CDN, Security, Cloud, Other';
+
+CREATE TABLE IF NOT EXISTS radius_subscription_addons (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER NOT NULL REFERENCES radius_subscriptions(id) ON DELETE CASCADE,
+    addon_id INTEGER NOT NULL REFERENCES radius_addon_services(id) ON DELETE CASCADE,
+    quantity INTEGER DEFAULT 1,
+    status VARCHAR(50) DEFAULT 'active',
+    activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    cancelled_at TIMESTAMP,
+    notes TEXT,
+    config_data JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE radius_subscription_addons IS 'Addon services assigned to subscriptions with protocol-specific config';
+COMMENT ON COLUMN radius_subscription_addons.config_data IS 'JSONB for protocol config: PPPoE={username,password}, Static IP={ip_address,subnet_mask,gateway}, DHCP={mac_address,reserved_ip}';
+
+CREATE INDEX IF NOT EXISTS idx_subscription_addons_subscription ON radius_subscription_addons(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_addons_addon ON radius_subscription_addons(addon_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_addons_status ON radius_subscription_addons(status);
+
+-- Add config_data column if table already exists
+ALTER TABLE radius_subscription_addons ADD COLUMN IF NOT EXISTS config_data JSONB DEFAULT '{}';
