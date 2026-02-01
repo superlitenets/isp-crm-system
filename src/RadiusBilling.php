@@ -2495,6 +2495,82 @@ class RadiusBilling {
         ];
     }
     
+    public function disconnectUserAsync(int $subscriptionId): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT rs.id, rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
+                   rs.nas_ip_address,
+                   sub.username, 
+                   COALESCE(rn.ip_address, nas_by_ip.ip_address, sub_nas.ip_address) as nas_ip, 
+                   COALESCE(rn.secret, nas_by_ip.secret, sub_nas.secret) as nas_secret
+            FROM radius_sessions rs
+            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
+            LEFT JOIN radius_nas nas_by_ip ON rs.nas_ip_address = nas_by_ip.ip_address
+            LEFT JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
+            LEFT JOIN radius_nas sub_nas ON sub.nas_id = sub_nas.id
+            WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+        ");
+        $stmt->execute([$subscriptionId]);
+        $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        if (empty($sessions)) {
+            return ['success' => true, 'disconnected' => 0, 'note' => 'No active sessions'];
+        }
+        
+        $sent = 0;
+        foreach ($sessions as $session) {
+            $this->sendCoADisconnectAsync($session);
+            $sent++;
+            if (!empty($session['id'])) {
+                $this->markSessionEnded($session['id'], 'coa_disconnect');
+            }
+        }
+        
+        return ['success' => true, 'sent' => $sent, 'note' => 'Disconnect requests sent'];
+    }
+    
+    private function sendCoADisconnectAsync(array $session): void {
+        if (empty($session['nas_ip']) || empty($session['nas_secret'])) {
+            return;
+        }
+        
+        $sessionId = $session['acct_session_id'] ?? '';
+        $username = $session['username'] ?? '';
+        $nasIp = $session['nas_ip'];
+        $nasSecret = $session['nas_secret'];
+        
+        if (empty($sessionId) && empty($username)) {
+            return;
+        }
+        
+        $oltServiceUrl = getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
+        $oltServiceUrl .= '/radius/disconnect';
+        
+        $payload = [
+            'nasIp' => $nasIp,
+            'nasPort' => 3799,
+            'secret' => $nasSecret,
+            'username' => $username ?: null,
+            'sessionId' => $sessionId ?: null
+        ];
+        
+        $ch = curl_init($oltServiceUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT_MS => 500,
+            CURLOPT_NOSIGNAL => 1
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+    
     private function markSessionEnded(int $sessionId, string $terminateCause = 'Admin-Reset'): void {
         $stmt = $this->db->prepare("
             UPDATE radius_sessions SET 

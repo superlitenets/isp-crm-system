@@ -1334,14 +1334,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $msg = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
                     
-                    // Always disconnect user when expiry changes so router reconnects with new session
-                    $disconnectResult = $radiusBilling->disconnectUser($subId);
-                    if (!empty($disconnectResult['disconnected']) && $disconnectResult['disconnected'] > 0) {
-                        $msg .= ' (session disconnected - will reconnect with new expiry)';
-                    } elseif (!empty($disconnectResult['errors'])) {
-                        $msg .= ' (disconnect: ' . implode(', ', $disconnectResult['errors']) . ')';
+                    // Send disconnect request async (fire and forget) so it doesn't block
+                    $disconnectResult = $radiusBilling->disconnectUserAsync($subId);
+                    if (!empty($disconnectResult['sent']) && $disconnectResult['sent'] > 0) {
+                        $msg .= ' (disconnect sent - will reconnect with new expiry)';
                     } else {
-                        $msg .= ' (no active session to disconnect)';
+                        $msg .= ' (no active session)';
                     }
                     
                     $message = $msg;
