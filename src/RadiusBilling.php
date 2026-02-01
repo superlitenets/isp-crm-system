@@ -902,6 +902,9 @@ class RadiusBilling {
             // Disconnect active sessions async (fire and forget)
             $disconnectResult = $this->disconnectUserAsync($id);
             
+            // Also disconnect addon internet services
+            $addonResult = $this->disconnectSubscriptionAddons($id);
+            
             // Block IP on MikroTik for static/DHCP accounts
             $mikrotikResult = $this->updateMikroTikBlockedStatus($id, true, "Suspended: $reason");
             
@@ -909,6 +912,7 @@ class RadiusBilling {
                 'success' => true, 
                 'days_remaining' => $daysRemaining,
                 'disconnect_sent' => $disconnectResult['sent'] ?? 0,
+                'addons_cancelled' => $addonResult['processed'] ?? 0,
                 'mikrotik_result' => $mikrotikResult
             ];
         } catch (\Exception $e) {
@@ -1979,6 +1983,9 @@ class RadiusBilling {
                 WHERE id = ?
             ")->execute([$sub['id']]);
             
+            // Also cancel and disconnect all addon internet services
+            $this->disconnectSubscriptionAddons($sub['id']);
+            
             // Block IP on MikroTik for static/DHCP accounts
             $this->updateMikroTikBlockedStatus($sub['id'], true, "Expired");
             
@@ -2527,6 +2534,141 @@ class RadiusBilling {
         }
         
         return ['success' => true, 'sent' => $sent, 'note' => 'Disconnect requests sent'];
+    }
+    
+    public function disconnectSubscriptionAddons(int $subscriptionId): array {
+        // Get all active addon services with internet config (PPPoE, Static, DHCP)
+        $stmt = $this->db->prepare("
+            SELECT sa.id, sa.addon_id, sa.config_data, ads.category
+            FROM radius_subscription_addons sa
+            JOIN radius_addon_services ads ON sa.addon_id = ads.id
+            WHERE sa.subscription_id = ? 
+            AND sa.status = 'active'
+            AND ads.category IN ('Internet - PPPoE', 'Internet - Static IP', 'Internet - DHCP')
+        ");
+        $stmt->execute([$subscriptionId]);
+        $addons = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        if (empty($addons)) {
+            return ['success' => true, 'processed' => 0];
+        }
+        
+        // Get subscription details for NAS info
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        $processed = 0;
+        foreach ($addons as $addon) {
+            $config = json_decode($addon['config_data'] ?? '{}', true) ?: [];
+            
+            if (!empty($config)) {
+                // Disconnect based on addon type
+                if (($config['type'] ?? '') === 'pppoe' && !empty($config['username'])) {
+                    // Disconnect PPPoE addon session by username
+                    $this->disconnectByUsername($config['username'], $sub['nas_id']);
+                } elseif (($config['type'] ?? '') === 'dhcp' && !empty($config['mac'])) {
+                    // Remove DHCP lease by MAC
+                    $this->removeDhcpLease($config['mac'], $sub['nas_id']);
+                } elseif (($config['type'] ?? '') === 'static' && !empty($config['ip'])) {
+                    // Block static IP on MikroTik
+                    $this->blockStaticIp($config['ip'], $sub['nas_id']);
+                }
+            }
+            
+            // Mark addon as cancelled
+            $this->db->prepare("
+                UPDATE radius_subscription_addons 
+                SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW() 
+                WHERE id = ?
+            ")->execute([$addon['id']]);
+            
+            $processed++;
+        }
+        
+        return ['success' => true, 'processed' => $processed];
+    }
+    
+    private function disconnectByUsername(string $username, ?int $nasId): void {
+        // Find active session by username and send disconnect
+        $stmt = $this->db->prepare("
+            SELECT rs.id, rs.acct_session_id, rn.ip_address as nas_ip, rn.secret as nas_secret
+            FROM radius_sessions rs
+            JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
+            LEFT JOIN radius_nas rn ON COALESCE(rs.nas_id, sub.nas_id) = rn.id
+            WHERE sub.username = ? AND rs.session_end IS NULL
+            LIMIT 1
+        ");
+        $stmt->execute([$username]);
+        $session = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($session && !empty($session['nas_ip'])) {
+            $this->sendCoADisconnectAsync([
+                'acct_session_id' => $session['acct_session_id'],
+                'username' => $username,
+                'nas_ip' => $session['nas_ip'],
+                'nas_secret' => $session['nas_secret']
+            ]);
+            if (!empty($session['id'])) {
+                $this->markSessionEnded($session['id'], 'addon_expired');
+            }
+        }
+    }
+    
+    private function removeDhcpLease(string $mac, ?int $nasId): void {
+        if (!$nasId) return;
+        
+        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE id = ?");
+        $stmt->execute([$nasId]);
+        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$nas || empty($nas['ip_address'])) return;
+        
+        try {
+            $api = new MikroTikAPI(
+                $nas['ip_address'],
+                $nas['api_port'] ?? 8728,
+                $nas['api_username'] ?? 'admin',
+                $nas['api_password'] ?? ''
+            );
+            $api->connect();
+            
+            // Find and remove DHCP lease by MAC
+            $leases = $api->command('/ip/dhcp-server/lease/print', ['?mac-address=' . strtoupper($mac)]);
+            foreach ($leases as $lease) {
+                if (!empty($lease['.id'])) {
+                    $api->command('/ip/dhcp-server/lease/remove', ['=.id=' . $lease['.id']]);
+                }
+            }
+            $api->disconnect();
+        } catch (\Exception $e) {
+            // Log error but don't fail
+        }
+    }
+    
+    private function blockStaticIp(string $ip, ?int $nasId): void {
+        if (!$nasId) return;
+        
+        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE id = ?");
+        $stmt->execute([$nasId]);
+        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$nas || empty($nas['ip_address'])) return;
+        
+        try {
+            $api = new MikroTikAPI(
+                $nas['ip_address'],
+                $nas['api_port'] ?? 8728,
+                $nas['api_username'] ?? 'admin',
+                $nas['api_password'] ?? ''
+            );
+            $api->connect();
+            
+            // Add to address list for blocking
+            $api->addAddressListEntry('expired-addons', $ip, 'Addon service expired');
+            $api->disconnect();
+        } catch (\Exception $e) {
+            // Log error but don't fail
+        }
     }
     
     private function sendCoADisconnectAsync(array $session): void {
