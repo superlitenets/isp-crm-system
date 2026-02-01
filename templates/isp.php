@@ -815,6 +815,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: ?page=isp&view=package_schedules&package_id={$packageId}&msg=" . urlencode($message) . "&type={$messageType}");
             exit;
             
+        case 'add_addon':
+            try {
+                $stmt = $db->prepare("INSERT INTO radius_addon_services (name, description, category, billing_type, price, setup_fee, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $_POST['name'],
+                    $_POST['description'] ?? '',
+                    $_POST['category'] ?? 'Other',
+                    $_POST['billing_type'] ?? 'monthly',
+                    (float)$_POST['price'],
+                    (float)($_POST['setup_fee'] ?? 0),
+                    isset($_POST['is_active']) ? 1 : 0
+                ]);
+                $message = 'Addon service created successfully';
+                $messageType = 'success';
+            } catch (\Exception $e) {
+                $message = 'Error creating addon: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'edit_addon':
+            try {
+                $stmt = $db->prepare("UPDATE radius_addon_services SET name = ?, description = ?, category = ?, billing_type = ?, price = ?, setup_fee = ?, is_active = ?, updated_at = NOW() WHERE id = ?");
+                $stmt->execute([
+                    $_POST['name'],
+                    $_POST['description'] ?? '',
+                    $_POST['category'] ?? 'Other',
+                    $_POST['billing_type'] ?? 'monthly',
+                    (float)$_POST['price'],
+                    (float)($_POST['setup_fee'] ?? 0),
+                    isset($_POST['is_active']) ? 1 : 0,
+                    (int)$_POST['addon_id']
+                ]);
+                $message = 'Addon service updated successfully';
+                $messageType = 'success';
+            } catch (\Exception $e) {
+                $message = 'Error updating addon: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'delete_addon':
+            try {
+                $addonId = (int)$_POST['addon_id'];
+                $activeCheck = $db->prepare("SELECT COUNT(*) FROM radius_subscription_addons WHERE addon_id = ? AND status = 'active'");
+                $activeCheck->execute([$addonId]);
+                if ($activeCheck->fetchColumn() > 0) {
+                    throw new \Exception('Cannot delete addon with active subscribers. Deactivate it instead.');
+                }
+                $stmt = $db->prepare("DELETE FROM radius_addon_services WHERE id = ?");
+                $stmt->execute([$addonId]);
+                $message = 'Addon service deleted';
+                $messageType = 'success';
+            } catch (\Exception $e) {
+                $message = 'Error: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'assign_addon':
+            try {
+                $subId = (int)$_POST['subscription_id'];
+                $addonId = (int)$_POST['addon_id'];
+                $quantity = max(1, (int)($_POST['quantity'] ?? 1));
+                
+                $stmt = $db->prepare("INSERT INTO radius_subscription_addons (subscription_id, addon_id, quantity, status, activated_at) VALUES (?, ?, ?, 'active', NOW()) ON CONFLICT (subscription_id, addon_id) DO UPDATE SET quantity = EXCLUDED.quantity, status = 'active', updated_at = NOW()");
+                $stmt->execute([$subId, $addonId, $quantity]);
+                $message = 'Addon assigned successfully';
+                $messageType = 'success';
+            } catch (\Exception $e) {
+                $message = 'Error assigning addon: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'remove_addon':
+            try {
+                $subId = (int)$_POST['subscription_id'];
+                $addonId = (int)$_POST['addon_id'];
+                $stmt = $db->prepare("UPDATE radius_subscription_addons SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW() WHERE subscription_id = ? AND addon_id = ?");
+                $stmt->execute([$subId, $addonId]);
+                $message = 'Addon removed from subscription';
+                $messageType = 'success';
+            } catch (\Exception $e) {
+                $message = 'Error: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'create_subscription':
             $postData = $_POST;
             $customerId = null;
@@ -1936,6 +2025,9 @@ try {
                 <a class="nav-link <?= $view === 'packages' ? 'active' : '' ?>" href="?page=isp&view=packages">
                     <i class="bi bi-box me-2"></i> Packages
                 </a>
+                <a class="nav-link <?= $view === 'addons' ? 'active' : '' ?>" href="?page=isp&view=addons">
+                    <i class="bi bi-plus-circle me-2"></i> Addon Services
+                </a>
                 <a class="nav-link <?= $view === 'nas' ? 'active' : '' ?>" href="?page=isp&view=nas">
                     <i class="bi bi-hdd-network me-2"></i> NAS Devices
                 </a>
@@ -1999,6 +2091,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'packages' ? 'active' : '' ?>" href="?page=isp&view=packages">
                     <i class="bi bi-box me-2"></i> Packages
+                </a>
+                <a class="nav-link <?= $view === 'addons' ? 'active' : '' ?>" href="?page=isp&view=addons">
+                    <i class="bi bi-plus-circle me-2"></i> Addon Services
                 </a>
                 <a class="nav-link <?= $view === 'nas' ? 'active' : '' ?>" href="?page=isp&view=nas">
                     <i class="bi bi-hdd-network me-2"></i> NAS Devices
@@ -3754,6 +3849,154 @@ try {
                                                 <?php endif; ?>
                                             </tbody>
                                         </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Addon Services -->
+                            <?php 
+                            $subscriberAddons = $db->prepare("
+                                SELECT sa.*, ads.name, ads.price, ads.billing_type, ads.category, ads.description
+                                FROM radius_subscription_addons sa
+                                JOIN radius_addon_services ads ON sa.addon_id = ads.id
+                                WHERE sa.subscription_id = ? AND sa.status = 'active'
+                            ");
+                            $subscriberAddons->execute([$subId]);
+                            $activeAddons = $subscriberAddons->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            $availableAddons = $db->query("SELECT * FROM radius_addon_services WHERE is_active = true ORDER BY category, name")->fetchAll(PDO::FETCH_ASSOC);
+                            $assignedAddonIds = array_column($activeAddons, 'addon_id');
+                            
+                            $addonsTotal = array_reduce($activeAddons, function($sum, $a) {
+                                return $sum + ($a['billing_type'] === 'monthly' ? $a['price'] * $a['quantity'] : 0);
+                            }, 0);
+                            $packagePrice = $package['price'] ?? 0;
+                            $totalMonthly = $packagePrice + $addonsTotal;
+                            ?>
+                            <div class="card shadow-sm border-0 mt-3">
+                                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Addon Services</h6>
+                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignAddonModal">
+                                        <i class="bi bi-plus me-1"></i>Add Service
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <?php if (empty($activeAddons)): ?>
+                                    <p class="text-muted mb-0 text-center py-2">No addon services assigned</p>
+                                    <?php else: ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Service</th>
+                                                    <th>Category</th>
+                                                    <th>Qty</th>
+                                                    <th>Price</th>
+                                                    <th>Billing</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($activeAddons as $addon): ?>
+                                                <tr>
+                                                    <td>
+                                                        <strong><?= htmlspecialchars($addon['name']) ?></strong>
+                                                        <?php if ($addon['description']): ?>
+                                                        <br><small class="text-muted"><?= htmlspecialchars($addon['description']) ?></small>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($addon['category'] ?? 'Other') ?></span></td>
+                                                    <td><?= $addon['quantity'] ?></td>
+                                                    <td>KES <?= number_format($addon['price'] * $addon['quantity'], 2) ?></td>
+                                                    <td>
+                                                        <?php if ($addon['billing_type'] === 'monthly'): ?>
+                                                        <span class="badge bg-info">Monthly</span>
+                                                        <?php elseif ($addon['billing_type'] === 'one_time'): ?>
+                                                        <span class="badge bg-warning">One-time</span>
+                                                        <?php else: ?>
+                                                        <span class="badge bg-primary">Per Use</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <form method="post" class="d-inline" onsubmit="return confirm('Remove this addon?')">
+                                                            <input type="hidden" name="action" value="remove_addon">
+                                                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                                                            <input type="hidden" name="addon_id" value="<?= $addon['addon_id'] ?>">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <div class="border-top mt-3 pt-3">
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <small class="text-muted">Package</small>
+                                                <div class="fw-bold">KES <?= number_format($packagePrice) ?></div>
+                                            </div>
+                                            <div class="col-4">
+                                                <small class="text-muted">Addons</small>
+                                                <div class="fw-bold text-info">+ KES <?= number_format($addonsTotal) ?></div>
+                                            </div>
+                                            <div class="col-4">
+                                                <small class="text-muted">Total Monthly</small>
+                                                <div class="fw-bold text-primary fs-5">KES <?= number_format($totalMonthly) ?></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Assign Addon Modal -->
+                            <div class="modal fade" id="assignAddonModal" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="post">
+                                            <input type="hidden" name="action" value="assign_addon">
+                                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Assign Addon Service</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <?php 
+                                                $unassignedAddons = array_filter($availableAddons, fn($a) => !in_array($a['id'], $assignedAddonIds));
+                                                if (empty($unassignedAddons)): ?>
+                                                <div class="alert alert-info mb-0">
+                                                    All available addon services are already assigned to this subscriber.
+                                                    <a href="?page=isp&view=addons">Manage addon services</a>
+                                                </div>
+                                                <?php else: ?>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Select Addon Service</label>
+                                                    <select name="addon_id" class="form-select" required>
+                                                        <option value="">-- Choose addon --</option>
+                                                        <?php foreach ($unassignedAddons as $addon): ?>
+                                                        <option value="<?= $addon['id'] ?>">
+                                                            <?= htmlspecialchars($addon['name']) ?> 
+                                                            (<?= $addon['category'] ?>) - 
+                                                            KES <?= number_format($addon['price'], 2) ?>/<?= $addon['billing_type'] ?>
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Quantity</label>
+                                                    <input type="number" name="quantity" class="form-control" value="1" min="1" max="100">
+                                                </div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <?php if (!empty($unassignedAddons)): ?>
+                                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Assign Addon</button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </form>
                                     </div>
                                 </div>
                             </div>
@@ -5914,6 +6157,231 @@ try {
                 </div>
             </div>
             <?php endif; ?>
+
+            <?php elseif ($view === 'addons'): ?>
+            <?php 
+            $addonServices = $db->query("SELECT * FROM radius_addon_services ORDER BY category, name")->fetchAll(PDO::FETCH_ASSOC);
+            $categories = ['IPTV', 'VoIP', 'CDN', 'Security', 'Cloud', 'Other'];
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-plus-circle"></i> Addon Services</h4>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAddonModal">
+                    <i class="bi bi-plus-lg me-1"></i> New Addon Service
+                </button>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <?php if (empty($addonServices)): ?>
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-plus-circle display-4 mb-3"></i>
+                        <p class="mb-0">No addon services configured yet.</p>
+                        <p class="small">Create addon services like IPTV, VoIP, CDN, etc. to charge alongside packages.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Price</th>
+                                    <th>Billing</th>
+                                    <th>Setup Fee</th>
+                                    <th>Status</th>
+                                    <th>Subscribers</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($addonServices as $addon): ?>
+                                <?php 
+                                $subCount = $db->prepare("SELECT COUNT(*) FROM radius_subscription_addons WHERE addon_id = ? AND status = 'active'");
+                                $subCount->execute([$addon['id']]);
+                                $activeCount = $subCount->fetchColumn();
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= htmlspecialchars($addon['name']) ?></strong>
+                                        <?php if ($addon['description']): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($addon['description']) ?></small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($addon['category'] ?? 'Other') ?></span></td>
+                                    <td><strong>KES <?= number_format($addon['price'], 2) ?></strong></td>
+                                    <td>
+                                        <?php if ($addon['billing_type'] === 'monthly'): ?>
+                                        <span class="badge bg-info">Monthly</span>
+                                        <?php elseif ($addon['billing_type'] === 'one_time'): ?>
+                                        <span class="badge bg-warning">One-time</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-primary">Per Use</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= $addon['setup_fee'] > 0 ? 'KES ' . number_format($addon['setup_fee'], 2) : '-' ?></td>
+                                    <td>
+                                        <?php if ($addon['is_active']): ?>
+                                        <span class="badge bg-success">Active</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-secondary">Inactive</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><span class="badge bg-primary"><?= $activeCount ?></span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editAddon(<?= htmlspecialchars(json_encode($addon)) ?>)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this addon service?')">
+                                            <input type="hidden" name="action" value="delete_addon">
+                                            <input type="hidden" name="addon_id" value="<?= $addon['id'] ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Add Addon Modal -->
+            <div class="modal fade" id="addAddonModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="add_addon">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>New Addon Service</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Service Name *</label>
+                                    <input type="text" name="name" class="form-control" required placeholder="e.g., IPTV Premium">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" class="form-control" rows="2" placeholder="Brief description of the service"></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Category</label>
+                                        <select name="category" class="form-select">
+                                            <?php foreach ($categories as $cat): ?>
+                                            <option value="<?= $cat ?>"><?= $cat ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Billing Type</label>
+                                        <select name="billing_type" class="form-select">
+                                            <option value="monthly">Monthly (Recurring)</option>
+                                            <option value="one_time">One-time</option>
+                                            <option value="per_use">Per Use</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Price (KES) *</label>
+                                        <input type="number" name="price" class="form-control" step="0.01" required placeholder="0.00">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Setup Fee (KES)</label>
+                                        <input type="number" name="setup_fee" class="form-control" step="0.01" value="0" placeholder="0.00">
+                                    </div>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_active" class="form-check-input" id="addonActive" checked>
+                                    <label class="form-check-label" for="addonActive">Active (available for assignment)</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create Addon</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit Addon Modal -->
+            <div class="modal fade" id="editAddonModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="edit_addon">
+                            <input type="hidden" name="addon_id" id="editAddonId">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Addon Service</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Service Name *</label>
+                                    <input type="text" name="name" id="editAddonName" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="editAddonDesc" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Category</label>
+                                        <select name="category" id="editAddonCategory" class="form-select">
+                                            <?php foreach ($categories as $cat): ?>
+                                            <option value="<?= $cat ?>"><?= $cat ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Billing Type</label>
+                                        <select name="billing_type" id="editAddonBilling" class="form-select">
+                                            <option value="monthly">Monthly (Recurring)</option>
+                                            <option value="one_time">One-time</option>
+                                            <option value="per_use">Per Use</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Price (KES) *</label>
+                                        <input type="number" name="price" id="editAddonPrice" class="form-control" step="0.01" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Setup Fee (KES)</label>
+                                        <input type="number" name="setup_fee" id="editAddonSetup" class="form-control" step="0.01">
+                                    </div>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_active" class="form-check-input" id="editAddonActive">
+                                    <label class="form-check-label" for="editAddonActive">Active (available for assignment)</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function editAddon(addon) {
+                document.getElementById('editAddonId').value = addon.id;
+                document.getElementById('editAddonName').value = addon.name;
+                document.getElementById('editAddonDesc').value = addon.description || '';
+                document.getElementById('editAddonCategory').value = addon.category || 'Other';
+                document.getElementById('editAddonBilling').value = addon.billing_type || 'monthly';
+                document.getElementById('editAddonPrice').value = addon.price;
+                document.getElementById('editAddonSetup').value = addon.setup_fee || 0;
+                document.getElementById('editAddonActive').checked = addon.is_active == 1;
+                new bootstrap.Modal(document.getElementById('editAddonModal')).show();
+            }
+            </script>
 
             <?php elseif ($view === 'nas'): ?>
             <?php 
