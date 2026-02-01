@@ -29,6 +29,8 @@ class OLTSession {
         this.buffer = '';
         this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\]|[A-Z0-9_-]+(?:\([^)]+\))?[#>])\s*$/i;
         this.dataListeners = [];
+        this.commandLock = false;  // Mutex to prevent concurrent commands
+        this.commandQueue = [];    // Queue for pending commands
     }
 
     // Handle Telnet protocol negotiations
@@ -280,24 +282,34 @@ class OLTSession {
     }
 
     async sendCommand(command, timeout = 60000) {
-        // Check if this is a multi-line command - if so, split and send sequentially
-        const lines = command.split(/\r?\n/).filter(l => l.trim());
-        if (lines.length > 1) {
-            console.log(`[OLT ${this.oltId}] Multi-line command detected (${lines.length} lines), sending sequentially`);
-            let fullResponse = '';
-            for (const line of lines) {
-                const response = await this.sendSingleCommand(line, timeout);
-                fullResponse += response;
-                // Small delay between commands to prevent garbling
-                await new Promise(r => setTimeout(r, 100));
-            }
-            return fullResponse;
+        // Wait for any pending command to complete (mutex)
+        while (this.commandLock) {
+            await new Promise(r => setTimeout(r, 100));
         }
+        this.commandLock = true;
         
-        const result = await this.sendSingleCommand(command, timeout);
-        // Small delay after command to allow OLT to settle before next command
-        await new Promise(r => setTimeout(r, 100));
-        return result;
+        try {
+            // Check if this is a multi-line command - if so, split and send sequentially
+            const lines = command.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length > 1) {
+                console.log(`[OLT ${this.oltId}] Multi-line command detected (${lines.length} lines), sending sequentially`);
+                let fullResponse = '';
+                for (const line of lines) {
+                    const response = await this.sendSingleCommand(line, timeout);
+                    fullResponse += response;
+                    // Small delay between commands to prevent garbling
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                return fullResponse;
+            }
+            
+            const result = await this.sendSingleCommand(command, timeout);
+            // Small delay after command to allow OLT to settle before next command
+            await new Promise(r => setTimeout(r, 100));
+            return result;
+        } finally {
+            this.commandLock = false;
+        }
     }
     
     async sendSingleCommand(command, timeout = 60000) {
