@@ -273,20 +273,39 @@ class DiscoveryWorker {
                 currentAutofindOnus.map(o => o.sn.toUpperCase().replace(/[^A-Z0-9]/g, ''))
             );
 
-            // Find ONUs that are pending but no longer in autofind = they were authorized externally
+            // Find ONUs that are pending but no longer in autofind
+            // Only mark as authorized if we can VERIFY the ONU is actually configured on the OLT
             for (const pending of pendingResult.rows) {
                 const normalizedSn = pending.serial_number.toUpperCase().replace(/[^A-Z0-9]/g, '');
                 if (!currentSerials.has(normalizedSn)) {
-                    // This ONU is no longer in autofind - mark as authorized
-                    await this.pool.query(`
-                        UPDATE onu_discovery_log 
-                        SET authorized = true, 
-                            authorized_at = CURRENT_TIMESTAMP,
-                            notified = true,
-                            notes = COALESCE(notes, '') || ' Authorized externally'
-                        WHERE id = $1
-                    `, [pending.id]);
-                    console.log(`[Discovery] Marked ${pending.serial_number} as authorized (no longer in autofind)`);
+                    // ONU is no longer in autofind - verify if it's actually authorized on OLT
+                    try {
+                        const verifyCmd = `display ont info by-sn ${pending.serial_number}`;
+                        const verifyOutput = await this.sessionManager.execute(olt.id.toString(), verifyCmd, { timeout: 15000 });
+                        
+                        // Check if ONU is actually configured (has F/S/P and ONT-ID assigned)
+                        const isConfigured = /F\/S\/P\s*:\s*\d+\/\d+\/\d+/i.test(verifyOutput) && 
+                                           /ONT-ID\s*:\s*\d+/i.test(verifyOutput);
+                        
+                        if (isConfigured) {
+                            // ONU is actually configured on OLT - mark as authorized
+                            await this.pool.query(`
+                                UPDATE onu_discovery_log 
+                                SET authorized = true, 
+                                    authorized_at = CURRENT_TIMESTAMP,
+                                    notified = true,
+                                    notes = COALESCE(notes, '') || ' Verified authorized on OLT'
+                                WHERE id = $1
+                            `, [pending.id]);
+                            console.log(`[Discovery] Verified ${pending.serial_number} is authorized on OLT (has ONT-ID assigned)`);
+                        } else {
+                            // ONU disappeared from autofind but NOT configured - might be offline/rebooting
+                            console.log(`[Discovery] ${pending.serial_number} not in autofind but NOT configured on OLT - keeping as pending`);
+                        }
+                    } catch (verifyError) {
+                        // Can't verify - don't change status
+                        console.log(`[Discovery] Could not verify ${pending.serial_number} status: ${verifyError.message}`);
+                    }
                 }
             }
         } catch (error) {
