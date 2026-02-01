@@ -8708,8 +8708,8 @@ class HuaweiOLT {
         $errors = [];
         
         // First, find the service-port index for this VLAN
-        // display service-port port gpon {frame}/{slot}/{port} ont {onu_id}
-        $displayCmd = "display service-port port gpon {$frame}/{$slot}/{$port} ont {$onuId}";
+        // display service-port port {frame}/{slot}/{port} ont {onu_id}
+        $displayCmd = "display service-port port {$frame}/{$slot}/{$port} ont {$onuId}";
         $displayResult = $this->executeCommand($oltId, $displayCmd);
         $displayOutput = $displayResult['output'] ?? '';
         $output .= "[Finding Service Port]\n{$displayOutput}\n";
