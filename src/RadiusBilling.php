@@ -2493,11 +2493,18 @@ class RadiusBilling {
             }
         }
         
+        // Include debug info in response
+        $debugInfo = [];
+        foreach ($sessions as $idx => $s) {
+            $debugInfo[] = "Session $idx: nas_ip_address=" . ($s['nas_ip_address'] ?? 'NULL') . ", nas_ip=" . ($s['nas_ip'] ?? 'NULL') . ", secret=" . (empty($s['nas_secret']) ? 'EMPTY' : 'SET');
+        }
+        
         return [
             'success' => true, 
             'disconnected' => $disconnected,
             'total_sessions' => count($sessions),
-            'errors' => $errors
+            'errors' => $errors,
+            'debug' => $debugInfo
         ];
     }
     
