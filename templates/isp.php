@@ -3023,12 +3023,13 @@ try {
                 $isOnline = !empty($activeSession);
                 
                 // Calculate uptime or offline duration
-                // Database stores timestamps with timezone info, use DateTime for proper handling
+                // Database stores timestamps in UTC, convert to local timezone for comparison
                 $uptimeStr = '';
                 $offlineStr = '';
                 if ($isOnline && $activeSession) {
-                    $sessionStart = new DateTime($activeSession['session_start']);
-                    $now = new DateTime('now', new DateTimeZone(date_default_timezone_get()));
+                    // Parse session_start as UTC, then convert to local for proper comparison
+                    $sessionStart = new DateTime($activeSession['session_start'], new DateTimeZone('UTC'));
+                    $now = new DateTime('now', new DateTimeZone('UTC'));
                     $uptime = $now->getTimestamp() - $sessionStart->getTimestamp();
                     if ($uptime < 0) $uptime = 0;
                     $days = floor($uptime / 86400);
@@ -3050,8 +3051,8 @@ try {
                         }
                     }
                     if ($lastSession) {
-                        $sessionEnd = new DateTime($lastSession['session_end']);
-                        $now = new DateTime('now', new DateTimeZone(date_default_timezone_get()));
+                        $sessionEnd = new DateTime($lastSession['session_end'], new DateTimeZone('UTC'));
+                        $now = new DateTime('now', new DateTimeZone('UTC'));
                         $offline = $now->getTimestamp() - $sessionEnd->getTimestamp();
                         if ($offline < 0) $offline = 0;
                         $days = floor($offline / 86400);
@@ -3739,9 +3740,9 @@ try {
                                                     <td><?= $sess['session_end'] ? date('M j, H:i', strtotime($sess['session_end'])) : '<span class="badge bg-success">Active</span>' ?></td>
                                                     <td>
                                                         <?php 
-                                                        $tz = new DateTimeZone(date_default_timezone_get());
-                                                        $startDt = new DateTime($sess['session_start'], $tz);
-                                                        $endDt = $sess['session_end'] ? new DateTime($sess['session_end'], $tz) : new DateTime('now', $tz);
+                                                        $utc = new DateTimeZone('UTC');
+                                                        $startDt = new DateTime($sess['session_start'], $utc);
+                                                        $endDt = $sess['session_end'] ? new DateTime($sess['session_end'], $utc) : new DateTime('now', $utc);
                                                         $dur = $endDt->getTimestamp() - $startDt->getTimestamp();
                                                         if ($dur < 0) $dur = 0;
                                                         echo floor($dur/3600) . 'h ' . floor(($dur%3600)/60) . 'm';
@@ -5301,9 +5302,9 @@ try {
                                     <td><?= date('M j, H:i', strtotime($session['session_start'])) ?></td>
                                     <td>
                                         <?php 
-                                        $tz = new DateTimeZone(date_default_timezone_get());
-                                        $startDt = new DateTime($session['session_start'], $tz);
-                                        $nowDt = new DateTime('now', $tz);
+                                        $utc = new DateTimeZone('UTC');
+                                        $startDt = new DateTime($session['session_start'], $utc);
+                                        $nowDt = new DateTime('now', $utc);
                                         $dur = $nowDt->getTimestamp() - $startDt->getTimestamp();
                                         if ($dur < 0) $dur = 0;
                                         $hours = floor($dur / 3600);
