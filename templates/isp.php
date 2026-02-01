@@ -880,8 +880,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $addonId = (int)$_POST['addon_id'];
                 $quantity = max(1, (int)($_POST['quantity'] ?? 1));
                 
-                $stmt = $db->prepare("INSERT INTO radius_subscription_addons (subscription_id, addon_id, quantity, status, activated_at) VALUES (?, ?, ?, 'active', NOW()) ON CONFLICT (subscription_id, addon_id) DO UPDATE SET quantity = EXCLUDED.quantity, status = 'active', updated_at = NOW()");
-                $stmt->execute([$subId, $addonId, $quantity]);
+                // Build config data based on addon category
+                $configData = [];
+                if (!empty($_POST['pppoe_username'])) {
+                    $configData['type'] = 'pppoe';
+                    $configData['username'] = trim($_POST['pppoe_username']);
+                    $configData['password'] = $_POST['pppoe_password'];
+                } elseif (!empty($_POST['static_ip'])) {
+                    $configData['type'] = 'static';
+                    $configData['ip'] = trim($_POST['static_ip']);
+                    $configData['netmask'] = trim($_POST['static_netmask'] ?? '255.255.255.0');
+                    $configData['gateway'] = trim($_POST['static_gateway'] ?? '');
+                } elseif (!empty($_POST['dhcp_mac'])) {
+                    $configData['type'] = 'dhcp';
+                    $configData['mac'] = strtoupper(trim($_POST['dhcp_mac']));
+                    $configData['reserved_ip'] = trim($_POST['dhcp_reserved_ip'] ?? '');
+                    $configData['description'] = trim($_POST['dhcp_description'] ?? '');
+                }
+                
+                $stmt = $db->prepare("INSERT INTO radius_subscription_addons (subscription_id, addon_id, quantity, config_data, status, activated_at) VALUES (?, ?, ?, ?, 'active', NOW()) ON CONFLICT (subscription_id, addon_id) DO UPDATE SET quantity = EXCLUDED.quantity, config_data = EXCLUDED.config_data, status = 'active', updated_at = NOW()");
+                $stmt->execute([$subId, $addonId, $quantity, json_encode($configData)]);
                 $message = 'Addon assigned successfully';
                 $messageType = 'success';
             } catch (\Exception $e) {
@@ -3897,12 +3915,28 @@ try {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <?php foreach ($activeAddons as $addon): ?>
+                                                <?php foreach ($activeAddons as $addon): 
+                                                $config = json_decode($addon['config_data'] ?? '{}', true) ?: [];
+                                                ?>
                                                 <tr>
                                                     <td>
                                                         <strong><?= htmlspecialchars($addon['name']) ?></strong>
                                                         <?php if ($addon['description']): ?>
                                                         <br><small class="text-muted"><?= htmlspecialchars($addon['description']) ?></small>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($config)): ?>
+                                                        <div class="mt-1">
+                                                            <?php if (($config['type'] ?? '') === 'pppoe'): ?>
+                                                            <small class="text-info"><i class="bi bi-person-fill me-1"></i><?= htmlspecialchars($config['username'] ?? '') ?></small>
+                                                            <?php elseif (($config['type'] ?? '') === 'static'): ?>
+                                                            <small class="text-success"><i class="bi bi-hdd-network me-1"></i><?= htmlspecialchars($config['ip'] ?? '') ?></small>
+                                                            <?php elseif (($config['type'] ?? '') === 'dhcp'): ?>
+                                                            <small class="text-warning"><i class="bi bi-ethernet me-1"></i><?= htmlspecialchars($config['mac'] ?? '') ?></small>
+                                                            <?php if (!empty($config['description'])): ?>
+                                                            <small class="text-muted ms-2">(<?= htmlspecialchars($config['description']) ?>)</small>
+                                                            <?php endif; ?>
+                                                            <?php endif; ?>
+                                                        </div>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td><span class="badge bg-secondary"><?= htmlspecialchars($addon['category'] ?? 'Other') ?></span></td>
@@ -3955,7 +3989,7 @@ try {
                             <div class="modal fade" id="assignAddonModal" tabindex="-1">
                                 <div class="modal-dialog">
                                     <div class="modal-content">
-                                        <form method="post">
+                                        <form method="post" id="assignAddonForm">
                                             <input type="hidden" name="action" value="assign_addon">
                                             <input type="hidden" name="subscription_id" value="<?= $subId ?>">
                                             <div class="modal-header">
@@ -3973,10 +4007,10 @@ try {
                                                 <?php else: ?>
                                                 <div class="mb-3">
                                                     <label class="form-label">Select Addon Service</label>
-                                                    <select name="addon_id" class="form-select" required>
-                                                        <option value="">-- Choose addon --</option>
+                                                    <select name="addon_id" id="addonSelect" class="form-select" required onchange="showAddonFields()">
+                                                        <option value="" data-category="">-- Choose addon --</option>
                                                         <?php foreach ($unassignedAddons as $addon): ?>
-                                                        <option value="<?= $addon['id'] ?>">
+                                                        <option value="<?= $addon['id'] ?>" data-category="<?= htmlspecialchars($addon['category']) ?>">
                                                             <?= htmlspecialchars($addon['name']) ?> 
                                                             (<?= $addon['category'] ?>) - 
                                                             KES <?= number_format($addon['price'], 2) ?>/<?= $addon['billing_type'] ?>
@@ -3984,6 +4018,60 @@ try {
                                                         <?php endforeach; ?>
                                                     </select>
                                                 </div>
+                                                
+                                                <!-- PPPoE Fields -->
+                                                <div id="pppoeFields" class="addon-config-fields" style="display:none;">
+                                                    <div class="alert alert-info py-2 small mb-3">
+                                                        <i class="bi bi-info-circle me-1"></i> PPPoE requires username and password for authentication
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">PPPoE Username <span class="text-danger">*</span></label>
+                                                        <input type="text" name="pppoe_username" class="form-control" placeholder="e.g., addon_user123">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">PPPoE Password <span class="text-danger">*</span></label>
+                                                        <input type="text" name="pppoe_password" class="form-control" placeholder="Enter password">
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Static IP Fields -->
+                                                <div id="staticFields" class="addon-config-fields" style="display:none;">
+                                                    <div class="alert alert-info py-2 small mb-3">
+                                                        <i class="bi bi-info-circle me-1"></i> Static IP requires an IP address assignment
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Static IP Address <span class="text-danger">*</span></label>
+                                                        <input type="text" name="static_ip" class="form-control" placeholder="e.g., 192.168.1.100" pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Subnet Mask</label>
+                                                        <input type="text" name="static_netmask" class="form-control" value="255.255.255.0" placeholder="e.g., 255.255.255.0">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Gateway</label>
+                                                        <input type="text" name="static_gateway" class="form-control" placeholder="e.g., 192.168.1.1">
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- DHCP Fields -->
+                                                <div id="dhcpFields" class="addon-config-fields" style="display:none;">
+                                                    <div class="alert alert-info py-2 small mb-3">
+                                                        <i class="bi bi-info-circle me-1"></i> DHCP requires MAC address for device binding
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">MAC Address <span class="text-danger">*</span></label>
+                                                        <input type="text" name="dhcp_mac" class="form-control" placeholder="e.g., AA:BB:CC:DD:EE:FF" style="text-transform:uppercase;">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Reserved IP (Optional)</label>
+                                                        <input type="text" name="dhcp_reserved_ip" class="form-control" placeholder="Leave blank for dynamic">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Device Description</label>
+                                                        <input type="text" name="dhcp_description" class="form-control" placeholder="e.g., Living room TV">
+                                                    </div>
+                                                </div>
+                                                
                                                 <div class="mb-3">
                                                     <label class="form-label">Quantity</label>
                                                     <input type="number" name="quantity" class="form-control" value="1" min="1" max="100">
@@ -4000,6 +4088,30 @@ try {
                                     </div>
                                 </div>
                             </div>
+                            
+                            <script>
+                            function showAddonFields() {
+                                const select = document.getElementById('addonSelect');
+                                const category = select.options[select.selectedIndex].dataset.category || '';
+                                
+                                document.querySelectorAll('.addon-config-fields').forEach(el => {
+                                    el.style.display = 'none';
+                                    el.querySelectorAll('input').forEach(inp => inp.required = false);
+                                });
+                                
+                                if (category.includes('PPPoE')) {
+                                    document.getElementById('pppoeFields').style.display = 'block';
+                                    document.querySelector('[name="pppoe_username"]').required = true;
+                                    document.querySelector('[name="pppoe_password"]').required = true;
+                                } else if (category.includes('Static IP')) {
+                                    document.getElementById('staticFields').style.display = 'block';
+                                    document.querySelector('[name="static_ip"]').required = true;
+                                } else if (category.includes('DHCP')) {
+                                    document.getElementById('dhcpFields').style.display = 'block';
+                                    document.querySelector('[name="dhcp_mac"]').required = true;
+                                }
+                            }
+                            </script>
                             
                             <!-- Authentication Logs -->
                             <div class="card shadow-sm border-0 mt-3">
@@ -6161,7 +6273,7 @@ try {
             <?php elseif ($view === 'addons'): ?>
             <?php 
             $addonServices = $db->query("SELECT * FROM radius_addon_services ORDER BY category, name")->fetchAll(PDO::FETCH_ASSOC);
-            $categories = ['IPTV', 'VoIP', 'CDN', 'Security', 'Cloud', 'Other'];
+            $categories = ['Internet - PPPoE', 'Internet - Static IP', 'Internet - DHCP', 'IPTV', 'VoIP', 'CDN', 'Security', 'Cloud', 'Other'];
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-plus-circle"></i> Addon Services</h4>
