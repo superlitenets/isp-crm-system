@@ -848,15 +848,11 @@ class RadiusBilling {
             
             $this->createBillingRecord($id, $packageId, $package['price'], 'renewal', $startDate, $expiryDate);
             
-            // If user was expired/suspended, disconnect them so they reconnect with new settings
+            // If user was expired/suspended, disconnect them async so they reconnect with new settings
             $coaResult = null;
             if ($wasExpired) {
-                // Disconnect first to force reconnection with new expiry/pool
-                $coaResult = $this->disconnectUser($id);
-                if (!$coaResult['success'] && ($coaResult['disconnected'] ?? 0) == 0) {
-                    // No active session - user will get correct settings on next connect
-                    $coaResult['note'] = 'No active session - settings will apply on next login';
-                }
+                // Disconnect async to force reconnection with new expiry/pool
+                $coaResult = $this->disconnectUserAsync($id);
             }
             
             // Unblock IP on MikroTik for static/DHCP accounts
@@ -903,8 +899,8 @@ class RadiusBilling {
             ");
             $stmt->execute([$daysRemaining, "\nSuspended: $reason (" . date('Y-m-d H:i') . ")", $id]);
             
-            // Disconnect active sessions via CoA
-            $disconnectResult = $this->sendCoAForSubscription($id);
+            // Disconnect active sessions async (fire and forget)
+            $disconnectResult = $this->disconnectUserAsync($id);
             
             // Block IP on MikroTik for static/DHCP accounts
             $mikrotikResult = $this->updateMikroTikBlockedStatus($id, true, "Suspended: $reason");
@@ -912,7 +908,7 @@ class RadiusBilling {
             return [
                 'success' => true, 
                 'days_remaining' => $daysRemaining,
-                'coa_result' => $disconnectResult,
+                'disconnect_sent' => $disconnectResult['sent'] ?? 0,
                 'mikrotik_result' => $mikrotikResult
             ];
         } catch (\Exception $e) {
@@ -1967,8 +1963,8 @@ class RadiusBilling {
                     $coaSent++;
                 }
             } else {
-                // Disconnect active sessions
-                $this->disconnectUser($sub['id']);
+                // Disconnect active sessions async
+                $this->disconnectUserAsync($sub['id']);
             }
             
             // Release static IP back to pool if assigned

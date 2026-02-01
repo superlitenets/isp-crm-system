@@ -951,12 +951,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($needsDisconnect) {
-                    // Force full disconnect so router reconnects with new session
-                    $disconnectResult = $radiusBilling->disconnectUser($id);
-                    if (!empty($disconnectResult['disconnected']) && $disconnectResult['disconnected'] > 0) {
-                        $coaMessage = " User disconnected ({$disconnectReason}).";
-                    } elseif (!empty($disconnectResult['errors'])) {
-                        $coaMessage = " (disconnect: " . implode(', ', $disconnectResult['errors']) . ")";
+                    // Force full disconnect async so router reconnects with new session
+                    $disconnectResult = $radiusBilling->disconnectUserAsync($id);
+                    if (!empty($disconnectResult['sent']) && $disconnectResult['sent'] > 0) {
+                        $coaMessage = " Disconnect sent ({$disconnectReason}).";
                     } else {
                         $coaMessage = " (no active session - {$disconnectReason})";
                     }
@@ -1403,12 +1401,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $msg = 'Package changed to ' . $newPkg['name'];
                 
-                // Always send CoA to update speed limits on MikroTik
-                $coaResult = $radiusBilling->sendCoAForSubscription($subId);
-                if ($coaResult && !empty($coaResult['success'])) {
-                    $msg .= ' (speed updated via CoA)';
-                } elseif ($coaResult && !empty($coaResult['error'])) {
-                    $msg .= ' (CoA failed: ' . $coaResult['error'] . ')';
+                // Send disconnect async so user reconnects with new package settings
+                $disconnectResult = $radiusBilling->disconnectUserAsync($subId);
+                if (!empty($disconnectResult['sent']) && $disconnectResult['sent'] > 0) {
+                    $msg .= ' (disconnect sent - will reconnect with new speeds)';
+                } else {
+                    $msg .= ' (no active session)';
                 }
                 
                 if ($applyProrate && $prorateAmount != 0) {
