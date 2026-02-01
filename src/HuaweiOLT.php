@@ -3862,7 +3862,10 @@ class HuaweiOLT {
         return $stmt->execute($params);
     }
     
-    public function deleteONU(int $id, bool $deauthorizeOnOLT = true): array {
+    public function deleteONU(int $id, bool $deauthorizeOnOLT = true, bool $async = true): array {
+        // Extend timeout for OLT operations
+        set_time_limit(120);
+        
         // Get ONU details first
         $onu = $this->getONU($id);
         if (!$onu) {
@@ -3871,9 +3874,9 @@ class HuaweiOLT {
         
         $deauthResult = null;
         
-        // Try to deauthorize on OLT if requested
+        // Try to deauthorize on OLT if requested (use async to avoid timeouts)
         if ($deauthorizeOnOLT && $onu['olt_id'] && $onu['frame'] !== null && $onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id']) {
-            $deauthResult = $this->deleteONUFromOLT($id);
+            $deauthResult = $this->deleteONUFromOLT($id, $async);
         }
         
         // Reset discovery log entry so ONU reappears in discovery
@@ -8874,7 +8877,10 @@ class HuaweiOLT {
         ];
     }
     
-    public function deleteONUFromOLT(int $onuId, bool $async = false): array {
+    public function deleteONUFromOLT(int $onuId, bool $async = true): array {
+        // Extend timeout for OLT operations
+        set_time_limit(120);
+        
         $onu = $this->getONU($onuId);
         if (!$onu) {
             return ['success' => false, 'message' => 'ONU not found'];
