@@ -951,12 +951,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($needsDisconnect) {
-                    // Use sendCoAForSubscription which has better NAS fallback logic
-                    $coaResult = $radiusBilling->sendCoAForSubscription($id);
-                    if (!empty($coaResult['success'])) {
+                    // Force full disconnect so router reconnects with new session
+                    $disconnectResult = $radiusBilling->disconnectUser($id);
+                    if (!empty($disconnectResult['disconnected']) && $disconnectResult['disconnected'] > 0) {
                         $coaMessage = " User disconnected ({$disconnectReason}).";
-                    } elseif (!empty($coaResult['error'])) {
-                        $coaMessage = " (CoA: {$coaResult['error']})";
+                    } elseif (!empty($disconnectResult['errors'])) {
+                        $coaMessage = " (disconnect: " . implode(', ', $disconnectResult['errors']) . ")";
+                    } else {
+                        $coaMessage = " (no active session - {$disconnectReason})";
                     }
                 } elseif ($oldPackageId != $newPackageId) {
                     // Package changed but same pool - just update speed
@@ -1332,19 +1334,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $msg = 'Expiry date updated to ' . date('M j, Y', strtotime($newExpiry));
                     
-                    // Handle CoA/Disconnect - always disconnect when expiry changes
-                    // Use sendCoAForSubscription which has better NAS fallback logic
-                    $coaResult = $radiusBilling->sendCoAForSubscription($subId);
-                    if (!empty($coaResult['success'])) {
-                        $msg .= ' (session disconnected via CoA)';
-                    } elseif ($wasExpired && $isExtending) {
-                        // Reactivating from expired - send reactivation CoA
-                        $reactivateResult = $radiusBilling->sendReactivationCoA($subId);
-                        if ($reactivateResult && !empty($reactivateResult['success'])) {
-                            $msg .= ' (subscription reactivated via CoA)';
-                        }
-                    } elseif (!empty($coaResult['error'])) {
-                        $msg .= ' (CoA: ' . $coaResult['error'] . ')';
+                    // Always disconnect user when expiry changes so router reconnects with new session
+                    $disconnectResult = $radiusBilling->disconnectUser($subId);
+                    if (!empty($disconnectResult['disconnected']) && $disconnectResult['disconnected'] > 0) {
+                        $msg .= ' (session disconnected - will reconnect with new expiry)';
+                    } elseif (!empty($disconnectResult['errors'])) {
+                        $msg .= ' (disconnect: ' . implode(', ', $disconnectResult['errors']) . ')';
+                    } else {
+                        $msg .= ' (no active session to disconnect)';
                     }
                     
                     $message = $msg;
