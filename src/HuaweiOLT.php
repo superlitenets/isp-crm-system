@@ -6214,7 +6214,9 @@ class HuaweiOLT {
         
         if ($tr069Vlan && $assignedOnuId !== null) {
             $tr069Priority = $options['tr069_priority'] ?? 2;
-            $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 1;  // Default to gemport 1
+            // Determine TR-069 gemport based on line profile
+            // Line profile 2 (SMARTOLT_FLEXIBLE_GPON) has gemport 2 for TR-069
+            $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? (($profile['line_profile'] ?? 0) == 2 ? 2 : 1);
             $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
             
             // Enter interface context for TR-069 OMCI commands
@@ -6511,8 +6513,16 @@ class HuaweiOLT {
         if ($tr069Vlan && $assignedOnuId !== null) {
             $tr069ProfileId = $options['tr069_profile_id'] ?? $this->getTR069ProfileId();
             $tr069Priority = $options['tr069_priority'] ?? 2;
-            $tr069GemPort = $options['tr069_gem_port'] ?? 1;  // Use gemport 1 (same as data) - gemport 2 may not exist in line profile
             $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
+            
+            // Determine TR-069 gemport based on line profile
+            // Line profile 2 (SMARTOLT_FLEXIBLE_GPON) has gemport 2 for TR-069
+            // Line profile 1 (one-isp-lp) only has gemport 1
+            $tr069GemPort = $options['tr069_gem_port'] ?? null;
+            if ($tr069GemPort === null) {
+                // Use gemport 2 for SmartOLT-style profiles, gemport 1 for others
+                $tr069GemPort = ($lineProfileId == 2) ? 2 : 1;
+            }
             
             // TR-069 OMCI config (ipconfig + tr069-server-config)
             $tr069OmciCmd = "interface gpon {$frame}/{$slot}\r\n";
@@ -6532,7 +6542,8 @@ class HuaweiOLT {
             $tr069Status = [
                 'attempted' => true,
                 'success' => !preg_match('/does not exist|is not valid|Unrecognized command/i', $tr069SpResult['output'] ?? ''),
-                'vlan' => $tr069Vlan
+                'vlan' => $tr069Vlan,
+                'gem_port' => $tr069GemPort
             ];
         }
         
@@ -6684,7 +6695,9 @@ class HuaweiOLT {
         }
         
         // Step 3: Create service-port for TR-069 VLAN
-        $tr069GemPort = $options['tr069_gem_port'] ?? 1;  // Use gemport 1 (same as data) - gemport 2 may not exist in line profile
+        // Determine gemport based on line profile (profile 2 has gemport 2 for TR-069)
+        $lineProfileId = $onu['line_profile'] ?? 1;
+        $tr069GemPort = $options['tr069_gem_port'] ?? ($lineProfileId == 2 ? 2 : 1);
         $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
         $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
         $result3 = $this->executeCommand($oltId, $cmd3);
