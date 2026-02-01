@@ -6503,10 +6503,15 @@ class HuaweiOLT {
             }
         }
         
-        // ==== STAGE 1C: BIND NATIVE VLAN TO ETH PORT (optional) ====
-        if ($vlanId && $assignedOnuId !== null) {
+        // ==== STAGE 1C: BIND NATIVE VLAN TO ETH PORT (only for line profile 1) ====
+        // SmartOLT profile (line profile 2) handles port VLAN config in the profile itself
+        $needsPortVlanConfig = ($lineProfileId != 2);
+        if ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
             $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
-            $this->executeCommand($oltId, $nativeVlanCmd);
+            $nativeResult = $this->executeCommand($oltId, $nativeVlanCmd);
+            $output .= "\n[Native VLAN]\n" . ($nativeResult['output'] ?? '');
+        } elseif ($vlanId && !$needsPortVlanConfig) {
+            $output .= "\n[Native VLAN] Skipped - SmartOLT profile handles port VLAN config";
         }
         
         // ==== STAGE 1D: TR-069 CONFIGURATION (Auto) ====
@@ -8541,6 +8546,11 @@ class HuaweiOLT {
         $slot = $onu['slot'];
         $port = $onu['port'];
         $onuId = $onu['onu_id'];
+        $lineProfile = $onu['line_profile'] ?? 1;
+        
+        // Line profile 2 (SmartOLT) doesn't need ont port vlan commands - just service-ports
+        // Line profile 1 (one-isp-lp) requires explicit port VLAN configuration
+        $needsPortVlanConfig = ($lineProfile != 2);
         
         // Get current attached VLANs
         $attachedVlans = [];
@@ -8563,7 +8573,7 @@ class HuaweiOLT {
         // Multiple VLANs can share the same gemport - each service-port is unique by VLAN
         $gemPort = 1;
         
-        // Create service-port command with traffic-table indices
+        // Step 1: Create service-port on OLT
         // Format: service-port vlan {vlan} gpon {frame}/{slot}/{port} ont {onu_id} gemport {gem} multi-service user-vlan {vlan} tag-transform translate inbound traffic-table index 9 outbound traffic-table index 8
         $cmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index 9 outbound traffic-table index 8";
         
@@ -8572,6 +8582,7 @@ class HuaweiOLT {
         
         // Check for real errors (ignore "already exists")
         $resultOutput = $result['output'] ?? '';
+        $servicePortSuccess = true;
         if (preg_match('/Failure|Error:|failed|Invalid parameter|Unknown command/i', $resultOutput) && 
             !preg_match('/already exist|Make configuration repeatedly/i', $resultOutput)) {
             // Extract actual error message from OLT response
@@ -8582,9 +8593,27 @@ class HuaweiOLT {
                 $errorDetail = trim($m[1]);
             }
             $errors[] = "Failed to create service-port" . ($errorDetail ? ": {$errorDetail}" : "");
+            $servicePortSuccess = false;
         } elseif (empty($resultOutput) && !($result['success'] ?? false)) {
             // No response from OLT - likely connection issue
             $errors[] = "No response from OLT - connection may have timed out";
+            $servicePortSuccess = false;
+        }
+        
+        // Step 2: Tag VLAN on ONU ETH port (only for line profile 1, not needed for SmartOLT profile 2)
+        if ($servicePortSuccess && $needsPortVlanConfig) {
+            // Enter GPON interface and add VLAN translation on ONU's ETH port 1
+            $portVlanCmd = "interface gpon {$frame}/{$slot}\nont port vlan {$port} {$onuId} eth 1 translation {$vlanId} user-vlan {$vlanId}\nquit";
+            $portResult = $this->executeCommand($oltId, $portVlanCmd);
+            $output .= "[ONU Port VLAN Tagging]\n" . ($portResult['output'] ?? '') . "\n";
+            
+            // Check for errors (but don't fail the whole operation - port tagging is secondary)
+            $portOutput = $portResult['output'] ?? '';
+            if (preg_match('/Failure|Error:/i', $portOutput) && !preg_match('/already exist/i', $portOutput)) {
+                $output .= "[Warning] Port VLAN tagging may have failed - check ONU config\n";
+            }
+        } elseif ($servicePortSuccess && !$needsPortVlanConfig) {
+            $output .= "[Info] SmartOLT profile - port VLAN tagging handled by line profile\n";
         }
         
         // Only update database if OLT command succeeded
