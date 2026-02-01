@@ -1,0 +1,54 @@
+root@superlitecrm:~/isp# docker exec isp_crm_php curl -s http://olt-service:3002/health 2>/dev/null || echo "Failed"
+Failed
+root@superlitecrm:~/isp# docker logs isp_crm_olt_service --tail=100 2>&1 | tail -50
+[SNMP] Updated OLT 1 status via snmp
+[SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+[CLI] Polling 6 ONUs for OLT G45_OLT via CLI...
+[OLT 1] SSH sending: "display ont info 0 1 0 all"
+[SNMP] Updated OLT 2 status via snmp
+[SNMP] Completed in 92ms - Success: 2, Failed: 0
+\n  -----------------------------  flag        state    state    state    side ct
+[CLI] ONU 1 matched pattern, state: offline
+[CLI] ONU 2 matched pattern, state: online
+[CLI] ONU 3 matched pattern, state: offline
+[CLI] ONU 4 not matched in output, defaulting to offline
+[CLI] ONU 5 matched pattern, state: offline
+[OLT 1] SSH sending: "display ont info 0 2 15 all"
+\n  ----------------------------   flag        state    state    state    side ct
+[CLI] ONU 13 not matched in output, defaulting to offline
+[CLI] Updated 6 ONUs for OLT G45_OLT
+[Discovery] Starting discovery cycle...
+[Discovery] Cached 0 SmartOLT serial numbers
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[OLT 1] SSH sending: "display ont autofind all"
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+[Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[OLT 2] SSH sending: "display ont autofind all"
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+[Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+[Discovery] Discovery cycle complete
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Updated OLT 1 status via snmp
+[SNMP] OLT G45_OLT returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[CLI] Polling 6 ONUs for OLT G45_OLT via CLI...
+[OLT 1] SSH sending: "display ont info 0 1 0 all"
+[SNMP] Updated OLT 2 status via snmp
+[SNMP] Completed in 106ms - Success: 2, Failed: 0
+\n  -----------------------------  flag        state    state    state    side ct
+[CLI] ONU 1 matched pattern, state: offline
+[CLI] ONU 2 matched pattern, state: online
+[CLI] ONU 3 matched pattern, state: offline
+[CLI] ONU 4 not matched in output, defaulting to offline
+[CLI] ONU 5 matched pattern, state: offline
+[OLT 1] SSH sending: "display ont info 0 2 15 all"
+root@superlitecrm:~/isp#
