@@ -1630,7 +1630,7 @@ class RadiusBilling {
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10
+                CURLOPT_TIMEOUT => 15
             ]);
             
             $response = curl_exec($ch);
@@ -2047,7 +2047,7 @@ class RadiusBilling {
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10
+                CURLOPT_TIMEOUT => 15
             ]);
             
             $response = curl_exec($ch);
@@ -2130,7 +2130,7 @@ class RadiusBilling {
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10
+                CURLOPT_TIMEOUT => 15
             ]);
             
             $response = curl_exec($ch);
@@ -2540,7 +2540,7 @@ class RadiusBilling {
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10
+                CURLOPT_TIMEOUT => 15
             ]);
             
             $response = curl_exec($ch);
@@ -2685,7 +2685,7 @@ class RadiusBilling {
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10
+                CURLOPT_TIMEOUT => 15
             ]);
             
             $response = curl_exec($ch);

@@ -807,7 +807,7 @@ function broadcastEvent(type, data) {
 }
 
 // Helper function to send RADIUS packet using the radius library
-function sendRadiusRequest(nasIp, nasPort, code, attributes, secret, timeout = 5000) {
+function sendRadiusRequest(nasIp, nasPort, code, attributes, secret, timeout = 10000) {
     return new Promise((resolve) => {
         try {
             const packet = radius.encode({
