@@ -817,15 +817,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
         case 'add_addon':
             try {
-                $stmt = $db->prepare("INSERT INTO radius_addon_services (name, description, category, billing_type, price, setup_fee, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $category = $_POST['category'] ?? 'Other';
+                $isInternet = str_starts_with($category, 'Internet');
+                
+                $stmt = $db->prepare("INSERT INTO radius_addon_services (name, description, category, billing_type, price, setup_fee, is_active, download_speed, upload_speed, speed_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
                     $_POST['name'],
                     $_POST['description'] ?? '',
-                    $_POST['category'] ?? 'Other',
+                    $category,
                     $_POST['billing_type'] ?? 'monthly',
                     (float)$_POST['price'],
                     (float)($_POST['setup_fee'] ?? 0),
-                    isset($_POST['is_active']) ? 1 : 0
+                    isset($_POST['is_active']) ? 1 : 0,
+                    $isInternet && !empty($_POST['download_speed']) ? (int)$_POST['download_speed'] : null,
+                    $isInternet && !empty($_POST['upload_speed']) ? (int)$_POST['upload_speed'] : null,
+                    $isInternet ? ($_POST['speed_unit'] ?? 'Mbps') : null
                 ]);
                 $message = 'Addon service created successfully';
                 $messageType = 'success';
@@ -837,15 +843,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
         case 'edit_addon':
             try {
-                $stmt = $db->prepare("UPDATE radius_addon_services SET name = ?, description = ?, category = ?, billing_type = ?, price = ?, setup_fee = ?, is_active = ?, updated_at = NOW() WHERE id = ?");
+                $category = $_POST['category'] ?? 'Other';
+                $isInternet = str_starts_with($category, 'Internet');
+                
+                $stmt = $db->prepare("UPDATE radius_addon_services SET name = ?, description = ?, category = ?, billing_type = ?, price = ?, setup_fee = ?, is_active = ?, download_speed = ?, upload_speed = ?, speed_unit = ?, updated_at = NOW() WHERE id = ?");
                 $stmt->execute([
                     $_POST['name'],
                     $_POST['description'] ?? '',
-                    $_POST['category'] ?? 'Other',
+                    $category,
                     $_POST['billing_type'] ?? 'monthly',
                     (float)$_POST['price'],
                     (float)($_POST['setup_fee'] ?? 0),
                     isset($_POST['is_active']) ? 1 : 0,
+                    $isInternet && !empty($_POST['download_speed']) ? (int)$_POST['download_speed'] : null,
+                    $isInternet && !empty($_POST['upload_speed']) ? (int)$_POST['upload_speed'] : null,
+                    $isInternet ? ($_POST['speed_unit'] ?? 'Mbps') : null,
                     (int)$_POST['addon_id']
                 ]);
                 $message = 'Addon service updated successfully';
@@ -6297,9 +6309,9 @@ try {
                                 <tr>
                                     <th>Name</th>
                                     <th>Category</th>
-                                    <th>Price</th>
+                                    <th>Unit Price</th>
+                                    <th>Bandwidth</th>
                                     <th>Billing</th>
-                                    <th>Setup Fee</th>
                                     <th>Status</th>
                                     <th>Subscribers</th>
                                     <th>Actions</th>
@@ -6311,6 +6323,7 @@ try {
                                 $subCount = $db->prepare("SELECT COUNT(*) FROM radius_subscription_addons WHERE addon_id = ? AND status = 'active'");
                                 $subCount->execute([$addon['id']]);
                                 $activeCount = $subCount->fetchColumn();
+                                $isInternet = str_starts_with($addon['category'] ?? '', 'Internet');
                                 ?>
                                 <tr>
                                     <td>
@@ -6322,6 +6335,18 @@ try {
                                     <td><span class="badge bg-secondary"><?= htmlspecialchars($addon['category'] ?? 'Other') ?></span></td>
                                     <td><strong>KES <?= number_format($addon['price'], 2) ?></strong></td>
                                     <td>
+                                        <?php if ($isInternet && ($addon['download_speed'] || $addon['upload_speed'])): ?>
+                                        <span class="badge bg-info">
+                                            <i class="bi bi-arrow-down"></i> <?= $addon['download_speed'] ?? '-' ?>/
+                                            <i class="bi bi-arrow-up"></i> <?= $addon['upload_speed'] ?? '-' ?> <?= $addon['speed_unit'] ?? 'Mbps' ?>
+                                        </span>
+                                        <?php elseif ($isInternet): ?>
+                                        <span class="text-muted">Not set</span>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
                                         <?php if ($addon['billing_type'] === 'monthly'): ?>
                                         <span class="badge bg-info">Monthly</span>
                                         <?php elseif ($addon['billing_type'] === 'one_time'): ?>
@@ -6330,7 +6355,6 @@ try {
                                         <span class="badge bg-primary">Per Use</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= $addon['setup_fee'] > 0 ? 'KES ' . number_format($addon['setup_fee'], 2) : '-' ?></td>
                                     <td>
                                         <?php if ($addon['is_active']): ?>
                                         <span class="badge bg-success">Active</span>
@@ -6397,12 +6421,33 @@ try {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Price (KES) *</label>
+                                        <label class="form-label">Unit Price (KES) *</label>
                                         <input type="number" name="price" class="form-control" step="0.01" required placeholder="0.00">
+                                        <small class="text-muted">Price per unit/quantity</small>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Setup Fee (KES)</label>
                                         <input type="number" name="setup_fee" class="form-control" step="0.01" value="0" placeholder="0.00">
+                                    </div>
+                                </div>
+                                <div id="addBandwidthFields" class="border rounded p-3 mb-3" style="display:none; background:#f8f9fa;">
+                                    <h6 class="mb-3"><i class="bi bi-speedometer2 me-1"></i> Bandwidth Settings</h6>
+                                    <div class="row">
+                                        <div class="col-md-4 mb-2">
+                                            <label class="form-label">Download Speed</label>
+                                            <input type="number" name="download_speed" class="form-control" min="1" placeholder="e.g., 10">
+                                        </div>
+                                        <div class="col-md-4 mb-2">
+                                            <label class="form-label">Upload Speed</label>
+                                            <input type="number" name="upload_speed" class="form-control" min="1" placeholder="e.g., 5">
+                                        </div>
+                                        <div class="col-md-4 mb-2">
+                                            <label class="form-label">Unit</label>
+                                            <select name="speed_unit" class="form-select">
+                                                <option value="Mbps">Mbps</option>
+                                                <option value="Kbps">Kbps</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="form-check">
@@ -6459,12 +6504,33 @@ try {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Price (KES) *</label>
+                                        <label class="form-label">Unit Price (KES) *</label>
                                         <input type="number" name="price" id="editAddonPrice" class="form-control" step="0.01" required>
+                                        <small class="text-muted">Price per unit/quantity</small>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Setup Fee (KES)</label>
                                         <input type="number" name="setup_fee" id="editAddonSetup" class="form-control" step="0.01">
+                                    </div>
+                                </div>
+                                <div id="editBandwidthFields" class="border rounded p-3 mb-3" style="display:none; background:#f8f9fa;">
+                                    <h6 class="mb-3"><i class="bi bi-speedometer2 me-1"></i> Bandwidth Settings</h6>
+                                    <div class="row">
+                                        <div class="col-md-4 mb-2">
+                                            <label class="form-label">Download Speed</label>
+                                            <input type="number" name="download_speed" id="editDownloadSpeed" class="form-control" min="1">
+                                        </div>
+                                        <div class="col-md-4 mb-2">
+                                            <label class="form-label">Upload Speed</label>
+                                            <input type="number" name="upload_speed" id="editUploadSpeed" class="form-control" min="1">
+                                        </div>
+                                        <div class="col-md-4 mb-2">
+                                            <label class="form-label">Unit</label>
+                                            <select name="speed_unit" id="editSpeedUnit" class="form-select">
+                                                <option value="Mbps">Mbps</option>
+                                                <option value="Kbps">Kbps</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="form-check">
@@ -6482,6 +6548,22 @@ try {
             </div>
             
             <script>
+            function toggleBandwidthFields(categorySelect, fieldsId) {
+                const cat = categorySelect.value;
+                const isInternet = cat.startsWith('Internet');
+                document.getElementById(fieldsId).style.display = isInternet ? 'block' : 'none';
+            }
+            
+            // Add modal category change
+            document.querySelector('#addAddonModal select[name="category"]').addEventListener('change', function() {
+                toggleBandwidthFields(this, 'addBandwidthFields');
+            });
+            
+            // Edit modal category change
+            document.getElementById('editAddonCategory').addEventListener('change', function() {
+                toggleBandwidthFields(this, 'editBandwidthFields');
+            });
+            
             function editAddon(addon) {
                 document.getElementById('editAddonId').value = addon.id;
                 document.getElementById('editAddonName').value = addon.name;
@@ -6491,6 +6573,14 @@ try {
                 document.getElementById('editAddonPrice').value = addon.price;
                 document.getElementById('editAddonSetup').value = addon.setup_fee || 0;
                 document.getElementById('editAddonActive').checked = addon.is_active == 1;
+                document.getElementById('editDownloadSpeed').value = addon.download_speed || '';
+                document.getElementById('editUploadSpeed').value = addon.upload_speed || '';
+                document.getElementById('editSpeedUnit').value = addon.speed_unit || 'Mbps';
+                
+                // Show/hide bandwidth fields based on category
+                const isInternet = (addon.category || '').startsWith('Internet');
+                document.getElementById('editBandwidthFields').style.display = isInternet ? 'block' : 'none';
+                
                 new bootstrap.Modal(document.getElementById('editAddonModal')).show();
             }
             </script>

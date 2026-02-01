@@ -1708,6 +1708,9 @@ CREATE TABLE IF NOT EXISTS radius_addon_services (
     category VARCHAR(100),
     is_active BOOLEAN DEFAULT TRUE,
     setup_fee DECIMAL(10,2) DEFAULT 0,
+    download_speed INTEGER,
+    upload_speed INTEGER,
+    speed_unit VARCHAR(10) DEFAULT 'Mbps',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

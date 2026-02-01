@@ -1967,12 +1967,23 @@ CREATE TABLE IF NOT EXISTS radius_addon_services (
     category VARCHAR(100),
     is_active BOOLEAN DEFAULT TRUE,
     setup_fee DECIMAL(10,2) DEFAULT 0,
+    download_speed INTEGER,
+    upload_speed INTEGER,
+    speed_unit VARCHAR(10) DEFAULT 'Mbps',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMENT ON TABLE radius_addon_services IS 'Catalog of addon services (Internet - PPPoE, Internet - Static IP, Internet - DHCP, IPTV, VoIP, etc.)';
 COMMENT ON COLUMN radius_addon_services.category IS 'Categories: Internet - PPPoE, Internet - Static IP, Internet - DHCP, IPTV, VoIP, CDN, Security, Cloud, Other';
+COMMENT ON COLUMN radius_addon_services.download_speed IS 'Download speed for internet addons';
+COMMENT ON COLUMN radius_addon_services.upload_speed IS 'Upload speed for internet addons';
+COMMENT ON COLUMN radius_addon_services.speed_unit IS 'Speed unit: Mbps or Kbps';
+
+-- Add bandwidth columns if table already exists
+ALTER TABLE radius_addon_services ADD COLUMN IF NOT EXISTS download_speed INTEGER;
+ALTER TABLE radius_addon_services ADD COLUMN IF NOT EXISTS upload_speed INTEGER;
+ALTER TABLE radius_addon_services ADD COLUMN IF NOT EXISTS speed_unit VARCHAR(10) DEFAULT 'Mbps';
 
 CREATE TABLE IF NOT EXISTS radius_subscription_addons (
     id SERIAL PRIMARY KEY,
