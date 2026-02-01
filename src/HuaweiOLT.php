@@ -6504,6 +6504,38 @@ class HuaweiOLT {
             $this->executeCommand($oltId, $nativeVlanCmd);
         }
         
+        // ==== STAGE 1D: TR-069 CONFIGURATION (Auto) ====
+        $tr069Status = ['attempted' => false, 'success' => false];
+        $tr069Vlan = $options['tr069_vlan'] ?? $this->getTR069VlanForOlt($oltId);
+        
+        if ($tr069Vlan && $assignedOnuId !== null) {
+            $tr069ProfileId = $options['tr069_profile_id'] ?? $this->getTR069ProfileId();
+            $tr069Priority = $options['tr069_priority'] ?? 2;
+            $tr069GemPort = $options['tr069_gem_port'] ?? 2;
+            $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
+            
+            // TR-069 OMCI config (ipconfig + tr069-server-config)
+            $tr069OmciCmd = "interface gpon {$frame}/{$slot}\r\n";
+            $tr069OmciCmd .= "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
+            if ($tr069ProfileId) {
+                $tr069OmciCmd .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
+            }
+            $tr069OmciCmd .= "quit";
+            $tr069OmciResult = $this->executeCommand($oltId, $tr069OmciCmd);
+            $output .= "\n[TR-069 OMCI]\n" . ($tr069OmciResult['output'] ?? '');
+            
+            // TR-069 Service-port (CRITICAL - without this, ONU cannot reach ACS via VLAN 69)
+            $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
+            $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
+            $output .= "\n[TR-069 Service-Port]\n" . ($tr069SpResult['output'] ?? '');
+            
+            $tr069Status = [
+                'attempted' => true,
+                'success' => !preg_match('/does not exist|is not valid|Unrecognized command/i', $tr069SpResult['output'] ?? ''),
+                'vlan' => $tr069Vlan
+            ];
+        }
+        
         // Mark discovery log entry as authorized
         try {
             $stmt = $this->db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = CURRENT_TIMESTAMP WHERE serial_number = ? AND olt_id = ?");
@@ -6521,11 +6553,12 @@ class HuaweiOLT {
         return [
             'success' => true,
             'stage' => 1,
-            'message' => "Stage 1 complete: ONU authorized as ID {$assignedOnuId}" . ($servicePortSuccess ? ", service-port created" : ''),
+            'message' => "Stage 1 complete: ONU authorized as ID {$assignedOnuId}" . ($servicePortSuccess ? ", service-port created" : '') . ($tr069Status['success'] ? ", TR-069 configured" : ''),
             'onu_id' => $assignedOnuId,
             'description' => $description,
             'vlan_id' => $vlanId,
             'service_port_success' => $servicePortSuccess,
+            'tr069_status' => $tr069Status,
             'output' => $output,
             'next_stage' => 2
         ];
