@@ -2472,6 +2472,12 @@ class RadiusBilling {
         $stmt->execute([$subscriptionId]);
         $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
+        // Debug logging
+        error_log("disconnectUser: subscription=$subscriptionId, sessions=" . count($sessions));
+        foreach ($sessions as $idx => $s) {
+            error_log("Session $idx: nas_ip_address={$s['nas_ip_address']}, nas_ip={$s['nas_ip']}, nas_secret=" . (empty($s['nas_secret']) ? 'EMPTY' : 'SET'));
+        }
+        
         $disconnected = 0;
         $errors = [];
         foreach ($sessions as $session) {
