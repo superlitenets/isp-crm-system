@@ -1,0 +1,49 @@
+root@superlitecrm:~/isp# # Check env var
+docker exec isp_crm_php env | grep OLT
+
+# Test localhost connection (since both use host network)
+docker exec isp_crm_php curl -s http://localhost:3002/health
+
+# Also check if OLT service is listening on 3002
+docker exec isp_crm_olt_service netstat -tlnp 2>/dev/null || ss -tlnp | grep 3002
+OLT_SERVICE_URL=http://localhost:3002
+SMARTOLT_API_URL=
+SMARTOLT_API_KEY=
+{"status":"ok","sessions":2}Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 0.0.0.0:3002            0.0.0.0:*               LISTEN      1/node
+tcp        0      0 0.0.0.0:3000            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:3001            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:443             0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      -
+tcp        0      0 127.0.0.54:53           0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:8081            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:7557            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:7567            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:7547            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:5038            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:5060            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:5061            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:5160            0.0.0.0:*               LISTEN      -
+tcp        0      0 0.0.0.0:8443            0.0.0.0:*               LISTEN      -
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      -
+tcp        0      0 127.0.0.1:5433          0.0.0.0:*               LISTEN      -
+tcp        0      0 :::3000                 :::*                    LISTEN      -
+tcp        0      0 :::3001                 :::*                    LISTEN      -
+tcp        0      0 :::443                  :::*                    LISTEN      -
+tcp        0      0 :::22                   :::*                    LISTEN      -
+tcp        0      0 :::80                   :::*                    LISTEN      -
+tcp        0      0 :::8080                 :::*                    LISTEN      -
+tcp        0      0 :::8081                 :::*                    LISTEN      -
+tcp        0      0 :::7557                 :::*                    LISTEN      -
+tcp        0      0 :::7567                 :::*                    LISTEN      -
+tcp        0      0 :::7547                 :::*                    LISTEN      -
+tcp        0      0 :::5038                 :::*                    LISTEN      -
+tcp        0      0 :::5060                 :::*                    LISTEN      -
+tcp        0      0 :::5061                 :::*                    LISTEN      -
+tcp        0      0 :::5160                 :::*                    LISTEN      -
+tcp        0      0 :::9000                 :::*                    LISTEN      -
+tcp        0      0 :::8443                 :::*                    LISTEN      -
+root@superlitecrm:~/isp#
