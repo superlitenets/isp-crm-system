@@ -245,18 +245,39 @@ class SNMPPollingWorker {
                             console.log(`[CLI] ONU ${onu.onu_id} not matched in output, defaulting to offline`);
                         }
                         
-                        await this.pool.query(`
-                            UPDATE huawei_onus SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
-                        `, [status, onu.id]);
+                        // Handle online_since transition properly
+                        if (status === 'online' && onu.status !== 'online') {
+                            // ONU just came online - set online_since
+                            await this.pool.query(`
+                                UPDATE huawei_onus SET status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                            `, [status, onu.id]);
+                        } else if (status !== 'online' && onu.status === 'online') {
+                            // ONU went offline - clear online_since
+                            await this.pool.query(`
+                                UPDATE huawei_onus SET status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                            `, [status, onu.id]);
+                        } else {
+                            // No transition, just update status
+                            await this.pool.query(`
+                                UPDATE huawei_onus SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                            `, [status, onu.id]);
+                        }
                         updated++;
                     }
                 } catch (e) {
                     console.log(`[CLI] Error polling port ${portKey}: ${e.message}`);
                     // Mark these ONUs as offline since we can't check them
                     for (const onu of onus) {
-                        await this.pool.query(`
-                            UPDATE huawei_onus SET status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
-                        `, [onu.id]);
+                        // Only clear online_since if ONU was online before
+                        if (onu.status === 'online') {
+                            await this.pool.query(`
+                                UPDATE huawei_onus SET status = 'offline', online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1
+                            `, [onu.id]);
+                        } else {
+                            await this.pool.query(`
+                                UPDATE huawei_onus SET status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
+                            `, [onu.id]);
+                        }
                         updated++;
                     }
                 }
@@ -402,17 +423,37 @@ class SNMPPollingWorker {
                 `, [oltId, slot, port, onuId]);
                 
                 const prevOnu = prevResult.rows[0];
+                const prevStatus = prevOnu?.prev_status;
                 
-                const result = await client.query(`
-                    UPDATE huawei_onus 
-                    SET status = $1, updated_at = CURRENT_TIMESTAMP
-                    WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
-                `, [s.status, oltId, slot, port, onuId]);
+                // Handle online_since transition properly
+                let result;
+                if (s.status === 'online' && prevStatus !== 'online') {
+                    // ONU just came online - set online_since
+                    result = await client.query(`
+                        UPDATE huawei_onus 
+                        SET status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                        WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
+                    `, [s.status, oltId, slot, port, onuId]);
+                } else if (s.status !== 'online' && prevStatus === 'online') {
+                    // ONU went offline - clear online_since
+                    result = await client.query(`
+                        UPDATE huawei_onus 
+                        SET status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP
+                        WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
+                    `, [s.status, oltId, slot, port, onuId]);
+                } else {
+                    // No transition, just update status
+                    result = await client.query(`
+                        UPDATE huawei_onus 
+                        SET status = $1, updated_at = CURRENT_TIMESTAMP
+                        WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
+                    `, [s.status, oltId, slot, port, onuId]);
+                }
                 
                 if (result.rowCount > 0) {
                     updated++;
                     // Detect fault: was online, now offline/los/dying-gasp
-                    if (prevOnu && prevOnu.prev_status === 'online' && 
+                    if (prevOnu && prevStatus === 'online' && 
                         ['offline', 'los', 'dying-gasp'].includes(s.status)) {
                         faults.push({
                             onu_id: prevOnu.id,

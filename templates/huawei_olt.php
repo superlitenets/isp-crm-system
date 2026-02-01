@@ -8493,8 +8493,9 @@ try {
             // Calculate uptime for display
             $uptimeDisplay = '';
             if (!empty($currentOnu['online_since']) && $currentOnu['status'] === 'online') {
-                $onlineSince = new DateTime($currentOnu['online_since']);
-                $now = new DateTime();
+                $tz = new DateTimeZone(date_default_timezone_get());
+                $onlineSince = new DateTime($currentOnu['online_since'], $tz);
+                $now = new DateTime('now', $tz);
                 $diff = $now->diff($onlineSince);
                 if ($diff->d > 0) {
                     $uptimeDisplay = $diff->d . 'd ' . $diff->h . 'h ' . $diff->i . 'm';
