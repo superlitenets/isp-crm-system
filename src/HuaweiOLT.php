@@ -5451,8 +5451,8 @@ class HuaweiOLT {
                 }
                 
                 // Create service-port with auto-assigned ID
-                $inboundIndex = $options['inbound_traffic_index'] ?? 8;
-                $outboundIndex = $options['outbound_traffic_index'] ?? 9;
+                $inboundIndex = $options['inbound_traffic_index'] ?? 9;
+                $outboundIndex = $options['outbound_traffic_index'] ?? 8;
                 
                 $spCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$ontId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}";
                 $out = $exec($spCmd);
@@ -6199,8 +6199,8 @@ class HuaweiOLT {
         $vlanId = $options['vlan_id'] ?? $profile['default_vlan'] ?? null;
         if ($vlanId && $assignedOnuId !== null) {
             $gemPort = $options['gem_port'] ?? 2;
-            $inboundIndex = $options['inbound_traffic_index'] ?? 8;
-            $outboundIndex = $options['outbound_traffic_index'] ?? 9;
+            $inboundIndex = $options['inbound_traffic_index'] ?? 9;
+            $outboundIndex = $options['outbound_traffic_index'] ?? 8;
             $batchScript .= "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}\r\n";
         }
         
@@ -6481,8 +6481,8 @@ class HuaweiOLT {
         
         if ($vlanId && $assignedOnuId !== null) {
             $gemPort = $options['gem_port'] ?? 1;
-            $inboundIndex = $options['inbound_traffic_index'] ?? 8;
-            $outboundIndex = $options['outbound_traffic_index'] ?? 9;
+            $inboundIndex = $options['inbound_traffic_index'] ?? 9;
+            $outboundIndex = $options['outbound_traffic_index'] ?? 8;
             
             $servicePortCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}";
             
@@ -8560,8 +8560,8 @@ class HuaweiOLT {
         $gemPort = count($attachedVlans) + 1;
         
         // Create service-port command with traffic-table indices
-        // Format: service-port vlan {vlan} gpon {frame}/{slot}/{port} ont {onu_id} gemport {gem} multi-service user-vlan {vlan} tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9
-        $cmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9";
+        // Format: service-port vlan {vlan} gpon {frame}/{slot}/{port} ont {onu_id} gemport {gem} multi-service user-vlan {vlan} tag-transform translate inbound traffic-table index 9 outbound traffic-table index 8
+        $cmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index 9 outbound traffic-table index 8";
         
         $result = $this->executeCommand($oltId, $cmd);
         $output .= "[Service Port Creation]\n" . ($result['output'] ?? '') . "\n";
