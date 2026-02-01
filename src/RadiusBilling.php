@@ -846,7 +846,16 @@ class RadiusBilling {
             ");
             $stmt->execute([$packageId, $startDate, $expiryDate, $id]);
             
-            $this->createBillingRecord($id, $packageId, $package['price'], 'renewal', $startDate, $expiryDate);
+            // Calculate total including addon services
+            $addonTotals = $this->getSubscriptionAddonTotals($id);
+            $totalAmount = $package['price'] + $addonTotals['monthly_total'];
+            
+            // Create billing record with package + addons
+            $description = "Package: {$package['name']}";
+            if ($addonTotals['monthly_total'] > 0) {
+                $description .= " + Addons: KES " . number_format($addonTotals['monthly_total'], 2);
+            }
+            $this->createBillingRecord($id, $packageId, $totalAmount, 'renewal', $startDate, $expiryDate, $description);
             
             // If user was expired/suspended, disconnect them async so they reconnect with new settings
             $coaResult = null;
@@ -1259,14 +1268,14 @@ class RadiusBilling {
     
     // ==================== Billing ====================
     
-    private function createBillingRecord(int $subscriptionId, int $packageId, float $amount, string $type, string $start, string $end): void {
+    private function createBillingRecord(int $subscriptionId, int $packageId, float $amount, string $type, string $start, string $end, string $description = ''): void {
         $invoiceNumber = 'RAD-' . date('Ymd') . '-' . str_pad($subscriptionId, 5, '0', STR_PAD_LEFT);
         
         $stmt = $this->db->prepare("
-            INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, period_start, period_end, invoice_number, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+            INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, period_start, period_end, invoice_number, status, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         ");
-        $stmt->execute([$subscriptionId, $packageId, $amount, $type, $start, $end, $invoiceNumber]);
+        $stmt->execute([$subscriptionId, $packageId, $amount, $type, $start, $end, $invoiceNumber, $description]);
     }
     
     public function getBillingHistory(?int $subscriptionId = null, int $limit = 50): array {
@@ -2588,6 +2597,48 @@ class RadiusBilling {
         }
         
         return ['success' => true, 'processed' => $processed];
+    }
+    
+    public function getSubscriptionAddonTotals(int $subscriptionId): array {
+        $stmt = $this->db->prepare("
+            SELECT sa.*, ads.name, ads.price, ads.billing_type, ads.category,
+                   ads.download_speed, ads.upload_speed, ads.speed_unit
+            FROM radius_subscription_addons sa
+            JOIN radius_addon_services ads ON sa.addon_id = ads.id
+            WHERE sa.subscription_id = ? AND sa.status = 'active'
+        ");
+        $stmt->execute([$subscriptionId]);
+        $addons = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $monthlyTotal = 0;
+        $oneTimeTotal = 0;
+        $items = [];
+        
+        foreach ($addons as $addon) {
+            $lineTotal = (float)$addon['price'] * (int)$addon['quantity'];
+            $items[] = [
+                'addon_id' => $addon['addon_id'],
+                'name' => $addon['name'],
+                'category' => $addon['category'],
+                'quantity' => $addon['quantity'],
+                'unit_price' => $addon['price'],
+                'total' => $lineTotal,
+                'billing_type' => $addon['billing_type']
+            ];
+            
+            if ($addon['billing_type'] === 'monthly') {
+                $monthlyTotal += $lineTotal;
+            } else {
+                $oneTimeTotal += $lineTotal;
+            }
+        }
+        
+        return [
+            'monthly_total' => $monthlyTotal,
+            'one_time_total' => $oneTimeTotal,
+            'total' => $monthlyTotal + $oneTimeTotal,
+            'items' => $items
+        ];
     }
     
     private function disconnectByUsername(string $username, ?int $nasId): void {

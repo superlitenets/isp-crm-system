@@ -1634,11 +1634,16 @@ CREATE TABLE IF NOT EXISTS radius_ip_pools (
 CREATE TABLE IF NOT EXISTS radius_billing (
     id SERIAL PRIMARY KEY,
     subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+    package_id INTEGER REFERENCES radius_packages(id) ON DELETE SET NULL,
     amount DECIMAL(10,2) NOT NULL,
-    transaction_type VARCHAR(20) NOT NULL,
+    billing_type VARCHAR(20) NOT NULL,
+    period_start DATE,
+    period_end DATE,
+    invoice_number VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'pending',
     payment_method VARCHAR(50),
-    reference VARCHAR(100),
-    notes TEXT,
+    transaction_ref VARCHAR(100),
+    description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

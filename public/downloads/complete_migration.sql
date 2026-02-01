@@ -1343,6 +1343,7 @@
  ALTER TABLE radius_billing ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
  ALTER TABLE radius_billing ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);
  ALTER TABLE radius_billing ADD COLUMN IF NOT EXISTS transaction_ref VARCHAR(100);
+ ALTER TABLE radius_billing ADD COLUMN IF NOT EXISTS description TEXT;
  ALTER TABLE radius_invoices ADD COLUMN IF NOT EXISTS subscription_id INTEGER;
  ALTER TABLE radius_invoices ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(30);
  ALTER TABLE radius_invoices ADD COLUMN IF NOT EXISTS amount NUMERIC;
