@@ -8559,8 +8559,9 @@ class HuaweiOLT {
         $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
-        // Determine GEM port based on number of attached VLANs
-        $gemPort = count($attachedVlans) + 1;
+        // Always use gemport 1 for all data VLANs (gemport 2 is reserved for TR-069 management)
+        // Multiple VLANs can share the same gemport - each service-port is unique by VLAN
+        $gemPort = 1;
         
         // Create service-port command with traffic-table indices
         // Format: service-port vlan {vlan} gpon {frame}/{slot}/{port} ont {onu_id} gemport {gem} multi-service user-vlan {vlan} tag-transform translate inbound traffic-table index 9 outbound traffic-table index 8
