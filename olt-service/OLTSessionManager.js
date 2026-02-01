@@ -376,27 +376,37 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send command character by character to simulate typing
+            // Send command - use word-by-word for commands with spaces
             // This prevents the OLT from stripping spaces on fast buffer input
-            const sendSlowly = async () => {
-                console.log(`[OLT ${this.oltId}] Typing: "${command}" (${command.length} chars)`);
+            const sendCommand = async () => {
+                console.log(`[OLT ${this.oltId}] Sending: "${command}" (${command.length} chars)`);
                 
-                for (let i = 0; i < command.length; i++) {
-                    const char = command[i];
-                    // Wait before sending space to ensure previous char is processed
-                    if (char === ' ') {
-                        await new Promise(r => setTimeout(r, 150));
+                // For commands with spaces, send word by word with delays
+                if (command.includes(' ')) {
+                    const words = command.split(' ');
+                    for (let i = 0; i < words.length; i++) {
+                        const word = words[i];
+                        // Send word
+                        this.socket.write(Buffer.from(word, 'utf8'));
+                        // Add space after word (except last)
+                        if (i < words.length - 1) {
+                            await new Promise(r => setTimeout(r, 50));
+                            this.socket.write(Buffer.from(' ', 'utf8'));
+                            await new Promise(r => setTimeout(r, 50));
+                        }
                     }
-                    this.socket.write(Buffer.from(char, 'utf8'));
-                    // Delay after each character
-                    const delay = (char === ' ') ? 200 : 30;
-                    await new Promise(r => setTimeout(r, delay));
+                } else {
+                    // No spaces - send directly
+                    this.socket.write(Buffer.from(command, 'utf8'));
                 }
+                
+                // Small delay before sending CR
+                await new Promise(r => setTimeout(r, 100));
                 // Send CR at the end
                 this.socket.write(Buffer.from('\r', 'utf8'));
             };
             
-            sendSlowly().catch(err => {
+            sendCommand().catch(err => {
                 console.error(`[OLT ${this.oltId}] Send error:`, err);
             });
         });
