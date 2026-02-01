@@ -442,15 +442,23 @@ class DiscoveryWorker {
         
         for (const type of result.rows) {
             const modelNorm = (type.model || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-            if (normalizedEqid.includes(modelNorm) && modelNorm.length >= 5) {
-                return type.id;
+            
+            // Check both directions: eqid contains model OR model contains eqid
+            // Examples: "546M" matches "HG8546M" because "HG8546M" contains "546M"
+            //           "HG8546M" matches "546M" because "HG8546M" contains "546M"
+            if (modelNorm.length >= 3 && normalizedEqid.length >= 3) {
+                if (normalizedEqid.includes(modelNorm) || modelNorm.includes(normalizedEqid)) {
+                    return type.id;
+                }
             }
             
             if (type.model_aliases) {
                 const aliases = type.model_aliases.split(',').map(a => a.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''));
                 for (const alias of aliases) {
-                    if (alias.length >= 5 && normalizedEqid.includes(alias)) {
-                        return type.id;
+                    if (alias.length >= 3 && normalizedEqid.length >= 3) {
+                        if (normalizedEqid.includes(alias) || alias.includes(normalizedEqid)) {
+                            return type.id;
+                        }
                     }
                 }
             }
