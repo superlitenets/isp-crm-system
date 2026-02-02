@@ -2796,7 +2796,7 @@ try {
                                         }
                                         ?>
                                         <?php if ($displayIp): ?>
-                                        <a href="javascript:void(0)" onclick="openRouterPage('<?= htmlspecialchars($displayIp) ?>')" class="badge <?= $isOnline ? 'bg-success' : 'bg-secondary-subtle text-secondary' ?> text-decoration-none" title="<?= $isOnline ? 'Online - Click to open router' : 'Static IP (offline)' ?>">
+                                        <a href="http://<?= htmlspecialchars($displayIp) ?>" target="_blank" class="badge <?= $isOnline ? 'bg-success' : 'bg-secondary-subtle text-secondary' ?> text-decoration-none" title="<?= $isOnline ? 'Online - Click to open router' : 'Static IP (offline)' ?>">
                                             <i class="bi bi-<?= $isOnline ? 'wifi' : 'hdd-network' ?>"></i> <?= htmlspecialchars($displayIp) ?>
                                         </a>
                                         <?php else: ?>
