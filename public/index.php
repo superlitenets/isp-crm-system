@@ -2386,8 +2386,27 @@ if ($page === 'isp') {
             $api->connect();
             
             // Get interface traffic statistics for the VLAN interface
+            // Try multiple interface naming patterns:
+            // 1. VLAN interface by vlan-id on parent interface
+            // 2. Interface named like "vlan{id}" 
+            // 3. The stored name from database
+            $vlanId = $vlan['vlan_id'];
+            $parentInterface = $vlan['interface'] ?? '';
+            
+            // First try to find VLAN by vlan-id
+            $stats = $api->command('/interface/vlan/print', ['?vlan-id' => (string)$vlanId]);
+            
+            // If not found, try interface named "vlan{id}"
+            if (empty($stats)) {
+                $stats = $api->command('/interface/print', ['?name' => 'vlan' . $vlanId]);
+            }
+            
+            // If still not found, try the database name
+            if (empty($stats)) {
+                $stats = $api->command('/interface/print', ['?name' => $vlan['name']]);
+            }
+            
             $interfaceName = $vlan['name'];
-            $stats = $api->command('/interface/print', ['?name' => $interfaceName]);
             
             $traffic = [
                 'name' => $interfaceName,
