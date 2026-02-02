@@ -313,6 +313,12 @@ class OLTSession {
     }
     
     async sendSingleCommand(command, timeout = 60000) {
+        // Skip standalone 'y' or 'n' confirmation commands - these are handled automatically
+        if (command.trim().toLowerCase() === 'y' || command.trim().toLowerCase() === 'n') {
+            console.log(`[OLT ${this.oltId}] Skipping standalone confirmation '${command}' - handled automatically`);
+            return '';
+        }
+        
         // Flush any stale data first by sending empty line and waiting
         await this.flushBuffer();
         
@@ -325,6 +331,7 @@ class OLTSession {
             let resolved = false;
             let timeoutId = null;
             let commandSeen = false;
+            let confirmationSent = false;
             
             const dataHandler = (chunk) => {
                 response += chunk;
@@ -340,6 +347,28 @@ class OLTSession {
                     response = response.replace(/---- More.*?----/gi, '');
                     response = response.replace(/--More--/gi, '');
                     response = response.replace(/Press any key.*$/gi, '');
+                }
+                
+                // Handle confirmation prompts (y/n) - auto-confirm for delete operations
+                if (!confirmationSent && commandSeen) {
+                    // Match patterns like: "y/n]", "(y/n)", "confirm", "are you sure", "delete this ont"
+                    const confirmPatterns = [
+                        /\[y\/n\]/i,
+                        /\(y\/n\)/i,
+                        /y or n/i,
+                        /Are you sure/i,
+                        /confirm.*\?/i,
+                        /delete this ont/i,
+                        /to delete\?/i
+                    ];
+                    const needsConfirmation = confirmPatterns.some(p => p.test(response));
+                    if (needsConfirmation) {
+                        confirmationSent = true;
+                        console.log(`[OLT ${this.oltId}] Confirmation prompt detected, sending 'y'`);
+                        setTimeout(() => {
+                            this.socket.write('y\r');
+                        }, 100);
+                    }
                 }
                 
                 // Check for prompt (command complete) - only after seeing our command
