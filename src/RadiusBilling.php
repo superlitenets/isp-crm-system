@@ -1349,19 +1349,24 @@ class RadiusBilling {
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
         
         if (!$sub) {
-            // If unknown users should be allowed with expired pool
+            // If unknown users should be allowed with expired/unknown pool
             if ($useExpiredPool && $allowUnknownUsers) {
+                // Use separate pool for unknown users if configured
+                $unknownPoolName = $this->getSetting('unknown_user_ip_pool') ?: $expiredPoolName;
+                $unknownRateLimit = $this->getSetting('unknown_user_rate_limit') ?: $expiredRateLimit;
+                
                 $attrs = [
-                    'Framed-Pool' => $expiredPoolName,
-                    'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                    'Framed-Pool' => $unknownPoolName,
+                    'Mikrotik-Rate-Limit' => $unknownRateLimit,
                     'Session-Timeout' => 300,
                     'Acct-Interim-Interval' => 60
                 ];
-                $this->logAuthAttempt(null, $username, $nasIp, $callingStationId, 'Accept', 'Unknown user - expired pool', null, $attrs);
+                $this->logAuthAttempt(null, $username, $nasIp, $callingStationId, 'Accept', 'Unknown user - unknown pool', null, $attrs);
                 return [
                     'success' => true,
                     'reply' => 'Access-Accept',
                     'unknown_user' => true,
+                    'pool_type' => 'unknown',
                     'attributes' => $attrs,
                     'subscription' => null
                 ];
