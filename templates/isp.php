@@ -2691,11 +2691,12 @@ try {
                                         <input type="checkbox" class="form-check-input" id="selectAllSubs" onchange="toggleSelectAll(this)">
                                     </th>
                                     <th>Subscriber</th>
+                                    <th>Zone</th>
                                     <th>Package</th>
+                                    <th>IP Address</th>
                                     <th class="text-center">Status</th>
                                     <th>Expiry</th>
                                     <th class="text-end">Usage</th>
-                                    <th class="text-center" style="width: 200px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2753,9 +2754,6 @@ try {
                                                     <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="fw-bold text-decoration-none"><?= htmlspecialchars($sub['username']) ?></a>
                                                     <button class="btn btn-link btn-sm p-0 text-muted" onclick="copyToClipboard('<?= htmlspecialchars($sub['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
                                                 </div>
-                                                <?php if ($isOnline && !empty($onlineInfo['ip'])): ?>
-                                                <a href="javascript:void(0)" onclick="openRouterPage('<?= htmlspecialchars($onlineInfo['ip']) ?>')" class="badge bg-success-subtle text-success border border-success-subtle text-decoration-none" title="Click to open router page"><i class="bi bi-hdd-network"></i> <?= htmlspecialchars($onlineInfo['ip']) ?></a>
-                                                <?php endif; ?>
                                                 <div class="small text-muted"><?= htmlspecialchars($sub['customer_name'] ?? 'No customer') ?></div>
                                                 <?php if (!empty($sub['customer_phone'])): ?>
                                                 <div class="small">
@@ -2767,12 +2765,43 @@ try {
                                         </div>
                                     </td>
                                     <td>
+                                        <?php if (!empty($sub['zone_name']) || !empty($sub['subzone_name'])): ?>
+                                        <div class="small">
+                                            <?php if (!empty($sub['zone_name'])): ?>
+                                            <span class="badge bg-secondary-subtle text-secondary"><?= htmlspecialchars($sub['zone_name']) ?></span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($sub['subzone_name'])): ?>
+                                            <div class="text-muted mt-1"><?= htmlspecialchars($sub['subzone_name']) ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
                                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle"><?= htmlspecialchars($sub['package_name']) ?></span>
                                         <div class="small text-muted mt-1">
                                             <i class="bi bi-arrow-down text-success"></i> <?= $sub['download_speed'] ?>
                                             <i class="bi bi-arrow-up text-danger ms-1"></i> <?= $sub['upload_speed'] ?>
                                         </div>
                                         <div class="small text-muted">KES <?= number_format($sub['package_price'] ?? 0) ?></div>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $displayIp = null;
+                                        if ($isOnline && !empty($onlineInfo['ip'])) {
+                                            $displayIp = $onlineInfo['ip'];
+                                        } elseif (!empty($sub['static_ip'])) {
+                                            $displayIp = $sub['static_ip'];
+                                        }
+                                        ?>
+                                        <?php if ($displayIp): ?>
+                                        <a href="javascript:void(0)" onclick="openRouterPage('<?= htmlspecialchars($displayIp) ?>')" class="badge <?= $isOnline ? 'bg-success' : 'bg-secondary-subtle text-secondary' ?> text-decoration-none" title="<?= $isOnline ? 'Online - Click to open router' : 'Static IP (offline)' ?>">
+                                            <i class="bi bi-<?= $isOnline ? 'wifi' : 'hdd-network' ?>"></i> <?= htmlspecialchars($displayIp) ?>
+                                        </a>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-<?= $statusClass ?> px-3 status-badge"><?= $statusLabel ?></span>
@@ -2819,47 +2848,6 @@ try {
                                         </div>
                                         <div class="small text-muted"><?= round($usagePercent) ?>% of <?= number_format($quotaGB, 0) ?>GB</div>
                                         <?php endif; ?>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="btn btn-outline-primary" title="View Details">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <?php if ($sub['status'] === 'active'): ?>
-                                            <button type="button" class="btn btn-outline-warning" title="Suspend" onclick="quickAction('suspend', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
-                                                <i class="bi bi-pause-fill"></i>
-                                            </button>
-                                            <?php elseif ($sub['status'] === 'suspended'): ?>
-                                            <button type="button" class="btn btn-outline-success" title="Unsuspend (restore days)" onclick="quickAction('unsuspend', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
-                                                <i class="bi bi-play-fill"></i>
-                                            </button>
-                                            <?php else: ?>
-                                            <button type="button" class="btn btn-outline-success" title="Activate" onclick="quickAction('activate', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
-                                                <i class="bi bi-play-fill"></i>
-                                            </button>
-                                            <?php endif; ?>
-                                            <button type="button" class="btn btn-outline-info" title="Renew" onclick="quickAction('renew', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
-                                                <i class="bi bi-arrow-clockwise"></i>
-                                            </button>
-                                            <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" title="More actions"></button>
-                                                <ul class="dropdown-menu dropdown-menu-end">
-                                                    <li><a class="dropdown-item" href="#" onclick="copyCredentials(<?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>', '<?= htmlspecialchars($sub['password'] ?? '') ?>')"><i class="bi bi-key me-2"></i>Copy Credentials</a></li>
-                                                    <?php if (!empty($sub['customer_phone'])): ?>
-                                                    <li><a class="dropdown-item" href="#" onclick="sendQuickSMS('<?= htmlspecialchars($sub['customer_phone']) ?>', '<?= htmlspecialchars($sub['customer_name'] ?? '') ?>')"><i class="bi bi-chat-dots me-2"></i>Send SMS</a></li>
-                                                    <li><a class="dropdown-item" href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $sub['customer_phone']) ?>" target="_blank"><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
-                                                    <li><hr class="dropdown-divider"></li>
-                                                    <?php endif; ?>
-                                                    <li><a class="dropdown-item" href="#" onclick="initiateMpesa(<?= $sub['id'] ?>, '<?= htmlspecialchars($sub['customer_phone'] ?? '') ?>', <?= (int)($sub['package_price'] ?? 0) ?>)"><i class="bi bi-phone me-2"></i>M-Pesa Payment</a></li>
-                                                    <li><hr class="dropdown-divider"></li>
-                                                    <li class="dropdown-header text-muted small">Real-time CoA</li>
-                                                    <li><a class="dropdown-item" href="#" onclick="quickAction('disconnect', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')"><i class="bi bi-x-circle me-2 text-warning"></i>Disconnect Sessions</a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="quickAction('speed_update', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')"><i class="bi bi-speedometer2 me-2 text-info"></i>Push Speed Update</a></li>
-                                                    <li><hr class="dropdown-divider"></li>
-                                                    <li><a class="dropdown-item text-danger" href="#" onclick="quickAction('delete', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')"><i class="bi bi-trash me-2"></i>Delete</a></li>
-                                                </ul>
-                                            </div>
-                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>

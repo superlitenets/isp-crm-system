@@ -575,11 +575,14 @@ class RadiusBilling {
     public function getSubscriptions(array $filters = []): array {
         $sql = "SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
                        p.name as package_name, p.download_speed, p.upload_speed, p.price as package_price,
-                       n.name as nas_name
+                       n.name as nas_name,
+                       z.name as zone_name, sz.name as subzone_name
                 FROM radius_subscriptions s
                 LEFT JOIN customers c ON s.customer_id = c.id
                 LEFT JOIN radius_packages p ON s.package_id = p.id
                 LEFT JOIN radius_nas n ON s.nas_id = n.id
+                LEFT JOIN huawei_zones z ON s.location_id = z.id
+                LEFT JOIN huawei_subzones sz ON s.sub_location_id = sz.id
                 WHERE 1=1";
         $params = [];
         
