@@ -20,6 +20,7 @@ freeradius:
     - ./freeradius/sites-enabled/default:/etc/freeradius/sites-enabled/default:ro
     - ./freeradius/mods-enabled/sql:/etc/freeradius/mods-enabled/sql:ro
     - ./freeradius/queries.conf:/etc/freeradius/mods-config/sql/main/postgresql/queries.conf:ro
+    - ./freeradius/policy.d/unknown-users:/etc/freeradius/policy.d/unknown-users:ro
   environment:
     - ENV_DB_HOST=isp_crm_db
     - ENV_DB_USER=crm
@@ -27,13 +28,18 @@ freeradius:
     - ENV_DB_NAME=isp_crm
 ```
 
+After updating, restart FreeRADIUS:
+```bash
+docker-compose restart freeradius
+```
+
 ## Key Configuration: Unknown Users
 
-The `sites-enabled/default` file includes this block in the `authorize` section:
+The system uses a policy (`policy.d/unknown-users`) called at the end of the `authorize` section:
 
 ```
-if (notfound || noop) {
-    if (!&control:Cleartext-Password && !&control:NT-Password && !&control:SSHA-Password) {
+policy accept_unknown_users {
+    if (!&control:Auth-Type) {
         update control {
             Auth-Type := Accept
         }
@@ -47,7 +53,10 @@ if (notfound || noop) {
 }
 ```
 
-This accepts unknown users and assigns them to the `expired-pool` so MikroTik can redirect them to the captive portal.
+This runs AFTER the `pap` module. If no `Auth-Type` was set (meaning no password was found for the user), it accepts with expired-pool assignment for captive portal redirect.
+
+**For existing users**: SQL finds them → sets Cleartext-Password → pap sets Auth-Type → policy skipped
+**For unknown users**: SQL returns notfound → no password → no Auth-Type → policy triggers → Accept with expired-pool
 
 ## MikroTik Configuration
 

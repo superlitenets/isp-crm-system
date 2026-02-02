@@ -39,23 +39,8 @@ server default {
         pap
         
         # IMPORTANT: Accept unknown users with expired-pool for captive portal
-        # This must come AFTER sql module
-        if (notfound || noop) {
-            # Check if we have a password set (known user) or not (unknown user)
-            if (!&control:Cleartext-Password && !&control:NT-Password && !&control:SSHA-Password) {
-                # Unknown user - accept with expired pool for captive portal redirect
-                update control {
-                    Auth-Type := Accept
-                }
-                update reply {
-                    Framed-Pool := "expired-pool"
-                    Mikrotik-Rate-Limit := "128k/128k"
-                    Session-Timeout := 300
-                    Acct-Interim-Interval := 60
-                    Reply-Message := "Unknown user - redirecting to portal"
-                }
-            }
-        }
+        # This runs AFTER pap/chap/mschap - if no Auth-Type was set, user is unknown
+        accept_unknown_users
     }
 
     authenticate {
