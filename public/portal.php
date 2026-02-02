@@ -9,6 +9,45 @@ header('Pragma: no-cache');
 $db = Database::getConnection();
 $radiusBilling = new \App\RadiusBilling($db);
 
+// AJAX endpoint: Check subscription status and trigger disconnect if renewed
+if (isset($_GET['action']) && $_GET['action'] === 'check_status') {
+    header('Content-Type: application/json');
+    $subId = (int)($_GET['subscription_id'] ?? 0);
+    
+    if ($subId > 0) {
+        $stmt = $db->prepare("
+            SELECT s.status, s.expiry_date, s.username
+            FROM radius_subscriptions s
+            WHERE s.id = ?
+        ");
+        $stmt->execute([$subId]);
+        $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($sub) {
+            $isActive = $sub['status'] === 'active' && 
+                        (!$sub['expiry_date'] || strtotime($sub['expiry_date']) >= strtotime('today'));
+            
+            if ($isActive) {
+                // Trigger session disconnect so user can reconnect with renewed subscription
+                $radiusBilling->disconnectSubscription($subId);
+                error_log("Portal: Disconnected {$sub['username']} after detecting renewal - user should reconnect");
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'status' => $sub['status'],
+                'expiry_date' => $sub['expiry_date'],
+                'is_active' => $isActive,
+                'disconnected' => $isActive
+            ]);
+            exit;
+        }
+    }
+    
+    echo json_encode(['success' => false, 'error' => 'Subscription not found']);
+    exit;
+}
+
 $ispName = $radiusBilling->getSetting('isp_name') ?: 'Your ISP';
 $ispPhone = $radiusBilling->getSetting('isp_contact_phone') ?: '';
 $ispPhoneFormatted = $ispPhone ? preg_replace('/[^0-9]/', '', $ispPhone) : '';
@@ -380,6 +419,66 @@ $redirectDelay = 3; // seconds
                     </p>
                     <?php endif; ?>
                 </div>
+                <?php elseif ($stkPushSent && $subscription): ?>
+                <!-- Payment Waiting Section with Polling -->
+                <div class="action-section" id="paymentWaiting">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-3x text-primary mb-3"></i>
+                        <h5>Waiting for Payment...</h5>
+                        <p class="text-muted mb-3">Please enter your M-Pesa PIN on your phone to complete the payment.</p>
+                        <p class="small text-muted" id="pollStatus">Checking payment status...</p>
+                    </div>
+                </div>
+                <div class="action-section d-none" id="paymentSuccess">
+                    <div class="text-center">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <h5 class="text-success">Payment Successful!</h5>
+                        <p class="mb-3">Your subscription has been renewed. Your session will be disconnected momentarily.</p>
+                        <p class="text-muted mb-3"><strong>Please reconnect to continue browsing.</strong></p>
+                        <button class="btn btn-success" onclick="location.reload();">
+                            <i class="fas fa-sync me-2"></i>Refresh Page
+                        </button>
+                    </div>
+                </div>
+                <script>
+                (function() {
+                    const subscriptionId = <?= (int)$subscription['id'] ?>;
+                    const waitingEl = document.getElementById('paymentWaiting');
+                    const successEl = document.getElementById('paymentSuccess');
+                    const statusEl = document.getElementById('pollStatus');
+                    let attempts = 0;
+                    const maxAttempts = 60; // Poll for up to 2 minutes
+                    
+                    function checkStatus() {
+                        if (attempts >= maxAttempts) {
+                            statusEl.innerHTML = 'Payment verification timed out. <a href="javascript:location.reload()">Refresh</a> to check again.';
+                            return;
+                        }
+                        attempts++;
+                        
+                        fetch('/portal.php?action=check_status&subscription_id=' + subscriptionId)
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data.is_active) {
+                                    // Payment successful - show success message
+                                    waitingEl.classList.add('d-none');
+                                    successEl.classList.remove('d-none');
+                                } else {
+                                    // Still waiting - poll again
+                                    statusEl.textContent = 'Checking payment status... (' + attempts + ')';
+                                    setTimeout(checkStatus, 2000); // Poll every 2 seconds
+                                }
+                            })
+                            .catch(() => {
+                                statusEl.textContent = 'Connection error, retrying...';
+                                setTimeout(checkStatus, 3000);
+                            });
+                    }
+                    
+                    // Start polling after 3 seconds (give time for STK push to reach phone)
+                    setTimeout(checkStatus, 3000);
+                })();
+                </script>
                 <?php endif; ?>
             <?php else: ?>
                 <!-- Account Lookup for Unknown Users -->
