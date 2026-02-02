@@ -8089,7 +8089,7 @@ class HuaweiOLT {
         $ssid = $config['ssid'] ?? '';
         $password = $config['password'] ?? '';
         $channel = (int)($config['channel'] ?? 0);
-        $security = $config['security'] ?? 'WPA2-PSK';
+        $encryption = $config['encryption'] ?? 'AES';
         
         if (empty($ssid)) {
             return ['success' => false, 'error' => 'SSID is required'];
@@ -8103,27 +8103,17 @@ class HuaweiOLT {
         // Build TR-069 parameter values
         $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}";
         
-        // Map security mode to Huawei BeaconType values
-        $beaconTypeMap = [
-            'WPA2-PSK' => '11i',
-            'WPA-WPA2-PSK' => 'WPAand11i',
-            'WPA3-SAE' => 'WPA3',
-            'WPA-PSK' => 'WPA',
-            'None' => 'Basic',
-            'Open' => 'Basic'
+        // Map encryption algorithm to TR-069 values
+        $encryptionModeMap = [
+            'AES' => 'AESEncryption',
+            'TKIP' => 'TKIPEncryption',
+            'TKIP+AES' => 'TKIPandAESEncryption'
         ];
-        $beaconType = $beaconTypeMap[$security] ?? '11i';
+        $encryptionMode = $encryptionModeMap[$encryption] ?? 'AESEncryption';
         
-        // Map security to authentication mode
-        $authModeMap = [
-            'WPA2-PSK' => 'PSKAuthentication',
-            'WPA-WPA2-PSK' => 'PSKAuthentication',
-            'WPA3-SAE' => 'SAEAuthentication',
-            'WPA-PSK' => 'PSKAuthentication',
-            'None' => 'None',
-            'Open' => 'None'
-        ];
-        $authMode = $authModeMap[$security] ?? 'PSKAuthentication';
+        // Default to WPA2-PSK (11i) with PSK authentication
+        $beaconType = '11i';
+        $authMode = 'PSKAuthentication';
         
         $paramValues = [
             ["{$basePath}.Enable", $enabled, 'xsd:boolean'],
@@ -8131,8 +8121,8 @@ class HuaweiOLT {
             ["{$basePath}.BeaconType", $beaconType, 'xsd:string'],
             ["{$basePath}.WPAAuthenticationMode", $authMode, 'xsd:string'],
             ["{$basePath}.IEEE11iAuthenticationMode", $authMode, 'xsd:string'],
-            ["{$basePath}.WPAEncryptionModes", 'AESEncryption', 'xsd:string'],
-            ["{$basePath}.IEEE11iEncryptionModes", 'AESEncryption', 'xsd:string'],
+            ["{$basePath}.WPAEncryptionModes", $encryptionMode, 'xsd:string'],
+            ["{$basePath}.IEEE11iEncryptionModes", $encryptionMode, 'xsd:string'],
         ];
         
         if (!empty($password)) {

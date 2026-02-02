@@ -4305,7 +4305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $ssid = $_POST['ssid'] ?? '';
                     $password = $_POST['password'] ?? '';
                     $channel = (int)($_POST['channel'] ?? 0);
-                    $security = $_POST['security'] ?? 'WPA2-PSK';
+                    $encryption = $_POST['encryption'] ?? 'AES';
                     
                     // Bridge/VLAN parameters
                     $connMode = $_POST['conn_mode'] ?? 'route';
@@ -4326,7 +4326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         'ssid' => $ssid,
                         'password' => $password,
                         'channel' => $channel,
-                        'security' => $security,
+                        'encryption' => $encryption,
                         'conn_mode' => $connMode,
                         'vlan_mode' => $vlanMode,
                         'access_vlan' => $accessVlan,
@@ -15957,12 +15957,11 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         
                                         <div class="row g-2 mb-3">
                                             <div class="col-6">
-                                                <label class="form-label">Security</label>
-                                                <select name="wifi24_security" id="wifi24Security" class="form-select" onchange="onModalSecurityChange('24')">
-                                                    <option value="WPA2-PSK">WPA2-PSK</option>
-                                                    <option value="WPA-WPA2-PSK">WPA/WPA2-PSK</option>
-                                                    <option value="WPA3-SAE">WPA3-SAE</option>
-                                                    <option value="Open">Open (No Password)</option>
+                                                <label class="form-label">Encryption</label>
+                                                <select name="wifi24_encryption" id="wifi24Encryption" class="form-select">
+                                                    <option value="AES" selected>AES</option>
+                                                    <option value="TKIP">TKIP</option>
+                                                    <option value="TKIP+AES">TKIP+AES</option>
                                                 </select>
                                             </div>
                                             <div class="col-6">
@@ -16042,12 +16041,11 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         
                                         <div class="row g-2 mb-3">
                                             <div class="col-6">
-                                                <label class="form-label">Security</label>
-                                                <select name="wifi5_security" id="wifi5Security" class="form-select" onchange="onModalSecurityChange('5')">
-                                                    <option value="WPA2-PSK">WPA2-PSK</option>
-                                                    <option value="WPA-WPA2-PSK">WPA/WPA2-PSK</option>
-                                                    <option value="WPA3-SAE">WPA3-SAE</option>
-                                                    <option value="Open">Open (No Password)</option>
+                                                <label class="form-label">Encryption</label>
+                                                <select name="wifi5_encryption" id="wifi5Encryption" class="form-select">
+                                                    <option value="AES" selected>AES</option>
+                                                    <option value="TKIP">TKIP</option>
+                                                    <option value="TKIP+AES">TKIP+AES</option>
                                                 </select>
                                             </div>
                                             <div class="col-6">
@@ -20220,12 +20218,11 @@ function saveDeviceStatus() {
                     }
                     html += '</select></div>';
                     
-                    // Security with Open option
-                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Security</label><select class="form-select form-select-sm" id="wifiSecurity' + idx + '" onchange="onSecurityChange(' + idx + ')">';
-                    html += '<option value="WPA2-PSK" ' + (w.security === 'WPA2-PSK' || (!w.security && w.password) ? 'selected' : '') + '>WPA2</option>';
-                    html += '<option value="WPA-WPA2-PSK" ' + (w.security === 'WPA-WPA2-PSK' ? 'selected' : '') + '>WPA/WPA2</option>';
-                    html += '<option value="WPA3-SAE" ' + (w.security === 'WPA3-SAE' ? 'selected' : '') + '>WPA3</option>';
-                    html += '<option value="Open" ' + (w.security === 'Open' || w.security === 'None' || w.security === 'Basic' || (!w.security && !w.password) ? 'selected' : '') + '>Open (No Password)</option>';
+                    // Encryption options (AES/TKIP/TKIP+AES)
+                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Encryption</label><select class="form-select form-select-sm" id="wifiEncryption' + idx + '">';
+                    html += '<option value="AES" ' + (w.encryption === 'AES' || w.encryption === 'AESEncryption' || !w.encryption ? 'selected' : '') + '>AES</option>';
+                    html += '<option value="TKIP" ' + (w.encryption === 'TKIP' || w.encryption === 'TKIPEncryption' ? 'selected' : '') + '>TKIP</option>';
+                    html += '<option value="TKIP+AES" ' + (w.encryption === 'TKIP+AES' || w.encryption === 'TKIPandAESEncryption' ? 'selected' : '') + '>TKIP+AES</option>';
                     html += '</select></div>';
                     
                     // Connection Mode
@@ -20625,18 +20622,7 @@ function saveDeviceStatus() {
         }
     }
     
-    function onSecurityChange(idx) {
-        const security = document.getElementById('wifiSecurity' + idx).value;
-        const passField = document.getElementById('wifiPass' + idx);
-        if (security === 'Open' || security === 'None') {
-            passField.value = '';
-            passField.disabled = true;
-            passField.placeholder = 'Not required for Open';
-        } else {
-            passField.disabled = false;
-            passField.placeholder = 'Min 8 chars';
-        }
-    }
+    // Encryption doesn't need special handling like security did
     
     function onConnModeChange(idx) {
         const mode = document.getElementById('wifiConnMode' + idx).value;
@@ -20680,12 +20666,11 @@ function saveDeviceStatus() {
         const ssid = document.getElementById('wifiSsid' + formIdx).value;
         const password = document.getElementById('wifiPass' + formIdx).value;
         const channel = document.getElementById('wifiChannel' + formIdx)?.value || '0';
-        let security = document.getElementById('wifiSecurity' + formIdx)?.value || 'WPA2-PSK';
+        const encryption = document.getElementById('wifiEncryption' + formIdx)?.value || 'AES';
         const connMode = document.getElementById('wifiConnMode' + formIdx)?.value || 'route';
         const accessVlan = document.getElementById('wifiVlan' + formIdx)?.value || '';
         
-        // Convert "Open" to "None" for backend compatibility
-        if (security === 'Open') security = 'None';
+
         
         if (!ssid) { alert('SSID is required'); return; }
         if (security !== 'None' && password && password.length < 8) { alert('Password must be at least 8 characters'); return; }
@@ -20697,7 +20682,7 @@ function saveDeviceStatus() {
         try {
             let body = 'action=save_tr069_wifi&onu_id=' + tr069CurrentOnuId + '&wlan_index=' + wlanIndex + 
                       '&enabled=' + (enabled ? '1' : '0') + '&ssid=' + encodeURIComponent(ssid) + 
-                      '&password=' + encodeURIComponent(password) + '&channel=' + channel + '&security=' + encodeURIComponent(security) +
+                      '&password=' + encodeURIComponent(password) + '&channel=' + channel + '&encryption=' + encodeURIComponent(encryption) +
                       '&conn_mode=' + connMode + '&vlan_mode=access&access_vlan=' + accessVlan;
             
             const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
