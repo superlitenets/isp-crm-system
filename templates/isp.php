@@ -4665,14 +4665,15 @@ try {
                         const rxKbps = (rxSpeed * 8) / 1000;
                         const txKbps = (txSpeed * 8) / 1000;
                         
-                        document.getElementById('currentDownload').textContent = formatSpeed(rxSpeed);
-                        document.getElementById('currentUpload').textContent = formatSpeed(txSpeed);
+                        // From router perspective: rx = customer upload, tx = customer download
+                        document.getElementById('currentDownload').textContent = formatSpeed(txSpeed);
+                        document.getElementById('currentUpload').textContent = formatSpeed(rxSpeed);
                         
                         const timeLabel = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                         
                         trafficChart.data.labels.push(timeLabel);
-                        trafficChart.data.datasets[0].data.push(rxKbps.toFixed(1));
-                        trafficChart.data.datasets[1].data.push(txKbps.toFixed(1));
+                        trafficChart.data.datasets[0].data.push(txKbps.toFixed(1));
+                        trafficChart.data.datasets[1].data.push(rxKbps.toFixed(1));
                         
                         if (trafficChart.data.labels.length > maxDataPoints) {
                             trafficChart.data.labels.shift();
