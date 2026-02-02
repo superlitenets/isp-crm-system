@@ -15949,21 +15949,34 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Password</label>
-                                            <input type="text" name="wifi24_password" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                            <div class="input-group">
+                                                <input type="password" name="wifi24_password" id="wifi24Password" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                                <button type="button" class="btn btn-outline-secondary" onclick="togglePass('wifi24Password')"><i class="bi bi-eye"></i></button>
+                                            </div>
                                         </div>
                                         
-                                        <div class="mb-3">
-                                            <label class="form-label">Channel</label>
-                                            <select name="wifi24_channel" class="form-select">
-                                                <option value="0">Auto</option>
-                                                <option value="1">1</option>
-                                                <option value="6">6</option>
-                                                <option value="11">11</option>
-                                            </select>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-6">
+                                                <label class="form-label">Security</label>
+                                                <select name="wifi24_security" id="wifi24Security" class="form-select" onchange="onModalSecurityChange('24')">
+                                                    <option value="WPA2-PSK">WPA2-PSK</option>
+                                                    <option value="WPA-WPA2-PSK">WPA/WPA2-PSK</option>
+                                                    <option value="WPA3-SAE">WPA3-SAE</option>
+                                                    <option value="Open">Open (No Password)</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label">Channel</label>
+                                                <select name="wifi24_channel" class="form-select">
+                                                    <option value="0">Auto</option>
+                                                    <option value="1">1</option>
+                                                    <option value="6">6</option>
+                                                    <option value="11">11</option>
+                                                </select>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
+                                        
+                                        <h6 class="text-muted mb-3 mt-4"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Connection Mode</label>
@@ -16021,26 +16034,39 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Password</label>
-                                            <input type="text" name="wifi5_password" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                            <div class="input-group">
+                                                <input type="password" name="wifi5_password" id="wifi5Password" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                                <button type="button" class="btn btn-outline-secondary" onclick="togglePass('wifi5Password')"><i class="bi bi-eye"></i></button>
+                                            </div>
                                         </div>
                                         
-                                        <div class="mb-3">
-                                            <label class="form-label">Channel</label>
-                                            <select name="wifi5_channel" class="form-select">
-                                                <option value="0">Auto</option>
-                                                <option value="36">36</option>
-                                                <option value="40">40</option>
-                                                <option value="44">44</option>
-                                                <option value="48">48</option>
-                                                <option value="149">149</option>
-                                                <option value="153">153</option>
-                                                <option value="157">157</option>
-                                                <option value="161">161</option>
-                                            </select>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-6">
+                                                <label class="form-label">Security</label>
+                                                <select name="wifi5_security" id="wifi5Security" class="form-select" onchange="onModalSecurityChange('5')">
+                                                    <option value="WPA2-PSK">WPA2-PSK</option>
+                                                    <option value="WPA-WPA2-PSK">WPA/WPA2-PSK</option>
+                                                    <option value="WPA3-SAE">WPA3-SAE</option>
+                                                    <option value="Open">Open (No Password)</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label">Channel</label>
+                                                <select name="wifi5_channel" class="form-select">
+                                                    <option value="0">Auto</option>
+                                                    <option value="36">36</option>
+                                                    <option value="40">40</option>
+                                                    <option value="44">44</option>
+                                                    <option value="48">48</option>
+                                                    <option value="149">149</option>
+                                                    <option value="153">153</option>
+                                                    <option value="157">157</option>
+                                                    <option value="161">161</option>
+                                                </select>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
+                                        
+                                        <h6 class="text-muted mb-3 mt-4"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Connection Mode</label>
@@ -16281,6 +16307,32 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         document.getElementById('wifi5TrunkVlans').classList.toggle('d-none', mode === 'access');
         document.getElementById('wifi5AllowedVlans').classList.toggle('d-none', mode === 'access');
     }
+    // Modal helper functions
+    function togglePass(fieldId) {
+        const field = document.getElementById(fieldId);
+        const btn = field.nextElementSibling;
+        if (field.type === 'password') {
+            field.type = 'text';
+            btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            field.type = 'password';
+            btn.innerHTML = '<i class="bi bi-eye"></i>';
+        }
+    }
+    
+    function onModalSecurityChange(band) {
+        const security = document.getElementById('wifi' + band + 'Security').value;
+        const passField = document.getElementById('wifi' + band + 'Password');
+        if (security === 'Open') {
+            passField.value = '';
+            passField.disabled = true;
+            passField.placeholder = 'Not required for Open network';
+        } else {
+            passField.disabled = false;
+            passField.placeholder = 'Min 8 characters';
+        }
+    }
+    
     function toggleWifi24ConnMode(mode) {
         const help = document.getElementById('wifi24ConnModeHelp');
         const bridgeOpts = document.getElementById('wifi24BridgeOptions');
