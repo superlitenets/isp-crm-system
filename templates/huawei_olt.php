@@ -20128,18 +20128,36 @@ function saveDeviceStatus() {
         let html = '';
         
         if (tab === 'wifi') {
-            // WiFi Configuration Tab
+            // WiFi Configuration Tab - Improved Design
+            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+            html += '<h6 class="mb-0 text-primary"><i class="bi bi-wifi me-1"></i>WiFi Interfaces</h6>';
+            html += '<div class="btn-group btn-group-sm">';
+            html += '<button class="btn btn-outline-primary" onclick="applyBulkVlan(' + onuId + ')" title="Apply VLAN to all interfaces"><i class="bi bi-collection me-1"></i>Bulk VLAN</button>';
+            html += '</div></div>';
+            
             if (data.wifi && data.wifi.length > 0) {
                 data.wifi.forEach((w, idx) => {
-                    html += '<div class="card mb-2"><div class="card-header py-1 d-flex justify-content-between align-items-center">';
-                    html += '<strong class="small"><i class="bi bi-wifi me-1"></i>' + escapeHtml(w.band || 'WiFi ' + (idx+1)) + '</strong>';
-                    html += '<div class="form-check form-switch mb-0"><input type="checkbox" class="form-check-input" id="wifiEnable' + idx + '" ' + (w.enabled ? 'checked' : '') + '><label class="form-check-label small">On</label></div>';
-                    html += '</div><div class="card-body py-2">';
+                    const borderClass = w.enabled ? 'border-success' : 'border-secondary';
+                    const bandBadge = (w.band && w.band.includes('5')) ? '<span class="badge bg-info ms-1">5G</span>' : '<span class="badge bg-secondary ms-1">2.4G</span>';
+                    
+                    html += '<div class="card mb-2 ' + borderClass + '" style="border-width:2px">';
+                    html += '<div class="card-header py-1 bg-light d-flex justify-content-between align-items-center">';
+                    html += '<div><strong class="small"><i class="bi bi-wifi me-1"></i>' + escapeHtml(w.band || 'WiFi ' + (idx+1)) + '</strong>' + bandBadge + '</div>';
+                    html += '<div class="form-check form-switch mb-0"><input type="checkbox" class="form-check-input" id="wifiEnable' + idx + '" ' + (w.enabled ? 'checked' : '') + ' onchange="toggleWifiPassword(' + idx + ')"><label class="form-check-label small fw-bold">' + (w.enabled ? 'ON' : 'OFF') + '</label></div>';
+                    html += '</div>';
+                    html += '<div class="card-body py-2">';
+                    
+                    // Row 1: SSID and Password
                     html += '<div class="row g-2 mb-2">';
-                    html += '<div class="col-6"><label class="form-label small mb-0">SSID</label><input type="text" class="form-control form-control-sm" id="wifiSsid' + idx + '" value="' + escapeHtml(w.ssid || '') + '"></div>';
-                    html += '<div class="col-6"><label class="form-label small mb-0">Password</label><input type="text" class="form-control form-control-sm" id="wifiPass' + idx + '" value="' + escapeHtml(w.password || '') + '"></div>';
-                    html += '</div><div class="row g-2 mb-2">';
-                    html += '<div class="col-4"><label class="form-label small mb-0">Channel</label><select class="form-select form-select-sm" id="wifiChannel' + idx + '">';
+                    html += '<div class="col-6"><label class="form-label small mb-0 text-muted">SSID</label><input type="text" class="form-control form-control-sm" id="wifiSsid' + idx + '" value="' + escapeHtml(w.ssid || '') + '" placeholder="Network Name"></div>';
+                    html += '<div class="col-6"><label class="form-label small mb-0 text-muted">Password</label>';
+                    html += '<div class="input-group input-group-sm"><input type="password" class="form-control form-control-sm" id="wifiPass' + idx + '" value="' + escapeHtml(w.password || '') + '" placeholder="Min 8 chars">';
+                    html += '<button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(' + idx + ')"><i class="bi bi-eye" id="wifiPassIcon' + idx + '"></i></button></div></div>';
+                    html += '</div>';
+                    
+                    // Row 2: Channel, Security, Conn Mode
+                    html += '<div class="row g-2 mb-2">';
+                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Channel</label><select class="form-select form-select-sm" id="wifiChannel' + idx + '">';
                     html += '<option value="0" ' + ((w.channel == 0 || w.channel == 'Auto') ? 'selected' : '') + '>Auto</option>';
                     if (w.band === '2.4GHz' || !w.band || w.band.includes('2.4')) {
                         for (let ch = 1; ch <= 13; ch++) html += '<option value="' + ch + '" ' + (w.channel == ch ? 'selected' : '') + '>' + ch + '</option>';
@@ -20149,17 +20167,40 @@ function saveDeviceStatus() {
                         });
                     }
                     html += '</select></div>';
-                    html += '<div class="col-4"><label class="form-label small mb-0">Security</label><select class="form-select form-select-sm" id="wifiSecurity' + idx + '">';
-                    html += '<option value="WPA2-PSK" ' + (w.security === 'WPA2-PSK' || !w.security ? 'selected' : '') + '>WPA2</option>';
+                    
+                    // Security with Open option
+                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Security</label><select class="form-select form-select-sm" id="wifiSecurity' + idx + '" onchange="onSecurityChange(' + idx + ')">';
+                    html += '<option value="WPA2-PSK" ' + (w.security === 'WPA2-PSK' || (!w.security && w.password) ? 'selected' : '') + '>WPA2</option>';
                     html += '<option value="WPA-WPA2-PSK" ' + (w.security === 'WPA-WPA2-PSK' ? 'selected' : '') + '>WPA/WPA2</option>';
                     html += '<option value="WPA3-SAE" ' + (w.security === 'WPA3-SAE' ? 'selected' : '') + '>WPA3</option>';
-                    html += '<option value="None" ' + (w.security === 'None' ? 'selected' : '') + '>None</option>';
+                    html += '<option value="Open" ' + (w.security === 'Open' || w.security === 'None' || w.security === 'Basic' || (!w.security && !w.password) ? 'selected' : '') + '>Open (No Password)</option>';
                     html += '</select></div>';
-                    html += '<div class="col-4 d-flex align-items-end"><button class="btn btn-success btn-sm w-100" onclick="saveWifiConfig(' + idx + ', ' + w.index + ')"><i class="bi bi-check"></i> Save</button></div>';
-                    html += '</div></div></div>';
+                    
+                    // Connection Mode
+                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Mode</label><select class="form-select form-select-sm" id="wifiConnMode' + idx + '" onchange="onConnModeChange(' + idx + ')">';
+                    html += '<option value="route" ' + (w.conn_mode !== 'bridge' ? 'selected' : '') + '>Route (NAT)</option>';
+                    html += '<option value="bridge" ' + (w.conn_mode === 'bridge' ? 'selected' : '') + '>Bridge</option>';
+                    html += '</select></div>';
+                    
+                    // Access VLAN
+                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Access VLAN</label>';
+                    html += '<input type="number" class="form-control form-control-sm" id="wifiVlan' + idx + '" value="' + (w.vlan_id || '') + '" placeholder="e.g. 100" min="1" max="4094" ' + (w.conn_mode !== 'bridge' ? 'disabled' : '') + '></div>';
+                    html += '</div>';
+                    
+                    // Save button row
+                    html += '<div class="d-flex justify-content-between align-items-center border-top pt-2 mt-2">';
+                    if (w.vlan_id) {
+                        html += '<small class="text-muted"><i class="bi bi-tag me-1"></i>VLAN: <span class="badge bg-info">' + w.vlan_id + '</span></small>';
+                    } else {
+                        html += '<small class="text-muted"><i class="bi bi-info-circle me-1"></i>Bridge mode required for VLAN</small>';
+                    }
+                    html += '<button class="btn btn-success btn-sm px-4" onclick="saveWifiConfig(' + idx + ', ' + w.index + ')"><i class="bi bi-check-lg me-1"></i>Save</button>';
+                    html += '</div>';
+                    
+                    html += '</div></div>';
                 });
             } else {
-                html += '<div class="alert alert-secondary small">No WiFi interfaces detected</div>';
+                html += '<div class="alert alert-secondary small"><i class="bi bi-info-circle me-2"></i>No WiFi interfaces detected. Click Sync to refresh device data.</div>';
             }
         }
         
@@ -20519,27 +20560,98 @@ function saveDeviceStatus() {
         btn.innerHTML = origHtml;
     }
     
+    // WiFi Helper Functions
+    function togglePasswordVisibility(idx) {
+        const passField = document.getElementById('wifiPass' + idx);
+        const icon = document.getElementById('wifiPassIcon' + idx);
+        if (passField.type === 'password') {
+            passField.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            passField.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+    
+    function onSecurityChange(idx) {
+        const security = document.getElementById('wifiSecurity' + idx).value;
+        const passField = document.getElementById('wifiPass' + idx);
+        if (security === 'Open' || security === 'None') {
+            passField.value = '';
+            passField.disabled = true;
+            passField.placeholder = 'Not required for Open';
+        } else {
+            passField.disabled = false;
+            passField.placeholder = 'Min 8 chars';
+        }
+    }
+    
+    function onConnModeChange(idx) {
+        const mode = document.getElementById('wifiConnMode' + idx).value;
+        const vlanField = document.getElementById('wifiVlan' + idx);
+        vlanField.disabled = (mode !== 'bridge');
+        if (mode !== 'bridge') vlanField.value = '';
+    }
+    
+    function toggleWifiPassword(idx) {
+        const enabled = document.getElementById('wifiEnable' + idx).checked;
+        const label = document.querySelector('label[for="wifiEnable' + idx + '"]');
+        if (label) label.textContent = enabled ? 'ON' : 'OFF';
+    }
+    
+    async function applyBulkVlan(onuId) {
+        const vlan = prompt('Enter VLAN ID to apply to all WiFi interfaces in Bridge mode:', '');
+        if (!vlan || isNaN(vlan) || vlan < 1 || vlan > 4094) {
+            if (vlan !== null) alert('Please enter a valid VLAN ID (1-4094)');
+            return;
+        }
+        
+        const confirmed = confirm('Apply VLAN ' + vlan + ' to all WiFi interfaces?\nThis will set Bridge mode and configure Access VLAN for each interface.');
+        if (!confirmed) return;
+        
+        // Apply to each interface
+        const wifiCards = document.querySelectorAll('[id^="wifiConnMode"]');
+        for (let i = 0; i < wifiCards.length; i++) {
+            const modeSelect = document.getElementById('wifiConnMode' + i);
+            const vlanField = document.getElementById('wifiVlan' + i);
+            if (modeSelect && vlanField) {
+                modeSelect.value = 'bridge';
+                vlanField.disabled = false;
+                vlanField.value = vlan;
+            }
+        }
+        alert('VLAN ' + vlan + ' set for all interfaces. Click Save on each interface to apply.');
+    }
+    
     async function saveWifiConfig(formIdx, wlanIndex) {
         const enabled = document.getElementById('wifiEnable' + formIdx).checked;
         const ssid = document.getElementById('wifiSsid' + formIdx).value;
         const password = document.getElementById('wifiPass' + formIdx).value;
         const channel = document.getElementById('wifiChannel' + formIdx)?.value || '0';
-        const security = document.getElementById('wifiSecurity' + formIdx)?.value || 'WPA2-PSK';
+        let security = document.getElementById('wifiSecurity' + formIdx)?.value || 'WPA2-PSK';
+        const connMode = document.getElementById('wifiConnMode' + formIdx)?.value || 'route';
+        const accessVlan = document.getElementById('wifiVlan' + formIdx)?.value || '';
+        
+        // Convert "Open" to "None" for backend compatibility
+        if (security === 'Open') security = 'None';
         
         if (!ssid) { alert('SSID is required'); return; }
-        if (password && password.length < 8) { alert('Password must be at least 8 characters'); return; }
+        if (security !== 'None' && password && password.length < 8) { alert('Password must be at least 8 characters'); return; }
         
         const btn = event.target;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
         
         try {
+            let body = 'action=save_tr069_wifi&onu_id=' + tr069CurrentOnuId + '&wlan_index=' + wlanIndex + 
+                      '&enabled=' + (enabled ? '1' : '0') + '&ssid=' + encodeURIComponent(ssid) + 
+                      '&password=' + encodeURIComponent(password) + '&channel=' + channel + '&security=' + encodeURIComponent(security) +
+                      '&conn_mode=' + connMode + '&vlan_mode=access&access_vlan=' + accessVlan;
+            
             const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'action=save_tr069_wifi&onu_id=' + tr069CurrentOnuId + '&wlan_index=' + wlanIndex + 
-                      '&enabled=' + (enabled ? '1' : '0') + '&ssid=' + encodeURIComponent(ssid) + 
-                      '&password=' + encodeURIComponent(password) + '&channel=' + channel + '&security=' + encodeURIComponent(security)
+                body: body
             });
             const text = await resp.text();
             let data;
