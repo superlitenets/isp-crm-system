@@ -9234,10 +9234,11 @@ try {
                         <thead class="table-dark">
                             <tr>
                                 <th>Port</th>
-                                <th>Admin State</th>
+                                <th>Status</th>
                                 <th>Mode</th>
                                 <th>SSID</th>
-                                <th>DHCP</th>
+                                <th>Encryption</th>
+                                <th>VLAN</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -9248,6 +9249,14 @@ try {
                                 <td><button class="btn btn-sm btn-secondary wifi-enable-toggle" data-index="<?= $i ?>" data-enabled="false" disabled>Disabled</button></td>
                                 <td class="wifi-mode"><span class="badge bg-secondary">--</span></td>
                                 <td class="wifi-ssid"><span class="text-muted fst-italic">Loading...</span></td>
+                                <td class="wifi-encryption">
+                                    <select class="form-select form-select-sm wifi-encryption-select" data-index="<?= $i ?>" style="width:110px" onchange="saveWiFiEncryption(<?= $i ?>, this.value)">
+                                        <option value="AES" selected>AES</option>
+                                        <option value="TKIP">TKIP</option>
+                                        <option value="TKIP+AES">TKIP+AES</option>
+                                        <option value="Open">Open</option>
+                                    </select>
+                                </td>
                                 <td class="wifi-vlan"><span class="text-muted">--</span></td>
                                 <td><button class="btn btn-sm btn-outline-primary" onclick="openTR069WiFiConfig('<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>', <?= $i ?>)"><i class="bi bi-gear me-1"></i>Configure</button></td>
                             </tr>
@@ -9392,6 +9401,25 @@ try {
                             ssidCell.innerHTML = ssid || '<span class="text-muted fst-italic">Not set</span>';
                         }
                         
+                        // Update Encryption dropdown
+                        const encCell = row.querySelector('.wifi-encryption');
+                        if (encCell) {
+                            const encSelect = encCell.querySelector('select');
+                            if (encSelect) {
+                                // Map TR-069 values to dropdown values
+                                let encValue = 'AES';
+                                const rawEnc = iface.encryption || iface.encryption_mode || '';
+                                if (rawEnc.includes('TKIP') && rawEnc.includes('AES')) {
+                                    encValue = 'TKIP+AES';
+                                } else if (rawEnc.includes('TKIP')) {
+                                    encValue = 'TKIP';
+                                } else if (rawEnc === 'None' || rawEnc === 'Basic' || iface.beacon_type === 'Basic') {
+                                    encValue = 'Open';
+                                }
+                                encSelect.value = encValue;
+                            }
+                        }
+                        
                         // Update VLAN column
                         const vlanCell = row.querySelector('.wifi-vlan');
                         if (vlanCell) {
@@ -9420,6 +9448,39 @@ try {
                     refreshBtn.disabled = false;
                     showToast('Error: ' + err.message, 'danger');
                 });
+            }
+            
+            // Save WiFi encryption setting
+            async function saveWiFiEncryption(wlanIndex, encryption) {
+                const select = document.querySelector('.wifi-encryption-select[data-index="' + wlanIndex + '"]');
+                if (!select) return;
+                
+                select.disabled = true;
+                
+                // Map encryption to TR-069 values
+                const encryptionMap = {
+                    'AES': 'AESEncryption',
+                    'TKIP': 'TKIPEncryption',
+                    'TKIP+AES': 'TKIPandAESEncryption',
+                    'Open': 'None'
+                };
+                const encValue = encryptionMap[encryption] || 'AESEncryption';
+                
+                try {
+                    // For Open, also set BeaconType to Basic
+                    if (encryption === 'Open') {
+                        await saveWiFiSettingAsync(wlanIndex, 'BeaconType', 'Basic');
+                    } else {
+                        await saveWiFiSettingAsync(wlanIndex, 'BeaconType', '11i');
+                        await saveWiFiSettingAsync(wlanIndex, 'WPAEncryptionModes', encValue);
+                        await saveWiFiSettingAsync(wlanIndex, 'IEEE11iEncryptionModes', encValue);
+                    }
+                    showToast('Encryption set to ' + encryption, 'success');
+                } catch (err) {
+                    showToast('Error: ' + err.message, 'danger');
+                }
+                
+                select.disabled = false;
             }
             
             function attachWifiToggleHandlers() {
