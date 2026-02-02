@@ -38,20 +38,49 @@ $subscription = null;
 $pageType = 'unknown'; // 'expired', 'suspended', 'quota', 'unknown'
 $stkPushSent = false;
 
+// Parse NAS IP from URL path: /portal/10.200.0.5 or /expired/10.200.0.5
+$nasIP = null;
+$requestUri = $_SERVER['REQUEST_URI'] ?? '';
+if (preg_match('#/(portal|expired)/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})#', $requestUri, $matches)) {
+    $nasIP = $matches[2];
+}
+// Also accept as query param: ?nas=10.200.0.5
+if (!$nasIP && isset($_GET['nas'])) {
+    $nasIP = $_GET['nas'];
+}
+
 // Try to find subscription by IP from active/recent session
-$stmt = $db->prepare("
-    SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
-           p.name as package_name, p.price as package_price, p.validity_days,
-           p.download_speed, p.upload_speed, rs.framed_ip_address
-    FROM radius_subscriptions s
-    LEFT JOIN customers c ON s.customer_id = c.id
-    LEFT JOIN radius_packages p ON s.package_id = p.id
-    LEFT JOIN radius_sessions rs ON rs.subscription_id = s.id
-    WHERE rs.framed_ip_address = ? OR s.static_ip = ?
-    ORDER BY rs.started_at DESC
-    LIMIT 1
-");
-$stmt->execute([$clientIP, $clientIP]);
+// Include NAS IP filter if provided to avoid IP conflicts across NAS devices
+if ($nasIP) {
+    $stmt = $db->prepare("
+        SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+               p.name as package_name, p.price as package_price, p.validity_days,
+               p.download_speed, p.upload_speed, rs.framed_ip_address, rs.nas_ip_address
+        FROM radius_subscriptions s
+        LEFT JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN radius_packages p ON s.package_id = p.id
+        LEFT JOIN radius_sessions rs ON rs.subscription_id = s.id
+        WHERE (rs.framed_ip_address = ? OR s.static_ip = ?)
+          AND rs.nas_ip_address = ?
+        ORDER BY rs.started_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$clientIP, $clientIP, $nasIP]);
+} else {
+    $stmt = $db->prepare("
+        SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+               p.name as package_name, p.price as package_price, p.validity_days,
+               p.download_speed, p.upload_speed, rs.framed_ip_address
+        FROM radius_subscriptions s
+        LEFT JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN radius_packages p ON s.package_id = p.id
+        LEFT JOIN radius_sessions rs ON rs.subscription_id = s.id
+        WHERE rs.framed_ip_address = ? OR s.static_ip = ?
+        ORDER BY rs.started_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$clientIP, $clientIP]);
+}
 $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // If not found by session IP, try by username from URL
