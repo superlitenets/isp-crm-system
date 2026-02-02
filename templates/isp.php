@@ -2756,7 +2756,7 @@ try {
                                     <td>
                                         <?php if (!empty($sub['customer_phone'])): ?>
                                         <a href="tel:<?= htmlspecialchars($sub['customer_phone']) ?>" class="text-decoration-none"><?= htmlspecialchars($sub['customer_phone']) ?></a>
-                                        <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $sub['customer_phone']) ?>" target="_blank" class="text-success ms-1" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                                        <a href="?page=whatsapp&phone=<?= urlencode(preg_replace('/[^0-9]/', '', $sub['customer_phone'])) ?>" class="text-success ms-1" title="Quick Chat"><i class="bi bi-whatsapp"></i></a>
                                         <?php else: ?>
                                         <span class="text-muted">-</span>
                                         <?php endif; ?>
