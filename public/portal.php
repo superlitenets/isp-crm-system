@@ -107,6 +107,8 @@ if ($subscription) {
         $pageType = 'quota';
     } elseif ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time()) {
         $pageType = 'expired';
+    } elseif ($subscription['status'] === 'active') {
+        $pageType = 'active'; // Subscription is active - should auto-login
     } else {
         $pageType = 'expired'; // Default to expired for any other issue
     }
@@ -183,32 +185,44 @@ $pageTitles = [
     'expired' => 'Subscription Expired',
     'suspended' => 'Account Suspended',
     'quota' => 'Data Quota Exhausted',
-    'unknown' => 'Account Not Found'
+    'unknown' => 'Account Not Found',
+    'active' => 'You Are Connected'
 ];
 $pageIcons = [
     'expired' => 'fa-clock',
     'suspended' => 'fa-ban',
     'quota' => 'fa-chart-pie',
-    'unknown' => 'fa-user-slash'
+    'unknown' => 'fa-user-slash',
+    'active' => 'fa-check-circle'
 ];
 $pageColors = [
     'expired' => '#f39c12',
     'suspended' => '#e74c3c',
     'quota' => '#9b59b6',
-    'unknown' => '#95a5a6'
+    'unknown' => '#95a5a6',
+    'active' => '#27ae60'
 ];
 $pageMessages = [
     'expired' => 'Your internet subscription has expired. Please renew to continue browsing.',
     'suspended' => 'Your account has been suspended. Please contact support or clear any pending payments.',
     'quota' => 'You have used all your allocated data. Please purchase more data to continue.',
-    'unknown' => 'Your account was not found in our system. You may need to register for service.'
+    'unknown' => 'Your account was not found in our system. You may need to register for service.',
+    'active' => 'Your subscription is active! You should be connected to the internet automatically.'
 ];
+
+// Auto-redirect for active subscriptions (unless coming back from captive portal)
+$autoRedirect = ($pageType === 'active' && !isset($_GET['noredirect']));
+$redirectUrl = $_GET['redirect'] ?? $_GET['url'] ?? 'https://www.google.com';
+$redirectDelay = 3; // seconds
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php if ($autoRedirect): ?>
+    <meta http-equiv="refresh" content="<?= $redirectDelay ?>;url=<?= htmlspecialchars($redirectUrl) ?>">
+    <?php endif; ?>
     <title><?= $pageTitles[$pageType] ?> - <?= htmlspecialchars($ispName) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -281,7 +295,46 @@ $pageMessages = [
                 <div class="alert alert-<?= $messageType ?> mb-3"><?= $message ?></div>
             <?php endif; ?>
             
-            <?php if ($subscription && $pageType !== 'unknown'): ?>
+            <?php if ($pageType === 'active' && $subscription): ?>
+                <!-- Active Subscription - Auto-redirect -->
+                <div class="account-info mb-4">
+                    <div class="info-row">
+                        <span class="info-label">Account</span>
+                        <span class="info-value"><?= htmlspecialchars($subscription['customer_name'] ?? $subscription['username']) ?></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Package</span>
+                        <span class="info-value"><?= htmlspecialchars($subscription['package_name'] ?? 'N/A') ?></span>
+                    </div>
+                    <?php if ($subscription['expiry_date']): ?>
+                    <div class="info-row">
+                        <span class="info-label">Valid Until</span>
+                        <span class="info-value text-success"><?= date('M d, Y', strtotime($subscription['expiry_date'])) ?></span>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <?php if ($autoRedirect): ?>
+                <div class="text-center p-3 bg-light rounded">
+                    <i class="fas fa-spinner fa-spin fa-2x text-success mb-2"></i>
+                    <p class="mb-1">Redirecting you in <strong id="countdown"><?= $redirectDelay ?></strong> seconds...</p>
+                    <a href="<?= htmlspecialchars($redirectUrl) ?>" class="btn btn-success mt-2">
+                        <i class="fas fa-arrow-right me-1"></i> Continue Now
+                    </a>
+                </div>
+                <script>
+                    let seconds = <?= $redirectDelay ?>;
+                    const countdown = document.getElementById('countdown');
+                    setInterval(() => {
+                        if (seconds > 0) {
+                            seconds--;
+                            countdown.textContent = seconds;
+                        }
+                    }, 1000);
+                </script>
+                <?php endif; ?>
+
+            <?php elseif ($subscription && $pageType !== 'unknown'): ?>
                 <!-- Account Info -->
                 <div class="account-info mb-4">
                     <div class="info-row">
