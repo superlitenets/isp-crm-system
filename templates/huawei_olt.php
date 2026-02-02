@@ -15958,10 +15958,11 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         <div class="row g-2 mb-3">
                                             <div class="col-6">
                                                 <label class="form-label">Encryption</label>
-                                                <select name="wifi24_encryption" id="wifi24Encryption" class="form-select">
+                                                <select name="wifi24_encryption" id="wifi24Encryption" class="form-select" onchange="onModalEncryptionChange('24')">
                                                     <option value="AES" selected>AES</option>
                                                     <option value="TKIP">TKIP</option>
                                                     <option value="TKIP+AES">TKIP+AES</option>
+                                                    <option value="Open">Open (No Password)</option>
                                                 </select>
                                             </div>
                                             <div class="col-6">
@@ -16042,10 +16043,11 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         <div class="row g-2 mb-3">
                                             <div class="col-6">
                                                 <label class="form-label">Encryption</label>
-                                                <select name="wifi5_encryption" id="wifi5Encryption" class="form-select">
+                                                <select name="wifi5_encryption" id="wifi5Encryption" class="form-select" onchange="onModalEncryptionChange('5')">
                                                     <option value="AES" selected>AES</option>
                                                     <option value="TKIP">TKIP</option>
                                                     <option value="TKIP+AES">TKIP+AES</option>
+                                                    <option value="Open">Open (No Password)</option>
                                                 </select>
                                             </div>
                                             <div class="col-6">
@@ -20218,11 +20220,12 @@ function saveDeviceStatus() {
                     }
                     html += '</select></div>';
                     
-                    // Encryption options (AES/TKIP/TKIP+AES)
-                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Encryption</label><select class="form-select form-select-sm" id="wifiEncryption' + idx + '">';
-                    html += '<option value="AES" ' + (w.encryption === 'AES' || w.encryption === 'AESEncryption' || !w.encryption ? 'selected' : '') + '>AES</option>';
+                    // Encryption options (AES/TKIP/TKIP+AES/Open)
+                    html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Encryption</label><select class="form-select form-select-sm" id="wifiEncryption' + idx + '" onchange="onEncryptionChange(' + idx + ')">';
+                    html += '<option value="AES" ' + (w.encryption === 'AES' || w.encryption === 'AESEncryption' || (!w.encryption && w.password) ? 'selected' : '') + '>AES</option>';
                     html += '<option value="TKIP" ' + (w.encryption === 'TKIP' || w.encryption === 'TKIPEncryption' ? 'selected' : '') + '>TKIP</option>';
                     html += '<option value="TKIP+AES" ' + (w.encryption === 'TKIP+AES' || w.encryption === 'TKIPandAESEncryption' ? 'selected' : '') + '>TKIP+AES</option>';
+                    html += '<option value="Open" ' + (w.encryption === 'Open' || w.encryption === 'None' || (!w.encryption && !w.password) ? 'selected' : '') + '>Open</option>';
                     html += '</select></div>';
                     
                     // Connection Mode
@@ -20622,7 +20625,32 @@ function saveDeviceStatus() {
         }
     }
     
-    // Encryption doesn't need special handling like security did
+    // Encryption change handlers
+    function onEncryptionChange(idx) {
+        const encryption = document.getElementById('wifiEncryption' + idx).value;
+        const passField = document.getElementById('wifiPass' + idx);
+        if (encryption === 'Open') {
+            passField.value = '';
+            passField.disabled = true;
+            passField.placeholder = 'Not required';
+        } else {
+            passField.disabled = false;
+            passField.placeholder = 'Min 8 chars';
+        }
+    }
+    
+    function onModalEncryptionChange(band) {
+        const encryption = document.getElementById('wifi' + band + 'Encryption').value;
+        const passField = document.getElementById('wifi' + band + 'Password');
+        if (encryption === 'Open') {
+            passField.value = '';
+            passField.disabled = true;
+            passField.placeholder = 'Not required for Open network';
+        } else {
+            passField.disabled = false;
+            passField.placeholder = 'Min 8 characters';
+        }
+    }
     
     function onConnModeChange(idx) {
         const mode = document.getElementById('wifiConnMode' + idx).value;

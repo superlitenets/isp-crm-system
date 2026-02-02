@@ -8107,13 +8107,21 @@ class HuaweiOLT {
         $encryptionModeMap = [
             'AES' => 'AESEncryption',
             'TKIP' => 'TKIPEncryption',
-            'TKIP+AES' => 'TKIPandAESEncryption'
+            'TKIP+AES' => 'TKIPandAESEncryption',
+            'Open' => 'None'
         ];
         $encryptionMode = $encryptionModeMap[$encryption] ?? 'AESEncryption';
         
-        // Default to WPA2-PSK (11i) with PSK authentication
-        $beaconType = '11i';
-        $authMode = 'PSKAuthentication';
+        // Handle Open (no password) network
+        if ($encryption === 'Open') {
+            $beaconType = 'Basic';  // No encryption
+            $authMode = 'None';
+            $password = '';  // Clear password for open networks
+        } else {
+            // Default to WPA2-PSK (11i) with PSK authentication
+            $beaconType = '11i';
+            $authMode = 'PSKAuthentication';
+        }
         
         $paramValues = [
             ["{$basePath}.Enable", $enabled, 'xsd:boolean'],
