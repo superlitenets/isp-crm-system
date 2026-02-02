@@ -1342,9 +1342,9 @@ class RadiusBilling {
     public function authenticate(string $username, string $password, string $nasIp = '', string $callingStationId = ''): array {
         $sub = $this->getSubscriptionByUsername($username);
         
-        // Get expired pool settings upfront
-        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
-        $allowUnknownUsers = $this->getSetting('allow_unknown_expired_pool') === 'true';
+        // Get expired pool settings upfront (getSetting returns bool for boolean type)
+        $useExpiredPool = (bool)$this->getSetting('use_expired_pool', false);
+        $allowUnknownUsers = (bool)$this->getSetting('allow_unknown_expired_pool', false);
         $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
         
@@ -1373,7 +1373,7 @@ class RadiusBilling {
         // Get expired/suspended pool settings
         $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
-        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        // Note: $useExpiredPool already set above
         
         // Suspended accounts - bypass password check, just return expired pool
         if ($sub['status'] === 'suspended') {
@@ -1400,7 +1400,7 @@ class RadiusBilling {
         }
         
         // Check MAC binding - only enforce for PPPoE if mac_binding is enabled
-        $enforceMacBinding = $this->getSetting('enforce_mac_binding') === 'true';
+        $enforceMacBinding = (bool)$this->getSetting('enforce_mac_binding', false);
         $isHotspot = ($sub['access_type'] ?? '') === 'hotspot';
         
         if ($enforceMacBinding && !$isHotspot && !empty($sub['mac_address']) && !empty($callingStationId)) {
@@ -1810,7 +1810,7 @@ class RadiusBilling {
         
         // Check expiry
         if ($sub['expiry_date'] && strtotime($sub['expiry_date']) < time()) {
-            $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+            $useExpiredPool = (bool)$this->getSetting('use_expired_pool', false);
             if ($useExpiredPool) {
                 return [
                     'success' => true,
@@ -1957,7 +1957,7 @@ class RadiusBilling {
         $ipsReleased = 0;
         $coaSent = 0;
         
-        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        $useExpiredPool = (bool)$this->getSetting('use_expired_pool', false);
         $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '64k/64k';
         
