@@ -1065,7 +1065,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $configData['description'] = trim($_POST['dhcp_description'] ?? '');
                 }
                 
-                $stmt = $db->prepare("INSERT INTO radius_subscription_addons (subscription_id, addon_id, quantity, config_data, status, activated_at) VALUES (?, ?, ?, ?, 'active', NOW()) ON CONFLICT (subscription_id, addon_id) DO UPDATE SET quantity = EXCLUDED.quantity, config_data = EXCLUDED.config_data, status = 'active', updated_at = NOW()");
+                $stmt = $db->prepare("INSERT INTO radius_subscription_addons (subscription_id, addon_id, quantity, config_data, status, activated_at) VALUES (?, ?, ?, ?, 'active', NOW()) ON CONFLICT ON CONSTRAINT radius_subscription_addons_subscription_id_addon_id_key DO UPDATE SET quantity = EXCLUDED.quantity, config_data = EXCLUDED.config_data, status = 'active', updated_at = NOW()");
                 $stmt->execute([$subId, $addonId, $quantity, json_encode($configData)]);
                 $message = 'Addon assigned successfully';
                 $messageType = 'success';
