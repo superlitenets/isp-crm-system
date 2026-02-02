@@ -1,0 +1,120 @@
+server default {
+    listen {
+        type = auth
+        ipaddr = *
+        port = 0
+        limit {
+            max_connections = 16
+            lifetime = 0
+            idle_timeout = 30
+        }
+    }
+
+    listen {
+        type = acct
+        ipaddr = *
+        port = 0
+        limit {
+        }
+    }
+
+    authorize {
+        filter_username
+        preprocess
+        chap
+        mschap
+        suffix
+        eap {
+            ok = return
+        }
+        files
+        
+        sql
+        
+        -ldap
+
+        expiration
+        logintime
+
+        pap
+        
+        # IMPORTANT: Accept unknown users with expired-pool for captive portal
+        # This must come AFTER sql module
+        if (notfound || noop) {
+            # Check if we have a password set (known user) or not (unknown user)
+            if (!&control:Cleartext-Password && !&control:NT-Password && !&control:SSHA-Password) {
+                # Unknown user - accept with expired pool for captive portal redirect
+                update control {
+                    Auth-Type := Accept
+                }
+                update reply {
+                    Framed-Pool := "expired-pool"
+                    Mikrotik-Rate-Limit := "128k/128k"
+                    Session-Timeout := 300
+                    Acct-Interim-Interval := 60
+                    Reply-Message := "Unknown user - redirecting to portal"
+                }
+            }
+        }
+    }
+
+    authenticate {
+        Auth-Type PAP {
+            pap
+        }
+
+        Auth-Type CHAP {
+            chap
+        }
+
+        Auth-Type MS-CHAP {
+            mschap
+        }
+
+        mschap
+
+        eap
+    }
+
+    preacct {
+        preprocess
+        acct_unique
+        suffix
+        files
+    }
+
+    accounting {
+        detail
+        unix
+        sql
+        exec
+        attr_filter.accounting_response
+    }
+
+    session {
+        sql
+    }
+
+    post-auth {
+        sql
+        exec
+        remove_reply_message_if_eap
+        
+        Post-Auth-Type REJECT {
+            sql
+            attr_filter.access_reject
+            eap
+            remove_reply_message_if_eap
+        }
+
+        Post-Auth-Type Challenge {
+        }
+    }
+
+    pre-proxy {
+    }
+
+    post-proxy {
+        eap
+    }
+}
