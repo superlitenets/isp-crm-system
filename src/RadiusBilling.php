@@ -1407,17 +1407,43 @@ class RadiusBilling {
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
         }
         
-        // Check MAC binding - only enforce for PPPoE if mac_binding is enabled
+        // Check MAC binding - use multi-MAC table for device locking
         $enforceMacBinding = (bool)$this->getSetting('enforce_mac_binding', false);
+        $autoCaptureMac = (bool)$this->getSetting('auto_capture_mac', true);
         $isHotspot = ($sub['access_type'] ?? '') === 'hotspot';
         
-        if ($enforceMacBinding && !$isHotspot && !empty($sub['mac_address']) && !empty($callingStationId)) {
-            $normalizedSubMac = strtoupper(str_replace(['-', '.'], ':', $sub['mac_address']));
-            $normalizedCallingMac = strtoupper(str_replace(['-', '.'], ':', $callingStationId));
-            if ($normalizedSubMac !== $normalizedCallingMac) {
-                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'MAC address mismatch');
-                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'MAC address mismatch'];
+        if ($enforceMacBinding && !$isHotspot && !empty($callingStationId)) {
+            $normalizedCallingMac = $this->normalizeMAC($callingStationId);
+            
+            // Check if MAC is in the allowed list
+            $registeredMACs = $this->getSubscriptionMACs($sub['id']);
+            $allowedMACs = array_column($registeredMACs, 'mac_address');
+            
+            if (empty($allowedMACs)) {
+                // No MACs registered yet - auto-capture first device
+                if ($autoCaptureMac) {
+                    $this->addSubscriptionMAC($sub['id'], $normalizedCallingMac, 'Auto-captured device', true);
+                }
+                // Allow connection (first device is always allowed)
+            } elseif (!in_array($normalizedCallingMac, $allowedMACs)) {
+                // MAC not in list - check if we can auto-add
+                $maxDevices = $this->getMaxDevicesForSubscription($sub['id']);
+                $currentCount = count($registeredMACs);
+                
+                if ($autoCaptureMac && $currentCount < $maxDevices) {
+                    // Auto-capture new device within limit
+                    $this->addSubscriptionMAC($sub['id'], $normalizedCallingMac, 'Auto-captured device ' . ($currentCount + 1), true);
+                } else {
+                    // Reject - device limit reached or MAC not allowed
+                    $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 
+                        "MAC not authorized. Registered: " . implode(', ', $allowedMACs));
+                    return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Device not authorized'];
+                }
             }
+            
+            // Update last_seen for this MAC
+            $this->db->prepare("UPDATE radius_subscription_macs SET last_seen = CURRENT_TIMESTAMP WHERE subscription_id = ? AND mac_address = ?")
+                ->execute([$sub['id'], $normalizedCallingMac]);
         }
         
         // Check if expired
