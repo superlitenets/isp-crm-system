@@ -15,18 +15,13 @@ Add these volume mounts to your FreeRADIUS container in `docker-compose.yml`:
 
 ```yaml
 freeradius:
-  image: freeradius/freeradius-server:latest
   volumes:
-    - ./freeradius/sites-enabled/default:/etc/freeradius/sites-enabled/default:ro
-    - ./freeradius/mods-enabled/sql:/etc/freeradius/mods-enabled/sql:ro
-    - ./freeradius/queries.conf:/etc/freeradius/mods-config/sql/main/postgresql/queries.conf:ro
-    - ./freeradius/policy.d/unknown-users:/etc/freeradius/policy.d/unknown-users:ro
-  environment:
-    - ENV_DB_HOST=isp_crm_db
-    - ENV_DB_USER=crm
-    - ENV_DB_PASSWORD=your_password
-    - ENV_DB_NAME=isp_crm
+    - ./freeradius/sites-enabled/default:/etc/freeradius/3.0/sites-enabled/default:ro
+    - ./freeradius/mods-enabled/sql:/etc/freeradius/3.0/mods-enabled/sql:ro
+    - ./freeradius/policy.d/unknown-users:/etc/freeradius/3.0/policy.d/unknown-users:ro
 ```
+
+Note: FreeRADIUS 3.x uses `/etc/freeradius/3.0/` as config path.
 
 After updating, restart FreeRADIUS:
 ```bash
