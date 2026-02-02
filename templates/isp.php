@@ -92,6 +92,41 @@ if ($action === 'preview_bulk_sms') {
     exit;
 }
 
+if ($action === 'search_subscribers') {
+    header('Content-Type: application/json');
+    
+    $search = trim($_GET['q'] ?? '');
+    $activeOnly = isset($_GET['active_only']);
+    
+    $query = "
+        SELECT s.id, s.username, s.status, c.name as customer_name, c.phone as customer_phone
+        FROM radius_subscriptions s
+        LEFT JOIN customers c ON s.customer_id = c.id
+        WHERE 1=1
+    ";
+    $params = [];
+    
+    if ($activeOnly) {
+        $query .= " AND s.status IN ('active', 'grace')";
+    }
+    
+    if ($search) {
+        $query .= " AND (s.username ILIKE ? OR c.name ILIKE ? OR c.phone ILIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+    
+    $query .= " ORDER BY c.name, s.username LIMIT 100";
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute($params);
+    $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['success' => true, 'subscribers' => $subscribers]);
+    exit;
+}
+
 if ($action === 'stk_push') {
     header('Content-Type: application/json');
     
@@ -280,6 +315,74 @@ if ($action === 'get_live_traffic') {
     exit;
 }
 
+if ($action === 'link_onu') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $subscriptionId = (int)($input['subscription_id'] ?? 0);
+    $onuId = $input['onu_id'] !== null ? (int)$input['onu_id'] : null;
+    
+    if (!$subscriptionId) {
+        echo json_encode(['success' => false, 'error' => 'Subscription ID required']);
+        exit;
+    }
+    
+    // Verify ONU exists if provided
+    if ($onuId !== null && $onuId > 0) {
+        $stmt = $db->prepare("SELECT id, name, serial_number, genieacs_id FROM huawei_onus WHERE id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$onu) {
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
+            exit;
+        }
+        if (empty($onu['genieacs_id'])) {
+            echo json_encode(['success' => false, 'error' => 'This ONU does not have a GenieACS device ID. Please configure TR-069 for this ONU first.']);
+            exit;
+        }
+    }
+    
+    $stmt = $db->prepare("UPDATE radius_subscriptions SET huawei_onu_id = ? WHERE id = ?");
+    $stmt->execute([$onuId > 0 ? $onuId : null, $subscriptionId]);
+    
+    echo json_encode(['success' => true, 'message' => $onuId ? 'ONU linked successfully' : 'ONU unlinked']);
+    exit;
+}
+
+if ($action === 'search_onus') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $search = trim($_GET['q'] ?? '');
+    
+    $query = "SELECT id, name, serial_number, genieacs_id, status FROM huawei_onus WHERE genieacs_id IS NOT NULL AND genieacs_id != ''";
+    $params = [];
+    
+    if ($search) {
+        $query .= " AND (name ILIKE ? OR serial_number ILIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+    
+    $query .= " ORDER BY name ASC LIMIT 50";
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute($params);
+    $onus = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['success' => true, 'onus' => $onus]);
+    exit;
+}
+
 if ($action === 'get_wifi_config') {
     header('Content-Type: application/json');
     
@@ -290,7 +393,13 @@ if ($action === 'get_wifi_config') {
     
     $subscriptionId = (int)($_GET['subscription_id'] ?? 0);
     
-    $stmt = $db->prepare("SELECT s.*, c.phone as customer_phone FROM radius_subscriptions s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?");
+    $stmt = $db->prepare("
+        SELECT s.*, c.phone as customer_phone, ho.genieacs_id as onu_genieacs_id, ho.name as onu_name
+        FROM radius_subscriptions s 
+        LEFT JOIN customers c ON s.customer_id = c.id 
+        LEFT JOIN huawei_onus ho ON s.huawei_onu_id = ho.id
+        WHERE s.id = ?
+    ");
     $stmt->execute([$subscriptionId]);
     $sub = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -300,17 +409,27 @@ if ($action === 'get_wifi_config') {
     }
     
     $deviceId = null;
-    $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
-    if ($phone && strlen($phone) >= 9) {
-        $phoneSearch = '%' . substr($phone, -9) . '%';
-        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
-        $stmt->execute([$phoneSearch, $phoneSearch]);
-        $device = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($device) {
-            $deviceId = $device['_id'];
+    
+    // First priority: linked ONU's GenieACS ID
+    if (!empty($sub['onu_genieacs_id'])) {
+        $deviceId = $sub['onu_genieacs_id'];
+    }
+    
+    // Second: try to find by customer phone
+    if (!$deviceId) {
+        $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
+        if ($phone && strlen($phone) >= 9) {
+            $phoneSearch = '%' . substr($phone, -9) . '%';
+            $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+            $stmt->execute([$phoneSearch, $phoneSearch]);
+            $device = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($device) {
+                $deviceId = $device['_id'];
+            }
         }
     }
     
+    // Third: try to find by MAC address
     if (!$deviceId && $sub['mac_address']) {
         $macSearch = '%' . strtoupper(str_replace([':', '-'], '', $sub['mac_address'])) . '%';
         $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
@@ -322,7 +441,7 @@ if ($action === 'get_wifi_config') {
     }
     
     if (!$deviceId) {
-        echo json_encode(['success' => false, 'error' => 'No TR-069 device found for this subscriber. Device may not be registered in GenieACS.']);
+        echo json_encode(['success' => false, 'error' => 'No TR-069 device found. Please link an ONU to this subscriber in the Device section below.', 'no_onu' => true]);
         exit;
     }
     
@@ -405,7 +524,13 @@ if ($action === 'set_wifi_config') {
         exit;
     }
     
-    $stmt = $db->prepare("SELECT s.*, c.phone as customer_phone FROM radius_subscriptions s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?");
+    $stmt = $db->prepare("
+        SELECT s.*, c.phone as customer_phone, ho.genieacs_id as onu_genieacs_id
+        FROM radius_subscriptions s 
+        LEFT JOIN customers c ON s.customer_id = c.id 
+        LEFT JOIN huawei_onus ho ON s.huawei_onu_id = ho.id
+        WHERE s.id = ?
+    ");
     $stmt->execute([$subscriptionId]);
     $sub = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -415,17 +540,27 @@ if ($action === 'set_wifi_config') {
     }
     
     $deviceId = null;
-    $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
-    if ($phone && strlen($phone) >= 9) {
-        $phoneSearch = '%' . substr($phone, -9) . '%';
-        $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
-        $stmt->execute([$phoneSearch, $phoneSearch]);
-        $device = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($device) {
-            $deviceId = $device['_id'];
+    
+    // First priority: linked ONU's GenieACS ID
+    if (!empty($sub['onu_genieacs_id'])) {
+        $deviceId = $sub['onu_genieacs_id'];
+    }
+    
+    // Second: try to find by customer phone
+    if (!$deviceId) {
+        $phone = preg_replace('/[^0-9]/', '', $sub['customer_phone'] ?? '');
+        if ($phone && strlen($phone) >= 9) {
+            $phoneSearch = '%' . substr($phone, -9) . '%';
+            $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? OR CAST(serial_number AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
+            $stmt->execute([$phoneSearch, $phoneSearch]);
+            $device = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($device) {
+                $deviceId = $device['_id'];
+            }
         }
     }
     
+    // Third: try to find by MAC address
     if (!$deviceId && $sub['mac_address']) {
         $macSearch = '%' . strtoupper(str_replace([':', '-'], '', $sub['mac_address'])) . '%';
         $stmt = $db->prepare("SELECT _id FROM genieacs_devices WHERE CAST(_deviceid AS TEXT) ILIKE ? ORDER BY last_inform DESC LIMIT 1");
@@ -3143,6 +3278,14 @@ try {
                 
                 // Get auth logs (login attempts with accept/reject status)
                 $authLogs = $radiusBilling->getAuthLogs($subId, 20);
+                
+                // Get linked ONU information
+                $linkedOnu = null;
+                if (!empty($subscriber['huawei_onu_id'])) {
+                    $stmt = $db->prepare("SELECT id, name, serial_number, genieacs_id, status FROM huawei_onus WHERE id = ?");
+                    $stmt->execute([$subscriber['huawei_onu_id']]);
+                    $linkedOnu = $stmt->fetch(PDO::FETCH_ASSOC);
+                }
                 
                 // Get tickets for this customer
                 $tickets = [];

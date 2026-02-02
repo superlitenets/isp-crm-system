@@ -1522,6 +1522,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $customerMode = $_POST['customer_mode'] ?? 'existing';
                 $createCustomer = ($_POST['create_customer'] ?? '0') === '1';
                 $billingCustomerId = !empty($_POST['billing_customer_id']) ? (int)$_POST['billing_customer_id'] : null;
+                $radiusSubscriptionId = !empty($_POST['radius_subscription_id']) ? (int)$_POST['radius_subscription_id'] : null;
                 
                 // Create new customer if requested
                 if ($createCustomer && !$customerId) {
@@ -1662,6 +1663,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         }
                     } catch (Exception $e) {
                         $authMessages[] = "TR-069 setup: " . $e->getMessage();
+                    }
+                }
+                
+                // Link to RADIUS subscription if specified
+                if ($radiusSubscriptionId && $onuId) {
+                    try {
+                        $linkStmt = $db->prepare("UPDATE radius_subscriptions SET huawei_onu_id = ? WHERE id = ?");
+                        $linkStmt->execute([$onuId, $radiusSubscriptionId]);
+                        $authMessages[] = "Linked to RADIUS subscriber";
+                    } catch (Exception $e) {
+                        $authMessages[] = "RADIUS link failed: " . $e->getMessage();
                     }
                 }
                 
@@ -15659,6 +15671,14 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <small class="text-muted">Bridge mode configures all LAN ports as bridged. Can be changed later under Ethernet Ports.</small>
                         </div>
                         
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-wifi text-success me-1"></i>Link to RADIUS Subscriber</label>
+                            <select name="radius_subscription_id" id="authRadiusSubscriptionId" class="form-select">
+                                <option value="">-- Select to enable WiFi Config --</option>
+                            </select>
+                            <small class="text-muted">Link ONU for TR-069 WiFi configuration
+                        </div>
+                        
                         <div class="alert alert-secondary small mb-0">
                             <i class="bi bi-gear me-2"></i>
                             <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured. Installation date will be set to today.
@@ -19099,6 +19119,28 @@ function saveDeviceStatus() {
             authModeBridge.checked = true;
         }
         
+        // Load RADIUS subscribers
+        var radiusSelect = document.getElementById('authRadiusSubscriptionId');
+        if (radiusSelect) {
+            radiusSelect.innerHTML = '<option value="">Loading subscribers...</option>';
+            fetch('/index.php?page=isp&action=search_subscribers&active_only=1')
+                .then(r => r.json())
+                .then(data => {
+                    radiusSelect.innerHTML = '<option value="">-- Select to enable WiFi Config --</option>';
+                    if (data.success && data.subscribers) {
+                        data.subscribers.forEach(s => {
+                            var opt = document.createElement('option');
+                            opt.value = s.id;
+                            opt.textContent = s.username + (s.customer_name ? ' - ' + s.customer_name : '');
+                            radiusSelect.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(() => {
+                    radiusSelect.innerHTML = '<option value="">-- Select to enable WiFi Config --</option>';
+                });
+        }
+        
         new bootstrap.Modal(document.getElementById('authModal')).show();
     }
     
@@ -19174,6 +19216,28 @@ function saveDeviceStatus() {
                 });
         } else {
             vlanSelect.innerHTML = '<option value="">-- Select OLT first --</option>';
+        }
+        
+        // Load RADIUS subscribers
+        var radiusSelect = document.getElementById('authRadiusSubscriptionId');
+        if (radiusSelect) {
+            radiusSelect.innerHTML = '<option value="">Loading subscribers...</option>';
+            fetch('/index.php?page=isp&action=search_subscribers&active_only=1')
+                .then(r => r.json())
+                .then(data => {
+                    radiusSelect.innerHTML = '<option value="">-- Select to enable WiFi Config --</option>';
+                    if (data.success && data.subscribers) {
+                        data.subscribers.forEach(s => {
+                            var opt = document.createElement('option');
+                            opt.value = s.id;
+                            opt.textContent = s.username + (s.customer_name ? ' - ' + s.customer_name : '');
+                            radiusSelect.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(() => {
+                    radiusSelect.innerHTML = '<option value="">-- Select to enable WiFi Config --</option>';
+                });
         }
         
         new bootstrap.Modal(document.getElementById('authModal')).show();
