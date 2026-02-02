@@ -3,7 +3,8 @@
 # This DEFAULT entry catches unknown users and accepts them with expired pool
 
 # Catch-all for unknown users - MUST be at bottom
-DEFAULT Auth-Type := Accept
+# Only applies when SQL did NOT find a Cleartext-Password (unknown user)
+DEFAULT Cleartext-Password !* ANY, Auth-Type := Accept
     Framed-Pool := "expired-pool",
     Mikrotik-Rate-Limit := "128k/128k",
     Mikrotik-Group := "expired",
