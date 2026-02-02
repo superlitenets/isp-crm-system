@@ -2690,7 +2690,9 @@ try {
                                     <th style="width: 40px;">
                                         <input type="checkbox" class="form-check-input" id="selectAllSubs" onchange="toggleSelectAll(this)">
                                     </th>
-                                    <th>Subscriber</th>
+                                    <th>Username</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
                                     <th>Zone</th>
                                     <th>Package</th>
                                     <th>IP Address</th>
@@ -2736,33 +2738,28 @@ try {
                                         <input type="checkbox" class="form-check-input sub-checkbox" value="<?= $sub['id'] ?>" onchange="updateBulkCount()">
                                     </td>
                                     <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="me-2 position-relative">
-                                                <?php if ($isOnline): ?>
-                                                <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                                    <i class="bi bi-wifi text-white"></i>
-                                                </div>
-                                                <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 12px; height: 12px;"></span>
-                                                <?php else: ?>
-                                                <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                                    <i class="bi bi-wifi-off text-secondary"></i>
-                                                </div>
-                                                <?php endif; ?>
-                                            </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <?php if ($isOnline): ?>
+                                            <span class="badge bg-success rounded-circle p-1" title="Online"><i class="bi bi-wifi"></i></span>
+                                            <?php else: ?>
+                                            <span class="badge bg-secondary-subtle text-secondary rounded-circle p-1" title="Offline"><i class="bi bi-wifi-off"></i></span>
+                                            <?php endif; ?>
                                             <div>
-                                                <div class="d-flex align-items-center gap-1">
-                                                    <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="fw-bold text-decoration-none"><?= htmlspecialchars($sub['username']) ?></a>
-                                                    <button class="btn btn-link btn-sm p-0 text-muted" onclick="copyToClipboard('<?= htmlspecialchars($sub['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
-                                                </div>
-                                                <div class="small text-muted"><?= htmlspecialchars($sub['customer_name'] ?? 'No customer') ?></div>
-                                                <?php if (!empty($sub['customer_phone'])): ?>
-                                                <div class="small">
-                                                    <a href="tel:<?= htmlspecialchars($sub['customer_phone']) ?>" class="text-decoration-none text-muted"><i class="bi bi-telephone"></i> <?= htmlspecialchars($sub['customer_phone']) ?></a>
-                                                    <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $sub['customer_phone']) ?>" target="_blank" class="text-success ms-1" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
-                                                </div>
-                                                <?php endif; ?>
+                                                <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="fw-bold text-decoration-none"><?= htmlspecialchars($sub['username']) ?></a>
+                                                <button class="btn btn-link btn-sm p-0 text-muted ms-1" onclick="copyToClipboard('<?= htmlspecialchars($sub['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
                                             </div>
                                         </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-truncate" style="max-width: 150px; display: inline-block;"><?= htmlspecialchars($sub['customer_name'] ?? '-') ?></span>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($sub['customer_phone'])): ?>
+                                        <a href="tel:<?= htmlspecialchars($sub['customer_phone']) ?>" class="text-decoration-none"><?= htmlspecialchars($sub['customer_phone']) ?></a>
+                                        <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $sub['customer_phone']) ?>" target="_blank" class="text-success ms-1" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php if (!empty($sub['zone_name']) || !empty($sub['subzone_name'])): ?>
