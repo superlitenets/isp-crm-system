@@ -6345,9 +6345,14 @@ class HuaweiOLT {
         $oltId = $onu['olt_id'];
         $equipmentId = $this->getOnuEquipmentId($onuId);
         
+        // Log equipment ID detection for debugging
+        error_log("[AuthStage1] ONU {$onuId} (SN: {$onu['sn']}) - Equipment ID: " . ($equipmentId ?: 'NULL'));
+        
         // Get line and service profiles (SmartOLT-style: ONU type as service profile)
         $lineProfile = $this->getDefaultOltLineProfile($oltId);
         $lineProfileId = $lineProfile['id'];
+        
+        error_log("[AuthStage1] Default line profile: ID={$lineProfileId}, Name={$lineProfile['name']}");
         
         $srvProfileId = null;
         $usedProfileName = null;
@@ -6355,8 +6360,10 @@ class HuaweiOLT {
         
         if ($equipmentId) {
             $oltSrvProfile = $this->getOltSrvProfileByOnuType($oltId, $equipmentId);
+            error_log("[AuthStage1] OLT srv profile lookup for '{$equipmentId}': " . ($oltSrvProfile ? "Found ID={$oltSrvProfile['id']}" : "NOT FOUND"));
             
             if (!$oltSrvProfile) {
+                error_log("[AuthStage1] Attempting to create service profile for '{$equipmentId}'");
                 $oltSrvProfile = $this->createOltSrvProfileForOnuType($oltId, $equipmentId);
             }
             
@@ -6364,17 +6371,20 @@ class HuaweiOLT {
                 $srvProfileId = $oltSrvProfile['id'];
                 $usedProfileName = $oltSrvProfile['name'] ?? $equipmentId;
                 $profileSource = 'olt-matched';
+                error_log("[AuthStage1] Using OLT-matched profile: ID={$srvProfileId}, Name={$usedProfileName}");
             }
         }
         
         // Fallback to CRM profile
         if ($srvProfileId === null && $profileId > 0) {
+            error_log("[AuthStage1] Falling back to CRM profile ID {$profileId}");
             $crmProfile = $this->getServiceProfile($profileId);
             if ($crmProfile) {
                 $lineProfileId = !empty($crmProfile['line_profile']) ? (int)$crmProfile['line_profile'] : $lineProfileId;
                 $srvProfileId = !empty($crmProfile['srv_profile']) ? (int)$crmProfile['srv_profile'] : null;
                 $usedProfileName = $crmProfile['name'] ?? 'CRM Profile';
                 $profileSource = 'crm-fallback';
+                error_log("[AuthStage1] CRM fallback: line={$lineProfileId}, srv={$srvProfileId}, name={$usedProfileName}");
             }
         }
         
@@ -6427,7 +6437,9 @@ class HuaweiOLT {
             $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
             
             // ==== STAGE 1A: AUTHORIZE ONU ====
+            error_log("[AuthStage1] FINAL: lineProfile={$lineProfileId}, srvProfile={$srvProfileId}, source={$profileSource}");
             $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$assignedOnuId} {$authPart} omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"\r\nquit";
+            error_log("[AuthStage1] CLI Script: " . str_replace("\r\n", " | ", $cliScript));
             
             $result = $this->executeCommand($oltId, $cliScript);
             $output = $result['output'] ?? '';
