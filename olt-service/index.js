@@ -89,6 +89,34 @@ app.post('/execute-async', async (req, res) => {
     }
 });
 
+app.post('/pause-discovery', async (req, res) => {
+    try {
+        const { oltId, duration } = req.body;
+        if (!oltId) {
+            return res.status(400).json({ success: false, error: 'Missing oltId' });
+        }
+        const durationMs = duration || 60000;
+        discoveryWorker.pauseOlt(oltId, durationMs);
+        res.json({ success: true, message: `Discovery paused for OLT ${oltId} for ${durationMs}ms` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/resume-discovery', async (req, res) => {
+    try {
+        const { oltId } = req.body;
+        if (!oltId) {
+            return res.status(400).json({ success: false, error: 'Missing oltId' });
+        }
+        discoveryWorker.pausedOlts.delete(oltId);
+        console.log(`[Discovery] Manually resumed OLT ${oltId}`);
+        res.json({ success: true, message: `Discovery resumed for OLT ${oltId}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.post('/execute-batch', async (req, res) => {
     try {
         const { oltId, commands, timeout } = req.body;

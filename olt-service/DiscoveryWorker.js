@@ -13,10 +13,25 @@ class DiscoveryWorker {
             client.query("SET timezone TO 'Africa/Nairobi'");
         });
         this.isRunning = false;
+        this.isPaused = false;
+        this.pausedOlts = new Set();
         this.phpApiUrl = process.env.PHP_API_URL || 'http://localhost:5000';
         this.cronJob = null;
         this.smartOltSerials = new Set();
         this.smartOltCacheTime = 0;
+    }
+    
+    pauseOlt(oltId, durationMs = 30000) {
+        this.pausedOlts.add(oltId);
+        console.log(`[Discovery] Paused OLT ${oltId} for ${durationMs}ms (authorization in progress)`);
+        setTimeout(() => {
+            this.pausedOlts.delete(oltId);
+            console.log(`[Discovery] Resumed OLT ${oltId}`);
+        }, durationMs);
+    }
+    
+    isOltPaused(oltId) {
+        return this.pausedOlts.has(oltId);
     }
 
     start(schedule = '*/30 * * * * *') {
@@ -85,6 +100,12 @@ class DiscoveryWorker {
     }
 
     async discoverOlt(olt) {
+        // Skip if OLT is paused (authorization in progress)
+        if (this.isOltPaused(olt.id)) {
+            console.log(`[Discovery] Skipping OLT ${olt.name} - paused for authorization`);
+            return;
+        }
+        
         console.log(`[Discovery] Checking OLT: ${olt.name} (${olt.ip_address})`);
 
         // Try SNMP first for faster, non-blocking discovery

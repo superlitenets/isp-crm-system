@@ -5799,6 +5799,47 @@ class HuaweiOLT {
         return ['success' => false, 'message' => $result['error'] ?? 'Command execution failed'];
     }
     
+    public function pauseDiscovery(int $oltId, int $durationMs = 60000): bool {
+        $url = $this->getOLTServiceUrl() . '/pause-discovery';
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+            'oltId' => (string)$oltId,
+            'duration' => $durationMs
+        ]));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        
+        $response = curl_exec($ch);
+        curl_close($ch);
+        
+        $result = json_decode($response, true);
+        return $result['success'] ?? false;
+    }
+    
+    public function resumeDiscovery(int $oltId): bool {
+        $url = $this->getOLTServiceUrl() . '/resume-discovery';
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+            'oltId' => (string)$oltId
+        ]));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        
+        $response = curl_exec($ch);
+        curl_close($ch);
+        
+        $result = json_decode($response, true);
+        return $result['success'] ?? false;
+    }
+    
     public function executeAsyncViaService(int $oltId, string $command, int $timeout = 30000): array {
         // Quick session check and connect if needed
         $status = $this->getOLTSessionStatusFast($oltId);
@@ -6076,6 +6117,10 @@ class HuaweiOLT {
         }
         
         $oltId = $onu['olt_id'];
+        
+        // Pause discovery during authorization to prevent command interleaving
+        $this->pauseDiscovery($oltId, 90000);
+        
         $equipmentId = $this->getOnuEquipmentId($onuId);
         
         // SmartOLT-style provisioning: Use ONU type as service profile
@@ -6122,6 +6167,7 @@ class HuaweiOLT {
         }
         
         if ($srvProfileId === null) {
+            $this->resumeDiscovery($oltId);
             return ['success' => false, 'message' => "Failed to create service profile for ONU type '{$equipmentId}'. Check OLT connection and try again."];
         }
         
@@ -6347,6 +6393,9 @@ class HuaweiOLT {
             error_log("Failed to update discovery log for {$onu['sn']}: " . $e->getMessage());
         }
         
+        // Resume discovery after authorization completes
+        $this->resumeDiscovery($oltId);
+        
         return [
             'success' => true,
             'message' => $statusMessage,
@@ -6378,6 +6427,10 @@ class HuaweiOLT {
         }
         
         $oltId = $onu['olt_id'];
+        
+        // Pause discovery during authorization to prevent command interleaving
+        $this->pauseDiscovery($oltId, 90000);
+        
         $equipmentId = $this->getOnuEquipmentId($onuId);
         
         // Log equipment ID detection for debugging
@@ -6424,6 +6477,7 @@ class HuaweiOLT {
         }
         
         if ($srvProfileId === null) {
+            $this->resumeDiscovery($oltId);
             return ['success' => false, 'stage' => 1, 'message' => "Failed to find/create service profile for ONU type '{$equipmentId}'"];
         }
         
@@ -6509,6 +6563,7 @@ class HuaweiOLT {
                     'command_sent' => $cliScript, 'command_response' => $output,
                     'user_id' => $_SESSION['user_id'] ?? null
                 ]);
+                $this->resumeDiscovery($oltId);
                 return ['success' => false, 'stage' => 1, 'message' => 'Authorization failed: ' . substr($output, 0, 200), 'output' => $output];
             }
         }
@@ -6621,6 +6676,9 @@ class HuaweiOLT {
             'command_sent' => $cliScript, 'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
+        
+        // Resume discovery after Stage 1 completes
+        $this->resumeDiscovery($oltId);
         
         return [
             'success' => true,
