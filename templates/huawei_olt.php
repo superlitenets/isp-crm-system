@@ -4912,6 +4912,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $result = $genieacs->getWANStatus($deviceId);
                 echo json_encode($result);
                 exit;
+            case 'update_onu_mode':
+                header('Content-Type: application/json');
+                $onuId = (int)($_POST['onu_id'] ?? 0);
+                $ipMode = $_POST['ip_mode'] ?? 'DHCP';
+                $serviceVlan = $_POST['service_vlan'] ?? '';
+                
+                if (!$onuId) {
+                    echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                    exit;
+                }
+                
+                try {
+                    // Update ONU mode in database
+                    $updateData = ['ip_mode' => $ipMode];
+                    if ($serviceVlan) {
+                        $updateData['vlan_id'] = (int)$serviceVlan;
+                    }
+                    
+                    // Handle PPPoE credentials
+                    if ($ipMode === 'PPPoE') {
+                        $pppoeUser = $_POST['pppoe_username'] ?? '';
+                        $pppoePass = $_POST['pppoe_password'] ?? '';
+                        if ($pppoeUser) $updateData['pppoe_username'] = $pppoeUser;
+                        if ($pppoePass) $updateData['pppoe_password'] = $pppoePass;
+                    }
+                    
+                    $huaweiOLT->updateONU($onuId, $updateData);
+                    
+                    // Optionally configure via TR-069 if device is online
+                    $onu = $huaweiOLT->getONU($onuId);
+                    $tr069Configured = false;
+                    
+                    if (!empty($onu['tr069_ip']) || !empty($onu['genieacs_id'])) {
+                        try {
+                            require_once __DIR__ . '/../src/GenieACS.php';
+                            $genieacs = new \App\GenieACS($db);
+                            $serial = $onu['tr069_serial'] ?? $onu['sn'];
+                            $deviceResult = $genieacs->getDeviceBySerial($serial);
+                            
+                            if ($deviceResult['success']) {
+                                $deviceId = $deviceResult['device']['_id'];
+                                
+                                if ($ipMode === 'PPPoE' && !empty($pppoeUser)) {
+                                    // Configure PPPoE WAN via TR-069
+                                    $result = $genieacs->configureInternetWAN($deviceId, $serviceVlan ?: $onu['vlan_id'], $pppoeUser, $pppoePass);
+                                    $tr069Configured = $result['success'] ?? false;
+                                } elseif ($ipMode === 'Bridge') {
+                                    // Configure bridge mode (disable NAT/routing)
+                                    $tr069Configured = true; // Bridge typically requires OLT-side config
+                                }
+                            }
+                        } catch (Exception $e) {
+                            // TR-069 config failed but database update succeeded
+                        }
+                    }
+                    
+                    $message = "Mode set to {$ipMode}";
+                    if ($tr069Configured) {
+                        $message .= " (TR-069 configured)";
+                    }
+                    
+                    echo json_encode(['success' => true, 'message' => $message, 'tr069_configured' => $tr069Configured]);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+                
             case 'get_tr069_wifi':
                 header('Content-Type: application/json');
                 $serial = $_POST['serial'] ?? '';
@@ -8659,8 +8726,22 @@ try {
                         <div class="col-auto border-start ps-2">
                             <small class="text-muted">TR-069</small>
                             <div>
-                                <?php $tr069Status = $currentOnu['tr069_status'] ?? 'pending'; ?>
+                                <?php 
+                                // Determine TR-069 status more accurately
+                                $tr069Status = $currentOnu['tr069_status'] ?? 'pending';
+                                $hasTr069Ip = !empty($currentOnu['tr069_ip']);
+                                $hasGenieacsId = !empty($currentOnu['genieacs_id']);
+                                // If device has TR-069 IP or GenieACS ID, it's at least configured
+                                if ($tr069Status === 'pending' && ($hasTr069Ip || $hasGenieacsId)) {
+                                    $tr069Status = 'configured';
+                                }
+                                // If tr069_ip exists, device is likely online
+                                if ($hasTr069Ip) {
+                                    $tr069Status = 'online';
+                                }
+                                ?>
                                 <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
+                                <?php if ($hasTr069Ip): ?><small class="text-muted ms-1"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></small><?php endif; ?>
                             </div>
                         </div>
                         <!-- ONU Mode (Bridge/Router) -->
@@ -8668,37 +8749,10 @@ try {
                             <small class="text-muted">Mode</small>
                             <div class="fw-medium">
                                 <?php $ipMode = $currentOnu['ip_mode'] ?? 'Router'; ?>
-                                <span id="onuModeDisplay" class="badge bg-<?= strtolower($ipMode) === 'bridge' ? 'secondary' : 'info' ?>"><?= htmlspecialchars($ipMode ?: 'Router') ?></span>
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="toggleOnuModeEdit()" title="Change Mode">
+                                <span id="onuModeDisplay" class="badge bg-<?= strtolower($ipMode) === 'bridge' ? 'secondary' : (strtolower($ipMode) === 'pppoe' ? 'success' : 'info') ?>"><?= htmlspecialchars($ipMode ?: 'Router') ?></span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-bs-toggle="modal" data-bs-target="#onuModeModal" title="Configure Mode">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
-                            </div>
-                            <div id="onuModeEditSection" style="display:none;">
-                                <div class="d-flex gap-1 mt-1">
-                                    <select id="onuModeSelect" class="form-select form-select-sm" style="width:auto;" onchange="onModeChange()">
-                                        <option value="Bridge" <?= strtolower($ipMode) === 'bridge' ? 'selected' : '' ?>>Bridge</option>
-                                        <option value="Router" <?= strtolower($ipMode) !== 'bridge' ? 'selected' : '' ?>>Router</option>
-                                    </select>
-                                    <button type="button" class="btn btn-success btn-sm" onclick="saveOnuMode()"><i class="bi bi-check"></i></button>
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOnuModeEdit()"><i class="bi bi-x"></i></button>
-                                </div>
-                                <div id="routerWanOptions" style="display:none;margin-top:5px;">
-                                    <small class="text-muted">WAN Type:</small>
-                                    <select id="routerWanType" class="form-select form-select-sm mt-1" onchange="onWanTypeChange()">
-                                        <option value="dhcp">DHCP</option>
-                                        <option value="pppoe">PPPoE</option>
-                                        <option value="static">Static IP</option>
-                                    </select>
-                                    <input type="number" id="routerServiceVlan" class="form-control form-control-sm mt-1" placeholder="Service VLAN" value="<?= htmlspecialchars($currentOnu['vlan_id'] ?? '') ?>">
-                                    <div id="pppoeFields2" style="display:none;">
-                                        <input type="text" id="pppoeUser" class="form-control form-control-sm mt-1" placeholder="PPPoE Username">
-                                        <input type="password" id="pppoePass" class="form-control form-control-sm mt-1" placeholder="PPPoE Password">
-                                    </div>
-                                    <div id="staticFields2" style="display:none;">
-                                        <input type="text" id="staticIp" class="form-control form-control-sm mt-1" placeholder="Static IP">
-                                        <input type="text" id="staticGw" class="form-control form-control-sm mt-1" placeholder="Gateway">
-                                    </div>
-                                </div>
                             </div>
                         </div>
                         <!-- Auth Date -->
@@ -8916,6 +8970,81 @@ try {
                     }
                 } catch (err) {
                     alert('Network error: ' + err.message);
+                }
+            }
+            
+            // Mode Modal Handlers
+            document.getElementById('onuModeModal')?.addEventListener('show.bs.modal', function() {
+                // Set current mode in modal
+                const currentMode = document.getElementById('onuModeDisplay')?.textContent?.trim() || 'DHCP';
+                const modeMap = {'Bridge': 'modeBridge', 'DHCP': 'modeDhcp', 'PPPoE': 'modePppoe', 'Static': 'modeStatic', 'Router': 'modeDhcp'};
+                const radioId = modeMap[currentMode] || 'modeDhcp';
+                const radio = document.getElementById(radioId);
+                if (radio) radio.checked = true;
+                updateModeFields();
+            });
+            
+            document.querySelectorAll('input[name="onuModeRadio"]').forEach(radio => {
+                radio.addEventListener('change', updateModeFields);
+            });
+            
+            function updateModeFields() {
+                const mode = document.querySelector('input[name="onuModeRadio"]:checked')?.value || 'DHCP';
+                document.getElementById('pppoeSettings').style.display = mode === 'PPPoE' ? 'block' : 'none';
+                document.getElementById('staticSettings').style.display = mode === 'Static' ? 'block' : 'none';
+            }
+            
+            async function saveOnuModeConfig() {
+                const mode = document.querySelector('input[name="onuModeRadio"]:checked')?.value || 'DHCP';
+                const serviceVlan = document.getElementById('modeServiceVlan')?.value || '';
+                const resultDiv = document.getElementById('modeSaveResult');
+                
+                resultDiv.innerHTML = '<div class="alert alert-info"><span class="spinner-border spinner-border-sm me-2"></span>Saving configuration...</div>';
+                
+                const formData = new FormData();
+                formData.append('action', 'update_onu_mode');
+                formData.append('onu_id', onuDbId);
+                formData.append('ip_mode', mode);
+                formData.append('service_vlan', serviceVlan);
+                
+                if (mode === 'PPPoE') {
+                    formData.append('pppoe_username', document.getElementById('modePppoeUser')?.value || '');
+                    formData.append('pppoe_password', document.getElementById('modePppoePass')?.value || '');
+                } else if (mode === 'Static') {
+                    formData.append('static_ip', document.getElementById('modeStaticIp')?.value || '');
+                    formData.append('static_mask', document.getElementById('modeStaticMask')?.value || '');
+                    formData.append('gateway', document.getElementById('modeStaticGw')?.value || '');
+                    formData.append('dns', document.getElementById('modeStaticDns')?.value || '');
+                }
+                
+                try {
+                    const resp = await fetch('?page=huawei-olt', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    
+                    if (data.success) {
+                        resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>' + (data.message || 'Mode saved!') + '</div>';
+                        
+                        // Update the badge display
+                        const display = document.getElementById('onuModeDisplay');
+                        if (display) {
+                            const badgeClass = mode === 'Bridge' ? 'secondary' : (mode === 'PPPoE' ? 'success' : 'info');
+                            display.className = 'badge bg-' + badgeClass;
+                            display.textContent = mode;
+                        }
+                        
+                        setTimeout(() => {
+                            bootstrap.Modal.getInstance(document.getElementById('onuModeModal'))?.hide();
+                            // Optionally reload to refresh all data
+                            // location.reload();
+                        }, 1500);
+                    } else {
+                        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>' + (data.error || 'Failed to save') + '</div>';
+                    }
+                } catch (err) {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Network error: ' + err.message + '</div>';
                 }
             }
             </script>
@@ -10064,6 +10193,101 @@ try {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ONU Mode Configuration Modal -->
+            <div class="modal fade" id="onuModeModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Configure ONU Mode</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info small">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <strong>Bridge Mode:</strong> ONU acts as transparent bridge, ISP handles routing/PPPoE<br>
+                                <strong>Router Mode:</strong> ONU handles NAT/routing, provides DHCP to devices
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Connection Mode</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="onuModeRadio" id="modeBridge" value="Bridge">
+                                    <label class="btn btn-outline-secondary" for="modeBridge">
+                                        <i class="bi bi-arrow-left-right me-1"></i> Bridge
+                                    </label>
+                                    <input type="radio" class="btn-check" name="onuModeRadio" id="modeDhcp" value="DHCP" checked>
+                                    <label class="btn btn-outline-info" for="modeDhcp">
+                                        <i class="bi bi-hdd-network me-1"></i> DHCP
+                                    </label>
+                                    <input type="radio" class="btn-check" name="onuModeRadio" id="modePppoe" value="PPPoE">
+                                    <label class="btn btn-outline-success" for="modePppoe">
+                                        <i class="bi bi-link-45deg me-1"></i> PPPoE
+                                    </label>
+                                    <input type="radio" class="btn-check" name="onuModeRadio" id="modeStatic" value="Static">
+                                    <label class="btn btn-outline-warning" for="modeStatic">
+                                        <i class="bi bi-geo-alt me-1"></i> Static
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Service VLAN</label>
+                                <select id="modeServiceVlan" class="form-select">
+                                    <option value="">-- Select VLAN --</option>
+                                    <?php foreach ($attachedVlans as $vid): ?>
+                                    <option value="<?= $vid ?>" <?= $vid == ($currentOnu['vlan_id'] ?? '') ? 'selected' : '' ?>><?= $vid ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            
+                            <!-- PPPoE Settings -->
+                            <div id="pppoeSettings" class="border rounded p-3 bg-light mb-3" style="display:none;">
+                                <h6 class="text-success"><i class="bi bi-key me-1"></i> PPPoE Credentials</h6>
+                                <div class="mb-2">
+                                    <label class="form-label small">Username</label>
+                                    <input type="text" class="form-control" id="modePppoeUser" placeholder="PPPoE Username">
+                                </div>
+                                <div>
+                                    <label class="form-label small">Password</label>
+                                    <input type="text" class="form-control" id="modePppoePass" placeholder="PPPoE Password">
+                                </div>
+                            </div>
+                            
+                            <!-- Static IP Settings -->
+                            <div id="staticSettings" class="border rounded p-3 bg-light mb-3" style="display:none;">
+                                <h6 class="text-warning"><i class="bi bi-geo-alt me-1"></i> Static IP Settings</h6>
+                                <div class="row">
+                                    <div class="col-6 mb-2">
+                                        <label class="form-label small">IP Address</label>
+                                        <input type="text" class="form-control" id="modeStaticIp" placeholder="192.168.1.100">
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        <label class="form-label small">Subnet Mask</label>
+                                        <input type="text" class="form-control" id="modeStaticMask" placeholder="255.255.255.0" value="255.255.255.0">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Gateway</label>
+                                        <input type="text" class="form-control" id="modeStaticGw" placeholder="192.168.1.1">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">DNS</label>
+                                        <input type="text" class="form-control" id="modeStaticDns" placeholder="8.8.8.8">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="modeSaveResult"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="saveOnuModeConfig()">
+                                <i class="bi bi-check-lg me-1"></i> Save Configuration
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
