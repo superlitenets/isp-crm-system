@@ -59,6 +59,20 @@ server default {
         pap
         chap
         mschap
+        
+        # Accept unknown users with expired-pool for captive portal
+        if (!&control:Auth-Type) {
+            update control {
+                Auth-Type := Accept
+            }
+            update reply {
+                Framed-Pool := "expired-pool"
+                Mikrotik-Rate-Limit := "128k/128k"
+                Session-Timeout := 300
+                Acct-Interim-Interval := 60
+                Reply-Message := "Unknown user - portal redirect"
+            }
+        }
     }
 
     authenticate {

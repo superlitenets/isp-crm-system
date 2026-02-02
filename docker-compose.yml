@@ -213,9 +213,6 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - ./freeradius/sites-enabled/default:/etc/freeradius/sites-enabled/default:ro
-      - ./freeradius/policy.d/unknown-users:/etc/freeradius/policy.d/unknown-users:ro
     networks:
       - crm_network
 
