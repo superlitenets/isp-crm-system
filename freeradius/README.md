@@ -16,12 +16,11 @@ Add these volume mounts to your FreeRADIUS container in `docker-compose.yml`:
 ```yaml
 freeradius:
   volumes:
-    - ./freeradius/sites-enabled/default:/etc/freeradius/3.0/sites-enabled/default:ro
-    - ./freeradius/mods-enabled/sql:/etc/freeradius/3.0/mods-enabled/sql:ro
-    - ./freeradius/policy.d/unknown-users:/etc/freeradius/3.0/policy.d/unknown-users:ro
+    - ./freeradius/sites-enabled/default:/etc/freeradius/sites-enabled/default:ro
+    - ./freeradius/policy.d/unknown-users:/etc/freeradius/policy.d/unknown-users:ro
 ```
 
-Note: FreeRADIUS 3.x uses `/etc/freeradius/3.0/` as config path.
+Note: Your Docker image uses `/etc/freeradius/` as config path.
 
 After updating, restart FreeRADIUS:
 ```bash
