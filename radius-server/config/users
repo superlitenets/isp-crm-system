@@ -1,13 +1,4 @@
 # User authorization file
 # Users are authenticated against the SQL database
-# This DEFAULT entry catches unknown users and accepts them with expired pool
-
-# Catch-all for unknown users - MUST be at bottom
-# Only applies when SQL did NOT find a Cleartext-Password (unknown user)
-DEFAULT Cleartext-Password !* ANY, Auth-Type := Accept
-    Framed-Pool := "expired-pool",
-    Mikrotik-Rate-Limit := "128k/128k",
-    Mikrotik-Group := "expired",
-    Session-Timeout := 300,
-    Acct-Interim-Interval := 60,
-    Reply-Message := "Account not found - redirecting to portal"
+# Unknown user handling is done in the site config using unlang
+# This file is intentionally empty to avoid conflicts with SQL auth

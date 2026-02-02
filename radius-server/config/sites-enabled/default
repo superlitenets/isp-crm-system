@@ -56,9 +56,20 @@ server default {
         # SQL first - looks up known users
         sql
         
-        # Files module with DEFAULT catch-all for unknown users
-        # This MUST come AFTER sql so known users get their attributes first
-        files
+        # If SQL didn't find the user (no password set), accept with expired pool
+        if (!&control:Cleartext-Password) {
+            update control {
+                Auth-Type := Accept
+            }
+            update reply {
+                Framed-Pool := "expired-pool"
+                Mikrotik-Rate-Limit := "128k/128k"
+                Mikrotik-Group := "expired"
+                Session-Timeout := 300
+                Acct-Interim-Interval := 60
+                Reply-Message := "Account not found - redirecting to portal"
+            }
+        }
         
         expiration
         logintime
