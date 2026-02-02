@@ -4017,26 +4017,61 @@ class HuaweiOLT {
         if (empty($output)) return null;
         
         $lines = explode("\n", $output);
+        $allProfiles = [];
         
-        // Parse profiles looking for matching ONU type
+        // Parse all profiles first
         // Format: "Profile-ID  Profile-name      Binding times"
         foreach ($lines as $line) {
             if (preg_match('/^\s*(\d+)\s+(\S+)\s+(\d+)\s*$/', trim($line), $matches)) {
-                $profileId = (int)$matches[1];
-                $profileName = $matches[2];
-                $bindingCount = (int)$matches[3];
-                
-                // Check if profile name matches ONU type (case-insensitive)
-                if (strcasecmp($profileName, $onuType) === 0) {
-                    return [
-                        'id' => $profileId,
-                        'name' => $profileName,
-                        'binding_count' => $bindingCount
-                    ];
+                $allProfiles[] = [
+                    'id' => (int)$matches[1],
+                    'name' => $matches[2],
+                    'binding_count' => (int)$matches[3]
+                ];
+            }
+        }
+        
+        // Pass 1: Exact match (case-insensitive)
+        foreach ($allProfiles as $profile) {
+            if (strcasecmp($profile['name'], $onuType) === 0) {
+                error_log("[ProfileMatch] Exact match: '{$onuType}' = '{$profile['name']}' (ID {$profile['id']})");
+                return $profile;
+            }
+        }
+        
+        // Pass 2: Profile name contains ONU type (e.g., "HG8546M" contains "546M")
+        foreach ($allProfiles as $profile) {
+            if (stripos($profile['name'], $onuType) !== false) {
+                error_log("[ProfileMatch] Partial match: '{$profile['name']}' contains '{$onuType}' (ID {$profile['id']})");
+                return $profile;
+            }
+        }
+        
+        // Pass 3: ONU type contains profile name (e.g., "HG8546M_V2" contains "HG8546M")
+        foreach ($allProfiles as $profile) {
+            if (stripos($onuType, $profile['name']) !== false) {
+                error_log("[ProfileMatch] Reverse partial match: '{$onuType}' contains '{$profile['name']}' (ID {$profile['id']})");
+                return $profile;
+            }
+        }
+        
+        // Pass 4: Fuzzy match - strip common Huawei prefixes and try again
+        $normalizedOnuType = preg_replace('/^(HG|EG|HS|ECHO|BH|WA|OptiXstar)/i', '', $onuType);
+        if ($normalizedOnuType !== $onuType && strlen($normalizedOnuType) >= 3) {
+            foreach ($allProfiles as $profile) {
+                $normalizedProfileName = preg_replace('/^(HG|EG|HS|ECHO|BH|WA|OptiXstar)/i', '', $profile['name']);
+                if (strcasecmp($normalizedProfileName, $normalizedOnuType) === 0) {
+                    error_log("[ProfileMatch] Normalized match: '{$onuType}' -> '{$normalizedOnuType}' = '{$normalizedProfileName}' <- '{$profile['name']}' (ID {$profile['id']})");
+                    return $profile;
+                }
+                if (stripos($normalizedProfileName, $normalizedOnuType) !== false || stripos($normalizedOnuType, $normalizedProfileName) !== false) {
+                    error_log("[ProfileMatch] Normalized partial match: '{$onuType}' ~ '{$profile['name']}' (ID {$profile['id']})");
+                    return $profile;
                 }
             }
         }
         
+        error_log("[ProfileMatch] No match found for '{$onuType}' among " . count($allProfiles) . " profiles");
         return null;
     }
     
