@@ -5529,6 +5529,7 @@ class HuaweiOLT {
             ];
             if ($vlanId) {
                 $updateData['vlan_id'] = $vlanId;
+                $updateData['attached_vlans'] = json_encode([$vlanId]);
             }
             $this->updateONU($onuDbId, $updateData);
             
@@ -6601,7 +6602,12 @@ class HuaweiOLT {
                 || ($spResult['success'] && !empty($servicePortOutput) && !preg_match('/does not exist|is not valid|Unrecognized command/i', $servicePortOutput));
             
             if ($servicePortSuccess) {
-                $this->updateONU($onuId, ['vlan_id' => $vlanId]);
+                // Update both vlan_id and attached_vlans
+                $attachedVlans = [$vlanId];
+                $this->updateONU($onuId, [
+                    'vlan_id' => $vlanId,
+                    'attached_vlans' => json_encode($attachedVlans)
+                ]);
             }
         }
         
