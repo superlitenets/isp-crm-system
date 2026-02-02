@@ -511,21 +511,24 @@ class DiscoveryWorker {
 
     async recordDiscovery(olt, onu) {
         try {
-            // Check if ONU is already authorized in huawei_onus
+            console.log(`[Discovery] Recording ONU ${onu.sn} on ${olt.name}`);
+            
+            // Check if ONU exists in huawei_onus
             const existingOnu = await this.pool.query(`
                 SELECT id, is_authorized FROM huawei_onus 
                 WHERE sn = $1 AND olt_id = $2
             `, [onu.sn, olt.id]);
             
-            const isAlreadyAuthorized = existingOnu.rows.length > 0 && existingOnu.rows[0].is_authorized;
-            
-            if (isAlreadyAuthorized) {
+            // If ONU appears in autofind, it's NOT actually authorized on the OLT
+            // Even if DB says is_authorized=true, the OLT autofind proves otherwise
+            // Reset the DB status to match OLT reality
+            if (existingOnu.rows.length > 0 && existingOnu.rows[0].is_authorized) {
+                console.log(`[Discovery] ${onu.sn} marked authorized in DB but found in autofind - resetting status`);
                 await this.pool.query(`
-                    UPDATE onu_discovery_log 
-                    SET authorized = true, authorized_at = COALESCE(authorized_at, CURRENT_TIMESTAMP)
-                    WHERE serial_number = $1 AND olt_id = $2
-                `, [onu.sn, olt.id]);
-                return;
+                    UPDATE huawei_onus 
+                    SET is_authorized = false, status = 'pending'
+                    WHERE id = $1
+                `, [existingOnu.rows[0].id]);
             }
 
             // Check if ONU is configured in SmartOLT
@@ -559,6 +562,7 @@ class DiscoveryWorker {
                     authorized = false,
                     notes = NULL
             `, [olt.id, onu.sn, onu.fsp, onu.eqid || null, onuTypeId]);
+            console.log(`[Discovery] Recorded ${onu.sn} to discovery log`);
         } catch (error) {
             console.error(`[Discovery] Error recording discovery:`, error.message);
         }
