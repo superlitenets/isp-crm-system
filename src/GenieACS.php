@@ -1039,7 +1039,10 @@ class GenieACS {
             $standard = $getValue($config, 'Standard');
             $beaconType = $getValue($config, 'BeaconType');
             $vlanId = $getValue($config, 'X_HW_VLANID') ?? $getValue($config, 'VLANID');
+            $vlanMode = $getValue($config, 'X_HW_VLANMode');
             $broadcast = $getValue($config, 'SSIDAdvertisementEnabled');
+            $accessMode = $getValue($config, 'X_HW_WlanAccessMode') ?? $getValue($config, 'X_HW_AccessMode');
+            $bindWan = $getValue($config, 'X_HW_BindWan');
             
             // Get password from nested PreSharedKey structure
             $password = null;
@@ -1054,7 +1057,10 @@ class GenieACS {
             $wifiData[] = ["{$basePath}.Standard", $standard];
             $wifiData[] = ["{$basePath}.BeaconType", $beaconType];
             $wifiData[] = ["{$basePath}.X_HW_VLANID", $vlanId];
+            $wifiData[] = ["{$basePath}.X_HW_VLANMode", $vlanMode];
             $wifiData[] = ["{$basePath}.SSIDAdvertisementEnabled", $broadcast];
+            $wifiData[] = ["{$basePath}.X_HW_WlanAccessMode", $accessMode];
+            $wifiData[] = ["{$basePath}.X_HW_BindWan", $bindWan];
             if ($password !== null) {
                 $wifiData[] = ["{$basePath}.PreSharedKey.1.KeyPassphrase", $password];
             }

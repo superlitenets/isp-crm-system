@@ -4954,6 +4954,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         }
                     }
                     
+                    // Helper to parse boolean from various GenieACS formats
+                    $parseBool = function($val, $default = false) {
+                        if ($val === null) return $default;
+                        if (is_bool($val)) return $val;
+                        if (is_int($val)) return $val !== 0;
+                        if (is_string($val)) {
+                            $val = strtolower(trim($val));
+                            return in_array($val, ['true', '1', 'yes', 'on', 'enabled']);
+                        }
+                        return $default;
+                    };
+                    
                     // Detect band based on channel or standard
                     foreach ($grouped as $idx => $data) {
                         $channel = (int)($data['Channel'] ?? 0);
@@ -4973,17 +4985,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         elseif ($idx == 5) $bandLabel = '5GHz #2';
                         else $bandLabel = "WiFi {$idx}";
                         
+                        // Parse Enable - WiFi 1 is typically enabled by default
+                        $enableVal = $data['Enable'] ?? null;
+                        // If Enable is null/missing, assume enabled for primary interfaces (1, 5)
+                        $isEnabled = ($enableVal === null && in_array($idx, [1, 5])) ? true : $parseBool($enableVal, false);
+                        
+                        // Get VLAN and connection mode info
+                        $vlanId = $data['X_HW_VLANID'] ?? $data['VLANID'] ?? '';
+                        $vlanMode = $data['X_HW_VLANMode'] ?? '';
+                        $connMode = $data['X_HW_WlanAccessMode'] ?? $data['X_HW_AccessMode'] ?? '';
+                        $bindWan = $data['X_HW_BindWan'] ?? '';
+                        
                         $wifiInterfaces[] = [
                             'index' => $idx,
                             'band' => $bandLabel,
                             'ssid' => $data['SSID'] ?? '',
                             'password' => $data['PreSharedKey.1.KeyPassphrase'] ?? '',
-                            'enabled' => ($data['Enable'] ?? false) === true || ($data['Enable'] ?? '') === 'true' || ($data['Enable'] ?? '') === '1' || $data['Enable'] === 1,
+                            'enabled' => $isEnabled,
+                            'enable_raw' => $enableVal,
                             'channel' => $channel,
                             'standard' => $standard,
-                            'vlan_id' => $data['X_HW_VLANID'] ?? $data['VLANID'] ?? '',
-                            'vlan_mode' => $data['X_HW_VLANMode'] ?? '',
-                            'broadcast' => ($data['SSIDAdvertisementEnabled'] ?? true) === true || ($data['SSIDAdvertisementEnabled'] ?? '') === 'true',
+                            'vlan_id' => $vlanId,
+                            'vlan_mode' => $vlanMode,
+                            'conn_mode' => $connMode,
+                            'bind_wan' => $bindWan,
+                            'broadcast' => $parseBool($data['SSIDAdvertisementEnabled'] ?? null, true),
                             'security' => $data['BeaconType'] ?? '',
                             'path' => "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
                         ];
@@ -19455,7 +19481,19 @@ function saveDeviceStatus() {
                     html += '</div>';
                 }
                 if (iface.channel > 0) {
-                    html += '<div><small class="text-muted">Channel:</small> <span>' + iface.channel + '</span></div>';
+                    html += '<div class="mb-1"><small class="text-muted">Channel:</small> <span>' + iface.channel + '</span></div>';
+                }
+                // Show VLAN and connection mode info
+                if (iface.vlan_id) {
+                    html += '<div class="mb-1"><small class="text-muted">VLAN:</small> <span class="badge bg-info">' + iface.vlan_id + '</span>';
+                    if (iface.vlan_mode) html += ' <small>(' + escapeHtml(iface.vlan_mode) + ')</small>';
+                    html += '</div>';
+                }
+                if (iface.conn_mode) {
+                    html += '<div class="mb-1"><small class="text-muted">Mode:</small> <span>' + escapeHtml(iface.conn_mode) + '</span></div>';
+                }
+                if (iface.bind_wan) {
+                    html += '<div class="mb-1"><small class="text-muted">WAN:</small> <span class="badge bg-secondary">' + escapeHtml(iface.bind_wan) + '</span></div>';
                 }
                 html += '</div>';
                 html += '</div>';
