@@ -8747,9 +8747,14 @@ try {
                                 if ($tr069Status === 'pending' && ($hasTr069Ip || $hasGenieacsId)) {
                                     $tr069Status = 'configured';
                                 }
-                                // If tr069_ip exists, device is likely online
-                                if ($hasTr069Ip) {
-                                    $tr069Status = 'online';
+                                // Check last_inform timestamp from database - online only if informed within 5 minutes
+                                if (!empty($currentOnu['tr069_last_inform'])) {
+                                    $lastInformTime = strtotime($currentOnu['tr069_last_inform']);
+                                    if ($lastInformTime && (time() - $lastInformTime) < 300) {
+                                        $tr069Status = 'online';
+                                    } elseif ($tr069Status === 'pending' && $lastInformTime) {
+                                        $tr069Status = 'offline';
+                                    }
                                 }
                                 ?>
                                 <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
