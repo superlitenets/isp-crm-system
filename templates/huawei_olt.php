@@ -9050,7 +9050,7 @@ try {
                                 <th>Port</th>
                                 <th>Admin state</th>
                                 <th>Mode</th>
-                                <th>DHCP</th>
+                                <th>VLAN</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -9117,9 +9117,9 @@ try {
                             <tr class="wifi-row" data-index="<?= $i ?>">
                                 <td><strong>wifi_0/<?= $i ?></strong></td>
                                 <td><button class="btn btn-sm btn-secondary wifi-enable-toggle" data-index="<?= $i ?>" data-enabled="false" disabled>Disabled</button></td>
-                                <td><span class="badge bg-info">LAN</span></td>
+                                <td class="wifi-mode"><span class="badge bg-secondary">--</span></td>
                                 <td class="wifi-ssid"><span class="text-muted fst-italic">Loading...</span></td>
-                                <td><span class="text-muted">No control</span></td>
+                                <td class="wifi-vlan"><span class="text-muted">--</span></td>
                                 <td><button class="btn btn-sm btn-outline-primary" onclick="openTR069WiFiConfig('<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>', <?= $i ?>)"><i class="bi bi-gear me-1"></i>Configure</button></td>
                             </tr>
                             <?php endfor; ?>
@@ -9234,10 +9234,47 @@ try {
                             btn.innerHTML = isEnabled ? 'Enabled' : 'Disabled';
                         }
                         
+                        // Update Mode column (connection mode: route/bridge with WAN binding)
+                        const modeCell = row.querySelector('.wifi-mode');
+                        if (modeCell) {
+                            let modeHtml = '';
+                            const connMode = iface.conn_mode || '';
+                            const bindWan = iface.bind_wan || '';
+                            
+                            if (connMode && connMode.toLowerCase().includes('bridge')) {
+                                modeHtml = '<span class="badge bg-warning text-dark">Bridge</span>';
+                            } else if (connMode && connMode.toLowerCase().includes('route')) {
+                                modeHtml = '<span class="badge bg-info">Route</span>';
+                            } else if (bindWan) {
+                                modeHtml = '<span class="badge bg-success">WAN</span>';
+                            } else {
+                                modeHtml = '<span class="badge bg-secondary">LAN</span>';
+                            }
+                            
+                            if (bindWan) {
+                                modeHtml += ' <small class="text-muted">' + escapeHtml(bindWan) + '</small>';
+                            }
+                            modeCell.innerHTML = modeHtml;
+                        }
+                        
                         // Update SSID
                         const ssidCell = row.querySelector('.wifi-ssid');
                         if (ssidCell) {
                             ssidCell.innerHTML = ssid || '<span class="text-muted fst-italic">Not set</span>';
+                        }
+                        
+                        // Update VLAN column
+                        const vlanCell = row.querySelector('.wifi-vlan');
+                        if (vlanCell) {
+                            const vlanId = iface.vlan_id || '';
+                            const vlanMode = iface.vlan_mode || '';
+                            if (vlanId) {
+                                let vlanHtml = '<span class="badge bg-primary">' + vlanId + '</span>';
+                                if (vlanMode) vlanHtml += ' <small>(' + escapeHtml(vlanMode) + ')</small>';
+                                vlanCell.innerHTML = vlanHtml;
+                            } else {
+                                vlanCell.innerHTML = '<span class="text-muted">--</span>';
+                            }
                         }
                         
                         // Update row style
