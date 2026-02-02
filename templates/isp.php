@@ -580,6 +580,26 @@ if ($action === 'reboot_nas') {
 }
 
 // Real-time CoA AJAX endpoints
+if ($action === 'ajax_reset_mac') {
+    header('Content-Type: application/json');
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id) {
+        try {
+            $stmt = $db->prepare("DELETE FROM radius_subscription_macs WHERE subscription_id = ?");
+            $stmt->execute([$id]);
+            $deleted = $stmt->rowCount();
+            // Also clear primary mac_address field
+            $db->prepare("UPDATE radius_subscriptions SET mac_address = NULL WHERE id = ?")->execute([$id]);
+            echo json_encode(['success' => true, 'message' => "Cleared {$deleted} registered device(s)"]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid subscription ID']);
+    }
+    exit;
+}
+
 if ($action === 'ajax_disconnect') {
     header('Content-Type: application/json');
     $id = (int)($_GET['id'] ?? 0);
@@ -3348,8 +3368,8 @@ try {
                     <button type="button" class="btn btn-info" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
                         <i class="bi bi-lightning me-1"></i> Ping
                     </button>
-                    <button type="button" class="btn btn-danger" onclick="disconnectSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
-                        <i class="bi bi-x-circle me-1"></i> Disconnect
+                    <button type="button" class="btn btn-danger" onclick="resetSubscriberMAC(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
+                        <i class="bi bi-phone me-1"></i> Reset MAC
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
                         <i class="bi bi-wifi me-1"></i> WiFi Config
@@ -10277,6 +10297,47 @@ try {
                     <i class="bi bi-x-circle-fill text-danger fs-1"></i>
                     <h5 class="mt-3 text-danger">Error</h5>
                     <p class="mb-0">Failed to disconnect subscriber</p>
+                `;
+            });
+    }
+    
+    function resetSubscriberMAC(subId, username) {
+        if (!confirm(`Reset all registered devices for ${username}? They will need to reconnect to be registered again.`)) return;
+        
+        const modal = new bootstrap.Modal(document.getElementById('testNASModal'));
+        const resultDiv = document.getElementById('testNASResult');
+        
+        resultDiv.innerHTML = `
+            <div class="spinner-border text-warning" role="status">
+                <span class="visually-hidden">Resetting...</span>
+            </div>
+            <p class="mt-2">Clearing registered devices for ${username}...</p>
+        `;
+        modal.show();
+        
+        fetch('/index.php?page=isp&action=ajax_reset_mac&id=' + subId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                        <h5 class="mt-3 text-success">Devices Reset</h5>
+                        <p class="mb-0">${data.message}</p>
+                    `;
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
+                        <h5 class="mt-3 text-warning">Warning</h5>
+                        <p class="mb-0">${data.error || 'Could not reset devices'}</p>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <i class="bi bi-x-circle-fill text-danger fs-1"></i>
+                    <h5 class="mt-3 text-danger">Error</h5>
+                    <p class="mb-0">Failed to reset devices</p>
                 `;
             });
     }
