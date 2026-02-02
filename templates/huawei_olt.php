@@ -6781,9 +6781,15 @@ try {
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body p-2">
-            <a href="?page=dashboard" class="nav-link text-white-50 small mb-2">
-                <i class="bi bi-arrow-left me-2"></i> Back to CRM
-            </a>
+            <div class="d-flex gap-2 small mb-2">
+                <a href="?page=dashboard" class="nav-link text-white-50 p-0">
+                    <i class="bi bi-arrow-left me-1"></i> CRM
+                </a>
+                <span class="text-white-50">|</span>
+                <a href="?page=isp" class="nav-link text-white-50 p-0">
+                    <i class="bi bi-broadcast me-1"></i> ISP
+                </a>
+            </div>
             <nav class="nav flex-column">
                 <a class="nav-link <?= $view === 'dashboard' ? 'active' : '' ?>" href="?page=huawei-olt&view=dashboard">
                     <i class="bi bi-speedometer2 me-2"></i> Dashboard
@@ -6833,9 +6839,15 @@ try {
     
     <div class="d-flex">
         <div class="sidebar d-none d-lg-flex flex-column p-3" style="width: 260px;">
-            <a href="?page=dashboard" class="text-decoration-none small mb-3 px-2 d-flex align-items-center" style="color: rgba(255,255,255,0.5);">
-                <i class="bi bi-arrow-left me-1"></i> Back to CRM
-            </a>
+            <div class="d-flex gap-2 small mb-3 px-2">
+                <a href="?page=dashboard" class="text-decoration-none d-flex align-items-center" style="color: rgba(255,255,255,0.5);">
+                    <i class="bi bi-arrow-left me-1"></i> CRM
+                </a>
+                <span style="color: rgba(255,255,255,0.3);">|</span>
+                <a href="?page=isp" class="text-decoration-none d-flex align-items-center" style="color: rgba(255,255,255,0.5);">
+                    <i class="bi bi-broadcast me-1"></i> ISP
+                </a>
+            </div>
             <div class="d-flex align-items-center mb-4 px-2">
                 <div class="me-3" style="width: 44px; height: 44px; background: linear-gradient(135deg, var(--oms-accent), var(--oms-accent-light)); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                     <i class="bi bi-router fs-5 text-white"></i>

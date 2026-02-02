@@ -2091,8 +2091,8 @@ try {
                     <i class="bi bi-upload me-2"></i> Import CSV
                 </a>
                 <hr class="my-2 border-light opacity-25">
-                <a class="nav-link <?= (strpos($view, 'olt') === 0) ? 'active' : '' ?>" href="?page=isp&view=olt">
-                    <i class="bi bi-router me-2"></i> OLT / Fiber
+                <a class="nav-link" href="?page=huawei-olt">
+                    <i class="bi bi-router me-2"></i> OLT / Fiber <i class="bi bi-box-arrow-up-right small ms-1 opacity-50"></i>
                 </a>
                 <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=isp&view=settings">
                     <i class="bi bi-gear me-2"></i> Settings
@@ -2158,8 +2158,8 @@ try {
                     <i class="bi bi-upload me-2"></i> Import CSV
                 </a>
                 <hr class="my-2 border-light opacity-25">
-                <a class="nav-link <?= (strpos($view, 'olt') === 0) ? 'active' : '' ?>" href="?page=isp&view=olt">
-                    <i class="bi bi-router me-2"></i> OLT / Fiber
+                <a class="nav-link" href="?page=huawei-olt">
+                    <i class="bi bi-router me-2"></i> OLT / Fiber <i class="bi bi-box-arrow-up-right small ms-1 opacity-50"></i>
                 </a>
                 <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=isp&view=settings">
                     <i class="bi bi-gear me-2"></i> Settings
