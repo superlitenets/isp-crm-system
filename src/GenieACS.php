@@ -2215,6 +2215,175 @@ class GenieACS {
         return $this->setParameterValues($deviceId, $params);
     }
     
+
+    /**
+     * Configure WiFi Access VLAN (Bridge mode for specific SSID)
+     * 
+     * This follows the exact sequence from Huawei ONU logs:
+     * 1. Add WLANConfiguration (if needed)
+     * 2. Add WANConnectionDevice
+     * 3. Set WLAN settings
+     * 4. Add WANIPConnection
+     * 5. Set ConnectionType: IP_Bridged
+     * 6. Add Layer3Forwarding.X_HW_policy_route
+     * 7. Set policy_route with PhyPortName, WanName
+     * 8. Set WANIPConnection Name and X_HW_VLAN
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param int $wifiIndex WiFi index (1=2.4GHz primary, 2=2.4GHz secondary, 5=5GHz primary)
+     * @param int $vlanId VLAN ID to assign
+     * @param string $ssidName Optional SSID name
+     * @return array Result with success status
+     */
+    public function configureWifiAccessVlan(string $deviceId, int $wifiIndex, int $vlanId, string $ssidName = ''): array {
+        $results = [];
+        $errors = [];
+        
+        // Map WiFi index to SSID port name (SSID1, SSID2, SSID3, SSID4 for 2.4GHz, SSID5-8 for 5GHz)
+        $ssidPortName = 'SSID' . $wifiIndex;
+        
+        // Determine WAN connection device index (use wifiIndex + 2 to avoid conflict with main WAN)
+        $wanDeviceIndex = $wifiIndex + 2;
+        $wanConnectionName = "WIFI_Bridge_VLAN_{$vlanId}";
+        $wanName = "wan1.{$wanDeviceIndex}.ip1";
+        
+        $deviceIdEncoded = rawurlencode($deviceId);
+        
+        try {
+            // Step 1: Add WLANConfiguration (if needed for secondary SSIDs)
+            // Primary SSIDs (1, 5) usually exist, secondaries (2, 6) may need creation
+            if ($wifiIndex > 1 && $wifiIndex != 5) {
+                $addWlanResult = $this->makeRequest(
+                    "POST",
+                    "devices/{$deviceIdEncoded}/tasks?connection_request",
+                    [
+                        'name' => 'addObject',
+                        'objectName' => 'InternetGatewayDevice.LANDevice.WLANConfiguration'
+                    ]
+                );
+                $results[] = ['step' => 'add_wlan_config', 'result' => $addWlanResult];
+                usleep(500000); // 500ms delay
+            }
+            
+            // Step 2: Add WANConnectionDevice
+            $addWanDevResult = $this->makeRequest(
+                "POST",
+                "devices/{$deviceIdEncoded}/tasks?connection_request",
+                [
+                    'name' => 'addObject',
+                    'objectName' => 'InternetGatewayDevice.WANDevice.WANConnectionDevice'
+                ]
+            );
+            $results[] = ['step' => 'add_wan_device', 'result' => $addWanDevResult];
+            usleep(500000);
+            
+            // Step 3: Set WLAN settings if SSID name provided
+            if ($ssidName) {
+                $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
+                $setWlanResult = $this->makeRequest(
+                    "POST",
+                    "devices/{$deviceIdEncoded}/tasks?connection_request",
+                    [
+                        'name' => 'setParameterValues',
+                        'parameterValues' => [
+                            ["{$wlanPath}.SSID", $ssidName, 'xsd:string'],
+                            ["{$wlanPath}.BeaconType", 'None', 'xsd:string']
+                        ]
+                    ]
+                );
+                $results[] = ['step' => 'set_wlan_settings', 'result' => $setWlanResult];
+                usleep(500000);
+            }
+            
+            // Step 4: Add WANIPConnection
+            $addWanIpResult = $this->makeRequest(
+                "POST",
+                "devices/{$deviceIdEncoded}/tasks?connection_request",
+                [
+                    'name' => 'addObject',
+                    'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection"
+                ]
+            );
+            $results[] = ['step' => 'add_wan_ip_connection', 'result' => $addWanIpResult];
+            usleep(500000);
+            
+            // Step 5: Set ConnectionType to IP_Bridged
+            $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1";
+            $setBridgeResult = $this->makeRequest(
+                "POST",
+                "devices/{$deviceIdEncoded}/tasks?connection_request",
+                [
+                    'name' => 'setParameterValues',
+                    'parameterValues' => [
+                        ["{$wanIpPath}.ConnectionType", 'IP_Bridged', 'xsd:string']
+                    ]
+                ]
+            );
+            $results[] = ['step' => 'set_bridge_mode', 'result' => $setBridgeResult];
+            usleep(500000);
+            
+            // Step 6: Add Layer3Forwarding.X_HW_policy_route
+            $addRouteResult = $this->makeRequest(
+                "POST",
+                "devices/{$deviceIdEncoded}/tasks?connection_request",
+                [
+                    'name' => 'addObject',
+                    'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route'
+                ]
+            );
+            $results[] = ['step' => 'add_policy_route', 'result' => $addRouteResult];
+            usleep(500000);
+            
+            // Step 7: Set policy_route with PhyPortName and WanName
+            // The route index is typically wifiIndex or the next available
+            $routeIndex = $wifiIndex;
+            $setRouteResult = $this->makeRequest(
+                "POST",
+                "devices/{$deviceIdEncoded}/tasks?connection_request",
+                [
+                    'name' => 'setParameterValues',
+                    'parameterValues' => [
+                        ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", $ssidPortName, 'xsd:string'],
+                        ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
+                        ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string']
+                    ]
+                ]
+            );
+            $results[] = ['step' => 'set_policy_route', 'result' => $setRouteResult];
+            usleep(500000);
+            
+            // Step 8: Set WANIPConnection Name and X_HW_VLAN
+            $setVlanResult = $this->makeRequest(
+                "POST",
+                "devices/{$deviceIdEncoded}/tasks?connection_request",
+                [
+                    'name' => 'setParameterValues',
+                    'parameterValues' => [
+                        ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
+                        ["{$wanIpPath}.X_HW_VLAN", (string)$vlanId, 'xsd:int']
+                    ]
+                ]
+            );
+            $results[] = ['step' => 'set_vlan', 'result' => $setVlanResult];
+            
+            return [
+                'success' => true,
+                'message' => "WiFi {$wifiIndex} configured with VLAN {$vlanId} in Bridge mode",
+                'results' => $results,
+                'wan_name' => $wanName,
+                'ssid_port' => $ssidPortName
+            ];
+            
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'results' => $results,
+                'errors' => $errors
+            ];
+        }
+    }
+
     /**
      * SmartOLT-style Internet WAN configuration via TR-069
      * Creates WAN objects using addObject then configures them

@@ -8151,16 +8151,24 @@ class HuaweiOLT {
         $accessVlan = (int)($config['access_vlan'] ?? 0);
         $nativeVlan = (int)($config['native_vlan'] ?? 0);
         
-        if ($connMode === 'bridge') {
-            // Set interface to bridge mode with VLAN
+        // Handle Access VLAN configuration (Bridge mode with WAN binding)
+        if ($connMode === 'bridge' && $vlanMode === 'access' && $accessVlan > 0) {
+            // Use the proper sequence: Add WAN objects + Policy Routes
+            // This matches the Huawei ONU log sequence for WiFi VLAN
+            $vlanResult = $genieacs->configureWifiAccessVlan($genieacsId, $wlanIndex, $accessVlan, $ssid);
+            
+            if (!$vlanResult['success']) {
+                return ['success' => false, 'error' => 'VLAN config failed: ' . ($vlanResult['error'] ?? 'Unknown error')];
+            }
+            
+            // Basic WiFi settings still need to be applied
+            // Continue with setParameterValues below for SSID/password/security
+        } elseif ($connMode === 'bridge') {
+            // Basic bridge without policy route (just set X_HW_SwitchMode)
             $paramValues[] = ["{$basePath}.X_HW_ServiceList", 'INTERNET', 'xsd:string'];
             $paramValues[] = ["{$basePath}.X_HW_SwitchMode", 'Bridge', 'xsd:string'];
             
-            if ($vlanMode === 'access' && $accessVlan > 0) {
-                // Access mode - single VLAN
-                $paramValues[] = ["{$basePath}.X_HW_VLAN", $accessVlan, 'xsd:unsignedInt'];
-                $paramValues[] = ["{$basePath}.X_HW_VLANMode", 'Access', 'xsd:string'];
-            } elseif ($vlanMode === 'trunk' && $nativeVlan > 0) {
+            if ($vlanMode === 'trunk' && $nativeVlan > 0) {
                 // Trunk mode - tagged VLANs
                 $paramValues[] = ["{$basePath}.X_HW_VLAN", $nativeVlan, 'xsd:unsignedInt'];
                 $paramValues[] = ["{$basePath}.X_HW_VLANMode", 'Trunk', 'xsd:string'];
