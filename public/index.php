@@ -8497,5 +8497,23 @@ $csrfToken = \App\Auth::generateToken();
             }
         }
     </script>
+<script>
+// Make all tables responsive on mobile
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.innerWidth < 992) {
+        document.querySelectorAll('table.table').forEach(function(table) {
+            // Skip if already in a responsive wrapper
+            if (table.parentElement.classList.contains('table-responsive')) return;
+            if (table.closest('.table-responsive')) return;
+            
+            // Create responsive wrapper
+            var wrapper = document.createElement('div');
+            wrapper.className = 'table-responsive';
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+        });
+    }
+});
+</script>
 </body>
 </html>

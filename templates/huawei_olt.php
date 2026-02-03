@@ -6814,6 +6814,36 @@ try {
             color: var(--oms-text);
             font-weight: 500;
         }
+        
+        /* OMS Mobile Responsiveness */
+        @media (max-width: 991.98px) {
+            .oms-sidebar { display: none !important; }
+            .oms-main { margin-left: 0 !important; padding: 1rem !important; }
+            .oms-header { padding: 0.75rem 1rem !important; }
+            .olt-card, .onu-card { margin-bottom: 1rem; }
+            /* Scrollable tables */
+            .card-body { overflow-x: auto; }
+            /* Stack ONU info on mobile */
+            .onu-info-grid { display: block !important; }
+            .onu-info-grid > div { margin-bottom: 0.5rem; }
+            /* Smaller ONU status indicators */
+            .onu-status-badge { font-size: 0.7rem; padding: 0.25rem 0.5rem; }
+            /* Hide SN column on small screens */
+            .hide-on-mobile { display: none !important; }
+            /* Full-width action buttons */
+            .onu-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+            .onu-actions .btn { flex: 1 1 45%; min-width: 0; }
+        }
+        @media (max-width: 575.98px) {
+            .oms-main { padding: 0.5rem !important; }
+            .card-header { padding: 0.75rem !important; font-size: 0.9rem; }
+            .card-body { padding: 0.75rem !important; }
+            /* Very compact tables on small phones */
+            table.table td, table.table th { font-size: 0.75rem; padding: 0.35rem; }
+            .btn-sm { font-size: 0.7rem; padding: 0.25rem 0.4rem; }
+            /* Stack nav tabs vertically on small screens */
+            .nav-tabs-mobile-stack { flex-direction: column; }
+            .nav-tabs-mobile-stack .nav-link { border-radius: 0.375rem; margin-bottom: 0.25rem; }
         }
     </style>
     <!-- Load Bootstrap JS early for mobile offcanvas and all modals -->

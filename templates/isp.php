@@ -2168,6 +2168,32 @@ try {
                 font-size: 0.9rem;
             }
         }
+        
+        /* Enhanced ISP Mobile Responsiveness */
+        @media (max-width: 991.98px) {
+            .isp-sidebar { display: none !important; }
+            .isp-main { margin-left: 0 !important; }
+            /* Make subscriber table scrollable */
+            .card-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            /* Subscriber list compact view */
+            #subscribersTable td, #subscribersTable th { font-size: 0.8rem; white-space: nowrap; }
+            /* Stack subscriber details */
+            .subscriber-detail-row { display: block !important; }
+            .subscriber-detail-row > div { margin-bottom: 0.5rem; }
+            /* Hide less critical columns */
+            .hide-tablet { display: none !important; }
+        }
+        @media (max-width: 575.98px) {
+            .isp-main { padding: 0.5rem !important; }
+            /* Very compact for small phones */
+            table td, table th { font-size: 0.7rem; padding: 0.3rem; }
+            .badge { font-size: 0.65rem; }
+            /* Stack action buttons */
+            .subscriber-actions { flex-direction: column; }
+            .subscriber-actions .btn { width: 100%; margin-bottom: 0.25rem; }
+            /* Hide extra columns */
+            .hide-mobile { display: none !important; }
+        }
     </style>
 </head>
 <body>
