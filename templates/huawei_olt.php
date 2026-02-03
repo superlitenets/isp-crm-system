@@ -7871,6 +7871,54 @@ try {
             <?php endif; ?>
             
             <?php elseif ($view === 'onus'): ?>
+            <!-- ONU Status Dashboard Summary -->
+            <?php
+            $onuStats = ['online' => 0, 'offline' => 0, 'los' => 0, 'total' => count($onus ?? [])];
+            foreach ($onus ?? [] as $o) {
+                $st = strtolower($o['status'] ?? 'offline');
+                if ($st === 'online') $onuStats['online']++;
+                elseif (in_array($st, ['los', 'dying-gasp', 'dyinggasp'])) $onuStats['los']++;
+                else $onuStats['offline']++;
+            }
+            ?>
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm bg-success bg-opacity-10">
+                        <div class="card-body py-2 text-center">
+                            <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                            <h4 class="mb-0 text-success"><?= $onuStats['online'] ?></h4>
+                            <small class="text-muted">Online</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm bg-secondary bg-opacity-10">
+                        <div class="card-body py-2 text-center">
+                            <i class="bi bi-circle text-secondary fs-4"></i>
+                            <h4 class="mb-0 text-secondary"><?= $onuStats['offline'] ?></h4>
+                            <small class="text-muted">Offline</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm bg-danger bg-opacity-10">
+                        <div class="card-body py-2 text-center">
+                            <i class="bi bi-exclamation-triangle-fill text-danger fs-4"></i>
+                            <h4 class="mb-0 text-danger"><?= $onuStats['los'] ?></h4>
+                            <small class="text-muted">LOS/Alarm</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm bg-primary bg-opacity-10">
+                        <div class="card-body py-2 text-center">
+                            <i class="bi bi-router text-primary fs-4"></i>
+                            <h4 class="mb-0 text-primary"><?= $onuStats['total'] ?></h4>
+                            <small class="text-muted">Total</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h4 class="mb-0">
@@ -8021,6 +8069,53 @@ try {
             </div>
             
             <div class="card shadow-sm">
+                <!-- ONU Search/Filter Toolbar -->
+                <div class="card-header bg-white border-bottom py-2">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="onuSearchInput" placeholder="Search SN, Name, Zone...">
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <select class="form-select form-select-sm" id="onuStatusFilter">
+                                <option value="">All Status</option>
+                                <option value="online">Online</option>
+                                <option value="offline">Offline</option>
+                                <option value="los">LOS</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <select class="form-select form-select-sm" id="onuZoneFilter">
+                                <option value="">All Zones</option>
+                                <?php 
+                                $zones = array_unique(array_filter(array_column($onus ?? [], 'zone_name')));
+                                sort($zones);
+                                foreach ($zones as $zone): ?>
+                                <option value="<?= htmlspecialchars($zone) ?>"><?= htmlspecialchars($zone) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4 text-md-end">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary" id="selectAllOnus" title="Select All">
+                                    <i class="bi bi-check-all"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-warning" id="bulkRebootBtn" disabled title="Bulk Reboot">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled title="Bulk Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-success" onclick="exportOnuList()" title="Export CSV">
+                                    <i class="bi bi-download"></i>
+                                </button>
+                            </div>
+                            <span class="ms-2 text-muted small" id="selectedCount"></span>
+                        </div>
+                    </div>
+                </div>
                 <div class="card-body p-0">
                     <?php if (empty($onus) && empty($discoveredOnus)): ?>
                     <div class="p-4 text-center text-muted">
@@ -8086,6 +8181,7 @@ try {
                         <table class="table table-hover mb-0" id="onuTable">
                             <thead>
                                 <tr>
+                                    <th style="width: 30px;"><input type="checkbox" id="selectAllCheckbox" class="form-check-input"></th>
                                     <th>Serial Number</th>
                                     <th>ONU Type</th>
                                     <th>Name</th>
@@ -8100,7 +8196,8 @@ try {
                             </thead>
                             <tbody>
                                 <?php foreach ($onus as $onu): ?>
-                                <tr data-onu-id="<?= $onu['id'] ?>">
+                                <tr data-onu-id="<?= $onu['id'] ?>" data-onu-sn="<?= htmlspecialchars($onu['sn']) ?>" data-onu-status="<?= strtolower($onu['status'] ?? 'offline') ?>" data-onu-zone="<?= htmlspecialchars($onu['zone_name'] ?? '') ?>">
+                                    <td><input type="checkbox" class="form-check-input onu-checkbox" value="<?= $onu['id'] ?>"></td>
                                     <td>
                                         <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $onu['id'] ?>" class="text-decoration-none">
                                             <code><?= htmlspecialchars($onu['sn']) ?></code>
@@ -22458,6 +22555,182 @@ function saveDeviceStatus() {
             }
         });
         console.log('[WAN] Form submit handler attached');
+    }
+    </script>
+
+    <!-- ONU Search, Filter, Bulk Operations, and Export -->
+    <script>
+    // ONU Search and Filter
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('onuSearchInput');
+        const statusFilter = document.getElementById('onuStatusFilter');
+        const zoneFilter = document.getElementById('onuZoneFilter');
+        const onuTable = document.getElementById('onuTable');
+        const selectAllBtn = document.getElementById('selectAllOnus');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const bulkRebootBtn = document.getElementById('bulkRebootBtn');
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        const selectedCountEl = document.getElementById('selectedCount');
+        
+        if (!onuTable) return;
+        
+        function filterTable() {
+            const searchTerm = (searchInput?.value || '').toLowerCase();
+            const statusTerm = (statusFilter?.value || '').toLowerCase();
+            const zoneTerm = (zoneFilter?.value || '').toLowerCase();
+            
+            const rows = onuTable.querySelectorAll('tbody tr');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const sn = row.getAttribute('data-onu-sn') || '';
+                const status = row.getAttribute('data-onu-status') || '';
+                const zone = row.getAttribute('data-onu-zone') || '';
+                const text = row.textContent.toLowerCase();
+                
+                const matchSearch = !searchTerm || text.includes(searchTerm) || sn.toLowerCase().includes(searchTerm);
+                const matchStatus = !statusTerm || status.includes(statusTerm);
+                const matchZone = !zoneTerm || zone.toLowerCase() === zoneTerm.toLowerCase();
+                
+                if (matchSearch && matchStatus && matchZone) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+        
+        searchInput?.addEventListener('input', filterTable);
+        statusFilter?.addEventListener('change', filterTable);
+        zoneFilter?.addEventListener('change', filterTable);
+        
+        // Checkbox handling
+        function updateSelectedCount() {
+            const checked = onuTable.querySelectorAll('.onu-checkbox:checked').length;
+            if (selectedCountEl) {
+                selectedCountEl.textContent = checked > 0 ? checked + ' selected' : '';
+            }
+            if (bulkRebootBtn) bulkRebootBtn.disabled = checked === 0;
+            if (bulkDeleteBtn) bulkDeleteBtn.disabled = checked === 0;
+        }
+        
+        selectAllCheckbox?.addEventListener('change', function() {
+            const checkboxes = onuTable.querySelectorAll('.onu-checkbox');
+            checkboxes.forEach(cb => {
+                if (cb.closest('tr').style.display !== 'none') {
+                    cb.checked = this.checked;
+                }
+            });
+            updateSelectedCount();
+        });
+        
+        selectAllBtn?.addEventListener('click', function() {
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = !selectAllCheckbox.checked;
+                selectAllCheckbox.dispatchEvent(new Event('change'));
+            }
+        });
+        
+        onuTable.addEventListener('change', function(e) {
+            if (e.target.classList.contains('onu-checkbox')) {
+                updateSelectedCount();
+            }
+        });
+        
+        // Bulk Reboot
+        bulkRebootBtn?.addEventListener('click', async function() {
+            const checked = Array.from(onuTable.querySelectorAll('.onu-checkbox:checked'));
+            if (checked.length === 0) return;
+            
+            if (!confirm('Reboot ' + checked.length + ' selected ONU(s)?')) return;
+            
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            let success = 0, failed = 0;
+            for (const cb of checked) {
+                try {
+                    const resp = await fetch('?page=huawei-olt&action=reboot_onu&onu_id=' + cb.value);
+                    const data = await resp.json();
+                    if (data.success) success++; else failed++;
+                } catch (e) {
+                    failed++;
+                }
+            }
+            
+            showToast('Rebooted: ' + success + ' Success, ' + failed + ' Failed', success > 0 ? 'success' : 'danger');
+            this.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+            this.disabled = false;
+        });
+        
+        // Bulk Delete
+        bulkDeleteBtn?.addEventListener('click', async function() {
+            const checked = Array.from(onuTable.querySelectorAll('.onu-checkbox:checked'));
+            if (checked.length === 0) return;
+            
+            if (!confirm('DELETE ' + checked.length + ' selected ONU(s)? This cannot be undone!')) return;
+            
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            let success = 0, failed = 0;
+            for (const cb of checked) {
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'delete_onu');
+                    formData.append('onu_id', cb.value);
+                    const resp = await fetch('?page=huawei-olt', { method: 'POST', body: formData });
+                    const data = await resp.json();
+                    if (data.success) {
+                        success++;
+                        cb.closest('tr').remove();
+                    } else failed++;
+                } catch (e) {
+                    failed++;
+                }
+            }
+            
+            showToast('Deleted: ' + success + ' Success, ' + failed + ' Failed', success > 0 ? 'success' : 'danger');
+            this.innerHTML = '<i class="bi bi-trash"></i>';
+            this.disabled = false;
+            updateSelectedCount();
+        });
+    });
+    
+    // Export ONU List to CSV
+    function exportOnuList() {
+        const table = document.getElementById('onuTable');
+        if (!table) return;
+        
+        const rows = table.querySelectorAll('tbody tr');
+        const headers = ['Serial Number', 'ONU Type', 'Name', 'Zone', 'VLAN', 'Management IP', 'Status', 'RX Power', 'TX Power', 'Distance'];
+        let csv = headers.join(',') + '\n';
+        
+        rows.forEach(row => {
+            if (row.style.display === 'none') return;
+            const cells = row.querySelectorAll('td');
+            const rowData = [
+                row.getAttribute('data-onu-sn') || '',
+                cells[2]?.textContent?.trim() || '',
+                cells[3]?.textContent?.trim() || '',
+                row.getAttribute('data-onu-zone') || '',
+                cells[5]?.textContent?.trim() || '',
+                cells[6]?.textContent?.trim() || '',
+                row.getAttribute('data-onu-status') || '',
+                '', '', ''
+            ];
+            csv += rowData.map(v => '"' + (v || '').replace(/"/g, '""') + '"').join(',') + '\n';
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'onu_list_' + new Date().toISOString().slice(0,10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('ONU list exported successfully', 'success');
     }
     </script>
 </body>
