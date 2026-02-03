@@ -2286,7 +2286,7 @@ try {
     </div>
     
     <div class="d-flex">
-        <div class="sidebar d-none d-lg-flex flex-column p-3" style="width: 260px;">
+        <div class="sidebar d-none d-lg-flex flex-column p-3" style="width: 220px;">
             <a href="?page=dashboard" class="text-decoration-none small mb-3 px-2 d-flex align-items-center" style="color: rgba(255,255,255,0.5);">
                 <i class="bi bi-arrow-left me-1"></i> Back to CRM
             </a>
