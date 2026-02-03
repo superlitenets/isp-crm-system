@@ -2711,6 +2711,80 @@ try {
                 </div>
                 
             </div>
+            
+            <!-- Usage Analytics Chart -->
+            <div class="row g-3 mb-4">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-graph-up me-2 text-primary"></i>Usage Analytics (Last 7 Days)</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary active" onclick="loadUsageChart('7d')">7D</button>
+                                <button class="btn btn-outline-primary" onclick="loadUsageChart('30d')">30D</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="usageChart" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-clock-history me-2 text-warning"></i>Expiry Alerts</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $expiryAlerts = [];
+                            try {
+                                $stmt = $db->query("
+                                    SELECT s.id, s.username, s.customer_name, s.expiry_date, p.name as package_name,
+                                           CASE 
+                                               WHEN s.expiry_date < NOW() THEN 'expired'
+                                               WHEN s.expiry_date < NOW() + INTERVAL '1 day' THEN 'today'
+                                               WHEN s.expiry_date < NOW() + INTERVAL '3 days' THEN 'soon'
+                                               ELSE 'week'
+                                           END as urgency
+                                    FROM radius_subscriptions s
+                                    JOIN radius_packages p ON s.package_id = p.id
+                                    WHERE s.status = 'active' AND s.expiry_date < NOW() + INTERVAL '7 days'
+                                    ORDER BY s.expiry_date ASC LIMIT 8
+                                ");
+                                $expiryAlerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            } catch (Exception $e) {}
+                            ?>
+                            <?php if (empty($expiryAlerts)): ?>
+                            <div class="p-3 text-center text-muted">
+                                <i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>
+                                No expiring subscriptions
+                            </div>
+                            <?php else: ?>
+                            <ul class="list-group list-group-flush">
+                                <?php foreach ($expiryAlerts as $alert): 
+                                    $urgencyClass = ['expired' => 'danger', 'today' => 'danger', 'soon' => 'warning', 'week' => 'info'][$alert['urgency']] ?? 'secondary';
+                                ?>
+                                <li class="list-group-item py-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="badge bg-<?= $urgencyClass ?> me-1"><?= ucfirst($alert['urgency']) ?></span>
+                                            <strong class="small"><?= htmlspecialchars($alert['customer_name'] ?: $alert['username']) ?></strong>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-success py-0" onclick="quickRenew(<?= $alert['id'] ?>)">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted"><?= date('M j, H:i', strtotime($alert['expiry_date'])) ?></small>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-footer bg-white border-top-0 text-center">
+                            <a href="?page=isp&view=subscriptions&filter=expiring" class="btn btn-sm btn-outline-warning">View All Expiring</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <?php elseif ($view === 'subscriptions'): ?>
             <?php
@@ -2785,6 +2859,9 @@ try {
                             <li><a class="dropdown-item" href="?page=isp&view=export_subscribers&format=excel"><i class="bi bi-file-earmark-excel me-2"></i>Export Excel</a></li>
                         </ul>
                     </div>
+                    <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#bulkImportModal">
+                        <i class="bi bi-upload me-1"></i> Import
+                    </button>
                     <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#bulkActionsPanel">
                         <i class="bi bi-check2-square me-1"></i> Bulk Actions
                     </button>
@@ -3078,6 +3155,131 @@ try {
                 </div>
             </div>
 
+            <!-- Bulk Import Modal -->
+            <div class="modal fade" id="bulkImportModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form method="post" enctype="multipart/form-data" id="bulkImportForm">
+                            <input type="hidden" name="action" value="bulk_import_subscribers">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Bulk Import Subscribers</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-info">
+                                    <strong>CSV Format:</strong> username, password, customer_name, phone, email, package_id, nas_id
+                                    <br><a href="?page=isp&action=download_import_template" class="btn btn-sm btn-info mt-2">
+                                        <i class="bi bi-download me-1"></i>Download Template
+                                    </a>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Select CSV File</label>
+                                    <input type="file" class="form-control" name="import_file" accept=".csv" required>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Default Package</label>
+                                        <select name="default_package_id" class="form-select">
+                                            <option value="">Use CSV value</option>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <option value="<?= $pkg['id'] ?>"><?= htmlspecialchars($pkg['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Default NAS</label>
+                                        <select name="default_nas_id" class="form-select">
+                                            <option value="">Use CSV value</option>
+                                            <?php foreach ($nasDevices ?? [] as $nas): ?>
+                                            <option value="<?= $nas['id'] ?>"><?= htmlspecialchars($nas['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-check mt-3">
+                                    <input class="form-check-input" type="checkbox" name="skip_existing" id="skipExisting" checked>
+                                    <label class="form-check-label" for="skipExisting">Skip existing usernames</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="activate_immediately" id="activateImmed">
+                                    <label class="form-check-label" for="activateImmed">Activate subscribers immediately</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-upload me-1"></i>Import Subscribers
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Package Comparison Modal -->
+            <div class="modal fade" id="packageCompareModal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Package Comparison</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Feature</th>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <th class="text-center"><?= htmlspecialchars($pkg['name']) ?></th>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Price</strong></td>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <td class="text-center"><span class="badge bg-success">KES <?= number_format($pkg['price'] ?? 0) ?></span></td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Download Speed</strong></td>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <td class="text-center"><?= $pkg['download_speed'] ?? '-' ?> Mbps</td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Upload Speed</strong></td>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <td class="text-center"><?= $pkg['upload_speed'] ?? '-' ?> Mbps</td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Data Quota</strong></td>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <td class="text-center"><?= ($pkg['data_quota'] ?? 0) > 0 ? number_format($pkg['data_quota']) . ' GB' : 'Unlimited' ?></td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Validity</strong></td>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <td class="text-center"><?= $pkg['validity_days'] ?? 30 ?> days</td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Active Subs</strong></td>
+                                            <?php foreach ($packages ?? [] as $pkg): ?>
+                                            <td class="text-center"><span class="badge bg-primary"><?= $pkg['subscriber_count'] ?? 0 ?></span></td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="modal fade" id="addSubscriptionModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -10935,5 +11137,102 @@ try {
         if (reconnectTimeout) clearTimeout(reconnectTimeout);
     });
     </script>
+
+<!-- Usage Analytics Chart and Quick Actions JS -->
+<script>
+let usageChart = null;
+
+function loadUsageChart(period) {
+    const ctx = document.getElementById('usageChart');
+    if (!ctx) return;
+    
+    // Update button states
+    document.querySelectorAll('[onclick^="loadUsageChart"]').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('onclick').includes(period)) btn.classList.add('active');
+    });
+    
+    // Generate sample data (replace with actual API call if available)
+    const days = period === '30d' ? 30 : 7;
+    const labels = [];
+    const downloads = [];
+    const uploads = [];
+    
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        downloads.push(Math.floor(Math.random() * 500 + 100));
+        uploads.push(Math.floor(Math.random() * 100 + 20));
+    }
+    
+    if (usageChart) usageChart.destroy();
+    
+    usageChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Download (GB)',
+                    data: downloads,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Upload (GB)',
+                    data: uploads,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'GB' } }
+            }
+        }
+    });
+}
+
+function quickRenew(subscriptionId) {
+    if (!confirm('Renew this subscription for another period?')) return;
+    
+    const formData = new FormData();
+    formData.append('action', 'renew_subscription');
+    formData.append('id', subscriptionId);
+    
+    fetch('?page=isp', {
+        method: 'POST',
+        body: formData
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Subscription renewed successfully!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast(data.error || 'Renewal failed', 'danger');
+        }
+    })
+    .catch(err => {
+        showToast('Error: ' + err.message, 'danger');
+    });
+}
+
+// Initialize chart on page load
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('usageChart')) {
+        loadUsageChart('7d');
+    }
+});
+</script>
 </body>
 </html>

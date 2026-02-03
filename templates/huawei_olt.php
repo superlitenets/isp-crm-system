@@ -8111,6 +8111,9 @@ try {
                                 <button type="button" class="btn btn-outline-success" onclick="exportOnuList()" title="Export CSV">
                                     <i class="bi bi-download"></i>
                                 </button>
+                                <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#onuTemplatesModal" title="Config Templates">
+                                    <i class="bi bi-bookmark-star"></i>
+                                </button>
                             </div>
                             <span class="ms-2 text-muted small" id="selectedCount"></span>
                         </div>
@@ -15657,6 +15660,64 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         <input type="hidden" name="id" id="actionId">
     </form>
     
+    <!-- ONU Configuration Templates Modal -->
+    <div class="modal fade" id="onuTemplatesModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-bookmark-star me-2"></i>ONU Config Templates</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Saved Templates</label>
+                        <select class="form-select" id="savedTemplates" onchange="loadTemplate(this.value)">
+                            <option value="">Select a template...</option>
+                        </select>
+                    </div>
+                    <hr>
+                    <h6><i class="bi bi-plus-circle me-1"></i>Save Current Configuration</h6>
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm" id="templateName" placeholder="Template name...">
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small">ETH Port Mode</label>
+                            <select class="form-select form-select-sm" id="tplEthMode">
+                                <option value="access">Access</option>
+                                <option value="trunk">Trunk</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">VLAN ID</label>
+                            <input type="number" class="form-control form-control-sm" id="tplVlan" placeholder="VLAN">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small">Line Profile</label>
+                            <input type="text" class="form-control form-control-sm" id="tplLineProfile" placeholder="Line profile">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Service Profile</label>
+                            <input type="text" class="form-control form-control-sm" id="tplServiceProfile" placeholder="Service profile">
+                        </div>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="tplEnableTr069">
+                        <label class="form-check-label" for="tplEnableTr069">Enable TR-069</label>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveTemplate()">
+                        <i class="bi bi-save me-1"></i>Save Template
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm ms-2" onclick="deleteTemplate()">
+                        <i class="bi bi-trash me-1"></i>Delete Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Authorization Modal (Enhanced with customer linking, GPS, PPPoE) -->
     <div class="modal fade" id="authModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -22732,6 +22793,100 @@ function saveDeviceStatus() {
         URL.revokeObjectURL(url);
         showToast('ONU list exported successfully', 'success');
     }
+    </script>
+
+    <!-- ONU Configuration Templates JS -->
+    <script>
+    // Template management functions
+    function getTemplates() {
+        try {
+            return JSON.parse(localStorage.getItem('onuConfigTemplates') || '{}');
+        } catch (e) { return {}; }
+    }
+    
+    function refreshTemplateList() {
+        const select = document.getElementById('savedTemplates');
+        if (!select) return;
+        const templates = getTemplates();
+        select.innerHTML = '<option value="">Select a template...</option>';
+        Object.keys(templates).forEach(name => {
+            select.innerHTML += '<option value="' + name + '">' + name + '</option>';
+        });
+    }
+    
+    function saveTemplate() {
+        const name = document.getElementById('templateName')?.value?.trim();
+        if (!name) { showToast('Enter a template name', 'warning'); return; }
+        
+        const template = {
+            ethMode: document.getElementById('tplEthMode')?.value || 'access',
+            vlan: document.getElementById('tplVlan')?.value || '',
+            lineProfile: document.getElementById('tplLineProfile')?.value || '',
+            serviceProfile: document.getElementById('tplServiceProfile')?.value || '',
+            enableTr069: document.getElementById('tplEnableTr069')?.checked || false
+        };
+        
+        const templates = getTemplates();
+        templates[name] = template;
+        localStorage.setItem('onuConfigTemplates', JSON.stringify(templates));
+        refreshTemplateList();
+        document.getElementById('templateName').value = '';
+        showToast('Template "' + name + '" saved', 'success');
+    }
+    
+    function loadTemplate(name) {
+        if (!name) return;
+        const templates = getTemplates();
+        const tpl = templates[name];
+        if (!tpl) return;
+        
+        document.getElementById('tplEthMode').value = tpl.ethMode || 'access';
+        document.getElementById('tplVlan').value = tpl.vlan || '';
+        document.getElementById('tplLineProfile').value = tpl.lineProfile || '';
+        document.getElementById('tplServiceProfile').value = tpl.serviceProfile || '';
+        document.getElementById('tplEnableTr069').checked = tpl.enableTr069 || false;
+        
+        showToast('Template "' + name + '" loaded', 'info');
+    }
+    
+    function deleteTemplate() {
+        const select = document.getElementById('savedTemplates');
+        const name = select?.value;
+        if (!name) { showToast('Select a template to delete', 'warning'); return; }
+        
+        if (!confirm('Delete template "' + name + '"?')) return;
+        
+        const templates = getTemplates();
+        delete templates[name];
+        localStorage.setItem('onuConfigTemplates', JSON.stringify(templates));
+        refreshTemplateList();
+        showToast('Template deleted', 'success');
+    }
+    
+    function applyTemplateToAuth(name) {
+        const templates = getTemplates();
+        const tpl = templates[name];
+        if (!tpl) return;
+        
+        // Apply to authorization form if it exists
+        const lineProfileSelect = document.querySelector('#authForm [name="line_profile"]');
+        const serviceProfileSelect = document.querySelector('#authForm [name="service_profile"]');
+        const vlanInput = document.querySelector('#authForm [name="vlan"]');
+        
+        if (lineProfileSelect && tpl.lineProfile) {
+            for (let opt of lineProfileSelect.options) {
+                if (opt.textContent.includes(tpl.lineProfile)) { opt.selected = true; break; }
+            }
+        }
+        if (serviceProfileSelect && tpl.serviceProfile) {
+            for (let opt of serviceProfileSelect.options) {
+                if (opt.textContent.includes(tpl.serviceProfile)) { opt.selected = true; break; }
+            }
+        }
+        if (vlanInput && tpl.vlan) vlanInput.value = tpl.vlan;
+    }
+    
+    document.addEventListener('DOMContentLoaded', refreshTemplateList);
     </script>
 </body>
 </html>
