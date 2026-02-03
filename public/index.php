@@ -7633,6 +7633,128 @@ $csrfToken = \App\Auth::generateToken();
                 margin-bottom: 0.75rem;
             }
         }
+        
+        /* Enhanced Mobile Responsiveness */
+        @media (max-width: 991.98px) {
+            /* Make all tables horizontally scrollable */
+            .table-responsive-mobile {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .table-responsive-mobile table {
+                min-width: 600px;
+            }
+            /* Smaller text in tables on mobile */
+            table.table-sm-mobile td, table.table-sm-mobile th {
+                font-size: 0.8rem;
+                padding: 0.4rem;
+            }
+            /* Cards should be full width */
+            .card {
+                margin-bottom: 1rem;
+            }
+            /* Fix nav tabs on mobile */
+            .nav-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .nav-tabs .nav-link {
+                white-space: nowrap;
+                font-size: 0.85rem;
+                padding: 0.5rem 0.75rem;
+            }
+            /* Smaller headers on mobile */
+            h1, .h1 { font-size: 1.5rem; }
+            h2, .h2 { font-size: 1.3rem; }
+            h3, .h3 { font-size: 1.15rem; }
+            h4, .h4 { font-size: 1rem; }
+            /* Better button groups on mobile */
+            .btn-group-mobile {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+            }
+            .btn-group-mobile .btn {
+                flex: 1 1 auto;
+                min-width: 45%;
+            }
+            /* ONU detail cards - stack on mobile */
+            .onu-detail-grid {
+                display: block !important;
+            }
+            .onu-detail-grid > div {
+                margin-bottom: 0.75rem;
+            }
+            /* Hide less important columns on mobile */
+            .hide-mobile {
+                display: none !important;
+            }
+            /* Full-width dropdown menus */
+            .dropdown-menu {
+                max-width: 100vw;
+            }
+            /* Compact badges */
+            .badge {
+                font-size: 0.7rem;
+            }
+        }
+        
+        @media (max-width: 575.98px) {
+            /* Extra small screens */
+            .main-content {
+                padding: 0.75rem;
+                padding-top: 65px;
+            }
+            /* Stack all action buttons */
+            .action-buttons-mobile {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .action-buttons-mobile .btn {
+                width: 100%;
+            }
+            /* Smaller stat cards */
+            .stat-card .stat-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+            .stat-card h3 {
+                font-size: 1.25rem;
+            }
+            /* More compact tables */
+            table.table-compact-mobile td, table.table-compact-mobile th {
+                font-size: 0.75rem;
+                padding: 0.3rem;
+            }
+            /* Modals full width */
+            .modal-dialog {
+                margin: 0;
+                max-width: 100%;
+            }
+            .modal-content {
+                border-radius: 0;
+                min-height: 100vh;
+            }
+            .modal-lg, .modal-xl {
+                max-width: 100%;
+            }
+        }
+        
+        /* Utility classes for mobile */
+        .text-truncate-mobile {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        @media (min-width: 768px) {
+            .text-truncate-mobile {
+                max-width: none;
+            }
+        }
     </style>
 </head>
 <body>
