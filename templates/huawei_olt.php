@@ -18451,7 +18451,6 @@ async function toggleLanPortParam(btn, path, newValue) {
 }
 // Tab definitions - Only show these specific sections
 const tabConfig = {
-    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1, editable: true },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2, editable: true },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3, editable: true },
     'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4, editable: true },
