@@ -203,6 +203,37 @@ if ($page === 'settings' && isset($_GET['subpage']) && $_GET['subpage'] === 'bac
     exit;
 }
 
+
+// Recent Activity Feed API
+if ($page === 'api' && $action === 'recent_activity') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'activities' => []]);
+        exit;
+    }
+    
+    $limit = min(50, max(10, (int)($_GET['limit'] ?? 20)));
+    
+    try {
+        $stmt = $db->prepare("
+            SELECT al.id, al.activity_type, al.description, al.created_at, u.name as user_name
+            FROM activity_log al
+            LEFT JOIN users u ON al.user_id = u.id
+            ORDER BY al.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$limit]);
+        $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'activities' => $activities]);
+    } catch (Exception $e) {
+        // Try fallback if activity_log doesn't exist
+        echo json_encode(['success' => true, 'activities' => []]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'late_deductions') {
     header('Content-Type: application/json');
     
@@ -7756,6 +7787,86 @@ $csrfToken = \App\Auth::generateToken();
             }
         }
     </style>
+    
+    <!-- Dark Mode Support -->
+    <style id="darkModeStyles">
+        body.dark-mode {
+            --bs-body-bg: #1a1a2e;
+            --bs-body-color: #e2e8f0;
+            background-color: #1a1a2e !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .card { background: #16213e !important; border-color: #1f4068 !important; }
+        body.dark-mode .card-header { background: #1f4068 !important; border-color: #1f4068 !important; }
+        body.dark-mode .table { --bs-table-bg: #16213e; --bs-table-color: #e2e8f0; --bs-table-border-color: #1f4068; }
+        body.dark-mode .modal-content { background: #16213e !important; border-color: #1f4068 !important; }
+        body.dark-mode .form-control, body.dark-mode .form-select { background: #1a1a2e !important; border-color: #1f4068 !important; color: #e2e8f0 !important; }
+        body.dark-mode .list-group-item { background: #16213e !important; border-color: #1f4068 !important; color: #e2e8f0 !important; }
+        body.dark-mode .bg-light, body.dark-mode .bg-white { background: #16213e !important; }
+        body.dark-mode .text-muted { color: #94a3b8 !important; }
+        body.dark-mode .sidebar, body.dark-mode .isp-sidebar, body.dark-mode .oms-sidebar { background: #0f0f23 !important; }
+        body.dark-mode .dropdown-menu { background: #16213e !important; border-color: #1f4068 !important; }
+        body.dark-mode .dropdown-item { color: #e2e8f0 !important; }
+        body.dark-mode .dropdown-item:hover { background: #1f4068 !important; }
+        body.dark-mode .nav-link { color: #94a3b8 !important; }
+        body.dark-mode .nav-link.active { color: #e2e8f0 !important; background: #1f4068 !important; }
+        body.dark-mode code { background: #1f4068; color: #fbbf24; }
+        body.dark-mode .alert-info { background: #1f4068 !important; border-color: #1f4068 !important; }
+        
+        /* Dark Mode Toggle Button */
+        .dark-mode-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+        .dark-mode-toggle:hover { transform: scale(1.1); }
+        body:not(.dark-mode) .dark-mode-toggle { background: #1a1a2e; color: #fff; }
+        body.dark-mode .dark-mode-toggle { background: #f1f5f9; color: #1a1a2e; }
+        
+        /* Keyboard Shortcuts Help */
+        .keyboard-shortcuts-help {
+            position: fixed;
+            bottom: 70px;
+            right: 20px;
+            z-index: 9998;
+            display: none;
+        }
+        .keyboard-shortcuts-help.show { display: block; }
+        .shortcut-key { 
+            display: inline-block;
+            background: #e2e8f0;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        body.dark-mode .shortcut-key { background: #1f4068; border-color: #1f4068; }
+        
+        /* Activity Feed */
+        .activity-feed-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 75px;
+            z-index: 9998;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: none;
+            background: #6366f1;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+    </style>
 </head>
 <body>
     <?php
@@ -8514,6 +8625,150 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+</script>
+
+<!-- Dark Mode Toggle & Activity Feed Buttons -->
+<button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode (Ctrl+D)">
+    <i class="bi bi-moon-stars-fill"></i>
+</button>
+
+<button class="activity-feed-btn" onclick="toggleActivityFeed()" title="Recent Activity (Ctrl+A)">
+    <i class="bi bi-activity"></i>
+</button>
+
+<!-- Keyboard Shortcuts Help Panel -->
+<div class="keyboard-shortcuts-help card shadow" id="shortcutsPanel">
+    <div class="card-body py-2 px-3">
+        <h6 class="mb-2"><i class="bi bi-keyboard me-1"></i>Keyboard Shortcuts</h6>
+        <div class="small">
+            <div class="mb-1"><span class="shortcut-key">Ctrl</span>+<span class="shortcut-key">D</span> Dark Mode</div>
+            <div class="mb-1"><span class="shortcut-key">Ctrl</span>+<span class="shortcut-key">/</span> Search</div>
+            <div class="mb-1"><span class="shortcut-key">Ctrl</span>+<span class="shortcut-key">H</span> Dashboard</div>
+            <div class="mb-1"><span class="shortcut-key">?</span> Show Shortcuts</div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Feed Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="activityFeedOffcanvas">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title"><i class="bi bi-activity me-2"></i>Recent Activity</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="activityFeedContent">
+        <div class="text-center text-muted py-4">
+            <div class="spinner-border spinner-border-sm me-2"></div>Loading...
+        </div>
+    </div>
+</div>
+
+<script>
+// Dark Mode Toggle
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('darkMode', isDark ? '1' : '0');
+    
+    // Update toggle button icon
+    const btn = document.querySelector('.dark-mode-toggle i');
+    if (btn) btn.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+}
+
+// Initialize dark mode from localStorage
+document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('darkMode') === '1') {
+        document.body.classList.add('dark-mode');
+        const btn = document.querySelector('.dark-mode-toggle i');
+        if (btn) btn.className = 'bi bi-sun-fill';
+    }
+});
+
+// Keyboard Shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl+D: Toggle dark mode
+    if (e.ctrlKey && e.key === 'd') {
+        e.preventDefault();
+        toggleDarkMode();
+    }
+    
+    // Ctrl+/: Focus search
+    if (e.ctrlKey && e.key === '/') {
+        e.preventDefault();
+        const search = document.querySelector('input[name="search"], #searchInput, .search-input');
+        if (search) search.focus();
+    }
+    
+    // Ctrl+H: Go to dashboard
+    if (e.ctrlKey && e.key === 'h') {
+        e.preventDefault();
+        window.location.href = '?page=dashboard';
+    }
+    
+    // ?: Show shortcuts help
+    if (e.key === '?' && !e.ctrlKey && !e.altKey) {
+        const panel = document.getElementById('shortcutsPanel');
+        if (panel) {
+            panel.classList.toggle('show');
+            setTimeout(() => panel.classList.remove('show'), 5000);
+        }
+    }
+    
+    // Escape: Close shortcuts help
+    if (e.key === 'Escape') {
+        const panel = document.getElementById('shortcutsPanel');
+        if (panel) panel.classList.remove('show');
+    }
+});
+
+// Activity Feed Toggle
+function toggleActivityFeed() {
+    const offcanvas = new bootstrap.Offcanvas(document.getElementById('activityFeedOffcanvas'));
+    offcanvas.toggle();
+    loadActivityFeed();
+}
+
+function loadActivityFeed() {
+    const content = document.getElementById('activityFeedContent');
+    if (!content) return;
+    
+    // Fetch recent activity (from activity log)
+    fetch('?page=api&action=recent_activity&limit=20')
+        .then(r => r.json())
+        .then(data => {
+            if (data.activities && data.activities.length > 0) {
+                let html = '<ul class="list-group list-group-flush">';
+                data.activities.forEach(act => {
+                    const time = new Date(act.created_at).toLocaleString();
+                    const icon = getActivityIcon(act.activity_type);
+                    html += '<li class="list-group-item px-0 py-2">';
+                    html += '<div class="d-flex"><span class="me-2">' + icon + '</span>';
+                    html += '<div class="flex-grow-1"><div class="small fw-bold">' + (act.description || act.activity_type) + '</div>';
+                    html += '<div class="text-muted small">' + (act.user_name || 'System') + ' • ' + time + '</div></div></div>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+                content.innerHTML = html;
+            } else {
+                content.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No recent activity</div>';
+            }
+        })
+        .catch(() => {
+            content.innerHTML = '<div class="text-center text-muted py-4">Unable to load activity</div>';
+        });
+}
+
+function getActivityIcon(type) {
+    const icons = {
+        'login': '<i class="bi bi-box-arrow-in-right text-success"></i>',
+        'logout': '<i class="bi bi-box-arrow-left text-secondary"></i>',
+        'ticket': '<i class="bi bi-ticket text-primary"></i>',
+        'customer': '<i class="bi bi-person text-info"></i>',
+        'payment': '<i class="bi bi-credit-card text-success"></i>',
+        'onu': '<i class="bi bi-router text-warning"></i>',
+        'subscriber': '<i class="bi bi-people text-info"></i>'
+    };
+    return icons[type] || '<i class="bi bi-circle text-muted"></i>';
+}
 </script>
 </body>
 </html>
