@@ -2271,6 +2271,9 @@ try {
                 <a class="nav-link <?= $view === 'import' ? 'active' : '' ?>" href="?page=isp&view=import">
                     <i class="bi bi-upload me-2"></i> Import CSV
                 </a>
+                <a class="nav-link <?= $view === 'communication' ? 'active' : '' ?>" href="?page=isp&view=communication">
+                    <i class="bi bi-chat-dots me-2"></i> Communication
+                </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link" href="?page=huawei-olt">
                     <i class="bi bi-router me-2"></i> OLT / Fiber <i class="bi bi-box-arrow-up-right small ms-1 opacity-50"></i>
@@ -2337,6 +2340,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'import' ? 'active' : '' ?>" href="?page=isp&view=import">
                     <i class="bi bi-upload me-2"></i> Import CSV
+                </a>
+                <a class="nav-link <?= $view === 'communication' ? 'active' : '' ?>" href="?page=isp&view=communication">
+                    <i class="bi bi-chat-dots me-2"></i> Communication
                 </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link" href="?page=huawei-olt">
@@ -9060,6 +9066,280 @@ try {
             </script>
             <?php } ?>
 
+            <?php elseif ($view === 'communication'): ?>
+            <?php
+            // Fetch SMS logs
+            $smsLogsPage = isset($_GET['sms_page']) ? max(1, (int)$_GET['sms_page']) : 1;
+            $smsLogsLimit = 25;
+            $smsLogsOffset = ($smsLogsPage - 1) * $smsLogsLimit;
+            
+            $smsLogsCountStmt = $db->query("SELECT COUNT(*) FROM sms_logs");
+            $smsLogsTotalCount = $smsLogsCountStmt->fetchColumn();
+            $smsLogsTotalPages = ceil($smsLogsTotalCount / $smsLogsLimit);
+            
+            $smsLogsStmt = $db->prepare("
+                SELECT sl.*, t.ticket_number 
+                FROM sms_logs sl 
+                LEFT JOIN tickets t ON sl.ticket_id = t.id 
+                ORDER BY sl.sent_at DESC 
+                LIMIT ? OFFSET ?
+            ");
+            $smsLogsStmt->execute([$smsLogsLimit, $smsLogsOffset]);
+            $smsLogs = $smsLogsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $ispLocations = $radiusBilling->getLocations();
+            $packages = $radiusBilling->getPackages();
+            $commTab = $_GET['tab'] ?? 'bulk_sms';
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-chat-dots"></i> Communication</h4>
+            </div>
+            
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <a class="nav-link <?= $commTab === 'bulk_sms' ? 'active' : '' ?>" href="?page=isp&view=communication&tab=bulk_sms">
+                        <i class="bi bi-envelope-paper me-1"></i> Bulk SMS
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $commTab === 'sms_logs' ? 'active' : '' ?>" href="?page=isp&view=communication&tab=sms_logs">
+                        <i class="bi bi-clock-history me-1"></i> SMS Logs
+                        <?php if ($smsLogsTotalCount > 0): ?>
+                        <span class="badge bg-secondary ms-1"><?= number_format($smsLogsTotalCount) ?></span>
+                        <?php endif; ?>
+                    </a>
+                </li>
+            </ul>
+            
+            <?php if ($commTab === 'bulk_sms'): ?>
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-envelope-paper me-2"></i>Bulk SMS to Subscribers
+                </div>
+                <div class="card-body">
+                    <form method="post" id="bulkSmsForm">
+                        <input type="hidden" name="action" value="send_bulk_sms">
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Status</label>
+                                <select name="filter_status" class="form-select" id="bulkFilterStatus">
+                                    <option value="">All Statuses</option>
+                                    <option value="active">Active</option>
+                                    <option value="expired">Expired</option>
+                                    <option value="suspended">Suspended</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Zone</label>
+                                <select name="filter_location" class="form-select" id="bulkFilterLocation">
+                                    <option value="">All Zones</option>
+                                    <?php foreach ($ispLocations as $loc): ?>
+                                    <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Filter by Package</label>
+                                <select name="filter_package" class="form-select" id="bulkFilterPackage">
+                                    <option value="">All Packages</option>
+                                    <?php foreach ($packages as $p): ?>
+                                    <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary" onclick="previewRecipients()">
+                                <i class="bi bi-eye me-1"></i> Preview Recipients
+                            </button>
+                            <span id="recipientCount" class="ms-3 text-muted"></span>
+                        </div>
+                        
+                        <div id="recipientPreview" class="mb-3" style="display: none;">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>Selected Recipients:</h6>
+                                    <div id="recipientList" style="max-height: 200px; overflow-y: auto;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Message <span class="text-danger">*</span></label>
+                            <textarea name="message" class="form-control" rows="4" required placeholder="Type your message here..."></textarea>
+                            <div class="d-flex justify-content-between mt-2">
+                                <small class="text-muted">Variables: {customer_name}, {username}, {package_name}, {expiry_date}, {balance}</small>
+                                <small class="text-muted"><span id="charCount">0</span>/160 characters</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Send Via</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="send_via" id="sendSms" value="sms" checked>
+                                <label class="btn btn-outline-primary" for="sendSms"><i class="bi bi-chat-dots me-1"></i> SMS</label>
+                                <input type="radio" class="btn-check" name="send_via" id="sendWhatsapp" value="whatsapp">
+                                <label class="btn btn-outline-success" for="sendWhatsapp"><i class="bi bi-whatsapp me-1"></i> WhatsApp</label>
+                                <input type="radio" class="btn-check" name="send_via" id="sendBoth" value="both">
+                                <label class="btn btn-outline-info" for="sendBoth"><i class="bi bi-send me-1"></i> Both</label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('Send bulk message to selected subscribers?')">
+                            <i class="bi bi-send-fill me-1"></i> Send Bulk Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <script>
+            document.querySelector('textarea[name="message"]').addEventListener('input', function() {
+                document.getElementById('charCount').textContent = this.value.length;
+            });
+            
+            function previewRecipients() {
+                const status = document.getElementById('bulkFilterStatus').value;
+                const location = document.getElementById('bulkFilterLocation').value;
+                const pkg = document.getElementById('bulkFilterPackage').value;
+                
+                fetch(`/index.php?page=isp&action=preview_bulk_sms&status=${status}&location=${location}&package=${pkg}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('recipientCount').textContent = `${data.count} subscribers selected`;
+                        
+                        if (data.subscribers && data.subscribers.length > 0) {
+                            let html = '<table class="table table-sm table-striped mb-0"><thead><tr><th>Customer</th><th>Phone</th><th>Package</th><th>Status</th></tr></thead><tbody>';
+                            data.subscribers.slice(0, 50).forEach(s => {
+                                html += `<tr><td>${s.customer_name || 'N/A'}</td><td>${s.customer_phone || 'N/A'}</td><td>${s.package_name || 'N/A'}</td><td>${s.status}</td></tr>`;
+                            });
+                            if (data.count > 50) {
+                                html += `<tr><td colspan="4" class="text-center text-muted">...and ${data.count - 50} more</td></tr>`;
+                            }
+                            html += '</tbody></table>';
+                            document.getElementById('recipientList').innerHTML = html;
+                            document.getElementById('recipientPreview').style.display = 'block';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Preview error:', err);
+                        document.getElementById('recipientCount').textContent = 'Error loading preview';
+                    });
+            }
+            </script>
+            
+            <?php elseif ($commTab === 'sms_logs'): ?>
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-clock-history me-2"></i>SMS Logs</span>
+                    <span class="badge bg-primary"><?= number_format($smsLogsTotalCount) ?> total messages</span>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($smsLogs)): ?>
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mt-2">No SMS logs found</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Recipient</th>
+                                    <th>Type</th>
+                                    <th>Message</th>
+                                    <th>Status</th>
+                                    <th>Ticket</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($smsLogs as $log): ?>
+                                <tr>
+                                    <td class="text-nowrap">
+                                        <small><?= date('M j, Y', strtotime($log['sent_at'])) ?></small><br>
+                                        <small class="text-muted"><?= date('H:i:s', strtotime($log['sent_at'])) ?></small>
+                                    </td>
+                                    <td>
+                                        <i class="bi bi-phone me-1 text-muted"></i>
+                                        <?= htmlspecialchars($log['recipient_phone']) ?>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-<?= $log['recipient_type'] === 'customer' ? 'info' : 'secondary' ?>">
+                                            <?= ucfirst(htmlspecialchars($log['recipient_type'])) ?>
+                                        </span>
+                                    </td>
+                                    <td style="max-width: 300px;">
+                                        <small class="text-truncate d-block" title="<?= htmlspecialchars($log['message']) ?>">
+                                            <?= htmlspecialchars(substr($log['message'], 0, 80)) ?><?= strlen($log['message']) > 80 ? '...' : '' ?>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $statusClass = 'secondary';
+                                        if ($log['status'] === 'sent' || $log['status'] === 'delivered') $statusClass = 'success';
+                                        elseif ($log['status'] === 'failed') $statusClass = 'danger';
+                                        elseif ($log['status'] === 'pending') $statusClass = 'warning';
+                                        ?>
+                                        <span class="badge bg-<?= $statusClass ?>">
+                                            <?= ucfirst(htmlspecialchars($log['status'])) ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php if ($log['ticket_number']): ?>
+                                        <a href="?page=tickets&action=view&id=<?= $log['ticket_id'] ?>" class="text-decoration-none">
+                                            <?= htmlspecialchars($log['ticket_number']) ?>
+                                        </a>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <?php if ($smsLogsTotalPages > 1): ?>
+                    <div class="card-footer">
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0 justify-content-center">
+                                <?php if ($smsLogsPage > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=isp&view=communication&tab=sms_logs&sms_page=<?= $smsLogsPage - 1 ?>">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+                                
+                                <?php
+                                $startPage = max(1, $smsLogsPage - 2);
+                                $endPage = min($smsLogsTotalPages, $smsLogsPage + 2);
+                                for ($i = $startPage; $i <= $endPage; $i++):
+                                ?>
+                                <li class="page-item <?= $i === $smsLogsPage ? 'active' : '' ?>">
+                                    <a class="page-link" href="?page=isp&view=communication&tab=sms_logs&sms_page=<?= $i ?>"><?= $i ?></a>
+                                </li>
+                                <?php endfor; ?>
+                                
+                                <?php if ($smsLogsPage < $smsLogsTotalPages): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=isp&view=communication&tab=sms_logs&sms_page=<?= $smsLogsPage + 1 ?>">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+                            </ul>
+                        </nav>
+                    </div>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <?php elseif ($view === 'settings'): ?>
             <?php
             $settingsTab = $_GET['tab'] ?? 'notifications';
@@ -9095,11 +9375,6 @@ try {
                 <li class="nav-item">
                     <a class="nav-link <?= $settingsTab === 'locations' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=locations">
                         <i class="bi bi-geo-alt me-1"></i> Zones
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link <?= $settingsTab === 'bulk_sms' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=bulk_sms">
-                        <i class="bi bi-envelope-paper me-1"></i> Bulk SMS
                     </a>
                 </li>
             </ul>
@@ -9692,129 +9967,6 @@ try {
                     </div>
                 </div>
             </div>
-            
-            <?php elseif ($settingsTab === 'bulk_sms'): ?>
-            <?php
-            $ispLocations = $radiusBilling->getLocations();
-            $packages = $radiusBilling->getPackages();
-            ?>
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <i class="bi bi-envelope-paper me-2"></i>Bulk SMS to Subscribers
-                </div>
-                <div class="card-body">
-                    <form method="post" id="bulkSmsForm">
-                        <input type="hidden" name="action" value="send_bulk_sms">
-                        
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-4">
-                                <label class="form-label">Filter by Status</label>
-                                <select name="filter_status" class="form-select" id="bulkFilterStatus">
-                                    <option value="">All Statuses</option>
-                                    <option value="active">Active</option>
-                                    <option value="expired">Expired</option>
-                                    <option value="suspended">Suspended</option>
-                                    <option value="inactive">Inactive</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Filter by Zone</label>
-                                <select name="filter_location" class="form-select" id="bulkFilterLocation">
-                                    <option value="">All Zones</option>
-                                    <?php foreach ($ispLocations as $loc): ?>
-                                    <option value="<?= $loc['id'] ?>"><?= htmlspecialchars($loc['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Filter by Package</label>
-                                <select name="filter_package" class="form-select" id="bulkFilterPackage">
-                                    <option value="">All Packages</option>
-                                    <?php foreach ($packages as $p): ?>
-                                    <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <button type="button" class="btn btn-outline-primary" onclick="previewRecipients()">
-                                <i class="bi bi-eye me-1"></i> Preview Recipients
-                            </button>
-                            <span id="recipientCount" class="ms-3 text-muted"></span>
-                        </div>
-                        
-                        <div id="recipientPreview" class="mb-3" style="display: none;">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6>Selected Recipients:</h6>
-                                    <div id="recipientList" style="max-height: 200px; overflow-y: auto;"></div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Message <span class="text-danger">*</span></label>
-                            <textarea name="message" class="form-control" rows="4" required placeholder="Type your message here..."></textarea>
-                            <div class="d-flex justify-content-between mt-2">
-                                <small class="text-muted">Variables: {customer_name}, {username}, {package_name}, {expiry_date}, {balance}</small>
-                                <small class="text-muted"><span id="charCount">0</span>/160 characters</small>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Send Via</label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="send_via" id="sendSms" value="sms" checked>
-                                <label class="btn btn-outline-primary" for="sendSms"><i class="bi bi-chat-dots me-1"></i> SMS</label>
-                                <input type="radio" class="btn-check" name="send_via" id="sendWhatsapp" value="whatsapp">
-                                <label class="btn btn-outline-success" for="sendWhatsapp"><i class="bi bi-whatsapp me-1"></i> WhatsApp</label>
-                                <input type="radio" class="btn-check" name="send_via" id="sendBoth" value="both">
-                                <label class="btn btn-outline-info" for="sendBoth"><i class="bi bi-send me-1"></i> Both</label>
-                            </div>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('Send bulk message to selected subscribers?')">
-                            <i class="bi bi-send-fill me-1"></i> Send Bulk Message
-                        </button>
-                    </form>
-                </div>
-            </div>
-            
-            <script>
-            document.querySelector('textarea[name="message"]').addEventListener('input', function() {
-                document.getElementById('charCount').textContent = this.value.length;
-            });
-            
-            function previewRecipients() {
-                const status = document.getElementById('bulkFilterStatus').value;
-                const location = document.getElementById('bulkFilterLocation').value;
-                const pkg = document.getElementById('bulkFilterPackage').value;
-                
-                fetch(`/index.php?page=isp&action=preview_bulk_sms&status=${status}&location=${location}&package=${pkg}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        document.getElementById('recipientCount').textContent = `${data.count} subscribers selected`;
-                        
-                        if (data.subscribers && data.subscribers.length > 0) {
-                            let html = '<table class="table table-sm table-striped mb-0"><thead><tr><th>Customer</th><th>Phone</th><th>Package</th><th>Status</th></tr></thead><tbody>';
-                            data.subscribers.slice(0, 50).forEach(s => {
-                                html += `<tr><td>${s.customer_name || 'N/A'}</td><td>${s.customer_phone || 'N/A'}</td><td>${s.package_name || 'N/A'}</td><td>${s.status}</td></tr>`;
-                            });
-                            if (data.count > 50) {
-                                html += `<tr><td colspan="4" class="text-center text-muted">...and ${data.count - 50} more</td></tr>`;
-                            }
-                            html += '</tbody></table>';
-                            document.getElementById('recipientList').innerHTML = html;
-                            document.getElementById('recipientPreview').style.display = 'block';
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Preview error:', err);
-                        document.getElementById('recipientCount').textContent = 'Error loading preview';
-                    });
-            }
-            </script>
             <?php endif; ?>
             
             <?php endif; ?>
