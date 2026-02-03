@@ -2307,7 +2307,7 @@ class GenieACS {
             $results[] = ['step' => 'add_wan_ip_connection', 'result' => $addWanIpResult];
             usleep(500000);
             
-            // Step 5: Set ConnectionType to IP_Bridged
+            // Step 5: Set ConnectionType to IP_Bridged and Enable it
             $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1";
             $setBridgeResult = $this->makeRequest(
                 "POST",
@@ -2315,7 +2315,10 @@ class GenieACS {
                 [
                     'name' => 'setParameterValues',
                     'parameterValues' => [
-                        ["{$wanIpPath}.ConnectionType", 'IP_Bridged', 'xsd:string']
+                        ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
+                        ["{$wanIpPath}.ConnectionType", 'IP_Bridged', 'xsd:string'],
+                        ["{$wanIpPath}.X_HW_ServiceList", 'INTERNET', 'xsd:string'],
+                        ["{$wanIpPath}.X_HW_MulticastVLAN", '-1', 'xsd:int']
                     ]
                 ]
             );
@@ -2360,7 +2363,8 @@ class GenieACS {
                     'name' => 'setParameterValues',
                     'parameterValues' => [
                         ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
-                        ["{$wanIpPath}.X_HW_VLAN", (string)$vlanId, 'xsd:int']
+                        ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
+                        ["{$wanIpPath}.X_HW_VLANPriority", 0, 'xsd:unsignedInt']
                     ]
                 ]
             );

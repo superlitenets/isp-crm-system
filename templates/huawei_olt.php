@@ -9350,7 +9350,16 @@ try {
                 if (!hasTR069) {
                     loading.classList.add('d-none');
                     refreshBtn.disabled = false;
-                    showToast('Device not connected to TR-069', 'warning');
+                    // Update all rows to show "No TR-069" instead of "Loading..."
+                    document.querySelectorAll('.wifi-row').forEach(row => {
+                        const ssidCell = row.querySelector('.wifi-ssid');
+                        const modeCell = row.querySelector('.wifi-mode');
+                        const vlanCell = row.querySelector('.wifi-vlan');
+                        if (ssidCell) ssidCell.innerHTML = '<span class="text-muted fst-italic">Not connected</span>';
+                        if (modeCell) modeCell.innerHTML = '<span class="badge bg-secondary">--</span>';
+                        if (vlanCell) vlanCell.innerHTML = '<span class="text-muted">--</span>';
+                    });
+                    if (!silent) showToast('Device not connected to TR-069', 'warning');
                     return;
                 }
                 
@@ -9475,6 +9484,13 @@ try {
                 .catch(err => {
                     loading.classList.add('d-none');
                     refreshBtn.disabled = false;
+                    // Update table to show error state
+                    document.querySelectorAll('.wifi-row').forEach(row => {
+                        const ssidCell = row.querySelector('.wifi-ssid');
+                        if (ssidCell && ssidCell.innerHTML.includes('Loading')) {
+                            ssidCell.innerHTML = '<span class="text-danger fst-italic">Error</span>';
+                        }
+                    });
                     showToast('Error: ' + err.message, 'danger');
                 });
             }
