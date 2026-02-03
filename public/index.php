@@ -8740,10 +8740,14 @@ function loadActivityFeed() {
                 data.activities.forEach(act => {
                     const time = new Date(act.created_at).toLocaleString();
                     const icon = getActivityIcon(act.activity_type);
+                    // Escape HTML to prevent XSS
+                    const escapeHtml = (str) => String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                    const desc = escapeHtml(act.description || act.activity_type);
+                    const user = escapeHtml(act.user_name || 'System');
                     html += '<li class="list-group-item px-0 py-2">';
                     html += '<div class="d-flex"><span class="me-2">' + icon + '</span>';
-                    html += '<div class="flex-grow-1"><div class="small fw-bold">' + (act.description || act.activity_type) + '</div>';
-                    html += '<div class="text-muted small">' + (act.user_name || 'System') + ' • ' + time + '</div></div></div>';
+                    html += '<div class="flex-grow-1"><div class="small fw-bold">' + desc + '</div>';
+                    html += '<div class="text-muted small">' + user + ' • ' + time + '</div></div></div>';
                     html += '</li>';
                 });
                 html += '</ul>';
