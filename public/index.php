@@ -3237,9 +3237,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             
             case 'quick_resolve_ticket':
-                // Admin quick resolve - no form required
-                if (!\App\Auth::isAdmin()) {
-                    $_SESSION['flash_message'] = 'Only administrators can use quick resolve.';
+                // Admin/Support quick resolve - no form required
+                if (!\App\Auth::isAdmin() && !\App\Auth::hasRole('support')) {
+                    $_SESSION['flash_message'] = 'Only administrators and support staff can use quick resolve.';
                     $_SESSION['flash_type'] = 'danger';
                     header('Location: ?page=tickets');
                     exit;
