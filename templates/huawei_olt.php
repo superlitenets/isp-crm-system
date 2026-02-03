@@ -9409,21 +9409,19 @@ try {
                             let modeHtml = '';
                             const connMode = iface.conn_mode || '';
                             const bindWan = iface.bind_wan || '';
+                            const vlanId = iface.vlan_id || '';
                             
-                            if (connMode && connMode.toLowerCase().includes('bridge')) {
-                                modeHtml = '<span class="badge bg-warning text-dark">Bridge</span>';
+                            // Priority: Show Access VLAN if VLAN is configured
+                            if (vlanId) {
+                                modeHtml = 'Access VLAN: ' + vlanId;
+                            } else if (connMode && connMode.toLowerCase().includes('bridge')) {
+                                modeHtml = 'Bridge';
                             } else if (connMode && connMode.toLowerCase().includes('route')) {
-                                modeHtml = '<span class="badge bg-info">Route</span>';
-                            } else if (bindWan) {
-                                modeHtml = '<span class="badge bg-success">WAN</span>';
+                                modeHtml = 'Route';
                             } else {
-                                modeHtml = '<span class="badge bg-secondary">LAN</span>';
+                                modeHtml = 'LAN';
                             }
-                            
-                            if (bindWan) {
-                                modeHtml += ' <small class="text-muted">' + escapeHtml(bindWan) + '</small>';
-                            }
-                            modeCell.innerHTML = modeHtml;
+                            modeCell.textContent = modeHtml;
                         }
                         
                         // Update SSID
