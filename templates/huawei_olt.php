@@ -9203,14 +9203,28 @@ try {
                         <tbody id="ethPortsTable">
                             <?php 
                             $ethPorts = $currentOnu['type_eth_ports'] ?? 4;
+                            $portConfig = !empty($currentOnu['port_config']) ? json_decode($currentOnu['port_config'], true) : [];
                             for ($i = 1; $i <= $ethPorts; $i++): 
+                                $pConfig = $portConfig[$i] ?? null;
+                                $mode = $pConfig['mode'] ?? 'transparent';
+                                $vlanId = $pConfig['vlan_id'] ?? null;
+                                // Format mode display
+                                if ($mode === 'access' && $vlanId) {
+                                    $modeDisplay = 'Access VLAN: ' . $vlanId;
+                                } elseif ($mode === 'trunk') {
+                                    $modeDisplay = 'Trunk' . ($vlanId ? ' (Native: ' . $vlanId . ')' : '');
+                                } elseif ($mode === 'hybrid') {
+                                    $modeDisplay = 'Hybrid' . ($vlanId ? ' (VLAN: ' . $vlanId . ')' : '');
+                                } else {
+                                    $modeDisplay = 'LAN';
+                                }
                             ?>
                             <tr>
                                 <td>eth_0/<?= $i ?></td>
                                 <td><span class="text-success">Enabled</span></td>
-                                <td>LAN</td>
-                                <td>No control</td>
-                                <td><a href="#" class="text-primary" onclick="configureEthPort(<?= $currentOnu['id'] ?>, <?= $i ?>)">Configure</a></td>
+                                <td><?= htmlspecialchars($modeDisplay) ?></td>
+                                <td><?= $vlanId ? 'VLAN ' . $vlanId : 'No control' ?></td>
+                                <td><a href="#" class="text-primary" onclick="configureEthPort(<?= $currentOnu['id'] ?>, <?= $i ?>); return false;"><i class="bi bi-gear me-1"></i>Configure</a></td>
                             </tr>
                             <?php endfor; ?>
                         </tbody>
