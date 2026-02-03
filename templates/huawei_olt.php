@@ -8165,10 +8165,10 @@ try {
                                             <button class="btn btn-outline-dark" onclick="showTR069LogsModal(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn'] ?? '') ?>')" title="TR-069 Logs">
                                                 <i class="bi bi-journal-text"></i>
                                             </button>
-                                            <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot ONU">
+                                            <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>, this)" title="Reboot ONU">
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
-                                            <button class="btn btn-outline-danger" onclick="deleteOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn'] ?? '') ?>')" title="Delete ONU">
+                                            <button class="btn btn-outline-danger" onclick="deleteOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn'] ?? '') ?>', this)" title="Delete ONU">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -16654,7 +16654,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <h5 class="modal-title"><i class="bi bi-speedometer2 me-2"></i>Configure Speed Profile (DBA)</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="?page=huawei-olt">
+                <form id="ethPortForm" onsubmit="return submitEthPortConfig(event)">
                     <input type="hidden" name="action" value="update_dba_profile">
                     <input type="hidden" name="onu_id" id="dbaOnuId">
                     <input type="hidden" name="vlan_id" id="dbaVlanId">
@@ -16708,7 +16708,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <h5 class="modal-title" id="ethPortModalLabel"><i class="bi bi-ethernet me-2"></i>Configure ETH Port</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="?page=huawei-olt">
+                <form id="ethPortForm" onsubmit="return submitEthPortConfig(event)">
                     <input type="hidden" name="action" value="configure_eth_port_omci">
                     <input type="hidden" name="onu_id" id="ethPortOnuId">
                     <input type="hidden" name="port_num" id="ethPortNum">
@@ -16764,7 +16764,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     </div>
                     <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" id="ethPortSubmitBtn" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i> Apply via OMCI
                         </button>
                     </div>
@@ -16774,6 +16774,56 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     </div>
     
     <script>
+    async function submitEthPortConfig(event) {
+        event.preventDefault();
+        const form = document.getElementById('ethPortForm');
+        const btn = document.getElementById('ethPortSubmitBtn');
+        const originalHtml = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Applying OMCI...';
+        
+        try {
+            const formData = new FormData(form);
+            formData.append('action', 'configure_eth_port_omci');
+            
+            const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            });
+            
+            const text = await response.text();
+            let data;
+            try { data = JSON.parse(text); } 
+            catch(e) { 
+                if (text.includes('success') || text.includes('configured')) {
+                    showToast('ETH port configured successfully', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('ethPortModal')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                    return false;
+                }
+                throw new Error('Invalid response');
+            }
+            
+            if (data.success) {
+                btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Applied!';
+                btn.className = 'btn btn-success';
+                showToast('ETH port configured successfully', 'success');
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('ethPortModal')).hide();
+                    location.reload();
+                }, 1500);
+            } else {
+                throw new Error(data.error || 'Configuration failed');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+        return false;
+    }
+    
     function toggleEthPortFields() {
         const mode = document.getElementById('ethPortMode').value;
         document.getElementById('ethPortAllowedField').style.display = (mode === 'trunk' || mode === 'hybrid') ? 'block' : 'none';
@@ -16810,7 +16860,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <h5 class="modal-title"><i class="bi bi-globe me-2"></i>Configure WAN/PPPoE</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="?page=huawei-olt">
+                <form id="ethPortForm" onsubmit="return submitEthPortConfig(event)">
                     <input type="hidden" name="action" value="configure_pppoe">
                     <input type="hidden" name="serial" id="pppoeSerialInput">
                     <div class="modal-body">
@@ -19376,26 +19426,85 @@ function saveDeviceStatus() {
         form.submit();
     }
     
-    function rebootOnu(id) {
-        if (confirm('Reboot this ONU?')) {
-            document.getElementById('actionType').value = 'reboot_onu';
-            document.getElementById('actionOnuId').value = id;
-            document.getElementById('actionForm').submit();
+    async function rebootOnu(id, btn = null) {
+        if (!confirm('Reboot this ONU?')) return;
+        
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
+        
+        try {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=reboot_onu&onu_id=' + id
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('Reboot command sent', 'success');
+                if (btn) { btn.innerHTML = '<i class="bi bi-check"></i>'; btn.className = 'btn btn-success btn-sm'; }
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                throw new Error(data.error || 'Reboot failed');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i>'; }
         }
     }
     
-    function deleteOnu(id, sn) {
-        if (confirm('Delete ONU ' + sn + ' from database?')) {
-            document.getElementById('actionType').value = 'delete_onu';
-            document.getElementById('actionId').value = id;
-            document.getElementById('actionForm').submit();
+    async function deleteOnu(id, sn, btn = null) {
+        if (!confirm('Delete ONU ' + sn + ' from database?')) return;
+        
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
+        
+        try {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=delete_onu&id=' + id
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('ONU deleted', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                throw new Error(data.error || 'Delete failed');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-trash"></i>'; }
         }
     }
     
-    function refreshOptical(id) {
-        document.getElementById('actionType').value = 'refresh_onu_optical';
-        document.getElementById('actionOnuId').value = id;
-        document.getElementById('actionForm').submit();
+    async function refreshOptical(id, btn = null) {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
+        
+        try {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=refresh_onu_optical&onu_id=' + id
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('Optical data refreshed', 'success');
+                if (btn) { btn.innerHTML = '<i class="bi bi-check"></i>'; btn.className = 'btn btn-success btn-sm'; }
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                throw new Error(data.error || 'Refresh failed');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>'; }
+        }
     }
     
     function getOnuFullStatus(onuId) {
@@ -19439,7 +19548,7 @@ function saveDeviceStatus() {
                 html += '<div class="btn-group btn-group-sm">';
                 html += '<button class="btn btn-primary" onclick="openWifiConfig(null, \'' + s.onu.sn + '\')"><i class="bi bi-wifi me-1"></i>WiFi</button>';
                 html += '<button class="btn btn-success" onclick="openPPPoEConfig(\'' + s.onu.sn + '\')"><i class="bi bi-globe me-1"></i>WAN</button>';
-                html += '<button class="btn btn-warning" onclick="tr069Reboot(\'' + s.onu.sn + '\')"><i class="bi bi-arrow-clockwise me-1"></i>Reboot</button>';
+                html += '<button class="btn btn-warning" onclick="tr069Reboot(\'' + s.onu.sn + '\', this)"><i class="bi bi-arrow-clockwise me-1"></i>Reboot</button>';
                 html += '</div></div>';
             }
             
@@ -21241,25 +21350,32 @@ function saveDeviceStatus() {
         new bootstrap.Modal(document.getElementById('ethPortModal')).show();
     }
     
-    function tr069Reboot(serialNumber) {
+    async function tr069Reboot(serialNumber, btn = null) {
         if (!confirm('Reboot ONU ' + serialNumber + ' via TR-069?')) return;
         
-        fetch('?page=huawei-olt&t=' + Date.now(), {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'action=tr069_reboot&serial=' + encodeURIComponent(serialNumber)
-        })
-        .then(r => r.json())
-        .then(data => {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Rebooting...';
+        }
+        
+        try {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=tr069_reboot&serial=' + encodeURIComponent(serialNumber)
+            });
+            const data = await resp.json();
+            
             if (data.success) {
-                alert('Reboot command sent successfully!');
+                showToast('Reboot command sent via TR-069', 'success');
+                if (btn) { btn.innerHTML = '<i class="bi bi-check me-1"></i>Sent!'; btn.className = 'btn btn-success'; }
             } else {
-                alert('Error: ' + (data.error || 'Failed to send reboot command'));
+                throw new Error(data.error || 'Failed to send reboot command');
             }
-        })
-        .catch(err => {
-            alert('Error: ' + err.message);
-        });
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Reboot'; }
+        }
     }
     
     function openAdminPasswordConfig(deviceId, serialNumber) {
