@@ -1305,9 +1305,8 @@ class Ticket {
         }
         
         $stmt = $this->db->prepare("
-            SELECT sl.*, u.name as user_name
+            SELECT sl.*
             FROM ticket_sla_logs sl
-            LEFT JOIN users u ON sl.created_by = u.id
             WHERE sl.ticket_id = ?
             ORDER BY sl.created_at ASC
         ");
