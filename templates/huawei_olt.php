@@ -16681,11 +16681,12 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     </div>
     
     <?php
-    // Ensure $oltVlans is available for ETH port modal
-    if (!isset($oltVlans) && isset($currentOnu['olt_id']) && isset($db)) {
-        $oltVlanStmt = $db->prepare("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = ? AND is_tr069 = FALSE AND is_active = TRUE ORDER BY vlan_id");
-        $oltVlanStmt->execute([$currentOnu['olt_id']]);
-        $oltVlans = $oltVlanStmt->fetchAll(PDO::FETCH_ASSOC);
+    // Get attached VLANs with descriptions for ETH port modal
+    $ethPortVlans = [];
+    if (isset($attachedVlans) && !empty($attachedVlans) && isset($db) && isset($currentOnu['olt_id'])) {
+        $vlanIds = implode(',', array_map('intval', $attachedVlans));
+        $ethVlanStmt = $db->query("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = " . intval($currentOnu['olt_id']) . " AND vlan_id IN ($vlanIds) ORDER BY vlan_id");
+        $ethPortVlans = $ethVlanStmt->fetchAll(PDO::FETCH_ASSOC);
     }
     ?>
     <div class="modal fade" id="ethPortModal" tabindex="-1">
@@ -16720,8 +16721,8 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <label class="form-label">VLAN</label>
                             <select name="vlan_id" id="ethPortVlanSelect" class="form-select">
                                 <option value="">-- Select VLAN --</option>
-                                <?php if (isset($oltVlans) && is_array($oltVlans)): ?>
-                                    <?php foreach ($oltVlans as $vlan): ?>
+                                <?php if (isset($ethPortVlans) && is_array($ethPortVlans)): ?>
+                                    <?php foreach ($ethPortVlans as $vlan): ?>
                                         <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: 'Service VLAN') ?></option>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
