@@ -11471,10 +11471,22 @@ class HuaweiOLT {
         
         $cmd = "interface gpon {$frame}/{$slot}\r\n";
         
+        // Note: ont port route only accepts enable|disable for routing mode
+        // This function is for toggling routing mode, not setting bridge VLANs
         if ($mode === 'transparent') {
-            $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} transparent\r\n";
-        } else {
-            $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} {$mode}\r\n";
+            // Transparent/bridge mode - disable routing
+            $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} disable\r\n";
+        } elseif ($mode === 'access' || $mode === 'hybrid') {
+            // Access/hybrid mode - use native-vlan command if VLAN specified in options
+            if (!empty($options['vlan_id'])) {
+                $priority = $options['priority'] ?? 0;
+                $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$options['vlan_id']} priority {$priority}\r\n";
+            }
+        } elseif ($mode === 'trunk') {
+            // Trunk mode - add allowed VLANs if specified
+            if (!empty($options['allowed_vlans'])) {
+                $cmd .= "ont port vlan {$port} {$onuId} eth {$ethPort} add vlan {$options['allowed_vlans']}\r\n";
+            }
         }
         
         $cmd .= "quit";
@@ -11521,18 +11533,26 @@ class HuaweiOLT {
             $priority = $config['priority'] ?? 0;
             $allowedVlans = $config['allowed_vlans'] ?? '';
             
+            // Note: ont port route only accepts enable|disable for routing mode
+            // For bridge/access mode, only use ont port native-vlan
+            // For transparent mode, no VLAN commands needed
+            
             if ($mode === 'transparent') {
-                $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} transparent\r\n";
-            } else {
-                $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} {$mode}\r\n";
-            }
-            
-            if ($vlanId && $mode !== 'trunk') {
+                // Transparent mode: disable routing, no VLAN assignment
+                $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} disable\r\n";
+            } elseif ($mode === 'access' && $vlanId) {
+                // Access mode: set native VLAN (bridge mode)
                 $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
-            }
-            
-            if ($mode === 'trunk' && !empty($allowedVlans)) {
+            } elseif ($mode === 'trunk' && !empty($allowedVlans)) {
+                // Trunk mode: add allowed VLANs
                 $cmd .= "ont port vlan {$port} {$onuId} eth {$ethPort} add vlan {$allowedVlans}\r\n";
+                if ($vlanId) {
+                    // Set native VLAN for trunk
+                    $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
+                }
+            } elseif ($mode === 'hybrid' && $vlanId) {
+                // Hybrid mode: set native VLAN
+                $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
             }
         }
         
