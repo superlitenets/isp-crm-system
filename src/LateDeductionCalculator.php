@@ -476,6 +476,11 @@ class LateDeductionCalculator {
             return [];
         }
         
+        $absentRule = $this->getAbsentRule();
+        $cutoffTime = $absentRule['cutoff_time'] ?? '10:00:00';
+        $today = date('Y-m-d');
+        $currentTime = date('H:i:s');
+        
         $placeholders = implode(',', array_fill(0, count($workingDays), '?'));
         $stmt = $this->db->prepare("
             SELECT DATE(date) as punch_date 
@@ -500,6 +505,10 @@ class LateDeductionCalculator {
         
         $absentDays = [];
         foreach ($workingDays as $day) {
+            if ($day === $today && $currentTime < $cutoffTime) {
+                continue;
+            }
+            
             if (!in_array($day, $punchedDays) && !in_array($day, $leaveDays) && !in_array($day, $holidays)) {
                 $absentDays[] = $day;
             }

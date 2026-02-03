@@ -3632,6 +3632,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
             
+            case 'update_absent_rule':
+                try {
+                    $cutoffTime = $_POST['cutoff_time'] ?? '10:00';
+                    $deductionType = $_POST['deduction_type'] ?? 'daily_rate';
+                    $deductionAmount = (float)($_POST['deduction_amount'] ?? 0);
+                    $applyAutomatically = isset($_POST['apply_automatically']) ? true : false;
+                    
+                    $stmt = $db->prepare("
+                        UPDATE absent_deduction_rules 
+                        SET cutoff_time = ?, deduction_type = ?, deduction_amount = ?, apply_automatically = ?, updated_at = NOW()
+                        WHERE is_active = TRUE
+                    ");
+                    $stmt->execute([$cutoffTime, $deductionType, $deductionAmount, $applyAutomatically]);
+                    
+                    $message = 'Absenteeism deduction settings updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+            
             case 'remove_late_penalty':
                 try {
                     $attendanceId = (int)$_POST['attendance_id'];

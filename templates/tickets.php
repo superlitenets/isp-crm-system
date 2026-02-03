@@ -740,6 +740,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
             <?php endif; endforeach; ?>
             <?php if (\App\Auth::isAdmin() || \App\Auth::hasRole('support')): ?>
             <form method="POST" class="d-inline" onsubmit="return confirm('Resolve this ticket?');">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                 <input type="hidden" name="action" value="quick_resolve_ticket">
                 <input type="hidden" name="ticket_id" value="<?= $ticketData['id'] ?>">
                 <button type="submit" class="btn btn-sm btn-success">

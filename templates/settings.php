@@ -3036,6 +3036,61 @@ $latePenaltiesEnabled = $settings->get('late_penalties_enabled', '1') === '1';
     </div>
 </div>
 
+<!-- Absenteeism Settings -->
+<?php
+$absentRule = $db->query("SELECT * FROM absent_deduction_rules WHERE is_active = TRUE LIMIT 1")->fetch(\PDO::FETCH_ASSOC);
+?>
+<div class="card mb-4 border-danger">
+    <div class="card-header bg-danger text-white">
+        <h5 class="mb-0"><i class="bi bi-calendar-x"></i> Absenteeism Deduction Settings</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">
+            Configure automatic deductions for employees who do not clock in by the cutoff time. 
+            If an employee has no clock-in record by this time, they are marked as absent and the deduction is applied.
+        </p>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="update_absent_rule">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Cutoff Time</label>
+                    <input type="time" name="cutoff_time" class="form-control" 
+                           value="<?= htmlspecialchars($absentRule['cutoff_time'] ?? '10:00') ?>" required>
+                    <small class="text-muted">Employee without clock-in by this time is marked absent</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Deduction Type</label>
+                    <select name="deduction_type" class="form-select">
+                        <option value="daily_rate" <?= ($absentRule['deduction_type'] ?? '') === 'daily_rate' ? 'selected' : '' ?>>Daily Rate</option>
+                        <option value="fixed" <?= ($absentRule['deduction_type'] ?? '') === 'fixed' ? 'selected' : '' ?>>Fixed Amount</option>
+                        <option value="percentage" <?= ($absentRule['deduction_type'] ?? '') === 'percentage' ? 'selected' : '' ?>>% of Salary</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Deduction Amount (KES)</label>
+                    <input type="number" name="deduction_amount" class="form-control" step="0.01" min="0"
+                           value="<?= htmlspecialchars($absentRule['deduction_amount'] ?? '0') ?>">
+                    <small class="text-muted">For fixed/percentage types</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Auto Apply</label>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" name="apply_automatically" value="1" 
+                               <?= ($absentRule['apply_automatically'] ?? true) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Apply automatically</label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-check-lg"></i> Save Absenteeism Settings
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="row g-4">
     <div class="col-md-<?= ($action === 'add_rule' || $editRule) ? '7' : '12' ?>">
         <div class="card">
