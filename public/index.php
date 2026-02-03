@@ -3236,6 +3236,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
             
+            case 'quick_resolve_ticket':
+                // Admin quick resolve - no form required
+                if (!\App\Auth::isAdmin()) {
+                    $_SESSION['flash_message'] = 'Only administrators can use quick resolve.';
+                    $_SESSION['flash_type'] = 'danger';
+                    header('Location: ?page=tickets');
+                    exit;
+                }
+                $ticketId = (int)($_POST['ticket_id'] ?? 0);
+                if ($ticketId) {
+                    try {
+                        $pdo = getDbConnection();
+                        
+                        // Update ticket status to resolved
+                        $stmt = $pdo->prepare("
+                            UPDATE tickets 
+                            SET status = 'resolved', 
+                                resolved_by = ?, 
+                                resolved_at = CURRENT_TIMESTAMP,
+                                updated_at = CURRENT_TIMESTAMP 
+                            WHERE id = ?
+                        ");
+                        $stmt->execute([$currentUser['id'], $ticketId]);
+                        
+                        // Log the activity
+                        $stmt = $pdo->prepare("
+                            INSERT INTO ticket_activity 
+                            (ticket_id, user_id, action, details, created_at) 
+                            VALUES (?, ?, 'status_change', ?, CURRENT_TIMESTAMP)
+                        ");
+                        $stmt->execute([
+                            $ticketId, 
+                            $currentUser['id'], 
+                            json_encode(['from' => 'open', 'to' => 'resolved', 'type' => 'admin_quick_resolve'])
+                        ]);
+                        
+                        $_SESSION['flash_message'] = 'Ticket resolved successfully.';
+                        $_SESSION['flash_type'] = 'success';
+                    } catch (Exception $e) {
+                        $_SESSION['flash_message'] = 'Error resolving ticket: ' . $e->getMessage();
+                        $_SESSION['flash_type'] = 'danger';
+                    }
+                    header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                    exit;
+                }
+                break;
+            
             case 'escalate_ticket':
                 $ticketId = (int)($_POST['ticket_id'] ?? 0);
                 $reason = trim($_POST['reason'] ?? '');

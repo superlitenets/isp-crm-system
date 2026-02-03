@@ -738,9 +738,19 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                 </button>
             </form>
             <?php endif; endforeach; ?>
+            <?php if (\App\Auth::isAdmin()): ?>
+            <form method="POST" class="d-inline" onsubmit="return confirm('Resolve this ticket?');">
+                <input type="hidden" name="action" value="quick_resolve_ticket">
+                <input type="hidden" name="ticket_id" value="<?= $ticketData['id'] ?>">
+                <button type="submit" class="btn btn-sm btn-success">
+                    <i class="bi bi-check-circle"></i> Resolve Ticket
+                </button>
+            </form>
+            <?php else: ?>
             <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#resolveTicketModal">
                 <i class="bi bi-check-circle"></i> Resolve Ticket
             </button>
+            <?php endif; ?>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#escalateModal">
