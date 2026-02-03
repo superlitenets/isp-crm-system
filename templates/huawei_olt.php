@@ -16680,6 +16680,14 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         </div>
     </div>
     
+    <?php
+    // Ensure $oltVlans is available for ETH port modal
+    if (!isset($oltVlans) && isset($currentOnu['olt_id']) && isset($db)) {
+        $oltVlanStmt = $db->prepare("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = ? AND is_tr069 = FALSE AND is_active = TRUE ORDER BY vlan_id");
+        $oltVlanStmt->execute([$currentOnu['olt_id']]);
+        $oltVlans = $oltVlanStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    ?>
     <div class="modal fade" id="ethPortModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -16709,9 +16717,16 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                         
                         <div class="mb-3" id="ethPortVlanField">
-                            <label class="form-label">Native VLAN ID</label>
-                            <input type="number" name="vlan_id" class="form-control" placeholder="e.g. 100" min="1" max="4094">
-                            <div class="form-text">VLAN ID for this port (required for Access/Trunk mode)</div>
+                            <label class="form-label">VLAN</label>
+                            <select name="vlan_id" id="ethPortVlanSelect" class="form-select">
+                                <option value="">-- Select VLAN --</option>
+                                <?php if (isset($oltVlans) && is_array($oltVlans)): ?>
+                                    <?php foreach ($oltVlans as $vlan): ?>
+                                        <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: 'Service VLAN') ?></option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
+                            <div class="form-text">Select VLAN for this port (required for Access/Trunk mode)</div>
                         </div>
                         
                         <div class="mb-3" id="ethPortAllowedField" style="display:none;">
