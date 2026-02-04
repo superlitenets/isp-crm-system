@@ -4571,7 +4571,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     
-                    if ($action === 'create_quote') {
+                    if ($postAction === 'create_quote') {
                         $quoteId = $accounting->createQuote([
                             'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'] ?? date('Y-m-d'),
