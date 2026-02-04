@@ -121,19 +121,18 @@ server default {
             # Check if user exists (has a password set from authorize)
             if (&control:Cleartext-Password) {
                 # User exists but password wrong - redirect to walled garden
+                update control {
+                    Response-Packet-Type := Access-Accept
+                }
                 update reply {
                     Framed-Pool := "expired-pool"
                     Mikrotik-Rate-Limit := "128k/128k"
                     Session-Timeout := 300
                     Reply-Message := "Invalid password - redirecting to portal"
-                    Packet-Type := Access-Accept
                 }
                 
                 # Log to database
                 sql
-                
-                # Return ok to send the modified packet
-                ok
             }
         }
     }
