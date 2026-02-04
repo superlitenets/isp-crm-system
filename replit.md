@@ -35,7 +35,7 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **Ticket Management**: Features timeline/activity, status changes, customer satisfaction, escalation, and secure status updates.
 - **Multi-Branch Support**: Manages operations across multiple physical locations.
 - **HR & Payroll**: Salary advance, leave management, and HR notification systems.
-- **Accounting Module**: Dashboard, Chart of Accounts, Invoices, Expenses, Quotes, Purchase Orders, and financial reports.
+- **Accounting Module**: Dashboard, Chart of Accounts, Invoices, Expenses, Quotes, Purchase Orders, financial reports, recurring invoice automation, and document delivery via email/WhatsApp (invoices, quotes, receipts as PDF).
 - **Database Backup System**: Manual PostgreSQL backup functionality.
 - **WireGuard VPN Integration**: Secure VPN connectivity management (server/peer, key generation, MikroTik script generation, traffic statistics).
 - **ISP RADIUS Billing Module**: Comprehensive MikroTik RADIUS billing with AAA support.
