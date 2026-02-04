@@ -4595,6 +4595,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $message = 'Quote created successfully!';
                     } else {
                         $quoteId = (int)($_POST['quote_id'] ?? 0);
+                        if ($quoteId <= 0) {
+                            throw new Exception('Invalid quote ID');
+                        }
                         $accounting->updateQuote($quoteId, [
                             'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'] ?? date('Y-m-d'),
