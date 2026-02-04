@@ -73,10 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
-        WHERE subscription_id = ? 
+        WHERE username = ? 
         ORDER BY created_at DESC LIMIT 1
     ");
-    $reasonStmt->execute([$subscription['id']]);
+    $reasonStmt->execute([$subscription['username']]);
     $authReason = $reasonStmt->fetchColumn() ?: null;
 }
         
@@ -109,10 +109,10 @@ if (!$subscription && !$lookupMode) {
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
-        WHERE subscription_id = ? 
+        WHERE username = ? 
         ORDER BY created_at DESC LIMIT 1
     ");
-    $reasonStmt->execute([$subscription['id']]);
+    $reasonStmt->execute([$subscription['username']]);
     $authReason = $reasonStmt->fetchColumn() ?: null;
 }
 
@@ -136,10 +136,10 @@ if ($subscription) {
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
-        WHERE subscription_id = ? 
+        WHERE username = ? 
         ORDER BY created_at DESC LIMIT 1
     ");
-    $reasonStmt->execute([$subscription['id']]);
+    $reasonStmt->execute([$subscription['username']]);
     $authReason = $reasonStmt->fetchColumn() ?: null;
 }
     }
