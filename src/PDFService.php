@@ -232,7 +232,7 @@ class PDFService {
                     </div>
                     <div class="totals-row total">
                         <span class="totals-label">Total</span>
-                        <span class="totals-value">' . $currency . ' ' . number_format($invoice['total'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($invoice['total_amount'] ?? $invoice['total'] ?? 0, 2) . '</span>
                     </div>
                     <div class="totals-row">
                         <span class="totals-label">Amount Paid</span>
