@@ -126,13 +126,14 @@ server default {
                     Mikrotik-Rate-Limit := "128k/128k"
                     Session-Timeout := 300
                     Reply-Message := "Invalid password - redirecting to portal"
+                    Packet-Type := Access-Accept
                 }
                 
                 # Log to database
                 sql
                 
-                # Force accept instead of reject
-                handled
+                # Return ok to send the modified packet
+                ok
             }
         }
     }
