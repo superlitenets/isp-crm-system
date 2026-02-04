@@ -117,15 +117,21 @@ server default {
         remove_reply_message_if_eap
         
         Post-Auth-Type REJECT {
-            # Query to get expired pool settings and log the rejection
-            sql
-            
-            # If we got a Framed-Pool back (redirect enabled), accept instead of reject
-            if (&reply:Framed-Pool) {
+            # For known users with wrong password - assign to expired pool
+            # Check if user exists (has a password set from authorize)
+            if (&control:Cleartext-Password) {
+                # User exists but password wrong - redirect to walled garden
                 update reply {
+                    Framed-Pool := "expired-pool"
+                    Mikrotik-Rate-Limit := "128k/128k"
+                    Session-Timeout := 300
                     Reply-Message := "Invalid password - redirecting to portal"
                 }
-                # Force accept with walled garden
+                
+                # Log to database
+                sql
+                
+                # Force accept instead of reject
                 handled
             }
         }
