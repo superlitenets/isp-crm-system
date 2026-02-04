@@ -144,36 +144,6 @@ if ($subscription) {
         }
     }
     
-    // If still no subscription, check auth_logs for recent unknown user or invalid password entries
-    if (!$subscription && !$authReason) {
-        // Check for recent auth log entries that might indicate invalid credentials or unknown user
-        $recentAuthStmt = $db->prepare("
-            SELECT username, reject_reason FROM radius_auth_logs 
-            WHERE reject_reason IN ('Invalid password', 'User not found') 
-            AND created_at > NOW() - INTERVAL '5 minutes'
-            ORDER BY created_at DESC LIMIT 1
-        ");
-        $recentAuthStmt->execute();
-        $recentAuth = $recentAuthStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($recentAuth) {
-            $authReason = $recentAuth['reject_reason'];
-            // Try to find the subscription for this username (for Invalid password case)
-            if ($authReason === 'Invalid password') {
-                $subStmt = $db->prepare("
-                    SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
-                           p.name as package_name, p.price as package_price, p.validity_days
-                    FROM radius_subscriptions s
-                    LEFT JOIN customers c ON s.customer_id = c.id
-                    LEFT JOIN radius_packages p ON s.package_id = p.id
-                    WHERE UPPER(s.username) = UPPER(?)
-                    LIMIT 1
-                ");
-                $subStmt->execute([$recentAuth['username']]);
-                $subscription = $subStmt->fetch(PDO::FETCH_ASSOC);
-            }
-        }
-    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
