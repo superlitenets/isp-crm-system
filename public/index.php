@@ -4267,7 +4267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     
-                    if ($action === 'create_invoice') {
+                    if ($postAction === 'create_invoice') {
                         $invoiceId = $accounting->createInvoice([
                             'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'],
@@ -4281,7 +4281,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'created_by' => $currentUser['id']
                         ]);
                     } else {
-                        $invoiceId = (int)$_POST['invoice_id'];
+                        $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                        if ($invoiceId <= 0) {
+                            throw new Exception('Invalid invoice ID');
+                        }
                         $accounting->updateInvoice($invoiceId, [
                             'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'],
@@ -4517,11 +4520,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $accounting = new \App\Accounting(Database::getConnection());
                     
-                    if ($action === 'create_vendor') {
+                    if ($postAction === 'create_vendor') {
                         $accounting->createVendor($_POST);
                         $message = 'Vendor created successfully!';
                     } else {
-                        $accounting->updateVendor((int)$_POST['vendor_id'], $_POST);
+                        $vendorId = (int)($_POST['vendor_id'] ?? 0);
+                        if ($vendorId <= 0) {
+                            throw new Exception('Invalid vendor ID');
+                        }
+                        $accounting->updateVendor($vendorId, $_POST);
                         $message = 'Vendor updated successfully!';
                     }
                     $messageType = 'success';
@@ -4580,11 +4587,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $accounting = new \App\Accounting(Database::getConnection());
                     
-                    if ($action === 'create_product') {
+                    if ($postAction === 'create_product') {
                         $accounting->createProduct($_POST);
                         $message = 'Product/service created successfully!';
                     } else {
-                        $accounting->updateProduct((int)($_POST['product_id'] ?? 0), $_POST);
+                        $productId = (int)($_POST['product_id'] ?? 0);
+                        if ($productId <= 0) {
+                            throw new Exception('Invalid product ID');
+                        }
+                        $accounting->updateProduct($productId, $_POST);
                         $message = 'Product/service updated successfully!';
                     }
                     $messageType = 'success';
@@ -4848,7 +4859,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $accounting = new \App\Accounting(Database::getConnection());
                     $items = $_POST['items'] ?? [];
                     
-                    if ($action === 'create_bill') {
+                    if ($postAction === 'create_bill') {
                         $billNumber = $accounting->getNextNumber('bill');
                         $billId = $accounting->createBill([
                             'bill_number' => $billNumber,
