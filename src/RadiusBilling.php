@@ -1406,9 +1406,8 @@ class RadiusBilling {
             $redirectInvalidPassword = (bool)$this->getSetting('redirect_invalid_password', false);
             
             if ($redirectInvalidPassword) {
-                $invalidPoolName = $this->getSetting('invalid_password_pool') ?: 'invalid-password-pool';
                 $attrs = [
-                    'Framed-Pool' => $invalidPoolName,
+                    'Framed-Pool' => $expiredPoolName,
                     'Mikrotik-Rate-Limit' => $expiredRateLimit,
                     'Session-Timeout' => 300,
                     'Acct-Interim-Interval' => 60

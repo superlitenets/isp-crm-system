@@ -34,6 +34,7 @@ $message = '';
 $messageType = 'info';
 $stkPushSent = false;
 $lookupMode = false;
+$authReason = null;
 
 // Load ISP settings
 $radiusBilling = new \App\RadiusBilling($db);
@@ -67,6 +68,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         ");
         $stmt->execute([$lookupValue, $phone, '%' . substr($phone, -9)]);
         $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Get auth reason from auth log
+if ($subscription) {
+    $reasonStmt = $db->prepare("
+        SELECT reason FROM radius_auth_log 
+        WHERE subscription_id = ? AND result = 'Accept' 
+        ORDER BY auth_time DESC LIMIT 1
+    ");
+    $reasonStmt->execute([$subscription['id']]);
+    $authReason = $reasonStmt->fetchColumn() ?: null;
+}
         
         if (!$subscription) {
             $message = "No subscription found for '{$lookupValue}'. Please check your username or phone number.";
@@ -93,6 +105,17 @@ if (!$subscription && !$lookupMode) {
     $stmt->execute([$clientIP, $clientIP]);
     $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
 
+// Get auth reason from auth log
+if ($subscription) {
+    $reasonStmt = $db->prepare("
+        SELECT reason FROM radius_auth_log 
+        WHERE subscription_id = ? AND result = 'Accept' 
+        ORDER BY auth_time DESC LIMIT 1
+    ");
+    $reasonStmt->execute([$subscription['id']]);
+    $authReason = $reasonStmt->fetchColumn() ?: null;
+}
+
     if (!$subscription) {
         $stmt = $db->prepare("
             SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
@@ -108,6 +131,17 @@ if (!$subscription && !$lookupMode) {
         ");
         $stmt->execute([$clientIP]);
         $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Get auth reason from auth log
+if ($subscription) {
+    $reasonStmt = $db->prepare("
+        SELECT reason FROM radius_auth_log 
+        WHERE subscription_id = ? AND result = 'Accept' 
+        ORDER BY auth_time DESC LIMIT 1
+    ");
+    $reasonStmt->execute([$subscription['id']]);
+    $authReason = $reasonStmt->fetchColumn() ?: null;
+}
     }
 }
 
@@ -254,9 +288,21 @@ try {
     <div class="expired-card">
         <?php if ($subscription): ?>
         <div class="expired-header">
-            <div class="icon"><i class="bi bi-exclamation-triangle"></i></div>
-            <h2 class="mb-2">Subscription Expired</h2>
-            <p class="mb-0 opacity-75">Your internet subscription has expired</p>
+            <div class="icon"><i class="bi bi-<?php echo ($authReason === 'Invalid password') ? 'shield-exclamation' : 'exclamation-triangle'; ?>"></i></div>
+            <h2 class="mb-2"><?php
+                if ($authReason === 'Invalid password') echo 'Invalid Credentials';
+                elseif ($authReason === 'Suspended - expired pool' || $subscription['status'] === 'suspended') echo 'Account Suspended';
+                elseif ($authReason === 'User not found') echo 'Account Not Found';
+                elseif ($authReason === 'Data quota exhausted') echo 'Data Quota Exhausted';
+                else echo 'Subscription Expired';
+            ?></h2>
+            <p class="mb-0 opacity-75"><?php
+                if ($authReason === 'Invalid password') echo 'The password you entered is incorrect';
+                elseif ($authReason === 'Suspended - expired pool' || $subscription['status'] === 'suspended') echo 'Your account has been suspended';
+                elseif ($authReason === 'User not found') echo 'We could not find your account';
+                elseif ($authReason === 'Data quota exhausted') echo 'Your data bundle has been exhausted';
+                else echo 'Your internet subscription has expired';
+            ?></p>
             <div class="package-badge">
                 <i class="bi bi-box me-1"></i> <?= htmlspecialchars($subscription['package_name'] ?? 'Unknown Package') ?>
             </div>
