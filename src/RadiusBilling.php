@@ -141,6 +141,51 @@ class RadiusBilling {
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
+    public function getNASByIP(string $ipAddress): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE ip_address = ? AND is_active = true");
+        $stmt->execute([$ipAddress]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function getNASPackages(int $nasId): array {
+        $stmt = $this->db->prepare("
+            SELECT p.* FROM radius_packages p
+            INNER JOIN radius_nas_packages np ON p.id = np.package_id
+            WHERE np.nas_id = ? AND p.is_active = true AND p.package_type = 'hotspot'
+            ORDER BY p.price ASC
+        ");
+        $stmt->execute([$nasId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function setNASPackages(int $nasId, array $packageIds): array {
+        try {
+            $this->db->beginTransaction();
+            
+            $stmt = $this->db->prepare("DELETE FROM radius_nas_packages WHERE nas_id = ?");
+            $stmt->execute([$nasId]);
+            
+            if (!empty($packageIds)) {
+                $stmt = $this->db->prepare("INSERT INTO radius_nas_packages (nas_id, package_id) VALUES (?, ?)");
+                foreach ($packageIds as $packageId) {
+                    $stmt->execute([$nasId, (int)$packageId]);
+                }
+            }
+            
+            $this->db->commit();
+            return ['success' => true];
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getNASPackageIds(int $nasId): array {
+        $stmt = $this->db->prepare("SELECT package_id FROM radius_nas_packages WHERE nas_id = ?");
+        $stmt->execute([$nasId]);
+        return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'package_id');
+    }
+    
     public function createNAS(array $data): array {
         try {
             $apiEnabled = !empty($data['api_enabled']) ? 'true' : 'false';

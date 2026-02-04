@@ -824,8 +824,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
         case 'update_nas':
             $result = $radiusBilling->updateNAS((int)$_POST['id'], $_POST);
+            if ($result['success']) {
+                // Save NAS packages
+                $packages = $_POST['packages'] ?? [];
+                $radiusBilling->setNASPackages((int)$_POST['id'], $packages);
+            }
             $message = $result['success'] ? 'NAS device updated' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'get_nas_packages':
+            header('Content-Type: application/json');
+            $nasId = (int)($_GET['nas_id'] ?? 0);
+            $packages = $radiusBilling->getNASPackageIds($nasId);
+            echo json_encode(['packages' => $packages]);
+            exit;
             break;
             
         case 'delete_nas':
@@ -7047,6 +7060,27 @@ try {
                                         <input type="password" name="api_password" class="form-control" placeholder="Leave blank to keep">
                                     </div>
                                 </div>
+                                <hr>
+                                <h6><i class="bi bi-box-seam me-1"></i> Hotspot Packages</h6>
+                                <p class="text-muted small">Select packages available for this NAS hotspot. If none selected, all packages will be shown.</p>
+                                <div class="mb-3" id="edit_nas_packages_container">
+                                    <?php 
+                                    $hotspotPackages = $radiusBilling->getPackages('hotspot');
+                                    foreach ($hotspotPackages as $pkg): ?>
+                                    <div class="form-check">
+                                        <input class="form-check-input nas-package-checkbox" type="checkbox" 
+                                               name="packages[]" value="<?= $pkg['id'] ?>" 
+                                               id="nas_pkg_<?= $pkg['id'] ?>">
+                                        <label class="form-check-label" for="nas_pkg_<?= $pkg['id'] ?>">
+                                            <?= htmlspecialchars($pkg['name']) ?> 
+                                            <span class="text-muted">(KES <?= number_format($pkg['price']) ?>)</span>
+                                        </label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                    <?php if (empty($hotspotPackages)): ?>
+                                    <p class="text-muted small mb-0">No hotspot packages defined yet.</p>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -10031,6 +10065,23 @@ try {
         document.getElementById('edit_api_port').value = nas.api_port || 8728;
         document.getElementById('edit_api_username').value = nas.api_username || '';
         document.getElementById('edit_nas_vpn_peer').value = nas.wireguard_peer_id || '';
+        
+        // Reset all package checkboxes
+        document.querySelectorAll('.nas-package-checkbox').forEach(cb => cb.checked = false);
+        
+        // Load assigned packages for this NAS
+        fetch('?section=isp&action=get_nas_packages&nas_id=' + nas.id)
+            .then(r => r.json())
+            .then(data => {
+                if (data.packages) {
+                    data.packages.forEach(pkgId => {
+                        const cb = document.getElementById('nas_pkg_' + pkgId);
+                        if (cb) cb.checked = true;
+                    });
+                }
+            })
+            .catch(e => console.error('Failed to load NAS packages:', e));
+        
         new bootstrap.Modal(document.getElementById('editNASModal')).show();
     }
     

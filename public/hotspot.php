@@ -64,10 +64,27 @@ $mpesaPaybill = $radiusBilling->getSetting('mpesa_paybill') ?: '';
 $mpesa = new \App\Mpesa();
 $mpesaEnabled = $mpesa->isConfigured();
 
-// Get available hotspot packages
+// Detect NAS device (from URL parameter or gateway IP)
+$nasIP = $_GET['nas'] ?? $_GET['server'] ?? $_GET['nasip'] ?? '';
+if ($nasIP) $_SESSION['nasIP'] = $nasIP;
+$nasIP = $nasIP ?: ($_SESSION['nasIP'] ?? '');
+
+$currentNAS = null;
+if (!empty($nasIP)) {
+    $currentNAS = $radiusBilling->getNASByIP($nasIP);
+}
+
+// Get available hotspot packages (filtered by NAS if detected)
 $packages = [];
-$stmt = $db->query("SELECT * FROM radius_packages WHERE is_active = true AND package_type = 'hotspot' ORDER BY price ASC");
-$packages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if ($currentNAS) {
+    // Get packages assigned to this NAS
+    $packages = $radiusBilling->getNASPackages($currentNAS['id']);
+}
+if (empty($packages)) {
+    // Fallback to all active hotspot packages if no NAS-specific packages
+    $stmt = $db->query("SELECT * FROM radius_packages WHERE is_active = true AND package_type = 'hotspot' ORDER BY price ASC");
+    $packages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Check if MAC authentication is enabled
 $macAuthEnabled = $radiusBilling->getSetting('hotspot_mac_auth') === 'true';
