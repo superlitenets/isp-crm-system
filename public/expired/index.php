@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Get auth reason from auth log
 if ($subscription) {
     $reasonStmt = $db->prepare("
-        SELECT reason FROM radius_auth_log 
+        SELECT reject_reason FROM radius_auth_logs 
         WHERE subscription_id = ? 
         ORDER BY auth_time DESC LIMIT 1
     ");
@@ -108,7 +108,7 @@ if (!$subscription && !$lookupMode) {
 // Get auth reason from auth log
 if ($subscription) {
     $reasonStmt = $db->prepare("
-        SELECT reason FROM radius_auth_log 
+        SELECT reject_reason FROM radius_auth_logs 
         WHERE subscription_id = ? 
         ORDER BY auth_time DESC LIMIT 1
     ");
@@ -135,7 +135,7 @@ if ($subscription) {
 // Get auth reason from auth log
 if ($subscription) {
     $reasonStmt = $db->prepare("
-        SELECT reason FROM radius_auth_log 
+        SELECT reject_reason FROM radius_auth_logs 
         WHERE subscription_id = ? 
         ORDER BY auth_time DESC LIMIT 1
     ");
