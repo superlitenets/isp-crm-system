@@ -33,9 +33,26 @@ $deviceStatus = 'unknown'; // 'active', 'expired', 'new'
 
 // MikroTik hotspot variables
 $linkLogin = $_GET['link-login'] ?? '';
-$linkLoginOnly = $_GET['link-login-only'] ?? '';
+$linkLoginOnly = $_GET['link-login-only'] ?? $_GET['loginLink'] ?? '';
 $linkOrig = $_GET['link-orig'] ?? $_GET['dst'] ?? '';
 $errorMsg = $_GET['error'] ?? '';
+
+// CHAP authentication variables from MikroTik
+$chapId = $_GET['chapID'] ?? $_GET['chap-id'] ?? '';
+$chapChallenge = $_GET['chapChallenge'] ?? $_GET['chap-challenge'] ?? '';
+
+// Store CHAP vars in session for form submissions
+session_start();
+if ($chapId) $_SESSION['chapId'] = $chapId;
+if ($chapChallenge) $_SESSION['chapChallenge'] = $chapChallenge;
+if ($linkLoginOnly) $_SESSION['linkLoginOnly'] = $linkLoginOnly;
+if ($clientMAC) $_SESSION['clientMAC'] = $clientMAC;
+
+// Restore from session if not in URL
+$chapId = $chapId ?: ($_SESSION['chapId'] ?? '');
+$chapChallenge = $chapChallenge ?: ($_SESSION['chapChallenge'] ?? '');
+$linkLoginOnly = $linkLoginOnly ?: ($_SESSION['linkLoginOnly'] ?? '');
+$clientMAC = $clientMAC ?: ($_SESSION['clientMAC'] ?? '');
 
 // Get ISP settings
 $ispName = $radiusBilling->getSetting('isp_name') ?: 'WiFi Hotspot';
@@ -377,12 +394,29 @@ if ($errorMsg && empty($message)) {
 <body>
     <div class="hotspot-card">
         <?php if ($loginSuccess): ?>
-        <!-- SUCCESS: Connected - Auto-redirect to MikroTik if available -->
-        <?php if (!empty($linkLoginOnly)): ?>
+        <!-- SUCCESS: Connected - Auto-redirect to MikroTik for MAC login -->
+        <?php 
+        // Build MikroTik login URL with MAC as username (for MAC-auth)
+        $mikrotikLoginUrl = '';
+        if (!empty($linkLoginOnly) && !empty($clientMAC)) {
+            // For MAC-based auth, use MAC as username with empty/MAC password
+            $loginParams = [
+                'username' => $clientMAC,
+                'password' => $clientMAC
+            ];
+            // Add CHAP if available
+            if (!empty($chapId) && !empty($chapChallenge)) {
+                $loginParams['chap-id'] = $chapId;
+                $loginParams['chap-challenge'] = $chapChallenge;
+            }
+            $mikrotikLoginUrl = $linkLoginOnly . (strpos($linkLoginOnly, '?') !== false ? '&' : '?') . http_build_query($loginParams);
+        }
+        ?>
+        <?php if (!empty($mikrotikLoginUrl)): ?>
         <script>
             // Auto-submit to MikroTik for MAC-based login
             setTimeout(function() {
-                window.location.href = '<?= htmlspecialchars($linkLoginOnly) ?>';
+                window.location.href = '<?= htmlspecialchars($mikrotikLoginUrl) ?>';
             }, 1500);
         </script>
         <?php endif; ?>
@@ -406,9 +440,9 @@ if ($errorMsg && empty($message)) {
             </div>
             <?php endif; ?>
             
-            <?php if (!empty($linkLoginOnly)): ?>
+            <?php if (!empty($mikrotikLoginUrl)): ?>
             <p class="small text-muted">Redirecting to network...</p>
-            <a href="<?= htmlspecialchars($linkLoginOnly) ?>" class="btn btn-primary-custom">
+            <a href="<?= htmlspecialchars($mikrotikLoginUrl) ?>" class="btn btn-primary-custom">
                 <i class="bi bi-arrow-right-circle me-2"></i>Click Here if Not Redirected
             </a>
             <?php elseif (!empty($linkOrig)): ?>
