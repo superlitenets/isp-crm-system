@@ -570,6 +570,42 @@ app.post('/chat/:chatId/read', async (req, res) => {
     }
 });
 
+app.post('/send-document', async (req, res) => {
+    const { phone, document, filename, mimetype, caption } = req.body;
+    
+    if (!phone || !document) {
+        return res.status(400).json({ error: 'Phone and document (base64) are required' });
+    }
+    
+    if (connectionStatus !== 'connected' || !sock) {
+        return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
+    }
+    
+    try {
+        const formattedPhone = phone.replace(/[^0-9]/g, '');
+        const jid = formattedPhone.includes('@') ? formattedPhone : `${formattedPhone}@s.whatsapp.net`;
+        
+        const documentBuffer = Buffer.from(document, 'base64');
+        
+        const result = await sock.sendMessage(jid, {
+            document: documentBuffer,
+            mimetype: mimetype || 'application/pdf',
+            fileName: filename || 'document.pdf',
+            caption: caption || ''
+        });
+        
+        console.log(`Document sent to ${phone}: ${filename}`);
+        res.json({ 
+            success: true, 
+            messageId: result.key.id,
+            timestamp: Math.floor(Date.now() / 1000)
+        });
+    } catch (error) {
+        console.error('Send document error:', error);
+        res.status(500).json({ error: error.message, success: false });
+    }
+});
+
 if (fs.existsSync(SESSION_PATH)) {
     console.log('Session found, auto-initializing...');
     initializeClient();

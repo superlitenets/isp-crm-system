@@ -1089,4 +1089,231 @@ class Accounting {
         ");
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: ['total_recurring' => 0, 'due_today' => 0, 'monthly_recurring_value' => 0];
     }
+    
+    // Email and WhatsApp sending functions
+    public function sendInvoiceByEmail(int $invoiceId, ?string $toEmail = null, ?string $subject = null, ?string $message = null): array {
+        $invoice = $this->getInvoice($invoiceId);
+        if (!$invoice) {
+            return ['success' => false, 'error' => 'Invoice not found'];
+        }
+        
+        $email = $toEmail ?: ($invoice['customer_email'] ?? null);
+        if (!$email) {
+            return ['success' => false, 'error' => 'No email address available'];
+        }
+        
+        $pdfService = new PDFService($this->db);
+        $pdfContent = $pdfService->generateInvoicePDF($invoice);
+        
+        $companyName = (new Settings())->get('company_name', 'Our Company');
+        $defaultSubject = "Invoice {$invoice['invoice_number']} from {$companyName}";
+        $defaultMessage = "Dear {$invoice['customer_name']},\n\nPlease find attached invoice {$invoice['invoice_number']} for " . 
+            ($invoice['currency'] ?? 'KES') . " " . number_format($invoice['total_amount'], 2) . ".\n\n" .
+            "Due Date: " . date('M d, Y', strtotime($invoice['due_date'])) . "\n\n" .
+            "Thank you for your business!\n\n{$companyName}";
+        
+        $emailService = new EmailService($this->db);
+        $result = $emailService->send(
+            $email,
+            $subject ?: $defaultSubject,
+            nl2br(htmlspecialchars($message ?: $defaultMessage)),
+            $message ?: $defaultMessage,
+            [['content' => base64_encode($pdfContent), 'name' => "Invoice-{$invoice['invoice_number']}.pdf", 'type' => 'application/pdf']]
+        );
+        
+        if ($result['success']) {
+            $this->db->prepare("UPDATE invoices SET status = 'sent' WHERE id = ? AND status = 'draft'")->execute([$invoiceId]);
+        }
+        
+        return $result;
+    }
+    
+    public function sendQuoteByEmail(int $quoteId, ?string $toEmail = null, ?string $subject = null, ?string $message = null): array {
+        $quote = $this->getQuote($quoteId);
+        if (!$quote) {
+            return ['success' => false, 'error' => 'Quote not found'];
+        }
+        
+        $email = $toEmail ?: ($quote['customer_email'] ?? null);
+        if (!$email) {
+            return ['success' => false, 'error' => 'No email address available'];
+        }
+        
+        $pdfService = new PDFService($this->db);
+        $pdfContent = $pdfService->generateQuotePDF($quote);
+        
+        $companyName = (new Settings())->get('company_name', 'Our Company');
+        $defaultSubject = "Quote {$quote['quote_number']} from {$companyName}";
+        $validUntil = !empty($quote['valid_until']) ? date('M d, Y', strtotime($quote['valid_until'])) : 'N/A';
+        $defaultMessage = "Dear {$quote['customer_name']},\n\nPlease find attached quote {$quote['quote_number']} for " . 
+            ($quote['currency'] ?? 'KES') . " " . number_format($quote['total_amount'] ?? $quote['total'] ?? 0, 2) . ".\n\n" .
+            "Valid Until: {$validUntil}\n\n" .
+            "We look forward to working with you!\n\n{$companyName}";
+        
+        $emailService = new EmailService($this->db);
+        $result = $emailService->send(
+            $email,
+            $subject ?: $defaultSubject,
+            nl2br(htmlspecialchars($message ?: $defaultMessage)),
+            $message ?: $defaultMessage,
+            [['content' => base64_encode($pdfContent), 'name' => "Quote-{$quote['quote_number']}.pdf", 'type' => 'application/pdf']]
+        );
+        
+        if ($result['success']) {
+            $this->db->prepare("UPDATE quotes SET status = 'sent' WHERE id = ? AND status = 'draft'")->execute([$quoteId]);
+        }
+        
+        return $result;
+    }
+    
+    public function sendReceiptByEmail(int $paymentId, ?string $toEmail = null, ?string $subject = null, ?string $message = null): array {
+        $payment = $this->getPayment($paymentId);
+        if (!$payment) {
+            return ['success' => false, 'error' => 'Payment not found'];
+        }
+        
+        $email = $toEmail ?: ($payment['customer_email'] ?? null);
+        if (!$email) {
+            return ['success' => false, 'error' => 'No email address available'];
+        }
+        
+        $pdfService = new PDFService($this->db);
+        $pdfContent = $pdfService->generateReceiptPDF($payment);
+        
+        $companyName = (new Settings())->get('company_name', 'Our Company');
+        $receiptNumber = $payment['receipt_number'] ?? 'REC-' . str_pad($payment['id'], 6, '0', STR_PAD_LEFT);
+        $defaultSubject = "Receipt {$receiptNumber} from {$companyName}";
+        $defaultMessage = "Dear {$payment['customer_name']},\n\nThank you for your payment!\n\n" .
+            "Amount: " . ($payment['currency'] ?? 'KES') . " " . number_format($payment['amount'], 2) . "\n" .
+            "Receipt Number: {$receiptNumber}\n" .
+            "Date: " . date('M d, Y', strtotime($payment['payment_date'])) . "\n\n" .
+            "We appreciate your business!\n\n{$companyName}";
+        
+        $emailService = new EmailService($this->db);
+        return $emailService->send(
+            $email,
+            $subject ?: $defaultSubject,
+            nl2br(htmlspecialchars($message ?: $defaultMessage)),
+            $message ?: $defaultMessage,
+            [['content' => base64_encode($pdfContent), 'name' => "Receipt-{$receiptNumber}.pdf", 'type' => 'application/pdf']]
+        );
+    }
+    
+    public function sendInvoiceByWhatsApp(int $invoiceId, ?string $phone = null, ?string $caption = null): array {
+        $invoice = $this->getInvoice($invoiceId);
+        if (!$invoice) {
+            return ['success' => false, 'error' => 'Invoice not found'];
+        }
+        
+        $phoneNumber = $phone ?: ($invoice['customer_phone'] ?? null);
+        if (!$phoneNumber) {
+            return ['success' => false, 'error' => 'No phone number available'];
+        }
+        
+        $pdfService = new PDFService($this->db);
+        $pdfContent = $pdfService->generateInvoicePDF($invoice);
+        $pdfBase64 = base64_encode($pdfContent);
+        
+        $companyName = (new Settings())->get('company_name', 'Our Company');
+        $defaultCaption = "Invoice {$invoice['invoice_number']}\n" .
+            "Amount: " . ($invoice['currency'] ?? 'KES') . " " . number_format($invoice['total_amount'], 2) . "\n" .
+            "Due: " . date('M d, Y', strtotime($invoice['due_date'])) . "\n" .
+            "From: {$companyName}";
+        
+        $whatsapp = new WhatsApp();
+        $result = $whatsapp->sendDocument(
+            $phoneNumber,
+            $pdfBase64,
+            "Invoice-{$invoice['invoice_number']}.pdf",
+            $caption ?: $defaultCaption
+        );
+        
+        if ($result['success']) {
+            $this->db->prepare("UPDATE invoices SET status = 'sent' WHERE id = ? AND status = 'draft'")->execute([$invoiceId]);
+        }
+        
+        return $result;
+    }
+    
+    public function sendQuoteByWhatsApp(int $quoteId, ?string $phone = null, ?string $caption = null): array {
+        $quote = $this->getQuote($quoteId);
+        if (!$quote) {
+            return ['success' => false, 'error' => 'Quote not found'];
+        }
+        
+        $phoneNumber = $phone ?: ($quote['customer_phone'] ?? null);
+        if (!$phoneNumber) {
+            return ['success' => false, 'error' => 'No phone number available'];
+        }
+        
+        $pdfService = new PDFService($this->db);
+        $pdfContent = $pdfService->generateQuotePDF($quote);
+        $pdfBase64 = base64_encode($pdfContent);
+        
+        $companyName = (new Settings())->get('company_name', 'Our Company');
+        $validUntil = !empty($quote['valid_until']) ? date('M d, Y', strtotime($quote['valid_until'])) : 'N/A';
+        $defaultCaption = "Quote {$quote['quote_number']}\n" .
+            "Amount: " . ($quote['currency'] ?? 'KES') . " " . number_format($quote['total_amount'] ?? $quote['total'] ?? 0, 2) . "\n" .
+            "Valid Until: {$validUntil}\n" .
+            "From: {$companyName}";
+        
+        $whatsapp = new WhatsApp();
+        $result = $whatsapp->sendDocument(
+            $phoneNumber,
+            $pdfBase64,
+            "Quote-{$quote['quote_number']}.pdf",
+            $caption ?: $defaultCaption
+        );
+        
+        if ($result['success']) {
+            $this->db->prepare("UPDATE quotes SET status = 'sent' WHERE id = ? AND status = 'draft'")->execute([$quoteId]);
+        }
+        
+        return $result;
+    }
+    
+    public function sendReceiptByWhatsApp(int $paymentId, ?string $phone = null, ?string $caption = null): array {
+        $payment = $this->getPayment($paymentId);
+        if (!$payment) {
+            return ['success' => false, 'error' => 'Payment not found'];
+        }
+        
+        $phoneNumber = $phone ?: ($payment['customer_phone'] ?? null);
+        if (!$phoneNumber) {
+            return ['success' => false, 'error' => 'No phone number available'];
+        }
+        
+        $pdfService = new PDFService($this->db);
+        $pdfContent = $pdfService->generateReceiptPDF($payment);
+        $pdfBase64 = base64_encode($pdfContent);
+        
+        $companyName = (new Settings())->get('company_name', 'Our Company');
+        $receiptNumber = $payment['receipt_number'] ?? 'REC-' . str_pad($payment['id'], 6, '0', STR_PAD_LEFT);
+        $defaultCaption = "Payment Receipt {$receiptNumber}\n" .
+            "Amount: " . ($payment['currency'] ?? 'KES') . " " . number_format($payment['amount'], 2) . "\n" .
+            "Thank you for your payment!\n" .
+            "From: {$companyName}";
+        
+        $whatsapp = new WhatsApp();
+        return $whatsapp->sendDocument(
+            $phoneNumber,
+            $pdfBase64,
+            "Receipt-{$receiptNumber}.pdf",
+            $caption ?: $defaultCaption
+        );
+    }
+    
+    private function getPayment(int $paymentId): ?array {
+        $stmt = $this->db->prepare("
+            SELECT p.*, 
+                c.name as customer_name, c.email as customer_email, c.phone as customer_phone,
+                i.invoice_number, i.total_amount as invoice_total, i.currency
+            FROM invoice_payments p
+            LEFT JOIN invoices i ON p.invoice_id = i.id
+            LEFT JOIN customers c ON i.customer_id = c.id
+            WHERE p.id = ?
+        ");
+        $stmt->execute([$paymentId]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
 }

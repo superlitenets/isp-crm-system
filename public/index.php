@@ -4510,6 +4510,165 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'send_invoice_email':
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                    $toEmail = trim($_POST['to_email'] ?? '');
+                    $subject = trim($_POST['email_subject'] ?? '');
+                    $emailMessage = trim($_POST['email_message'] ?? '');
+                    
+                    if (!$invoiceId) {
+                        throw new Exception('Invalid invoice ID');
+                    }
+                    
+                    $result = $accounting->sendInvoiceByEmail($invoiceId, $toEmail ?: null, $subject ?: null, $emailMessage ?: null);
+                    
+                    if ($result['success']) {
+                        $message = 'Invoice sent via email successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error'] ?? 'Failed to send email');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'send_invoice_whatsapp':
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                    $phone = trim($_POST['phone'] ?? '');
+                    $caption = trim($_POST['caption'] ?? '');
+                    
+                    if (!$invoiceId) {
+                        throw new Exception('Invalid invoice ID');
+                    }
+                    
+                    $result = $accounting->sendInvoiceByWhatsApp($invoiceId, $phone ?: null, $caption ?: null);
+                    
+                    if ($result['success']) {
+                        $message = 'Invoice sent via WhatsApp successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error'] ?? 'Failed to send via WhatsApp');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'send_quote_email':
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $quoteId = (int)($_POST['quote_id'] ?? 0);
+                    $toEmail = trim($_POST['to_email'] ?? '');
+                    $subject = trim($_POST['email_subject'] ?? '');
+                    $emailMessage = trim($_POST['email_message'] ?? '');
+                    
+                    if (!$quoteId) {
+                        throw new Exception('Invalid quote ID');
+                    }
+                    
+                    $result = $accounting->sendQuoteByEmail($quoteId, $toEmail ?: null, $subject ?: null, $emailMessage ?: null);
+                    
+                    if ($result['success']) {
+                        $message = 'Quote sent via email successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error'] ?? 'Failed to send email');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'send_quote_whatsapp':
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $quoteId = (int)($_POST['quote_id'] ?? 0);
+                    $phone = trim($_POST['phone'] ?? '');
+                    $caption = trim($_POST['caption'] ?? '');
+                    
+                    if (!$quoteId) {
+                        throw new Exception('Invalid quote ID');
+                    }
+                    
+                    $result = $accounting->sendQuoteByWhatsApp($quoteId, $phone ?: null, $caption ?: null);
+                    
+                    if ($result['success']) {
+                        $message = 'Quote sent via WhatsApp successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error'] ?? 'Failed to send via WhatsApp');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'send_receipt_email':
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $paymentId = (int)($_POST['payment_id'] ?? 0);
+                    $toEmail = trim($_POST['to_email'] ?? '');
+                    $subject = trim($_POST['email_subject'] ?? '');
+                    $emailMessage = trim($_POST['email_message'] ?? '');
+                    
+                    if (!$paymentId) {
+                        throw new Exception('Invalid payment ID');
+                    }
+                    
+                    $result = $accounting->sendReceiptByEmail($paymentId, $toEmail ?: null, $subject ?: null, $emailMessage ?: null);
+                    
+                    if ($result['success']) {
+                        $message = 'Receipt sent via email successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error'] ?? 'Failed to send email');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'send_receipt_whatsapp':
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $paymentId = (int)($_POST['payment_id'] ?? 0);
+                    $phone = trim($_POST['phone'] ?? '');
+                    $caption = trim($_POST['caption'] ?? '');
+                    
+                    if (!$paymentId) {
+                        throw new Exception('Invalid payment ID');
+                    }
+                    
+                    $result = $accounting->sendReceiptByWhatsApp($paymentId, $phone ?: null, $caption ?: null);
+                    
+                    if ($result['success']) {
+                        $message = 'Receipt sent via WhatsApp successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error'] ?? 'Failed to send via WhatsApp');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_vendor':
             case 'update_vendor':
                 if (!\App\Auth::can('settings.view')) {

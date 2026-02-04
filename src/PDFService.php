@@ -429,4 +429,137 @@ class PDFService {
 </body>
 </html>';
     }
+    
+    public function generateReceiptPDF(array $payment): string {
+        $html = $this->getReceiptHTML($payment);
+        $this->dompdf->loadHtml($html);
+        $this->dompdf->setPaper('A4', 'portrait');
+        $this->dompdf->render();
+        return $this->dompdf->output();
+    }
+    
+    private function getReceiptHTML(array $payment): string {
+        $company = $this->getCompanyInfo();
+        $docSettings = $this->getDocSettings();
+        $currency = $docSettings['currency'];
+        
+        $paymentMethodLabel = match($payment['payment_method'] ?? 'cash') {
+            'mpesa' => 'M-Pesa',
+            'bank' => 'Bank Transfer',
+            'cheque' => 'Cheque',
+            'credit_card' => 'Credit Card',
+            default => 'Cash'
+        };
+        
+        return '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.5; background: #fff; }
+        .container { max-width: 800px; margin: 0 auto; padding: 40px; }
+        .header { display: table; width: 100%; margin-bottom: 40px; }
+        .header-left { display: table-cell; width: 60%; vertical-align: top; }
+        .header-right { display: table-cell; width: 40%; vertical-align: top; text-align: right; }
+        .company-name { font-size: 28px; font-weight: bold; color: #059669; margin-bottom: 5px; }
+        .company-info { font-size: 11px; color: #6b7280; line-height: 1.6; }
+        .receipt-title { font-size: 32px; font-weight: bold; color: #10b981; letter-spacing: -1px; }
+        .receipt-number { font-size: 14px; color: #6b7280; margin-top: 5px; }
+        .success-badge { display: inline-block; padding: 8px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; color: white; text-transform: uppercase; letter-spacing: 1px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-top: 10px; }
+        .info-section { display: table; width: 100%; margin-bottom: 30px; }
+        .info-box { display: table-cell; width: 50%; vertical-align: top; }
+        .info-box h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 8px; font-weight: 600; }
+        .info-box p { font-size: 13px; color: #374151; margin-bottom: 3px; }
+        .info-box .name { font-size: 16px; font-weight: 600; color: #111827; }
+        .payment-details { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #10b981; border-radius: 15px; padding: 30px; margin: 30px 0; }
+        .payment-details-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #065f46; margin-bottom: 20px; font-weight: 600; text-align: center; }
+        .payment-row { display: table; width: 100%; margin-bottom: 12px; }
+        .payment-label { display: table-cell; width: 40%; font-size: 13px; color: #6b7280; }
+        .payment-value { display: table-cell; width: 60%; font-size: 14px; color: #374151; font-weight: 500; }
+        .amount-row { border-top: 2px solid #10b981; padding-top: 20px; margin-top: 20px; }
+        .amount-label { font-size: 16px; font-weight: bold; color: #065f46; }
+        .amount-value { font-size: 28px; font-weight: bold; color: #059669; }
+        .invoice-ref { background: #f8fafc; border-radius: 10px; padding: 20px; margin-top: 20px; }
+        .invoice-ref-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 10px; font-weight: 600; }
+        .invoice-ref-content { font-size: 13px; color: #475569; }
+        .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; }
+        .footer p { font-size: 11px; color: #9ca3af; }
+        .footer .thank-you { font-size: 18px; color: #10b981; font-weight: 600; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <div class="company-name">' . htmlspecialchars($company['name']) . '</div>
+                <div class="company-info">
+                    ' . ($company['address'] ? htmlspecialchars($company['address']) . '<br>' : '') . '
+                    ' . ($company['phone'] ? 'Tel: ' . htmlspecialchars($company['phone']) . '<br>' : '') . '
+                    ' . ($company['email'] ? 'Email: ' . htmlspecialchars($company['email']) : '') . '
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="receipt-title">RECEIPT</div>
+                <div class="receipt-number">#' . htmlspecialchars($payment['receipt_number'] ?? 'REC-' . str_pad($payment['id'] ?? 0, 6, '0', STR_PAD_LEFT)) . '</div>
+                <div class="success-badge">PAID</div>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <div class="info-box">
+                <h3>Received From</h3>
+                <p class="name">' . htmlspecialchars($payment['customer_name'] ?? 'Customer') . '</p>
+                ' . (!empty($payment['customer_email']) ? '<p>' . htmlspecialchars($payment['customer_email']) . '</p>' : '') . '
+                ' . (!empty($payment['customer_phone']) ? '<p>' . htmlspecialchars($payment['customer_phone']) . '</p>' : '') . '
+            </div>
+            <div class="info-box" style="text-align: right;">
+                <h3>Receipt Details</h3>
+                <table style="width: 100%; font-size: 12px;">
+                    <tr><td style="text-align: right; color: #6b7280;">Date:</td><td style="text-align: right; padding-left: 10px;">' . date('M d, Y', strtotime($payment['payment_date'] ?? 'now')) . '</td></tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="payment-details">
+            <div class="payment-details-title">Payment Details</div>
+            <div class="payment-row">
+                <span class="payment-label">Payment Method</span>
+                <span class="payment-value">' . htmlspecialchars($paymentMethodLabel) . '</span>
+            </div>
+            ' . (!empty($payment['reference']) ? '
+            <div class="payment-row">
+                <span class="payment-label">Reference Number</span>
+                <span class="payment-value">' . htmlspecialchars($payment['reference']) . '</span>
+            </div>' : '') . '
+            <div class="payment-row amount-row">
+                <span class="payment-label amount-label">Amount Received</span>
+                <span class="payment-value amount-value">' . $currency . ' ' . number_format($payment['amount'] ?? 0, 2) . '</span>
+            </div>
+        </div>
+        
+        ' . (!empty($payment['invoice_number']) ? '
+        <div class="invoice-ref">
+            <div class="invoice-ref-title">For Invoice</div>
+            <div class="invoice-ref-content">
+                <strong>' . htmlspecialchars($payment['invoice_number']) . '</strong>
+                ' . (!empty($payment['invoice_total']) ? ' - Total: ' . $currency . ' ' . number_format($payment['invoice_total'], 2) : '') . '
+            </div>
+        </div>' : '') . '
+        
+        ' . (!empty($payment['notes']) ? '
+        <div style="margin-top: 20px; padding: 15px; background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 0 8px 8px 0;">
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #065f46; margin-bottom: 8px; font-weight: 600;">Notes</div>
+            <div style="font-size: 12px; color: #166534;">' . nl2br(htmlspecialchars($payment['notes'])) . '</div>
+        </div>' : '') . '
+        
+        <div class="footer">
+            <p class="thank-you">Thank you for your payment!</p>
+            <p>This receipt confirms payment has been received.</p>
+            <p>Generated on ' . date('M d, Y \a\t h:i A') . '</p>
+        </div>
+    </div>
+</body>
+</html>';
+    }
 }

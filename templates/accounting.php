@@ -625,6 +625,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-pdf"></i> PDF</button>
                     </form>
                     <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#sendInvoiceEmailModal"><i class="bi bi-envelope"></i> Email</button>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#sendInvoiceWhatsAppModal"><i class="bi bi-whatsapp"></i> WhatsApp</button>
                     <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal"><i class="bi bi-cash"></i> Record Payment</button>
                     <?php if ($invoice['balance_due'] > 0 && $mpesa->isConfigured()): ?>
                     <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#mpesaPaymentModal"><i class="bi bi-phone"></i> M-Pesa</button>
@@ -732,12 +733,86 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p class="text-muted">No payments recorded</p>
                 <?php else: ?>
                 <?php foreach ($payments as $payment): ?>
-                <div class="d-flex justify-content-between border-bottom py-2">
-                    <div>
-                        <small class="text-muted"><?= date('M j, Y', strtotime($payment['payment_date'])) ?></small><br>
-                        <?= htmlspecialchars($payment['payment_method']) ?>
+                <div class="border-bottom py-2">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <small class="text-muted"><?= date('M j, Y', strtotime($payment['payment_date'])) ?></small><br>
+                            <?= htmlspecialchars($payment['payment_method']) ?>
+                        </div>
+                        <strong class="text-success">KES <?= number_format($payment['amount'], 2) ?></strong>
                     </div>
-                    <strong class="text-success">KES <?= number_format($payment['amount'], 2) ?></strong>
+                    <div class="mt-1">
+                        <button type="button" class="btn btn-outline-info btn-sm py-0" data-bs-toggle="modal" data-bs-target="#sendReceiptEmailModal<?= $payment['id'] ?>">
+                            <i class="bi bi-envelope"></i>
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm py-0" data-bs-toggle="modal" data-bs-target="#sendReceiptWhatsAppModal<?= $payment['id'] ?>">
+                            <i class="bi bi-whatsapp"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Receipt Email Modal for Payment <?= $payment['id'] ?> -->
+                <div class="modal fade" id="sendReceiptEmailModal<?= $payment['id'] ?>" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST">
+                                <div class="modal-header bg-info text-white">
+                                    <h5 class="modal-title"><i class="bi bi-envelope"></i> Send Receipt via Email</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="send_receipt_email">
+                                    <input type="hidden" name="payment_id" value="<?= $payment['id'] ?>">
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Recipient Email *</label>
+                                        <input type="email" class="form-control" name="to_email" value="<?= htmlspecialchars($invoice['customer_email'] ?? '') ?>" required>
+                                    </div>
+                                    <div class="alert alert-info small mb-0">
+                                        <i class="bi bi-receipt me-1"></i>
+                                        Receipt for KES <?= number_format($payment['amount'], 2) ?> will be attached as PDF.
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-info"><i class="bi bi-send"></i> Send Receipt</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Receipt WhatsApp Modal for Payment <?= $payment['id'] ?> -->
+                <div class="modal fade" id="sendReceiptWhatsAppModal<?= $payment['id'] ?>" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST">
+                                <div class="modal-header bg-success text-white">
+                                    <h5 class="modal-title"><i class="bi bi-whatsapp"></i> Send Receipt via WhatsApp</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="send_receipt_whatsapp">
+                                    <input type="hidden" name="payment_id" value="<?= $payment['id'] ?>">
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Phone Number *</label>
+                                        <input type="text" class="form-control" name="phone" value="<?= htmlspecialchars($invoice['customer_phone'] ?? '') ?>" required placeholder="e.g., 0712345678">
+                                    </div>
+                                    <div class="alert alert-success small mb-0">
+                                        <i class="bi bi-receipt me-1"></i>
+                                        Receipt for KES <?= number_format($payment['amount'], 2) ?> will be sent as PDF.
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-success"><i class="bi bi-whatsapp"></i> Send Receipt</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
                 <?php endforeach; endif; ?>
             </div>
@@ -750,9 +825,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST">
-                <div class="modal-header">
-                    <h5 class="modal-title">Send Invoice via Email</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-envelope"></i> Send Invoice via Email</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
@@ -761,16 +836,60 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     <div class="mb-3">
                         <label class="form-label">Recipient Email *</label>
-                        <input type="email" class="form-control" name="recipient_email" value="<?= htmlspecialchars($invoice['customer_email'] ?? '') ?>" required>
+                        <input type="email" class="form-control" name="to_email" value="<?= htmlspecialchars($invoice['customer_email'] ?? '') ?>" required>
                     </div>
-                    <div class="alert alert-info small">
+                    <div class="mb-3">
+                        <label class="form-label">Subject (optional)</label>
+                        <input type="text" class="form-control" name="email_subject" placeholder="Leave blank for default subject">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message (optional)</label>
+                        <textarea class="form-control" name="email_message" rows="3" placeholder="Leave blank for default message"></textarea>
+                    </div>
+                    <div class="alert alert-info small mb-0">
                         <i class="bi bi-info-circle me-1"></i>
-                        Invoice #<?= htmlspecialchars($invoice['invoice_number']) ?> for KES <?= number_format($invoice['total'], 2) ?> will be sent to this email address.
+                        Invoice #<?= htmlspecialchars($invoice['invoice_number']) ?> for KES <?= number_format($invoice['total'], 2) ?> will be attached as PDF.
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Send Invoice</button>
+                    <button type="submit" class="btn btn-info"><i class="bi bi-send"></i> Send Email</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Send Invoice WhatsApp Modal -->
+<div class="modal fade" id="sendInvoiceWhatsAppModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-whatsapp"></i> Send Invoice via WhatsApp</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="send_invoice_whatsapp">
+                    <input type="hidden" name="invoice_id" value="<?= $invoice['id'] ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number *</label>
+                        <input type="text" class="form-control" name="phone" value="<?= htmlspecialchars($invoice['customer_phone'] ?? '') ?>" required placeholder="e.g., 0712345678">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Caption (optional)</label>
+                        <textarea class="form-control" name="caption" rows="2" placeholder="Leave blank for default caption"></textarea>
+                    </div>
+                    <div class="alert alert-success small mb-0">
+                        <i class="bi bi-file-pdf me-1"></i>
+                        Invoice #<?= htmlspecialchars($invoice['invoice_number']) ?> will be sent as a PDF document.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-whatsapp"></i> Send WhatsApp</button>
                 </div>
             </form>
         </div>
@@ -2057,11 +2176,12 @@ document.addEventListener('DOMContentLoaded', function() {
         <?php if ($quote['status'] !== 'converted'): ?>
         <a href="?page=accounting&subpage=quotes&action=edit&id=<?= $quote['id'] ?>" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
         <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#sendQuoteEmailModal"><i class="bi bi-envelope"></i> Email</button>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#sendQuoteWhatsAppModal"><i class="bi bi-whatsapp"></i> WhatsApp</button>
         <form method="POST" class="d-inline" onsubmit="return confirm('Convert this quote to an invoice?');">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="convert_quote_to_invoice">
             <input type="hidden" name="quote_id" value="<?= $quote['id'] ?>">
-            <button type="submit" class="btn btn-success"><i class="bi bi-receipt"></i> Convert to Invoice</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-receipt"></i> Convert to Invoice</button>
         </form>
         <?php endif; ?>
     </div>
@@ -2161,9 +2281,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST">
-                <div class="modal-header">
-                    <h5 class="modal-title">Send Quote via Email</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-envelope"></i> Send Quote via Email</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
@@ -2172,16 +2292,60 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     <div class="mb-3">
                         <label class="form-label">Recipient Email *</label>
-                        <input type="email" class="form-control" name="recipient_email" value="<?= htmlspecialchars($quote['customer_email'] ?? '') ?>" required>
+                        <input type="email" class="form-control" name="to_email" value="<?= htmlspecialchars($quote['customer_email'] ?? '') ?>" required>
                     </div>
-                    <div class="alert alert-info small">
+                    <div class="mb-3">
+                        <label class="form-label">Subject (optional)</label>
+                        <input type="text" class="form-control" name="email_subject" placeholder="Leave blank for default subject">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message (optional)</label>
+                        <textarea class="form-control" name="email_message" rows="3" placeholder="Leave blank for default message"></textarea>
+                    </div>
+                    <div class="alert alert-info small mb-0">
                         <i class="bi bi-info-circle me-1"></i>
-                        Quote #<?= htmlspecialchars($quote['quote_number']) ?> for KES <?= number_format($quote['total'] ?? 0, 2) ?> will be sent to this email address.
+                        Quote #<?= htmlspecialchars($quote['quote_number']) ?> for KES <?= number_format($quote['total'] ?? 0, 2) ?> will be attached as PDF.
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Send Quote</button>
+                    <button type="submit" class="btn btn-info"><i class="bi bi-send"></i> Send Email</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Send Quote WhatsApp Modal -->
+<div class="modal fade" id="sendQuoteWhatsAppModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-whatsapp"></i> Send Quote via WhatsApp</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="send_quote_whatsapp">
+                    <input type="hidden" name="quote_id" value="<?= $quote['id'] ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number *</label>
+                        <input type="text" class="form-control" name="phone" value="<?= htmlspecialchars($quote['customer_phone'] ?? '') ?>" required placeholder="e.g., 0712345678">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Caption (optional)</label>
+                        <textarea class="form-control" name="caption" rows="2" placeholder="Leave blank for default caption"></textarea>
+                    </div>
+                    <div class="alert alert-success small mb-0">
+                        <i class="bi bi-file-pdf me-1"></i>
+                        Quote #<?= htmlspecialchars($quote['quote_number']) ?> will be sent as a PDF document.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-whatsapp"></i> Send WhatsApp</button>
                 </div>
             </form>
         </div>

@@ -683,6 +683,64 @@ class WhatsApp {
         }
     }
     
+    public function sendDocument(string $phone, string $documentBase64, string $filename, string $caption = '', string $mimetype = 'application/pdf'): array {
+        if (!$this->enabled) {
+            return ['success' => false, 'error' => 'WhatsApp is disabled'];
+        }
+        
+        if ($this->provider !== 'session') {
+            return ['success' => false, 'error' => 'Document sending requires session provider'];
+        }
+        
+        $formattedPhone = $this->formatPhone($phone);
+        
+        try {
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/send-document');
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                'phone' => $formattedPhone,
+                'document' => $documentBase64,
+                'filename' => $filename,
+                'mimetype' => $mimetype,
+                'caption' => $caption
+            ]));
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error, 'method' => 'session'];
+            }
+            
+            $data = json_decode($response, true);
+            
+            if ($httpCode >= 200 && $httpCode < 300 && ($data['success'] ?? false)) {
+                return [
+                    'success' => true,
+                    'method' => 'session',
+                    'messageId' => $data['messageId'] ?? null,
+                    'phone' => $formattedPhone,
+                    'filename' => $filename
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => $data['error'] ?? "HTTP $httpCode",
+                    'method' => 'session',
+                    'http_code' => $httpCode
+                ];
+            }
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'method' => 'session'];
+        }
+    }
+    
     public function sendToGroup(string $groupId, string $message): array {
         error_log("WhatsApp sendToGroup called - Group: $groupId, Provider: {$this->provider}, URL: {$this->sessionServiceUrl}");
         
