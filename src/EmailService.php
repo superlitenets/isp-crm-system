@@ -105,7 +105,8 @@ class EmailService {
             'ssl' => [
                 'verify_peer' => false,
                 'verify_peer_name' => false,
-                'allow_self_signed' => true
+                'allow_self_signed' => true,
+                'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT
             ]
         ]);
         
@@ -117,10 +118,15 @@ class EmailService {
             "{$host}:{$port}",
             $errno,
             $errstr,
-            30,
+            60, // Increased timeout for slow cPanel servers
             STREAM_CLIENT_CONNECT,
             $context
         );
+        
+        if ($socket) {
+            // Set read/write timeouts
+            stream_set_timeout($socket, 60);
+        }
         
         return $socket;
     }
