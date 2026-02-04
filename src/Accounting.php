@@ -915,4 +915,178 @@ class Accounting {
         
         return $report;
     }
+    
+    // Recurring Invoices
+    public function getRecurringInvoices(): array {
+        return $this->db->query("
+            SELECT i.*, c.name as customer_name, c.email as customer_email
+            FROM invoices i
+            LEFT JOIN customers c ON i.customer_id = c.id
+            WHERE i.is_recurring = true
+            ORDER BY i.next_recurring_date ASC
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function setInvoiceRecurring(int $invoiceId, string $interval, ?string $nextDate = null): void {
+        $nextDate = $nextDate ?? $this->calculateNextRecurringDate($interval);
+        
+        $stmt = $this->db->prepare("
+            UPDATE invoices 
+            SET is_recurring = true, recurring_interval = ?, next_recurring_date = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([$interval, $nextDate, $invoiceId]);
+    }
+    
+    public function stopRecurring(int $invoiceId): void {
+        $stmt = $this->db->prepare("
+            UPDATE invoices 
+            SET is_recurring = false, recurring_interval = NULL, next_recurring_date = NULL, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([$invoiceId]);
+    }
+    
+    public function calculateNextRecurringDate(string $interval, ?string $fromDate = null): string {
+        $from = $fromDate ? new \DateTime($fromDate) : new \DateTime();
+        
+        switch ($interval) {
+            case 'weekly':
+                $from->modify('+1 week');
+                break;
+            case 'biweekly':
+                $from->modify('+2 weeks');
+                break;
+            case 'monthly':
+                $from->modify('+1 month');
+                break;
+            case 'quarterly':
+                $from->modify('+3 months');
+                break;
+            case 'semi-annually':
+                $from->modify('+6 months');
+                break;
+            case 'annually':
+                $from->modify('+1 year');
+                break;
+            default:
+                $from->modify('+1 month');
+        }
+        
+        return $from->format('Y-m-d');
+    }
+    
+    public function getDueRecurringInvoices(): array {
+        return $this->db->query("
+            SELECT i.*, c.name as customer_name, c.email as customer_email
+            FROM invoices i
+            LEFT JOIN customers c ON i.customer_id = c.id
+            WHERE i.is_recurring = true 
+            AND i.next_recurring_date <= CURRENT_DATE
+            ORDER BY i.next_recurring_date ASC
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function processRecurringInvoices(): array {
+        $processed = [];
+        $dueInvoices = $this->getDueRecurringInvoices();
+        
+        foreach ($dueInvoices as $template) {
+            try {
+                $this->db->beginTransaction();
+                
+                // Update next recurring date first (atomically claim this invoice)
+                $nextDate = $this->calculateNextRecurringDate($template['recurring_interval'], $template['next_recurring_date']);
+                $stmt = $this->db->prepare("
+                    UPDATE invoices 
+                    SET next_recurring_date = ? 
+                    WHERE id = ? AND next_recurring_date <= CURRENT_DATE
+                ");
+                $stmt->execute([$nextDate, $template['id']]);
+                
+                // Check if we actually updated (idempotency protection)
+                if ($stmt->rowCount() === 0) {
+                    $this->db->rollBack();
+                    continue; // Already processed by another run
+                }
+                
+                // Create new invoice from template
+                $newInvoiceId = $this->createInvoiceFromRecurring($template);
+                
+                $this->db->commit();
+                
+                $processed[] = [
+                    'template_id' => $template['id'],
+                    'new_invoice_id' => $newInvoiceId,
+                    'customer' => $template['customer_name'],
+                    'amount' => $template['total_amount'],
+                    'next_date' => $nextDate
+                ];
+            } catch (\Exception $e) {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+                $processed[] = [
+                    'template_id' => $template['id'],
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+        
+        return $processed;
+    }
+    
+    private function createInvoiceFromRecurring(array $template): int {
+        // Get payment terms from settings
+        $paymentDays = (int)$this->getSetting('invoice_due_days', 30);
+        
+        // Create new invoice
+        $newInvoiceId = $this->createInvoice([
+            'customer_id' => $template['customer_id'],
+            'issue_date' => date('Y-m-d'),
+            'due_date' => date('Y-m-d', strtotime("+{$paymentDays} days")),
+            'status' => 'sent',
+            'subtotal' => $template['subtotal'],
+            'tax_amount' => $template['tax_amount'],
+            'discount_amount' => $template['discount_amount'],
+            'total_amount' => $template['total_amount'],
+            'currency' => $template['currency'],
+            'notes' => $template['notes'],
+            'terms' => $template['terms'],
+            'created_by' => $template['created_by']
+        ]);
+        
+        // Copy invoice items
+        $stmt = $this->db->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
+        $stmt->execute([$template['id']]);
+        $items = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        foreach ($items as $item) {
+            $this->addInvoiceItem($newInvoiceId, [
+                'product_id' => $item['product_id'],
+                'description' => $item['description'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $item['unit_price'],
+                'tax_rate_id' => $item['tax_rate_id'],
+                'tax_amount' => $item['tax_amount'],
+                'discount_percent' => $item['discount_percent'],
+                'line_total' => $item['line_total'],
+                'sort_order' => $item['sort_order']
+            ]);
+        }
+        
+        return $newInvoiceId;
+    }
+    
+    public function getRecurringStats(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total_recurring,
+                COUNT(CASE WHEN next_recurring_date <= CURRENT_DATE THEN 1 END) as due_today,
+                COALESCE(SUM(total_amount), 0) as monthly_recurring_value
+            FROM invoices 
+            WHERE is_recurring = true
+        ");
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: ['total_recurring' => 0, 'due_today' => 0, 'monthly_recurring_value' => 0];
+    }
 }

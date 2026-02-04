@@ -4962,6 +4962,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'make_recurring':
+                try {
+                    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                    $interval = $_POST['recurring_interval'] ?? 'monthly';
+                    $nextDate = $_POST['next_recurring_date'] ?? null;
+                    
+                    if ($invoiceId <= 0) {
+                        throw new Exception('Invalid invoice ID');
+                    }
+                    
+                    $accounting->setInvoiceRecurring($invoiceId, $interval, $nextDate);
+                    $message = 'Invoice is now set as recurring!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=recurring');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_recurring':
+                try {
+                    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                    $interval = $_POST['recurring_interval'] ?? 'monthly';
+                    $nextDate = $_POST['next_recurring_date'] ?? null;
+                    
+                    if ($invoiceId <= 0) {
+                        throw new Exception('Invalid invoice ID');
+                    }
+                    
+                    $accounting->setInvoiceRecurring($invoiceId, $interval, $nextDate);
+                    $message = 'Recurring schedule updated!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=recurring');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'stop_recurring':
+                try {
+                    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                    
+                    if ($invoiceId <= 0) {
+                        throw new Exception('Invalid invoice ID');
+                    }
+                    
+                    $accounting->stopRecurring($invoiceId);
+                    $message = 'Recurring invoice stopped!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=recurring');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'process_recurring':
+                try {
+                    $results = $accounting->processRecurringInvoices();
+                    $successCount = count(array_filter($results, fn($r) => !isset($r['error'])));
+                    $errorCount = count(array_filter($results, fn($r) => isset($r['error'])));
+                    
+                    if ($successCount > 0 || $errorCount === 0) {
+                        $message = "Processed {$successCount} recurring invoice(s)!";
+                        $messageType = 'success';
+                    }
+                    if ($errorCount > 0) {
+                        $message .= " ({$errorCount} error(s))";
+                        $messageType = 'warning';
+                    }
+                    if ($successCount === 0 && $errorCount === 0) {
+                        $message = 'No recurring invoices due for processing.';
+                        $messageType = 'info';
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_sms_settings':
                 try {
                     $settings->saveSMSSettings($_POST);

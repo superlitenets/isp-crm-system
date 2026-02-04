@@ -31,6 +31,11 @@ $expenseCategories = $accounting->getExpenseCategories();
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'recurring' ? 'active' : '' ?>" href="?page=accounting&subpage=recurring">
+            <i class="bi bi-arrow-repeat"></i> Recurring
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link <?= $subpage === 'quotes' ? 'active' : '' ?>" href="?page=accounting&subpage=quotes">
             <i class="bi bi-file-text"></i> Quotes
         </a>
@@ -624,6 +629,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     <?php if ($invoice['balance_due'] > 0 && $mpesa->isConfigured()): ?>
                     <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#mpesaPaymentModal"><i class="bi bi-phone"></i> M-Pesa</button>
                     <?php endif; ?>
+                    <?php if (!$invoice['is_recurring']): ?>
+                    <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#makeRecurringModal"><i class="bi bi-arrow-repeat"></i> Make Recurring</button>
+                    <?php else: ?>
+                    <span class="btn btn-sm btn-warning disabled"><i class="bi bi-arrow-repeat"></i> Recurring (<?= ucfirst($invoice['recurring_interval']) ?>)</span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="card-body">
@@ -884,6 +894,58 @@ document.getElementById('mpesaPaymentForm').addEventListener('submit', function(
     }
 });
 </script>
+<?php endif; ?>
+
+<!-- Make Recurring Modal -->
+<?php if (!$invoice['is_recurring']): ?>
+<div class="modal fade" id="makeRecurringModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="bi bi-arrow-repeat"></i> Make Invoice Recurring</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="make_recurring">
+                    <input type="hidden" name="invoice_id" value="<?= $invoice['id'] ?>">
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> This will use this invoice as a template. New invoices will be automatically generated on the schedule you set.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Invoice Template</label>
+                        <input type="text" class="form-control" value="<?= htmlspecialchars($invoice['invoice_number']) ?> - <?= htmlspecialchars($invoice['customer_name'] ?? 'N/A') ?> (KES <?= number_format($invoice['total_amount'], 2) ?>)" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Recurring Interval *</label>
+                        <select name="recurring_interval" class="form-select" required>
+                            <option value="weekly">Weekly</option>
+                            <option value="biweekly">Bi-Weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="semi-annually">Semi-Annually</option>
+                            <option value="annually">Annually</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">First Invoice Date *</label>
+                        <input type="date" name="next_recurring_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 month')) ?>" required>
+                        <div class="form-text">When should the first recurring invoice be generated?</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-arrow-repeat"></i> Make Recurring</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php endif; ?>
@@ -1513,6 +1575,180 @@ document.getElementById('stkCustomer').addEventListener('change', function() {
 </div>
 
 <?php endif; ?>
+
+<?php elseif ($subpage === 'recurring'): ?>
+
+<?php
+$recurringInvoices = $accounting->getRecurringInvoices();
+$recurringStats = $accounting->getRecurringStats();
+$intervals = [
+    'weekly' => 'Weekly',
+    'biweekly' => 'Bi-Weekly',
+    'monthly' => 'Monthly',
+    'quarterly' => 'Quarterly',
+    'semi-annually' => 'Semi-Annually',
+    'annually' => 'Annually'
+];
+?>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary bg-opacity-10 h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Active Recurring</h6>
+                <h3 class="mb-0 text-primary"><?= $recurringStats['total_recurring'] ?></h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning bg-opacity-10 h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Due Today</h6>
+                <h3 class="mb-0 text-warning"><?= $recurringStats['due_today'] ?></h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success bg-opacity-10 h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Recurring Value</h6>
+                <h3 class="mb-0 text-success">KES <?= number_format($recurringStats['monthly_recurring_value'], 2) ?></h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Recurring Invoices</h5>
+        <div>
+            <form method="post" class="d-inline">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="process_recurring">
+                <button type="submit" class="btn btn-success btn-sm">
+                    <i class="bi bi-play-fill"></i> Process Due Invoices
+                </button>
+            </form>
+        </div>
+    </div>
+    <div class="card-body">
+        <?php if (empty($recurringInvoices)): ?>
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-arrow-repeat display-4"></i>
+            <p class="mt-2">No recurring invoices set up yet.</p>
+            <p class="small">To create a recurring invoice, go to an existing invoice and click "Make Recurring".</p>
+            <a href="?page=accounting&subpage=invoices" class="btn btn-primary">
+                <i class="bi bi-receipt"></i> View Invoices
+            </a>
+        </div>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Interval</th>
+                        <th>Next Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($recurringInvoices as $inv): ?>
+                    <tr>
+                        <td>
+                            <a href="?page=accounting&subpage=invoices&action=view&id=<?= $inv['id'] ?>">
+                                <?= htmlspecialchars($inv['invoice_number']) ?>
+                            </a>
+                        </td>
+                        <td><?= htmlspecialchars($inv['customer_name'] ?? 'N/A') ?></td>
+                        <td>KES <?= number_format($inv['total_amount'], 2) ?></td>
+                        <td>
+                            <span class="badge bg-info"><?= $intervals[$inv['recurring_interval']] ?? ucfirst($inv['recurring_interval']) ?></span>
+                        </td>
+                        <td>
+                            <?php 
+                            $nextDate = $inv['next_recurring_date'] ? new DateTime($inv['next_recurring_date']) : null;
+                            $today = new DateTime();
+                            $isDue = $nextDate && $nextDate <= $today;
+                            ?>
+                            <span class="<?= $isDue ? 'text-danger fw-bold' : '' ?>">
+                                <?= $nextDate ? $nextDate->format('M d, Y') : 'Not set' ?>
+                                <?php if ($isDue): ?>
+                                    <span class="badge bg-danger ms-1">Due</span>
+                                <?php endif; ?>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">Active</span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="?page=accounting&subpage=invoices&action=view&id=<?= $inv['id'] ?>" class="btn btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editRecurringModal<?= $inv['id'] ?>" title="Edit Schedule">
+                                    <i class="bi bi-calendar-event"></i>
+                                </button>
+                                <form method="post" class="d-inline" onsubmit="return confirm('Stop recurring for this invoice?');">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="stop_recurring">
+                                    <input type="hidden" name="invoice_id" value="<?= $inv['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-danger" title="Stop Recurring">
+                                        <i class="bi bi-stop-circle"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <!-- Edit Recurring Modal -->
+                            <div class="modal fade" id="editRecurringModal<?= $inv['id'] ?>" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="post">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Edit Recurring Schedule</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                                <input type="hidden" name="action" value="update_recurring">
+                                                <input type="hidden" name="invoice_id" value="<?= $inv['id'] ?>">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Invoice</label>
+                                                    <input type="text" class="form-control" value="<?= htmlspecialchars($inv['invoice_number']) ?> - <?= htmlspecialchars($inv['customer_name'] ?? 'N/A') ?>" readonly>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Recurring Interval</label>
+                                                    <select name="recurring_interval" class="form-select" required>
+                                                        <?php foreach ($intervals as $key => $label): ?>
+                                                        <option value="<?= $key ?>" <?= $inv['recurring_interval'] === $key ? 'selected' : '' ?>><?= $label ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Next Invoice Date</label>
+                                                    <input type="date" name="next_recurring_date" class="form-control" value="<?= $inv['next_recurring_date'] ?>" required>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">Update Schedule</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
 
 <?php elseif ($subpage === 'quotes'): ?>
 
