@@ -688,8 +688,8 @@ class WhatsApp {
             return ['success' => false, 'error' => 'WhatsApp is disabled'];
         }
         
-        if ($this->provider !== 'session') {
-            return ['success' => false, 'error' => 'Document sending requires session provider'];
+        if (!in_array($this->provider, ['session', 'web'])) {
+            return ['success' => false, 'error' => 'Document sending requires session or web provider'];
         }
         
         $formattedPhone = $this->formatPhone($phone);
