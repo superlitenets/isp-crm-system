@@ -101,11 +101,14 @@ class EmailService {
         $response = $this->readResponse($socket);
         
         if ($this->config['smtp_encryption'] === 'tls') {
-            $this->sendCommand($socket, "STARTTLS");
+            if (!$this->sendCommand($socket, "STARTTLS")) {
+                return ['success' => false, 'error' => 'Connection lost during STARTTLS'];
+            }
             $this->readResponse($socket);
             
-            if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
-                return ['success' => false, 'error' => 'Failed to enable TLS'];
+            $cryptoEnabled = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+            if (!$cryptoEnabled) {
+                return ['success' => false, 'error' => 'Failed to enable TLS - connection may have been reset'];
             }
             
             $this->sendCommand($socket, "EHLO " . gethostname());
@@ -163,13 +166,20 @@ class EmailService {
         return ['success' => false, 'error' => 'Message not accepted: ' . $response];
     }
     
-    private function sendCommand($socket, string $command): void {
-        fwrite($socket, $command . "\r\n");
+    private function sendCommand($socket, string $command): bool {
+        if (!is_resource($socket) || feof($socket)) {
+            return false;
+        }
+        $result = @fwrite($socket, $command . "\r\n");
+        return $result !== false;
     }
     
     private function readResponse($socket): string {
+        if (!is_resource($socket) || feof($socket)) {
+            return '';
+        }
         $response = '';
-        while ($line = fgets($socket, 515)) {
+        while ($line = @fgets($socket, 515)) {
             $response .= $line;
             if (substr($line, 3, 1) == ' ') break;
         }
