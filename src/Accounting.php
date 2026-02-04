@@ -425,7 +425,7 @@ class Accounting {
         ");
         $stmt->execute([
             $quoteId,
-            $item['product_id'] ?: null,
+            $item['product_id'] ?? null,
             $item['description'] ?? '',
             $quantity,
             $unitPrice,
