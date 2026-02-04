@@ -1868,7 +1868,9 @@ CREATE TABLE IF NOT EXISTS quote_items (
     quantity DECIMAL(10,2) DEFAULT 1,
     unit_price DECIMAL(12,2) NOT NULL,
     tax_rate_id INTEGER REFERENCES tax_rates(id),
+    tax_rate DECIMAL(5,2) DEFAULT 0,
     tax_amount DECIMAL(12,2) DEFAULT 0,
+    discount DECIMAL(10,2) DEFAULT 0,
     discount_percent DECIMAL(5,2) DEFAULT 0,
     line_total DECIMAL(12,2) NOT NULL,
     sort_order INTEGER DEFAULT 0
