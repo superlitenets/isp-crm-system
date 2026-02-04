@@ -4369,6 +4369,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'send_invoice_email':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to send emails.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                    $recipientEmail = filter_var($_POST['recipient_email'] ?? '', FILTER_VALIDATE_EMAIL);
+                    
+                    if (!$invoiceId || !$recipientEmail) {
+                        throw new Exception('Invalid invoice or email address');
+                    }
+                    
+                    $invoice = $accounting->getInvoice($invoiceId);
+                    if (!$invoice) {
+                        throw new Exception('Invoice not found');
+                    }
+                    
+                    $emailService = new \App\EmailService(Database::getConnection());
+                    $result = $emailService->sendInvoice($invoice, $recipientEmail);
+                    
+                    if ($result['success']) {
+                        $message = 'Invoice sent successfully to ' . $recipientEmail;
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error']);
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Failed to send email: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'send_quote_email':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to send emails.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $quoteId = (int)($_POST['quote_id'] ?? 0);
+                    $recipientEmail = filter_var($_POST['recipient_email'] ?? '', FILTER_VALIDATE_EMAIL);
+                    
+                    if (!$quoteId || !$recipientEmail) {
+                        throw new Exception('Invalid quote or email address');
+                    }
+                    
+                    $quote = $accounting->getQuote($quoteId);
+                    if (!$quote) {
+                        throw new Exception('Quote not found');
+                    }
+                    
+                    $emailService = new \App\EmailService(Database::getConnection());
+                    $result = $emailService->sendQuote($quote, $recipientEmail);
+                    
+                    if ($result['success']) {
+                        $message = 'Quote sent successfully to ' . $recipientEmail;
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['error']);
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Failed to send email: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_vendor':
             case 'update_vendor':
                 if (!\App\Auth::can('settings.view')) {
@@ -4522,7 +4594,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $accounting->recalculateQuote($quoteId);
                         $message = 'Quote created successfully!';
                     } else {
-                        $quoteId = (int)$_POST['quote_id'];
+                        $quoteId = (int)($_POST['quote_id'] ?? 0);
                         $accounting->updateQuote($quoteId, [
                             'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'] ?? date('Y-m-d'),
@@ -4754,6 +4826,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error saving settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'save_email_settings':
+                try {
+                    $settings->set('smtp_host', trim($_POST['smtp_host'] ?? ''));
+                    $settings->set('smtp_port', (int)($_POST['smtp_port'] ?? 587));
+                    $settings->set('smtp_username', trim($_POST['smtp_username'] ?? ''));
+                    $settings->set('smtp_password', $_POST['smtp_password'] ?? '');
+                    $settings->set('smtp_encryption', $_POST['smtp_encryption'] ?? 'tls');
+                    $settings->set('smtp_from_email', trim($_POST['smtp_from_email'] ?? ''));
+                    $settings->set('smtp_from_name', trim($_POST['smtp_from_name'] ?? ''));
+                    \App\Settings::clearCache();
+                    $message = 'Email settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving email settings: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

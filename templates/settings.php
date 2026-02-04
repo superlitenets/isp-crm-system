@@ -37,6 +37,11 @@ if ($action === 'edit_template' && $id) {
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'email' ? 'active' : '' ?>" href="?page=settings&subpage=email">
+            <i class="bi bi-envelope"></i> Email
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link <?= $subpage === 'sms' ? 'active' : '' ?>" href="?page=settings&subpage=sms">
             <i class="bi bi-chat-dots"></i> SMS Gateway
         </a>
@@ -391,6 +396,207 @@ function removeLogo() {
     }
 }
 </script>
+
+<?php elseif ($subpage === 'email'): ?>
+<?php
+$emailService = new \App\EmailService(\Database::getConnection());
+$emailConfig = $emailService->getConfig();
+$testResult = null;
+$sendTestResult = null;
+
+if (($_GET['action'] ?? '') === 'test_email') {
+    $testResult = $emailService->testConnection();
+}
+if (($_GET['action'] ?? '') === 'send_test_email' && isset($_GET['email'])) {
+    $testEmail = filter_var($_GET['email'], FILTER_VALIDATE_EMAIL);
+    if ($testEmail) {
+        $sendTestResult = $emailService->send(
+            $testEmail, 
+            'Test Email from ISP CRM', 
+            '<h2>Test Email</h2><p>If you received this, your email server is configured correctly!</p><p>Sent at: ' . date('Y-m-d H:i:s') . '</p>'
+        );
+    } else {
+        $sendTestResult = ['success' => false, 'error' => 'Invalid email address'];
+    }
+}
+
+$emailLogs = [];
+try {
+    $logStmt = \Database::getConnection()->query("SELECT * FROM email_logs ORDER BY sent_at DESC LIMIT 20");
+    $emailLogs = $logStmt->fetchAll(\PDO::FETCH_ASSOC);
+} catch (\Exception $e) {}
+?>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-envelope"></i> Email Server Configuration</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($testResult): ?>
+                <div class="alert alert-<?= $testResult['success'] ? 'success' : 'danger' ?> alert-dismissible">
+                    <?php if ($testResult['success']): ?>
+                    <i class="bi bi-check-circle"></i> Connection successful! SMTP server is reachable.
+                    <?php else: ?>
+                    <i class="bi bi-x-circle"></i> Connection failed: <?= htmlspecialchars($testResult['error']) ?>
+                    <?php endif; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($sendTestResult): ?>
+                <div class="alert alert-<?= $sendTestResult['success'] ? 'success' : 'danger' ?> alert-dismissible">
+                    <?php if ($sendTestResult['success']): ?>
+                    <i class="bi bi-check-circle"></i> Test email sent successfully!
+                    <?php else: ?>
+                    <i class="bi bi-x-circle"></i> Failed to send: <?= htmlspecialchars($sendTestResult['error']) ?>
+                    <?php endif; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php endif; ?>
+
+                <form method="POST" action="?page=settings&subpage=email">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_email_settings">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">SMTP Host <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="smtp_host" value="<?= htmlspecialchars($settings->get('smtp_host', '')) ?>" placeholder="smtp.gmail.com">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SMTP Port <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="smtp_port" value="<?= htmlspecialchars($settings->get('smtp_port', '587')) ?>" placeholder="587">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Username <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="smtp_username" value="<?= htmlspecialchars($settings->get('smtp_username', '')) ?>" placeholder="your-email@gmail.com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Password <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" name="smtp_password" value="<?= htmlspecialchars($settings->get('smtp_password', '')) ?>" placeholder="App password or SMTP password">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Encryption</label>
+                            <select class="form-select" name="smtp_encryption">
+                                <option value="tls" <?= $settings->get('smtp_encryption', 'tls') === 'tls' ? 'selected' : '' ?>>TLS (Recommended)</option>
+                                <option value="ssl" <?= $settings->get('smtp_encryption') === 'ssl' ? 'selected' : '' ?>>SSL</option>
+                                <option value="none" <?= $settings->get('smtp_encryption') === 'none' ? 'selected' : '' ?>>None</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">From Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" name="smtp_from_email" value="<?= htmlspecialchars($settings->get('smtp_from_email', '')) ?>" placeholder="noreply@yourcompany.com">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">From Name</label>
+                            <input type="text" class="form-control" name="smtp_from_name" value="<?= htmlspecialchars($settings->get('smtp_from_name', '')) ?>" placeholder="Your Company Name">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Settings</button>
+                        <a href="?page=settings&subpage=email&action=test_email" class="btn btn-outline-secondary"><i class="bi bi-plug"></i> Test Connection</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-send"></i> Send Test Email</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <input type="hidden" name="page" value="settings">
+                    <input type="hidden" name="subpage" value="email">
+                    <input type="hidden" name="action" value="send_test_email">
+                    <div class="col-md-8">
+                        <input type="email" class="form-control" name="email" placeholder="Enter recipient email address" required>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-success w-100" <?= !$emailService->isConfigured() ? 'disabled' : '' ?>>
+                            <i class="bi bi-envelope-arrow-up"></i> Send Test
+                        </button>
+                    </div>
+                </form>
+                <?php if (!$emailService->isConfigured()): ?>
+                <small class="text-muted mt-2 d-block">Configure SMTP settings above to enable sending.</small>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Email Logs</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Recipient</th>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Sent At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($emailLogs)): ?>
+                            <tr><td colspan="4" class="text-center text-muted py-3">No emails sent yet</td></tr>
+                            <?php else: ?>
+                            <?php foreach ($emailLogs as $log): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($log['recipient']) ?></td>
+                                <td><?= htmlspecialchars(substr($log['subject'] ?? '', 0, 50)) ?></td>
+                                <td>
+                                    <?php if ($log['status'] === 'sent'): ?>
+                                    <span class="badge bg-success">Sent</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-danger" title="<?= htmlspecialchars($log['error_message'] ?? '') ?>">Failed</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><small><?= date('M d, H:i', strtotime($log['sent_at'])) ?></small></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Configuration Help</h6>
+            </div>
+            <div class="card-body small">
+                <h6>Gmail Settings:</h6>
+                <ul class="mb-3">
+                    <li>Host: smtp.gmail.com</li>
+                    <li>Port: 587 (TLS) or 465 (SSL)</li>
+                    <li>Use App Password (not regular password)</li>
+                </ul>
+                
+                <h6>Office 365 Settings:</h6>
+                <ul class="mb-3">
+                    <li>Host: smtp.office365.com</li>
+                    <li>Port: 587</li>
+                    <li>Encryption: TLS</li>
+                </ul>
+                
+                <h6>Custom SMTP:</h6>
+                <ul class="mb-0">
+                    <li>Contact your hosting provider</li>
+                    <li>Usually port 25, 465, or 587</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php elseif ($subpage === 'sms'): ?>
 

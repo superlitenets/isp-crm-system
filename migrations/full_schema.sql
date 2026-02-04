@@ -2135,3 +2135,12 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at
 -- ==========================================
 -- End of Schema
 -- ==========================================
+-- Email logs table
+CREATE TABLE IF NOT EXISTS email_logs (
+    id SERIAL PRIMARY KEY,
+    recipient VARCHAR(255) NOT NULL,
+    subject VARCHAR(500),
+    status VARCHAR(20) DEFAULT 'sent',
+    error_message TEXT,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

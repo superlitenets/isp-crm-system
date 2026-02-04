@@ -613,6 +613,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h5 class="mb-0">Invoice <?= htmlspecialchars($invoice['invoice_number']) ?></h5>
                 <div class="btn-group">
                     <a href="?page=accounting&subpage=invoices&action=edit&id=<?= $invoice['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
+                    <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#sendInvoiceEmailModal"><i class="bi bi-envelope"></i> Email</button>
                     <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal"><i class="bi bi-cash"></i> Record Payment</button>
                     <?php if ($invoice['balance_due'] > 0 && $mpesa->isConfigured()): ?>
                     <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#mpesaPaymentModal"><i class="bi bi-phone"></i> M-Pesa</button>
@@ -724,6 +725,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <?php endforeach; endif; ?>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Send Invoice Email Modal -->
+<div class="modal fade" id="sendInvoiceEmailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Invoice via Email</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="send_invoice_email">
+                    <input type="hidden" name="invoice_id" value="<?= $invoice['id'] ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Recipient Email *</label>
+                        <input type="email" class="form-control" name="recipient_email" value="<?= htmlspecialchars($invoice['customer_email'] ?? '') ?>" required>
+                    </div>
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Invoice #<?= htmlspecialchars($invoice['invoice_number']) ?> for KES <?= number_format($invoice['total'], 2) ?> will be sent to this email address.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Send Invoice</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -1775,6 +1808,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="d-flex gap-2">
         <?php if ($quote['status'] !== 'converted'): ?>
         <a href="?page=accounting&subpage=quotes&action=edit&id=<?= $quote['id'] ?>" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
+        <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#sendQuoteEmailModal"><i class="bi bi-envelope"></i> Email</button>
         <form method="POST" class="d-inline" onsubmit="return confirm('Convert this quote to an invoice?');">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="convert_quote_to_invoice">
@@ -1871,6 +1905,38 @@ document.addEventListener('DOMContentLoaded', function() {
             <?php endif; ?>
         </div>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Send Quote Email Modal -->
+<div class="modal fade" id="sendQuoteEmailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Quote via Email</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="send_quote_email">
+                    <input type="hidden" name="quote_id" value="<?= $quote['id'] ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Recipient Email *</label>
+                        <input type="email" class="form-control" name="recipient_email" value="<?= htmlspecialchars($quote['customer_email'] ?? '') ?>" required>
+                    </div>
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Quote #<?= htmlspecialchars($quote['quote_number']) ?> for KES <?= number_format($quote['total'] ?? 0, 2) ?> will be sent to this email address.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Send Quote</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
