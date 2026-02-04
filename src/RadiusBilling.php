@@ -222,7 +222,8 @@ class RadiusBilling {
     public function updateNAS(int $id, array $data): array {
         try {
             $fields = ['name', 'ip_address', 'secret', 'nas_type', 'ports', 'description', 
-                       'api_port', 'api_username'];
+                       'api_port', 'api_username', 
+                       'hotspot_portal_url', 'hotspot_title', 'hotspot_welcome', 'hotspot_logo_url'];
             $boolFields = ['api_enabled', 'is_active'];
             $intFields = ['location_id', 'sub_location_id'];
             $updates = [];

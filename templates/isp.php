@@ -841,6 +841,196 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
             break;
             
+        case 'download_hotspot_files':
+            $nasId = (int)($_GET['nas_id'] ?? 0);
+            $nas = $radiusBilling->getNAS($nasId);
+            if (!$nas) {
+                $message = 'NAS not found';
+                $messageType = 'danger';
+                break;
+            }
+            
+            $portalUrl = $nas['hotspot_portal_url'] ?? '';
+            if (empty($portalUrl)) {
+                $message = 'Please configure the Portal URL first';
+                $messageType = 'warning';
+                break;
+            }
+            
+            // Generate hotspot files
+            $zip = new ZipArchive();
+            $zipFile = tempnam(sys_get_temp_dir(), 'hotspot_') . '.zip';
+            
+            if ($zip->open($zipFile, ZipArchive::CREATE) === TRUE) {
+                // login.html - redirects to external portal
+                $loginHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <meta http-equiv="refresh" content="0; url=' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)&chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)&dst=$(link-orig-esc)">
+</head>
+<body>
+    <p>Redirecting to login portal...</p>
+    <p><a href="' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)">Click here if not redirected</a></p>
+</body>
+</html>';
+                $zip->addFromString('login.html', $loginHtml);
+                
+                // alogin.html - after successful login
+                $aloginHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Connected - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="refresh" content="3; url=$(link-orig)">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .success { color: #28a745; font-size: 48px; }
+        h1 { color: #333; }
+        p { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="success">&#10004;</div>
+    <h1>Connected!</h1>
+    <p>Welcome to ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</p>
+    <p>You will be redirected shortly...</p>
+    <p><a href="$(link-orig)">Click here to continue</a></p>
+</body>
+</html>';
+                $zip->addFromString('alogin.html', $aloginHtml);
+                
+                // logout.html - logout page
+                $logoutHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Logged Out - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        h1 { color: #333; }
+        p { color: #666; }
+        .btn { display: inline-block; padding: 10px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Logged Out</h1>
+    <p>You have been disconnected from ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</p>
+    <a href="$(link-login)" class="btn">Login Again</a>
+</body>
+</html>';
+                $zip->addFromString('logout.html', $logoutHtml);
+                
+                // status.html - connection status
+                $statusHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Status - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="refresh" content="60">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 30px; background: #f5f5f5; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 8px 0; border-bottom: 1px solid #eee; }
+        td:first-child { color: #666; }
+        .btn { display: inline-block; padding: 10px 30px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Connection Status</h2>
+        <table>
+            <tr><td>Username:</td><td>$(username)</td></tr>
+            <tr><td>IP Address:</td><td>$(ip)</td></tr>
+            <tr><td>MAC Address:</td><td>$(mac)</td></tr>
+            <tr><td>Session Time:</td><td>$(uptime)</td></tr>
+            <tr><td>Downloaded:</td><td>$(bytes-in)</td></tr>
+            <tr><td>Uploaded:</td><td>$(bytes-out)</td></tr>
+        </table>
+        <a href="$(link-logout)" class="btn">Logout</a>
+    </div>
+</body>
+</html>';
+                $zip->addFromString('status.html', $statusHtml);
+                
+                // error.html - error page
+                $errorHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Error - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .error { color: #dc3545; font-size: 48px; }
+        h1 { color: #333; }
+        p { color: #666; }
+        .btn { display: inline-block; padding: 10px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="error">&#10008;</div>
+    <h1>Login Failed</h1>
+    <p>$(error)</p>
+    <a href="$(link-login)" class="btn">Try Again</a>
+</body>
+</html>';
+                $zip->addFromString('error.html', $errorHtml);
+                
+                // rlogin.html - redirect login (for MAC auth)
+                $rloginHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Connecting... - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="refresh" content="0; url=$(link-redirect)">
+</head>
+<body>
+    <p>Connecting...</p>
+</body>
+</html>';
+                $zip->addFromString('rlogin.html', $rloginHtml);
+                
+                // README.txt
+                $readme = "MikroTik Hotspot Files for: " . $nas['name'] . "
+=============================================
+
+Upload these files to your MikroTik hotspot directory:
+/ip hotspot profile set [find] html-directory=hotspot
+
+Files included:
+- login.html    : Redirects to external portal (" . $portalUrl . ")
+- alogin.html   : Shown after successful login
+- logout.html   : Shown after logout
+- status.html   : Shows connection status
+- error.html    : Shown on login errors
+- rlogin.html   : Redirect for MAC authentication
+
+Portal URL: " . $portalUrl . "
+NAS IP: " . $nas['ip_address'] . "
+
+Generated: " . date('Y-m-d H:i:s') . "
+";
+                $zip->addFromString('README.txt', $readme);
+                
+                $zip->close();
+                
+                header('Content-Type: application/zip');
+                header('Content-Disposition: attachment; filename="hotspot_' . preg_replace('/[^a-zA-Z0-9]/', '_', $nas['name']) . '.zip"');
+                header('Content-Length: ' . filesize($zipFile));
+                readfile($zipFile);
+                unlink($zipFile);
+                exit;
+            } else {
+                $message = 'Failed to create ZIP file';
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'delete_nas':
             $result = $radiusBilling->deleteNAS((int)$_POST['id']);
             $message = $result['success'] ? 'NAS device deleted' : 'Error: ' . ($result['error'] ?? 'Unknown error');
@@ -7061,6 +7251,30 @@ try {
                                     </div>
                                 </div>
                                 <hr>
+                                <h6><i class="bi bi-wifi me-1"></i> Hotspot Portal Settings</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-12 mb-3">
+                                        <label class="form-label">Portal URL</label>
+                                        <input type="url" name="hotspot_portal_url" id="edit_hotspot_portal_url" class="form-control" placeholder="https://your-domain.com/hotspot.php">
+                                        <small class="text-muted">External captive portal URL for this NAS</small>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Hotspot Title</label>
+                                        <input type="text" name="hotspot_title" id="edit_hotspot_title" class="form-control" placeholder="WiFi Hotspot">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Logo URL</label>
+                                        <input type="url" name="hotspot_logo_url" id="edit_hotspot_logo_url" class="form-control" placeholder="https://...">
+                                    </div>
+                                    <div class="col-md-12 mb-3">
+                                        <label class="form-label">Welcome Message</label>
+                                        <textarea name="hotspot_welcome" id="edit_hotspot_welcome" class="form-control" rows="2" placeholder="Connect to the internet"></textarea>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="downloadHotspotFiles()">
+                                    <i class="bi bi-download me-1"></i> Download Hotspot Files
+                                </button>
+                                <hr>
                                 <h6><i class="bi bi-box-seam me-1"></i> Hotspot Packages</h6>
                                 <p class="text-muted small">Select packages available for this NAS hotspot. If none selected, all packages will be shown.</p>
                                 <div class="mb-3" id="edit_nas_packages_container">
@@ -10069,6 +10283,12 @@ try {
         // Reset all package checkboxes
         document.querySelectorAll('.nas-package-checkbox').forEach(cb => cb.checked = false);
         
+        // Load hotspot settings
+        document.getElementById('edit_hotspot_portal_url').value = nas.hotspot_portal_url || '';
+        document.getElementById('edit_hotspot_title').value = nas.hotspot_title || '';
+        document.getElementById('edit_hotspot_logo_url').value = nas.hotspot_logo_url || '';
+        document.getElementById('edit_hotspot_welcome').value = nas.hotspot_welcome || '';
+        
         // Load assigned packages for this NAS
         fetch('?section=isp&action=get_nas_packages&nas_id=' + nas.id)
             .then(r => r.json())
@@ -10083,6 +10303,15 @@ try {
             .catch(e => console.error('Failed to load NAS packages:', e));
         
         new bootstrap.Modal(document.getElementById('editNASModal')).show();
+    }
+    
+    function downloadHotspotFiles() {
+        const nasId = document.getElementById('edit_nas_id').value;
+        if (!nasId) {
+            alert('Please save the NAS first before downloading hotspot files.');
+            return;
+        }
+        window.location.href = '?section=isp&action=download_hotspot_files&nas_id=' + nasId;
     }
     
     function filterSubLocations(locationSelect, subLocationSelectId, selectedValue = '') {
