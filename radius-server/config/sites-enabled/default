@@ -53,14 +53,11 @@ server default {
         preprocess
         suffix
         
-        # SQL first - looks up known users
+        # SQL first - looks up known users and sets reply attributes
         sql
         
-        # If SQL didn't find the user (no password set), accept with expired pool
+        # If SQL didn't find the user (no password set), set expired pool attributes
         if (!&control:Cleartext-Password) {
-            update control {
-                Auth-Type := Accept
-            }
             update reply {
                 Framed-Pool := "expired-pool"
                 Mikrotik-Rate-Limit := "128k/128k"
@@ -71,22 +68,20 @@ server default {
             }
         }
         
+        # Accept ALL users - control access via SQL attributes (pool, rate limit, etc)
+        update control {
+            Auth-Type := Accept
+        }
+        
         expiration
         logintime
-        pap
-        chap
-        mschap
     }
 
     authenticate {
-        Auth-Type PAP {
-            pap
-        }
-        Auth-Type CHAP {
-            chap
-        }
-        Auth-Type MS-CHAP {
-            mschap
+        # All authentication is handled via SQL attributes
+        # PAP/CHAP/MSCHAP removed to allow walled garden for invalid passwords
+        Auth-Type Accept {
+            ok
         }
     }
 
@@ -116,25 +111,7 @@ server default {
         exec
         remove_reply_message_if_eap
         
-        Post-Auth-Type REJECT {
-            # For known users with wrong password - assign to expired pool
-            # Check if user exists (has a password set from authorize)
-            if (&control:Cleartext-Password) {
-                # User exists but password wrong - redirect to walled garden
-                update reply {
-                    Framed-Pool := "expired-pool"
-                    Mikrotik-Rate-Limit := "128k/128k"
-                    Session-Timeout := 300
-                    Reply-Message := "Invalid password - redirecting to portal"
-                }
-                
-                # Log to database
-                sql
-                
-                # Force accept
-                accept
-            }
-        }
+        # Post-Auth-Type REJECT not needed - all users accepted via Auth-Type Accept
     }
 
     pre-proxy {
