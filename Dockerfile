@@ -36,6 +36,9 @@ COPY . .
 # Copy security configuration AFTER composer install (disable dangerous functions at runtime)
 COPY docker/security.ini /usr/local/etc/php/conf.d/security.ini
 
+# Copy PHP-FPM pool configuration for optimal performance (increased max_children)
+COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+
 RUN chown -R www-data:www-data /var/www/html
 
 EXPOSE 9000

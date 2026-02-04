@@ -37,11 +37,18 @@ This Docker setup allows you to run the ISP CRM & Ticketing System locally or on
 
 ```
 docker/
-├── Dockerfile          # PHP/Apache container configuration
-├── docker-compose.yml  # Multi-container orchestration
+├── Dockerfile          # PHP/Apache container configuration (standalone)
+├── docker-compose.yml  # Multi-container orchestration (development)
 ├── apache.conf         # Apache virtual host configuration
+├── nginx.conf          # Nginx configuration (production)
+├── php-fpm.conf        # PHP-FPM pool configuration (production)
+├── security.ini        # PHP security hardening
 ├── .env.example        # Environment variables template
 └── README.md           # This file
+
+# Root directory (production)
+├── Dockerfile          # PHP-FPM container (used with Nginx)
+└── docker-compose.yml  # Full production stack
 ```
 
 ## Common Commands
@@ -101,6 +108,17 @@ For production:
 4. Set proper `SESSION_SECRET`
 5. Configure proper backup for PostgreSQL data
 
+## PHP-FPM Configuration
+
+The production setup uses PHP-FPM with Nginx. The `php-fpm.conf` file configures:
+- **pm.max_children = 20**: Maximum worker processes
+- **pm.start_servers = 5**: Initial workers on startup
+- **pm.min_spare_servers = 3**: Minimum idle workers
+- **pm.max_spare_servers = 10**: Maximum idle workers
+- **pm.max_requests = 500**: Requests per worker before respawn
+
+Adjust these values based on your server RAM (each worker uses ~30-50MB).
+
 ## Troubleshooting
 
 **Container won't start:**
@@ -112,10 +130,18 @@ docker-compose logs app
 - Ensure the db container is healthy: `docker-compose ps`
 - Check database logs: `docker-compose logs db`
 
+**PHP-FPM max_children reached:**
+If you see `server reached pm.max_children setting` warnings:
+1. Increase `pm.max_children` in `docker/php-fpm.conf`
+2. Rebuild the container: `docker-compose up -d --build php`
+
 **Permission issues:**
 ```bash
 docker-compose exec app chown -R www-data:www-data /var/www/html
 ```
+
+**Email SSL broken pipe errors:**
+This typically happens with unstable SMTP connections. The EmailService now handles these gracefully.
 
 ## Support
 
