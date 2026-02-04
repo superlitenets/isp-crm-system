@@ -1,0 +1,43 @@
+isp_crm_freeradius  | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 30169
+isp_crm_freeradius  | rlm_sql (sql): Closing expired connection (5) - Hit idle_timeout limit
+isp_crm_freeradius  | rlm_sql_postgresql: Socket destructor called, closing socket
+isp_crm_freeradius  | rlm_sql (sql): Closing expired connection (4) - Hit idle_timeout limit
+isp_crm_freeradius  | rlm_sql_postgresql: Socket destructor called, closing socket
+isp_crm_freeradius  | rlm_sql (sql): Closing expired connection (3) - Hit idle_timeout limit
+isp_crm_freeradius  | rlm_sql_postgresql: Socket destructor called, closing socket
+isp_crm_freeradius  | rlm_sql (sql): Closing expired connection (0) - Hit idle_timeout limit
+isp_crm_freeradius  | rlm_sql_postgresql: Socket destructor called, closing socket
+isp_crm_freeradius  | (2)     [sql] = ok
+isp_crm_freeradius  | (2)     if (!&control:Cleartext-Password) {
+isp_crm_freeradius  | (2)     if (!&control:Cleartext-Password)  -> FALSE
+isp_crm_freeradius  | (2)     [expiration] = noop
+isp_crm_freeradius  | (2)     [logintime] = noop
+isp_crm_freeradius  | (2)     [pap] = updated
+isp_crm_freeradius  | (2)     [chap] = noop
+isp_crm_freeradius  | (2)     [mschap] = noop
+isp_crm_freeradius  | (2)   } # authorize = updated
+isp_crm_freeradius  | (2) Found Auth-Type = PAP
+isp_crm_freeradius  | (2) # Executing group from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius  | (2)   Auth-Type PAP {
+isp_crm_freeradius  | (2) pap: Login attempt with password
+isp_crm_freeradius  | (2) pap: Comparing with "known good" Cleartext-Password
+isp_crm_freeradius  | (2) pap: ERROR: Cleartext password does not match "known good" password
+isp_crm_freeradius  | (2) pap: Passwords don't match
+isp_crm_freeradius  | (2)     [pap] = reject
+isp_crm_freeradius  | (2)   } # Auth-Type PAP = reject
+isp_crm_freeradius  | (2) Failed to authenticate the user
+isp_crm_freeradius  | (2) Using Post-Auth-Type Reject
+isp_crm_freeradius  | (2) Post-Auth-Type sub-section not found.  Ignoring.
+isp_crm_freeradius  | (2) # Executing group from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius  | (2) Login incorrect (pap: Cleartext password does not match "known good" password): [SFL002/Kenya] (from client vpn_clients port 15729116 cli 04:33:89:74:47:08)
+isp_crm_freeradius  | (2) Delaying response for 1.000000 seconds
+isp_crm_freeradius  | Waking up in 0.2 seconds.
+isp_crm_freeradius  | Waking up in 0.7 seconds.
+isp_crm_freeradius  | (2) Sending delayed response
+isp_crm_freeradius  | (2) Sent Access-Reject Id 120 from 172.18.0.4:1812 to 10.200.0.5:56626 length 40
+isp_crm_freeradius  | (2)   Mikrotik-Rate-Limit = "5M/10M"
+isp_crm_freeradius  | (2)   Session-Timeout = 2592000
+isp_crm_freeradius  | Waking up in 3.9 seconds.
+isp_crm_freeradius  | (2) Cleaning up request packet ID 120 with timestamp +73 due to cleanup_delay was reached
+isp_crm_freeradius  | Ready to process requests
+
