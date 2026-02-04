@@ -1983,6 +1983,235 @@ class RadiusBilling {
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
+    // ==================== MAC-Only Hotspot System ====================
+    
+    public function getSubscriptionByMAC(string $mac): ?array {
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+        if (strlen($mac) !== 12) {
+            return null;
+        }
+        $macFormatted = implode(':', str_split($mac, 2));
+        
+        $stmt = $this->db->prepare("
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone,
+                   p.name as package_name, p.download_speed, p.upload_speed, p.address_pool,
+                   p.data_quota_mb, p.price as package_price, p.validity_days
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE s.mac_address = ?
+            ORDER BY s.created_at DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$macFormatted]);
+        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($sub) {
+            $sub['is_expired'] = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
+            $sub['mac_formatted'] = $macFormatted;
+        }
+        
+        return $sub ?: null;
+    }
+    
+    public function redeemVoucherForMAC(string $code, string $mac): array {
+        $code = strtoupper(trim($code));
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+        
+        if (strlen($mac) !== 12) {
+            return ['success' => false, 'error' => 'Invalid MAC address'];
+        }
+        $macFormatted = implode(':', str_split($mac, 2));
+        
+        // Get voucher
+        $stmt = $this->db->prepare("
+            SELECT v.*, p.name as package_name, p.download_speed, p.upload_speed, 
+                   p.validity_days, p.data_quota_mb, p.address_pool
+            FROM radius_vouchers v
+            LEFT JOIN radius_packages p ON v.package_id = p.id
+            WHERE v.code = ? AND v.status = 'unused'
+            LIMIT 1
+        ");
+        $stmt->execute([$code]);
+        $voucher = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$voucher) {
+            return ['success' => false, 'error' => 'Invalid or already used voucher'];
+        }
+        
+        $this->db->beginTransaction();
+        try {
+            // Check if MAC already has a subscription
+            $existing = $this->getSubscriptionByMAC($mac);
+            
+            if ($existing) {
+                // Extend existing subscription
+                $validityMinutes = $voucher['validity_minutes'] ?? ($voucher['validity_days'] * 1440);
+                $newExpiry = date('Y-m-d H:i:s', strtotime("+{$validityMinutes} minutes"));
+                
+                // If subscription is expired, extend from now; otherwise extend from current expiry
+                if ($existing['is_expired']) {
+                    $newExpiry = date('Y-m-d H:i:s', strtotime("+{$validityMinutes} minutes"));
+                } else {
+                    $newExpiry = date('Y-m-d H:i:s', strtotime($existing['expiry_date'] . " +{$validityMinutes} minutes"));
+                }
+                
+                $stmt = $this->db->prepare("
+                    UPDATE radius_subscriptions 
+                    SET expiry_date = ?, status = 'active', updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$newExpiry, $existing['id']]);
+                
+                $subscriptionId = $existing['id'];
+            } else {
+                // Create new subscription for this MAC
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_subscriptions 
+                    (username, password, mac_address, package_id, status, expiry_date, access_type, created_at)
+                    VALUES (?, ?, ?, ?, 'active', ?, 'hotspot', CURRENT_TIMESTAMP)
+                ");
+                $username = 'HS-' . strtoupper(substr(md5($macFormatted . time()), 0, 8));
+                $password = strtoupper(substr(md5(uniqid()), 0, 8));
+                $validityMinutes = $voucher['validity_minutes'] ?? ($voucher['validity_days'] * 1440);
+                $expiry = date('Y-m-d H:i:s', strtotime("+{$validityMinutes} minutes"));
+                
+                $stmt->execute([$username, $password, $macFormatted, $voucher['package_id'], $expiry]);
+                $subscriptionId = $this->db->lastInsertId();
+            }
+            
+            // Mark voucher as used
+            $stmt = $this->db->prepare("
+                UPDATE radius_vouchers 
+                SET status = 'used', used_by_subscription_id = ?, used_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            ");
+            $stmt->execute([$subscriptionId, $voucher['id']]);
+            
+            $this->db->commit();
+            
+            return [
+                'success' => true,
+                'subscription_id' => $subscriptionId,
+                'voucher_id' => $voucher['id'],
+                'package_name' => $voucher['package_name'],
+                'message' => 'Voucher applied successfully. You can now access the internet.'
+            ];
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return ['success' => false, 'error' => 'Failed to apply voucher: ' . $e->getMessage()];
+        }
+    }
+    
+    public function registerHotspotDeviceByPhone(string $phone, string $mac, int $packageId): array {
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+        if (strlen($mac) !== 12) {
+            return ['success' => false, 'error' => 'Invalid MAC address'];
+        }
+        $macFormatted = implode(':', str_split($mac, 2));
+        
+        // Normalize phone
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        if (substr($phone, 0, 1) === '0') {
+            $phone = '254' . substr($phone, 1);
+        }
+        
+        // Check if MAC already registered
+        $existing = $this->getSubscriptionByMAC($mac);
+        if ($existing && !$existing['is_expired']) {
+            return ['success' => false, 'error' => 'This device is already registered'];
+        }
+        
+        // Get package
+        $stmt = $this->db->prepare("SELECT * FROM radius_packages WHERE id = ? AND is_active = true");
+        $stmt->execute([$packageId]);
+        $package = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$package) {
+            return ['success' => false, 'error' => 'Invalid package selected'];
+        }
+        
+        // Find or create customer
+        $stmt = $this->db->prepare("
+            SELECT id FROM customers 
+            WHERE REPLACE(REPLACE(phone, '+', ''), ' ', '') = ?
+               OR REPLACE(REPLACE(phone, '+', ''), ' ', '') LIKE ?
+            LIMIT 1
+        ");
+        $stmt->execute([$phone, '%' . substr($phone, -9)]);
+        $customer = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $customerId = null;
+        if ($customer) {
+            $customerId = $customer['id'];
+        } else {
+            // Create new customer
+            $stmt = $this->db->prepare("
+                INSERT INTO customers (name, phone, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+            ");
+            $stmt->execute(['Hotspot User ' . substr($phone, -4), '+' . $phone]);
+            $customerId = $this->db->lastInsertId();
+        }
+        
+        if ($existing) {
+            // Update existing subscription
+            $stmt = $this->db->prepare("
+                UPDATE radius_subscriptions 
+                SET customer_id = ?, package_id = ?, status = 'pending_payment', updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            ");
+            $stmt->execute([$customerId, $packageId, $existing['id']]);
+            $subscriptionId = $existing['id'];
+        } else {
+            // Create new subscription
+            $username = 'HS-' . strtoupper(substr(md5($macFormatted . time()), 0, 8));
+            $password = strtoupper(substr(md5(uniqid()), 0, 8));
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_subscriptions 
+                (customer_id, username, password, mac_address, package_id, status, access_type, created_at)
+                VALUES (?, ?, ?, ?, ?, 'pending_payment', 'hotspot', CURRENT_TIMESTAMP)
+            ");
+            $stmt->execute([$customerId, $username, $password, $macFormatted, $packageId]);
+            $subscriptionId = $this->db->lastInsertId();
+        }
+        
+        return [
+            'success' => true,
+            'subscription_id' => $subscriptionId,
+            'customer_id' => $customerId,
+            'phone' => $phone,
+            'package' => $package,
+            'amount' => $package['price']
+        ];
+    }
+    
+    public function activateHotspotByPayment(int $subscriptionId): array {
+        $stmt = $this->db->prepare("
+            SELECT s.*, p.validity_days 
+            FROM radius_subscriptions s 
+            LEFT JOIN radius_packages p ON s.package_id = p.id 
+            WHERE s.id = ?
+        ");
+        $stmt->execute([$subscriptionId]);
+        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        $expiry = date('Y-m-d H:i:s', strtotime("+{$sub['validity_days']} days"));
+        
+        $stmt = $this->db->prepare("
+            UPDATE radius_subscriptions 
+            SET status = 'active', expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        ");
+        $stmt->execute([$expiry, $subscriptionId]);
+        
+        return ['success' => true, 'expiry_date' => $expiry];
+    }
+
     public function registerMACForHotspot(int $subscriptionId, string $mac): array {
         $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
         if (strlen($mac) !== 12) {

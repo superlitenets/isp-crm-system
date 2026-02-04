@@ -463,11 +463,17 @@ class Mpesa {
             $accountRef = $trans['account_reference'];
             $subscription = null;
             
-            // Check if account_reference is in format "radius_X" where X is subscription ID
+            // Check if account_reference is in format "radius_X" or "HS-X" where X is subscription ID
+            $subscriptionId = null;
             if (preg_match('/^radius_(\d+)$/i', $accountRef, $matches)) {
                 $subscriptionId = (int)$matches[1];
+            } elseif (preg_match('/^HS-(\d+)$/i', $accountRef, $matches)) {
+                $subscriptionId = (int)$matches[1];
+            }
+            
+            if ($subscriptionId) {
                 $stmt = $this->db->prepare("
-                    SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                    SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price, p.validity_days
                     FROM radius_subscriptions s
                     LEFT JOIN customers c ON s.customer_id = c.id
                     LEFT JOIN radius_packages p ON s.package_id = p.id
@@ -478,6 +484,19 @@ class Mpesa {
                 
                 if ($subscription) {
                     error_log("RADIUS: Found subscription by ID={$subscriptionId} (username: {$subscription['username']})");
+                    
+                    // For pending_payment hotspot subscriptions, activate them
+                    if ($subscription['status'] === 'pending_payment') {
+                        $validityDays = $subscription['validity_days'] ?? 30;
+                        $expiryDate = date('Y-m-d H:i:s', strtotime("+{$validityDays} days"));
+                        $activateStmt = $this->db->prepare("
+                            UPDATE radius_subscriptions 
+                            SET status = 'active', expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
+                            WHERE id = ?
+                        ");
+                        $activateStmt->execute([$expiryDate, $subscriptionId]);
+                        error_log("RADIUS: Activated hotspot subscription ID={$subscriptionId}, expires: {$expiryDate}");
+                    }
                 }
             }
             
