@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reason FROM radius_auth_log 
-        WHERE subscription_id = ? AND result = 'Accept' 
+        WHERE subscription_id = ? 
         ORDER BY auth_time DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['id']]);
@@ -109,7 +109,7 @@ if (!$subscription && !$lookupMode) {
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reason FROM radius_auth_log 
-        WHERE subscription_id = ? AND result = 'Accept' 
+        WHERE subscription_id = ? 
         ORDER BY auth_time DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['id']]);
@@ -136,7 +136,7 @@ if ($subscription) {
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reason FROM radius_auth_log 
-        WHERE subscription_id = ? AND result = 'Accept' 
+        WHERE subscription_id = ? 
         ORDER BY auth_time DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['id']]);
