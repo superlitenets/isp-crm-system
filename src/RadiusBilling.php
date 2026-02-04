@@ -477,10 +477,21 @@ class RadiusBilling {
             $params[] = $filters['nas_id'];
         }
         
+        if (!empty($filters['access_type'])) {
+            $sql .= " AND s.access_type = ?";
+            $params[] = $filters['access_type'];
+        }
+        
         $sql .= " ORDER BY c.name";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function countSubscribersByAccessType(string $accessType): int {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM radius_subscriptions WHERE LOWER(access_type) = LOWER(?)");
+        $stmt->execute([$accessType]);
+        return (int)$stmt->fetchColumn();
     }
     
     // ==================== Package Management ====================

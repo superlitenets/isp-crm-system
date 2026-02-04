@@ -2929,6 +2929,7 @@ try {
             if ($filter === 'expired') $filters['expired'] = true;
             if (!empty($_GET['status'])) $filters['status'] = $_GET['status'];
             if (!empty($_GET['package_id'])) $filters['package_id'] = (int)$_GET['package_id'];
+            if (!empty($_GET['access_type'])) $filters['access_type'] = $_GET['access_type'];
             
             $packages = $radiusBilling->getPackages();
             $nasDevices = $radiusBilling->getNASDevices();
@@ -3027,11 +3028,45 @@ try {
                 </div>
             </div>
             
+            <?php
+            // Count subscribers by access type
+            $pppoeCount = $radiusBilling->countSubscribersByAccessType('pppoe');
+            $staticCount = $radiusBilling->countSubscribersByAccessType('static');
+            $hotspotCount = $radiusBilling->countSubscribersByAccessType('hotspot');
+            $currentAccessType = $_GET['access_type'] ?? '';
+            ?>
+            
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <a class="nav-link <?= empty($currentAccessType) ? 'active' : '' ?>" href="?page=isp&view=subscriptions">
+                        <i class="bi bi-people me-1"></i> All <span class="badge bg-secondary ms-1"><?= $totalSubs ?></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $currentAccessType === 'pppoe' ? 'active' : '' ?>" href="?page=isp&view=subscriptions&access_type=pppoe">
+                        <i class="bi bi-ethernet me-1"></i> PPPoE <span class="badge bg-primary ms-1"><?= $pppoeCount ?></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $currentAccessType === 'static' ? 'active' : '' ?>" href="?page=isp&view=subscriptions&access_type=static">
+                        <i class="bi bi-hdd-network me-1"></i> Static IP <span class="badge bg-info ms-1"><?= $staticCount ?></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $currentAccessType === 'hotspot' ? 'active' : '' ?>" href="?page=isp&view=subscriptions&access_type=hotspot">
+                        <i class="bi bi-wifi me-1"></i> Hotspot <span class="badge bg-warning text-dark ms-1"><?= $hotspotCount ?></span>
+                    </a>
+                </li>
+            </ul>
+            
             <div class="card shadow-sm">
                 <div class="card-header bg-white py-3">
                     <form method="get" class="row g-2 align-items-end">
                         <input type="hidden" name="page" value="isp">
                         <input type="hidden" name="view" value="subscriptions">
+                        <?php if ($currentAccessType): ?>
+                        <input type="hidden" name="access_type" value="<?= htmlspecialchars($currentAccessType) ?>">
+                        <?php endif; ?>
                         <div class="col-lg-3 col-md-6">
                             <label class="form-label small text-muted mb-1">Search</label>
                             <div class="input-group">
