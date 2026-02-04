@@ -3278,10 +3278,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ticketId = (int)($_POST['ticket_id'] ?? 0);
                 if ($ticketId) {
                     try {
-                        $pdo = getDbConnection();
-                        
                         // Update ticket status to resolved
-                        $stmt = $pdo->prepare("
+                        $stmt = $db->prepare("
                             UPDATE tickets 
                             SET status = 'resolved', 
                                 resolved_by = ?, 
@@ -3292,7 +3290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$currentUser['id'], $ticketId]);
                         
                         // Log the activity
-                        $stmt = $pdo->prepare("
+                        $stmt = $db->prepare("
                             INSERT INTO ticket_activity 
                             (ticket_id, user_id, action, details, created_at) 
                             VALUES (?, ?, 'status_change', ?, CURRENT_TIMESTAMP)
