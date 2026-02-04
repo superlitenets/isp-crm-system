@@ -8238,7 +8238,7 @@ $csrfToken = \App\Auth::generateToken();
             $unassignedStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status NOT IN ('closed', 'resolved')");
             $unassignedCount = $unassignedStmt->fetchColumn() ?: 0;
             if ($unassignedCount > 0) {
-                $alerts[] = ['type' => 'warning', 'icon' => 'exclamation-triangle', 'text' => $unassignedCount . ' unassigned ticket(s)'];
+                $alerts[] = ['type' => 'warning', 'icon' => 'exclamation-triangle', 'text' => $unassignedCount . ' unassigned ticket(s)', 'link' => '?page=tickets&filter=unassigned'];
             }
             
             // Active RADIUS subscribers
@@ -8249,7 +8249,7 @@ $csrfToken = \App\Auth::generateToken();
             $expiringStmt = $db->query("SELECT COUNT(*) FROM radius_subscriptions WHERE status = 'active' AND expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '3 days'");
             $expiringCount = $expiringStmt->fetchColumn() ?: 0;
             if ($expiringCount > 0) {
-                $alerts[] = ['type' => 'info', 'icon' => 'clock', 'text' => $expiringCount . ' subscription(s) expiring soon'];
+                $alerts[] = ['type' => 'info', 'icon' => 'clock', 'text' => $expiringCount . ' subscription(s) expiring soon', 'link' => '?page=isp&view=expiring'];
             }
             
             // Today's revenue
@@ -8260,7 +8260,7 @@ $csrfToken = \App\Auth::generateToken();
             $overdueStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('closed', 'resolved') AND priority IN ('high', 'critical') AND created_at < NOW() - INTERVAL '24 hours'");
             $overdueCount = $overdueStmt->fetchColumn() ?: 0;
             if ($overdueCount > 0) {
-                $alerts[] = ['type' => 'danger', 'icon' => 'alarm', 'text' => $overdueCount . ' overdue high-priority ticket(s)'];
+                $alerts[] = ['type' => 'danger', 'icon' => 'alarm', 'text' => $overdueCount . ' overdue high-priority ticket(s)', 'link' => '?page=tickets&filter=overdue'];
             }
         } catch (Exception $e) {
             // Silently fail if tables don't exist
@@ -8298,7 +8298,7 @@ $csrfToken = \App\Auth::generateToken();
                             <ul class="dropdown-menu dropdown-menu-end shadow">
                                 <li><h6 class="dropdown-header">Alerts</h6></li>
                                 <?php foreach ($alerts as $alert): ?>
-                                <li><a class="dropdown-item text-<?= $alert['type'] ?>" href="#"><i class="bi bi-<?= $alert['icon'] ?> me-2"></i><?= $alert['text'] ?></a></li>
+                                <li><a class="dropdown-item text-<?= $alert['type'] ?>" href="<?= $alert['link'] ?? '#' ?>"><i class="bi bi-<?= $alert['icon'] ?> me-2"></i><?= $alert['text'] ?></a></li>
                                 <?php endforeach; ?>
                             </ul>
                         </div>
