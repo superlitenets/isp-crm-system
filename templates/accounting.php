@@ -613,6 +613,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h5 class="mb-0">Invoice <?= htmlspecialchars($invoice['invoice_number']) ?></h5>
                 <div class="btn-group">
                     <a href="?page=accounting&subpage=invoices&action=edit&id=<?= $invoice['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
+                    <form method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                        <input type="hidden" name="action" value="download_invoice_pdf">
+                        <input type="hidden" name="invoice_id" value="<?= $invoice['id'] ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-pdf"></i> PDF</button>
+                    </form>
                     <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#sendInvoiceEmailModal"><i class="bi bi-envelope"></i> Email</button>
                     <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal"><i class="bi bi-cash"></i> Record Payment</button>
                     <?php if ($invoice['balance_due'] > 0 && $mpesa->isConfigured()): ?>
@@ -1806,6 +1812,12 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="d-flex justify-content-between align-items-center mb-4">
     <a href="?page=accounting&subpage=quotes" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
     <div class="d-flex gap-2">
+        <form method="POST" class="d-inline">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="download_quote_pdf">
+            <input type="hidden" name="quote_id" value="<?= $quote['id'] ?>">
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-file-pdf"></i> PDF</button>
+        </form>
         <?php if ($quote['status'] !== 'converted'): ?>
         <a href="?page=accounting&subpage=quotes&action=edit&id=<?= $quote['id'] ?>" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
         <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#sendQuoteEmailModal"><i class="bi bi-envelope"></i> Email</button>

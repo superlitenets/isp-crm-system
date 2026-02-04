@@ -4441,6 +4441,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'download_invoice_pdf':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to download invoices.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+                    
+                    if (!$invoiceId) {
+                        throw new Exception('Invalid invoice ID');
+                    }
+                    
+                    $invoice = $accounting->getInvoice($invoiceId);
+                    if (!$invoice) {
+                        throw new Exception('Invoice not found');
+                    }
+                    
+                    $pdfService = new \App\PDFService(Database::getConnection());
+                    $pdfContent = $pdfService->generateInvoicePDF($invoice);
+                    
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: attachment; filename="Invoice-' . $invoice['invoice_number'] . '.pdf"');
+                    header('Content-Length: ' . strlen($pdfContent));
+                    echo $pdfContent;
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Failed to generate PDF: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'download_quote_pdf':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to download quotes.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $quoteId = (int)($_POST['quote_id'] ?? 0);
+                    
+                    if (!$quoteId) {
+                        throw new Exception('Invalid quote ID');
+                    }
+                    
+                    $quote = $accounting->getQuote($quoteId);
+                    if (!$quote) {
+                        throw new Exception('Quote not found');
+                    }
+                    
+                    $pdfService = new \App\PDFService(Database::getConnection());
+                    $pdfContent = $pdfService->generateQuotePDF($quote);
+                    
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: attachment; filename="Quote-' . $quote['quote_number'] . '.pdf"');
+                    header('Content-Length: ' . strlen($pdfContent));
+                    echo $pdfContent;
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Failed to generate PDF: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_vendor':
             case 'update_vendor':
                 if (!\App\Auth::can('settings.view')) {
