@@ -3038,12 +3038,7 @@ try {
             
             <ul class="nav nav-tabs mb-3">
                 <li class="nav-item">
-                    <a class="nav-link <?= empty($currentAccessType) ? 'active' : '' ?>" href="?page=isp&view=subscriptions">
-                        <i class="bi bi-people me-1"></i> All <span class="badge bg-secondary ms-1"><?= $totalSubs ?></span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link <?= $currentAccessType === 'pppoe' ? 'active' : '' ?>" href="?page=isp&view=subscriptions&access_type=pppoe">
+                    <a class="nav-link <?= $currentAccessType === 'pppoe' || empty($currentAccessType) ? 'active' : '' ?>" href="?page=isp&view=subscriptions&access_type=pppoe">
                         <i class="bi bi-ethernet me-1"></i> PPPoE <span class="badge bg-primary ms-1"><?= $pppoeCount ?></span>
                     </a>
                 </li>
