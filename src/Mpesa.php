@@ -496,6 +496,24 @@ class Mpesa {
                         ");
                         $activateStmt->execute([$expiryDate, $subscriptionId]);
                         error_log("RADIUS: Activated hotspot subscription ID={$subscriptionId}, expires: {$expiryDate}");
+                        
+                        // Add the first device to radius_subscription_devices table for multi-device support
+                        if (!empty($subscription['mac_address'])) {
+                            $deviceCheckStmt = $this->db->prepare("
+                                SELECT id FROM radius_subscription_devices 
+                                WHERE subscription_id = ? AND mac_address = ?
+                            ");
+                            $deviceCheckStmt->execute([$subscriptionId, $subscription['mac_address']]);
+                            if (!$deviceCheckStmt->fetch()) {
+                                $deviceInsertStmt = $this->db->prepare("
+                                    INSERT INTO radius_subscription_devices 
+                                    (subscription_id, mac_address, device_name, is_active, created_at)
+                                    VALUES (?, ?, 'Primary Device', true, CURRENT_TIMESTAMP)
+                                ");
+                                $deviceInsertStmt->execute([$subscriptionId, $subscription['mac_address']]);
+                                error_log("RADIUS: Added primary device {$subscription['mac_address']} to subscription ID={$subscriptionId}");
+                            }
+                        }
                     }
                 }
             }
