@@ -850,12 +850,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             }
             
-            $portalUrl = $nas['hotspot_portal_url'] ?? '';
-            if (empty($portalUrl)) {
-                $message = 'Please configure the Portal URL first';
-                $messageType = 'warning';
-                break;
-            }
+            // Automatic portal URL based on server domain
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $portalUrl = $protocol . '://' . $host . '/hotspot.php';
+            
+            $ispName = $radiusBilling->getSetting('isp_name') ?: 'WiFi Hotspot';
             
             // Generate hotspot files
             $zip = new ZipArchive();
@@ -866,7 +866,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $loginHtml = '<!DOCTYPE html>
 <html>
 <head>
-    <title>' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <title>' . htmlspecialchars($ispName) . '</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="pragma" content="no-cache">
     <meta http-equiv="expires" content="-1">
@@ -883,7 +883,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $aloginHtml = '<!DOCTYPE html>
 <html>
 <head>
-    <title>Connected - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <title>Connected - ' . htmlspecialchars($ispName) . '</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="refresh" content="3; url=$(link-orig)">
     <style>
@@ -896,7 +896,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="success">&#10004;</div>
     <h1>Connected!</h1>
-    <p>Welcome to ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</p>
+    <p>Welcome to ' . htmlspecialchars($ispName) . '</p>
     <p>You will be redirected shortly...</p>
     <p><a href="$(link-orig)">Click here to continue</a></p>
 </body>
@@ -907,7 +907,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $logoutHtml = '<!DOCTYPE html>
 <html>
 <head>
-    <title>Logged Out - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <title>Logged Out - ' . htmlspecialchars($ispName) . '</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
@@ -918,7 +918,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <h1>Logged Out</h1>
-    <p>You have been disconnected from ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</p>
+    <p>You have been disconnected from ' . htmlspecialchars($ispName) . '</p>
     <a href="$(link-login)" class="btn">Login Again</a>
 </body>
 </html>';
@@ -928,7 +928,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $statusHtml = '<!DOCTYPE html>
 <html>
 <head>
-    <title>Status - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <title>Status - ' . htmlspecialchars($ispName) . '</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="refresh" content="60">
     <style>
@@ -962,7 +962,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errorHtml = '<!DOCTYPE html>
 <html>
 <head>
-    <title>Error - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <title>Error - ' . htmlspecialchars($ispName) . '</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
@@ -985,7 +985,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $rloginHtml = '<!DOCTYPE html>
 <html>
 <head>
-    <title>Connecting... - ' . htmlspecialchars($nas['hotspot_title'] ?? 'WiFi Hotspot') . '</title>
+    <title>Connecting... - ' . htmlspecialchars($ispName) . '</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="refresh" content="0; url=$(link-redirect)">
 </head>
@@ -7403,31 +7403,10 @@ try {
                                     </div>
                                 </div>
                                 <hr>
-                                <h6><i class="bi bi-wifi me-1"></i> Hotspot Portal Settings</h6>
-                                <div class="row mb-3">
-                                    <div class="col-md-12 mb-3">
-                                        <label class="form-label">Portal URL</label>
-                                        <input type="url" name="hotspot_portal_url" id="edit_hotspot_portal_url" class="form-control" placeholder="https://your-domain.com/hotspot.php">
-                                        <small class="text-muted">External captive portal URL for this NAS</small>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Hotspot Title</label>
-                                        <input type="text" name="hotspot_title" id="edit_hotspot_title" class="form-control" placeholder="WiFi Hotspot">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Logo URL</label>
-                                        <input type="url" name="hotspot_logo_url" id="edit_hotspot_logo_url" class="form-control" placeholder="https://...">
-                                    </div>
-                                    <div class="col-md-12 mb-3">
-                                        <label class="form-label">Welcome Message</label>
-                                        <textarea name="hotspot_welcome" id="edit_hotspot_welcome" class="form-control" rows="2" placeholder="Connect to the internet"></textarea>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="downloadHotspotFiles()">
-                                    <i class="bi bi-download me-1"></i> Download Hotspot Files
-                                </button>
-                                <hr>
                                 <h6><i class="bi bi-box-seam me-1"></i> Hotspot Packages</h6>
+                                <button type="button" class="btn btn-outline-primary btn-sm mb-3" onclick="downloadHotspotFiles()">
+                                    <i class="bi bi-download me-1"></i> Download MikroTik Hotspot Files
+                                </button>
                                 <p class="text-muted small">Select packages available for this NAS hotspot. If none selected, all packages will be shown.</p>
                                 <div class="mb-3" id="edit_nas_packages_container">
                                     <?php 
@@ -10440,10 +10419,6 @@ try {
         document.querySelectorAll('.nas-package-checkbox').forEach(cb => cb.checked = false);
         
         // Load hotspot settings
-        document.getElementById('edit_hotspot_portal_url').value = nas.hotspot_portal_url || '';
-        document.getElementById('edit_hotspot_title').value = nas.hotspot_title || '';
-        document.getElementById('edit_hotspot_logo_url').value = nas.hotspot_logo_url || '';
-        document.getElementById('edit_hotspot_welcome').value = nas.hotspot_welcome || '';
         
         // Load assigned packages for this NAS
         fetch('?section=isp&action=get_nas_packages&nas_id=' + nas.id)
