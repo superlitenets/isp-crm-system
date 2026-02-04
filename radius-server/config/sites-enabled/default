@@ -115,6 +115,20 @@ server default {
         sql
         exec
         remove_reply_message_if_eap
+        
+        Post-Auth-Type REJECT {
+            # Query to get expired pool settings and log the rejection
+            sql
+            
+            # If we got a Framed-Pool back (redirect enabled), accept instead of reject
+            if (&reply:Framed-Pool) {
+                update reply {
+                    Reply-Message := "Invalid password - redirecting to portal"
+                }
+                # Force accept with walled garden
+                handled
+            }
+        }
     }
 
     pre-proxy {
