@@ -5203,14 +5203,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             }
                             
                             // Try to get IP from GenieACS
-                            $wanPath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ExternalIPAddress';
-                            if (isset($device[$wanPath]['_value'])) {
-                                $ip = $device[$wanPath]['_value'];
+                            // Get TR-069 Management IP from ConnectionRequestURL instead of WAN IP
+                            $connReqPath = 'InternetGatewayDevice.ManagementServer.ConnectionRequestURL';
+                            if (isset($device[$connReqPath]['_value'])) {
+                                $connUrl = $device[$connReqPath]['_value'];
+                                if (preg_match('/http[s]?:\/\/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/',$connUrl, $m)) {
+                                    $ip = $m[1];
+                                }
+                            }
+                            // Fallback to Device.ManagementServer path for TR-181
+                            if ($ip === '-') {
+                                $connReqPath2 = 'Device.ManagementServer.ConnectionRequestURL';
+                                if (isset($device[$connReqPath2]['_value'])) {
+                                    $connUrl = $device[$connReqPath2]['_value'];
+                                    if (preg_match('/http[s]?:\/\/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/',$connUrl, $m)) {
+                                        $ip = $m[1];
+                                    }
+                                }
                             }
                             
                             // Update database with GenieACS info
-                            $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ?, tr069_status = ?, updated_at = NOW() WHERE id = ?");
-                            $updateStmt->execute([$deviceId, $tr069Status, $onuId]);
+                            $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ?, tr069_status = ?, tr069_ip = CASE WHEN ? != '-' THEN ? ELSE tr069_ip END, updated_at = NOW() WHERE id = ?");
+                            $updateStmt->execute([$deviceId, $tr069Status, $ip, $ip, $onuId]);
                         }
                     } catch (Exception $e) {
                         // GenieACS check failed, continue to OLT method
