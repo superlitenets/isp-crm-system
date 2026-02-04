@@ -848,7 +848,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div class="alert alert-info small mb-0">
                         <i class="bi bi-info-circle me-1"></i>
-                        Invoice #<?= htmlspecialchars($invoice['invoice_number']) ?> for KES <?= number_format($invoice['total'], 2) ?> will be attached as PDF.
+                        Invoice #<?= htmlspecialchars($invoice['invoice_number']) ?> for KES <?= number_format($invoice['total_amount'] ?? 0, 2) ?> will be attached as PDF.
                     </div>
                 </div>
                 <div class="modal-footer">
