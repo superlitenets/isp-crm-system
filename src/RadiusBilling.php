@@ -1403,6 +1403,26 @@ class RadiusBilling {
         
         // Check password (only for non-suspended accounts)
         if ($this->decrypt($sub['password_encrypted']) !== $password) {
+            $redirectInvalidPassword = (bool)$this->getSetting('redirect_invalid_password', false);
+            
+            if ($redirectInvalidPassword) {
+                $invalidPoolName = $this->getSetting('invalid_password_pool') ?: 'invalid-password-pool';
+                $attrs = [
+                    'Framed-Pool' => $invalidPoolName,
+                    'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                    'Session-Timeout' => 300,
+                    'Acct-Interim-Interval' => 60
+                ];
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Invalid password', null, $attrs);
+                return [
+                    'success' => true,
+                    'reply' => 'Access-Accept',
+                    'invalid_password' => true,
+                    'attributes' => $attrs,
+                    'subscription' => $sub
+                ];
+            }
+            
             $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Invalid password');
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
         }

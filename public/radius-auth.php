@@ -45,6 +45,10 @@ if ($result['success']) {
         $response['reply:Reply-Message'] = 'Data quota exhausted - limited access';
     }
     
+    if (!empty($result['invalid_password'])) {
+        $response['reply:Reply-Message'] = 'Invalid credentials - limited access';
+    }
+    
     echo json_encode($response);
 } else {
     echo json_encode([
