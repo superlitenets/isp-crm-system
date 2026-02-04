@@ -39,30 +39,61 @@ class EmailService {
             return ['success' => false, 'error' => 'Email not configured. Please configure SMTP settings.'];
         }
         
-        try {
-            $boundary = md5(uniqid(time()));
-            $headers = $this->buildHeaders($boundary, !empty($attachments));
-            $body = $this->buildBody($htmlBody, $textBody, $attachments, $boundary);
-            
-            $socket = $this->connect();
-            if (!$socket) {
-                return ['success' => false, 'error' => 'Failed to connect to SMTP server'];
+        $maxRetries = 3;
+        $lastError = '';
+        
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $boundary = md5(uniqid(time()));
+                $headers = $this->buildHeaders($boundary, !empty($attachments));
+                $body = $this->buildBody($htmlBody, $textBody, $attachments, $boundary);
+                
+                $socket = $this->connect();
+                if (!$socket) {
+                    $lastError = 'Failed to connect to SMTP server';
+                    if ($attempt < $maxRetries) {
+                        usleep(500000); // 0.5 second delay before retry
+                        continue;
+                    }
+                    $this->logEmail($to, $subject, 'failed', $lastError);
+                    return ['success' => false, 'error' => $lastError];
+                }
+                
+                $result = $this->sendSmtp($socket, $to, $subject, $headers, $body);
+                @fclose($socket);
+                
+                if ($result['success']) {
+                    $this->logEmail($to, $subject, 'sent');
+                    return $result;
+                }
+                
+                $lastError = $result['error'] ?? 'Unknown error';
+                
+                // Retry on connection-related errors
+                if ($attempt < $maxRetries && (
+                    strpos($lastError, 'Connection') !== false ||
+                    strpos($lastError, 'TLS') !== false ||
+                    strpos($lastError, 'pipe') !== false
+                )) {
+                    usleep(500000); // 0.5 second delay before retry
+                    continue;
+                }
+                
+                $this->logEmail($to, $subject, 'failed', $lastError);
+                return $result;
+                
+            } catch (\Exception $e) {
+                $lastError = $e->getMessage();
+                if ($attempt >= $maxRetries) {
+                    $this->logEmail($to, $subject, 'failed', $lastError);
+                    return ['success' => false, 'error' => $lastError];
+                }
+                usleep(500000);
             }
-            
-            $result = $this->sendSmtp($socket, $to, $subject, $headers, $body);
-            fclose($socket);
-            
-            if ($result['success']) {
-                $this->logEmail($to, $subject, 'sent');
-            } else {
-                $this->logEmail($to, $subject, 'failed', $result['error']);
-            }
-            
-            return $result;
-        } catch (\Exception $e) {
-            $this->logEmail($to, $subject, 'failed', $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
         }
+        
+        $this->logEmail($to, $subject, 'failed', $lastError);
+        return ['success' => false, 'error' => $lastError];
     }
     
     private function connect() {
@@ -104,11 +135,26 @@ class EmailService {
             if (!$this->sendCommand($socket, "STARTTLS")) {
                 return ['success' => false, 'error' => 'Connection lost during STARTTLS'];
             }
-            $this->readResponse($socket);
+            $starttlsResponse = $this->readResponse($socket);
+            if (strpos($starttlsResponse, '220') === false) {
+                return ['success' => false, 'error' => 'STARTTLS rejected by server: ' . $starttlsResponse];
+            }
             
-            $cryptoEnabled = @stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+            // Try multiple TLS methods for compatibility
+            $cryptoMethods = [
+                STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
+                STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT,
+                STREAM_CRYPTO_METHOD_TLS_CLIENT
+            ];
+            
+            $cryptoEnabled = false;
+            foreach ($cryptoMethods as $method) {
+                $cryptoEnabled = @stream_socket_enable_crypto($socket, true, $method);
+                if ($cryptoEnabled) break;
+            }
+            
             if (!$cryptoEnabled) {
-                return ['success' => false, 'error' => 'Failed to enable TLS - connection may have been reset'];
+                return ['success' => false, 'error' => 'Failed to enable TLS - server may not support required encryption'];
             }
             
             $this->sendCommand($socket, "EHLO " . gethostname());
