@@ -74,7 +74,7 @@ if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
         WHERE subscription_id = ? 
-        ORDER BY auth_time DESC LIMIT 1
+        ORDER BY created_at DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['id']]);
     $authReason = $reasonStmt->fetchColumn() ?: null;
@@ -110,7 +110,7 @@ if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
         WHERE subscription_id = ? 
-        ORDER BY auth_time DESC LIMIT 1
+        ORDER BY created_at DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['id']]);
     $authReason = $reasonStmt->fetchColumn() ?: null;
@@ -137,7 +137,7 @@ if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
         WHERE subscription_id = ? 
-        ORDER BY auth_time DESC LIMIT 1
+        ORDER BY created_at DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['id']]);
     $authReason = $reasonStmt->fetchColumn() ?: null;
