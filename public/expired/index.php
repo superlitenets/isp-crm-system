@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
-        WHERE username = ? 
+        WHERE UPPER(username) = UPPER(?) 
         ORDER BY created_at DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['username']]);
@@ -109,7 +109,7 @@ if (!$subscription && !$lookupMode) {
 if ($subscription) {
     $reasonStmt = $db->prepare("
         SELECT reject_reason FROM radius_auth_logs 
-        WHERE username = ? 
+        WHERE UPPER(username) = UPPER(?) 
         ORDER BY created_at DESC LIMIT 1
     ");
     $reasonStmt->execute([$subscription['username']]);
@@ -136,7 +136,7 @@ if ($subscription) {
         if ($subscription) {
             $reasonStmt = $db->prepare("
                 SELECT reject_reason FROM radius_auth_logs 
-                WHERE username = ? 
+                WHERE UPPER(username) = UPPER(?) 
                 ORDER BY created_at DESC LIMIT 1
             ");
             $reasonStmt->execute([$subscription['username']]);
