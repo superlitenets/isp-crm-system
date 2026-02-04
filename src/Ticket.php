@@ -1041,23 +1041,23 @@ class Ticket {
         $team = $this->getTeam($teamId);
         
         // Get team leader info with office_phone from employee record
+        // Note: leader_id references employees(id), not users(id)
         $leaderName = '';
         $leaderPhone = '';
         $leaderOfficePhone = '';
         if (!empty($team['leader_id'])) {
-            $leader = $this->getUser($team['leader_id']);
-            if ($leader) {
-                $leaderName = $leader['name'] ?? '';
-                $leaderPhone = $leader['phone'] ?? '';
-                // Get office_phone from employee record
-                $empStmt = $this->db->prepare("SELECT office_phone, phone FROM employees WHERE user_id = ?");
-                $empStmt->execute([$team['leader_id']]);
-                $empData = $empStmt->fetch();
-                if ($empData) {
-                    $leaderOfficePhone = $empData['office_phone'] ?? $empData['phone'] ?? $leaderPhone;
-                } else {
-                    $leaderOfficePhone = $leaderPhone;
-                }
+            $empStmt = $this->db->prepare("
+                SELECT e.*, u.name as user_name, u.phone as user_phone 
+                FROM employees e 
+                LEFT JOIN users u ON e.user_id = u.id 
+                WHERE e.id = ?
+            ");
+            $empStmt->execute([$team['leader_id']]);
+            $empData = $empStmt->fetch();
+            if ($empData) {
+                $leaderName = $empData['user_name'] ?? $empData['name'] ?? '';
+                $leaderPhone = $empData['user_phone'] ?? $empData['phone'] ?? '';
+                $leaderOfficePhone = $empData['office_phone'] ?? $leaderPhone;
             }
         }
         
