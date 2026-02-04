@@ -132,16 +132,47 @@ if ($subscription) {
         $stmt->execute([$clientIP]);
         $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Get auth reason from auth log
-if ($subscription) {
-    $reasonStmt = $db->prepare("
-        SELECT reject_reason FROM radius_auth_logs 
-        WHERE username = ? 
-        ORDER BY created_at DESC LIMIT 1
-    ");
-    $reasonStmt->execute([$subscription['username']]);
-    $authReason = $reasonStmt->fetchColumn() ?: null;
-}
+        // Get auth reason from auth log
+        if ($subscription) {
+            $reasonStmt = $db->prepare("
+                SELECT reject_reason FROM radius_auth_logs 
+                WHERE username = ? 
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $reasonStmt->execute([$subscription['username']]);
+            $authReason = $reasonStmt->fetchColumn() ?: null;
+        }
+    }
+    
+    // If still no subscription, check auth_logs for recent unknown user or invalid password entries
+    if (!$subscription && !$authReason) {
+        // Check for recent auth log entries that might indicate invalid credentials or unknown user
+        $recentAuthStmt = $db->prepare("
+            SELECT username, reject_reason FROM radius_auth_logs 
+            WHERE reject_reason IN ('Invalid password', 'User not found') 
+            AND created_at > NOW() - INTERVAL '5 minutes'
+            ORDER BY created_at DESC LIMIT 1
+        ");
+        $recentAuthStmt->execute();
+        $recentAuth = $recentAuthStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($recentAuth) {
+            $authReason = $recentAuth['reject_reason'];
+            // Try to find the subscription for this username (for Invalid password case)
+            if ($authReason === 'Invalid password') {
+                $subStmt = $db->prepare("
+                    SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+                           p.name as package_name, p.price as package_price, p.validity_days
+                    FROM radius_subscriptions s
+                    LEFT JOIN customers c ON s.customer_id = c.id
+                    LEFT JOIN radius_packages p ON s.package_id = p.id
+                    WHERE UPPER(s.username) = UPPER(?)
+                    LIMIT 1
+                ");
+                $subStmt->execute([$recentAuth['username']]);
+                $subscription = $subStmt->fetch(PDO::FETCH_ASSOC);
+            }
+        }
     }
 }
 
@@ -286,26 +317,32 @@ try {
 </head>
 <body>
     <div class="expired-card">
-        <?php if ($subscription): ?>
+        <?php if ($subscription || $authReason === 'Invalid password' || $authReason === 'User not found'): ?>
         <div class="expired-header">
-            <div class="icon"><i class="bi bi-<?php echo ($authReason === 'Invalid password') ? 'shield-exclamation' : 'exclamation-triangle'; ?>"></i></div>
+            <div class="icon"><i class="bi bi-<?php 
+                if ($authReason === 'Invalid password') echo 'shield-exclamation';
+                elseif ($authReason === 'User not found') echo 'person-x';
+                else echo 'exclamation-triangle'; 
+            ?>"></i></div>
             <h2 class="mb-2"><?php
                 if ($authReason === 'Invalid password') echo 'Invalid Credentials';
-                elseif ($authReason === 'Suspended - expired pool' || $subscription['status'] === 'suspended') echo 'Account Suspended';
                 elseif ($authReason === 'User not found') echo 'Account Not Found';
+                elseif ($subscription && ($authReason === 'Suspended - expired pool' || $subscription['status'] === 'suspended')) echo 'Account Suspended';
                 elseif ($authReason === 'Data quota exhausted') echo 'Data Quota Exhausted';
                 else echo 'Subscription Expired';
             ?></h2>
             <p class="mb-0 opacity-75"><?php
-                if ($authReason === 'Invalid password') echo 'The password you entered is incorrect';
-                elseif ($authReason === 'Suspended - expired pool' || $subscription['status'] === 'suspended') echo 'Your account has been suspended';
-                elseif ($authReason === 'User not found') echo 'We could not find your account';
+                if ($authReason === 'Invalid password') echo 'The password you entered is incorrect. Please check and try again.';
+                elseif ($authReason === 'User not found') echo 'This username does not exist in our system';
+                elseif ($subscription && ($authReason === 'Suspended - expired pool' || $subscription['status'] === 'suspended')) echo 'Your account has been suspended';
                 elseif ($authReason === 'Data quota exhausted') echo 'Your data bundle has been exhausted';
                 else echo 'Your internet subscription has expired';
             ?></p>
+            <?php if ($subscription): ?>
             <div class="package-badge">
                 <i class="bi bi-box me-1"></i> <?= htmlspecialchars($subscription['package_name'] ?? 'Unknown Package') ?>
             </div>
+            <?php endif; ?>
         </div>
         <div class="expired-body">
             <?php if ($message): ?>
@@ -314,6 +351,7 @@ try {
             </div>
             <?php endif; ?>
             
+            <?php if ($subscription): ?>
             <div class="info-row">
                 <span class="info-label">Customer Name</span>
                 <span class="info-value"><?= htmlspecialchars($subscription['customer_name'] ?? 'N/A') ?></span>
@@ -329,6 +367,7 @@ try {
                     <br><small class="text-muted"><?= $subscription['download_speed'] ?? '' ?>/<?= $subscription['upload_speed'] ?? '' ?></small>
                 </span>
             </div>
+            <?php if ($authReason !== 'Invalid password'): ?>
             <div class="info-row">
                 <span class="info-label">Expired On</span>
                 <span class="info-value text-danger">
@@ -339,11 +378,22 @@ try {
                 <span class="info-label">Renewal Amount</span>
                 <span class="info-value text-success fs-5">KES <?= number_format($subscription['package_price'] ?? 0) ?></span>
             </div>
+            <?php endif; ?>
             <div class="info-row">
                 <span class="info-label">Your IP Address</span>
                 <span class="info-value"><code><?= htmlspecialchars($clientIP) ?></code></span>
             </div>
+            <?php else: ?>
+            <div class="text-center py-3">
+                <p class="text-muted mb-3">Please check your credentials and try again, or contact support.</p>
+                <div class="info-row">
+                    <span class="info-label">Your IP Address</span>
+                    <span class="info-value"><code><?= htmlspecialchars($clientIP) ?></code></span>
+                </div>
+            </div>
+            <?php endif; ?>
             
+            <?php if ($subscription && $authReason !== 'Invalid password' && $authReason !== 'User not found'): ?>
             <?php if ($stkPushSent): ?>
             <div class="text-center py-4">
                 <div class="spinner-border text-success mb-3" role="status"></div>
@@ -368,6 +418,15 @@ try {
                     <i class="bi bi-phone me-2"></i> Pay KES <?= number_format($subscription['package_price'] ?? 0) ?> via M-Pesa
                 </button>
             </form>
+            <?php endif; ?>
+            <?php elseif ($authReason === 'Invalid password'): ?>
+            <div class="text-center py-4">
+                <div class="alert alert-warning">
+                    <i class="bi bi-key me-2"></i>
+                    <strong>Wrong Password</strong><br>
+                    Please disconnect and reconnect with the correct password.
+                </div>
+            </div>
             <?php endif; ?>
             
             <?php if ($ispPhone): ?>
