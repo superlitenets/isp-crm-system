@@ -270,16 +270,45 @@ $expenseCategories = $accounting->getExpenseCategories();
             <?php endif; ?>
             
             <div class="row g-3 mb-4">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label">Customer *</label>
-                    <select class="form-select" name="customer_id" required>
-                        <option value="">Select Customer</option>
-                        <?php foreach ($customers as $cust): ?>
-                        <option value="<?= $cust['id'] ?>" <?= ($invoice['customer_id'] ?? '') == $cust['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($cust['name']) ?> (<?= htmlspecialchars($cust['account_number']) ?>)
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <ul class="nav nav-tabs nav-tabs-sm mb-2" id="invCustomerTabs">
+                        <li class="nav-item">
+                            <a class="nav-link active py-1 px-2" data-bs-toggle="tab" href="#invCrmCustomer">CRM Customers</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link py-1 px-2" data-bs-toggle="tab" href="#invBillingCustomer">Billing Customers</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="invCrmCustomer">
+                            <select class="form-select" name="customer_id" id="invCustomerSelect">
+                                <option value="">Select Customer</option>
+                                <?php foreach ($customers as $cust): ?>
+                                <option value="<?= $cust['id'] ?>" <?= ($invoice['customer_id'] ?? '') == $cust['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($cust['name']) ?> (<?= htmlspecialchars($cust['account_number']) ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="tab-pane fade" id="invBillingCustomer">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id="invBillingSearch" placeholder="Search by name, username or phone...">
+                                <button type="button" class="btn btn-outline-primary" onclick="searchInvBillingCustomer()"><i class="bi bi-search"></i></button>
+                            </div>
+                            <div id="invBillingResults" class="small" style="max-height: 200px; overflow-y: auto;"></div>
+                            <div id="invSelectedBilling" class="alert alert-success py-2 mt-2" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong id="invBillingName"></strong> <span class="badge bg-secondary" id="invBillingUsername"></span><br>
+                                        <small id="invBillingPhone"></small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearInvBilling()"><i class="bi bi-x"></i></button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="billing_customer" id="invBillingData">
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Invoice Date</label>
@@ -515,6 +544,59 @@ document.addEventListener('DOMContentLoaded', function() {
     
     attachEventListeners();
     calculateTotals();
+    
+    // Billing customer search for invoices
+    window.searchInvBillingCustomer = function() {
+        const query = document.getElementById('invBillingSearch').value.trim();
+        if (query.length < 2) {
+            document.getElementById('invBillingResults').innerHTML = '<div class="text-muted">Enter at least 2 characters</div>';
+            return;
+        }
+        document.getElementById('invBillingResults').innerHTML = '<div class="text-muted">Searching...</div>';
+        fetch('/api/billing.php?action=search&q=' + encodeURIComponent(query))
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('invBillingResults').innerHTML = '<div class="text-danger">' + data.error + '</div>';
+                    return;
+                }
+                if (!data.customers || data.customers.length === 0) {
+                    document.getElementById('invBillingResults').innerHTML = '<div class="alert alert-warning py-1">No customers found</div>';
+                    return;
+                }
+                let html = '<div class="list-group">';
+                data.customers.forEach(c => {
+                    html += '<button type="button" class="list-group-item list-group-item-action py-1" onclick=\'selectInvBilling(' + JSON.stringify(c) + ')\'>' +
+                        '<strong>' + (c.name || 'N/A') + '</strong>' +
+                        (c.username ? ' <span class="badge bg-secondary">' + c.username + '</span>' : '') +
+                        '<br><small class="text-muted">' + (c.phone || 'No phone') + '</small></button>';
+                });
+                html += '</div>';
+                document.getElementById('invBillingResults').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('invBillingResults').innerHTML = '<div class="text-danger">Error: ' + err.message + '</div>';
+            });
+    };
+    
+    window.selectInvBilling = function(customer) {
+        document.getElementById('invBillingName').textContent = customer.name || 'N/A';
+        document.getElementById('invBillingUsername').textContent = customer.username || '';
+        document.getElementById('invBillingPhone').textContent = customer.phone || 'No phone';
+        document.getElementById('invBillingData').value = JSON.stringify(customer);
+        document.getElementById('invSelectedBilling').style.display = 'block';
+        document.getElementById('invBillingResults').innerHTML = '';
+        document.getElementById('invCustomerSelect').value = '';
+    };
+    
+    window.clearInvBilling = function() {
+        document.getElementById('invSelectedBilling').style.display = 'none';
+        document.getElementById('invBillingData').value = '';
+    };
+    
+    document.getElementById('invBillingSearch')?.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); searchInvBillingCustomer(); }
+    });
 });
 </script>
 
@@ -1416,14 +1498,43 @@ $defaultTax = $accounting->getDefaultTaxRate();
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label class="form-label">Customer <span class="text-danger">*</span></label>
-                    <select name="customer_id" class="form-select" required>
-                        <option value="">Select Customer</option>
-                        <?php foreach ($customers as $c): ?>
-                        <option value="<?= $c['id'] ?>" <?= ($quote['customer_id'] ?? '') == $c['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($c['name']) ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <ul class="nav nav-tabs nav-tabs-sm mb-2" id="quoteCustomerTabs">
+                        <li class="nav-item">
+                            <a class="nav-link active py-1 px-2" data-bs-toggle="tab" href="#quoteCrmCustomer">CRM Customers</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link py-1 px-2" data-bs-toggle="tab" href="#quoteBillingCustomer">Billing Customers</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="quoteCrmCustomer">
+                            <select name="customer_id" class="form-select" id="quoteCustomerSelect">
+                                <option value="">Select Customer</option>
+                                <?php foreach ($customers as $c): ?>
+                                <option value="<?= $c['id'] ?>" <?= ($quote['customer_id'] ?? '') == $c['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($c['name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="tab-pane fade" id="quoteBillingCustomer">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id="quoteBillingSearch" placeholder="Search by name, username or phone...">
+                                <button type="button" class="btn btn-outline-primary" onclick="searchQuoteBillingCustomer()"><i class="bi bi-search"></i></button>
+                            </div>
+                            <div id="quoteBillingResults" class="small" style="max-height: 200px; overflow-y: auto;"></div>
+                            <div id="quoteSelectedBilling" class="alert alert-success py-2 mt-2" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong id="quoteBillingName"></strong> <span class="badge bg-secondary" id="quoteBillingUsername"></span><br>
+                                        <small id="quoteBillingPhone"></small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearQuoteBilling()"><i class="bi bi-x"></i></button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="billing_customer" id="quoteBillingData">
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Issue Date</label>
@@ -1599,6 +1710,59 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.querySelectorAll('.quote-item-row').forEach(attachRowEvents);
     calculateTotals();
+    
+    // Billing customer search for quotes
+    window.searchQuoteBillingCustomer = function() {
+        const query = document.getElementById('quoteBillingSearch').value.trim();
+        if (query.length < 2) {
+            document.getElementById('quoteBillingResults').innerHTML = '<div class="text-muted">Enter at least 2 characters</div>';
+            return;
+        }
+        document.getElementById('quoteBillingResults').innerHTML = '<div class="text-muted">Searching...</div>';
+        fetch('/api/billing.php?action=search&q=' + encodeURIComponent(query))
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('quoteBillingResults').innerHTML = '<div class="text-danger">' + data.error + '</div>';
+                    return;
+                }
+                if (!data.customers || data.customers.length === 0) {
+                    document.getElementById('quoteBillingResults').innerHTML = '<div class="alert alert-warning py-1">No customers found</div>';
+                    return;
+                }
+                let html = '<div class="list-group">';
+                data.customers.forEach(c => {
+                    html += '<button type="button" class="list-group-item list-group-item-action py-1" onclick=\'selectQuoteBilling(' + JSON.stringify(c) + ')\'>' +
+                        '<strong>' + (c.name || 'N/A') + '</strong>' +
+                        (c.username ? ' <span class="badge bg-secondary">' + c.username + '</span>' : '') +
+                        '<br><small class="text-muted">' + (c.phone || 'No phone') + '</small></button>';
+                });
+                html += '</div>';
+                document.getElementById('quoteBillingResults').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('quoteBillingResults').innerHTML = '<div class="text-danger">Error: ' + err.message + '</div>';
+            });
+    };
+    
+    window.selectQuoteBilling = function(customer) {
+        document.getElementById('quoteBillingName').textContent = customer.name || 'N/A';
+        document.getElementById('quoteBillingUsername').textContent = customer.username || '';
+        document.getElementById('quoteBillingPhone').textContent = customer.phone || 'No phone';
+        document.getElementById('quoteBillingData').value = JSON.stringify(customer);
+        document.getElementById('quoteSelectedBilling').style.display = 'block';
+        document.getElementById('quoteBillingResults').innerHTML = '';
+        document.getElementById('quoteCustomerSelect').value = '';
+    };
+    
+    window.clearQuoteBilling = function() {
+        document.getElementById('quoteSelectedBilling').style.display = 'none';
+        document.getElementById('quoteBillingData').value = '';
+    };
+    
+    document.getElementById('quoteBillingSearch')?.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); searchQuoteBillingCustomer(); }
+    });
 });
 </script>
 

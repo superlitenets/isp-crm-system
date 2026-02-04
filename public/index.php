@@ -4238,9 +4238,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $accounting = new \App\Accounting(Database::getConnection());
                     $items = $_POST['items'] ?? [];
                     
+                    // Handle billing customer if provided
+                    $customerId = $_POST['customer_id'] ?? null;
+                    $billingData = $_POST['billing_customer'] ?? '';
+                    if (!empty($billingData) && empty($customerId)) {
+                        $billingCustomer = json_decode($billingData, true);
+                        if ($billingCustomer) {
+                            $customer = new \App\Customer(Database::getConnection());
+                            $billingName = $billingCustomer['name'] ?? 'Billing Customer';
+                            $billingPhone = $billingCustomer['phone'] ?? null;
+                            
+                            if ($billingPhone) {
+                                $existingByPhone = $customer->findByPhone($billingPhone);
+                                if ($existingByPhone) {
+                                    $customerId = $existingByPhone['id'];
+                                } else {
+                                    $customerId = $customer->create([
+                                        'name' => $billingName,
+                                        'phone' => $billingPhone,
+                                        'email' => $billingCustomer['email'] ?? null,
+                                        'service_plan' => $billingCustomer['service_plan'] ?? 'Standard',
+                                        'address' => $billingCustomer['address'] ?? 'N/A',
+                                        'connection_status' => $billingCustomer['connection_status'] ?? 'active',
+                                        'username' => $billingCustomer['username'] ?? null,
+                                    ]);
+                                }
+                            }
+                        }
+                    }
+                    
                     if ($action === 'create_invoice') {
                         $invoiceId = $accounting->createInvoice([
-                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'],
                             'due_date' => $_POST['due_date'],
                             'status' => $_POST['status'] ?? 'draft',
@@ -4254,7 +4283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $invoiceId = (int)$_POST['invoice_id'];
                         $accounting->updateInvoice($invoiceId, [
-                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'],
                             'due_date' => $_POST['due_date'],
                             'status' => $_POST['status'],
@@ -4441,9 +4470,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $accounting = new \App\Accounting(Database::getConnection());
                     $items = $_POST['items'] ?? [];
                     
+                    // Handle billing customer if provided
+                    $customerId = $_POST['customer_id'] ?? null;
+                    $billingData = $_POST['billing_customer'] ?? '';
+                    if (!empty($billingData) && empty($customerId)) {
+                        $billingCustomer = json_decode($billingData, true);
+                        if ($billingCustomer) {
+                            $customer = new \App\Customer(Database::getConnection());
+                            $billingName = $billingCustomer['name'] ?? 'Billing Customer';
+                            $billingPhone = $billingCustomer['phone'] ?? null;
+                            
+                            if ($billingPhone) {
+                                $existingByPhone = $customer->findByPhone($billingPhone);
+                                if ($existingByPhone) {
+                                    $customerId = $existingByPhone['id'];
+                                } else {
+                                    $customerId = $customer->create([
+                                        'name' => $billingName,
+                                        'phone' => $billingPhone,
+                                        'email' => $billingCustomer['email'] ?? null,
+                                        'service_plan' => $billingCustomer['service_plan'] ?? 'Standard',
+                                        'address' => $billingCustomer['address'] ?? 'N/A',
+                                        'connection_status' => $billingCustomer['connection_status'] ?? 'active',
+                                        'username' => $billingCustomer['username'] ?? null,
+                                    ]);
+                                }
+                            }
+                        }
+                    }
+                    
                     if ($action === 'create_quote') {
                         $quoteId = $accounting->createQuote([
-                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'] ?? date('Y-m-d'),
                             'expiry_date' => $_POST['expiry_date'] ?? date('Y-m-d', strtotime('+30 days')),
                             'subtotal' => $_POST['subtotal'] ?? 0,
@@ -4466,7 +4524,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $quoteId = (int)$_POST['quote_id'];
                         $accounting->updateQuote($quoteId, [
-                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'customer_id' => $customerId,
                             'issue_date' => $_POST['issue_date'] ?? date('Y-m-d'),
                             'expiry_date' => $_POST['expiry_date'] ?? date('Y-m-d', strtotime('+30 days')),
                             'subtotal' => $_POST['subtotal'] ?? 0,
