@@ -494,6 +494,112 @@ class RadiusBilling {
         return (int)$stmt->fetchColumn();
     }
     
+    // ==================== Subscription Device Management ====================
+    
+    public function getSubscriptionDevices(int $subscriptionId): array {
+        $stmt = $this->db->prepare("SELECT * FROM radius_subscription_devices WHERE subscription_id = ? ORDER BY created_at DESC");
+        $stmt->execute([$subscriptionId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function addSubscriptionDevice(int $subscriptionId, string $macAddress, ?string $deviceName = null): array {
+        try {
+            $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $macAddress));
+            if (strlen($mac) !== 12) {
+                return ['success' => false, 'error' => 'Invalid MAC address format'];
+            }
+            $mac = implode(':', str_split($mac, 2));
+            
+            // Check max devices for subscription
+            $sub = $this->getSubscription($subscriptionId);
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            $package = $this->getPackage($sub['package_id']);
+            $maxDevices = $package['max_devices'] ?? 1;
+            
+            $currentDevices = $this->getSubscriptionDevices($subscriptionId);
+            if (count($currentDevices) >= $maxDevices) {
+                return ['success' => false, 'error' => "Maximum devices ($maxDevices) reached for this package"];
+            }
+            
+            // Check if MAC is already used by another subscription
+            $stmt = $this->db->prepare("SELECT d.*, s.id as sub_id, c.name as customer_name 
+                FROM radius_subscription_devices d 
+                JOIN radius_subscriptions s ON d.subscription_id = s.id 
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE d.mac_address = ? AND d.subscription_id != ?");
+            $stmt->execute([$mac, $subscriptionId]);
+            $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($existing) {
+                return ['success' => false, 'error' => "MAC address already registered to: {$existing['customer_name']}"];
+            }
+            
+            $stmt = $this->db->prepare("INSERT INTO radius_subscription_devices (subscription_id, mac_address, device_name) VALUES (?, ?, ?)
+                ON CONFLICT (subscription_id, mac_address) DO UPDATE SET device_name = EXCLUDED.device_name, is_active = true");
+            $stmt->execute([$subscriptionId, $mac, $deviceName]);
+            
+            return ['success' => true, 'mac' => $mac];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function removeSubscriptionDevice(int $deviceId): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM radius_subscription_devices WHERE id = ?");
+            $stmt->execute([$deviceId]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSubscriptionByDeviceMAC(string $macAddress): ?array {
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $macAddress));
+        if (strlen($mac) === 12) {
+            $mac = implode(':', str_split($mac, 2));
+        }
+        
+        // First check devices table
+        $stmt = $this->db->prepare("
+            SELECT s.*, d.mac_address as device_mac, d.device_name,
+                   p.name as package_name, p.price as package_price, p.download_speed, p.upload_speed, p.max_devices,
+                   c.name as customer_name, c.phone as customer_phone
+            FROM radius_subscription_devices d
+            JOIN radius_subscriptions s ON d.subscription_id = s.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            LEFT JOIN customers c ON s.customer_id = c.id
+            WHERE d.mac_address = ? AND d.is_active = true
+        ");
+        $stmt->execute([$mac]);
+        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($sub) {
+            $sub['is_expired'] = !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time();
+            return $sub;
+        }
+        
+        // Fallback to legacy single mac_address field
+        $stmt = $this->db->prepare("
+            SELECT s.*, p.name as package_name, p.price as package_price, p.download_speed, p.upload_speed, p.max_devices,
+                   c.name as customer_name, c.phone as customer_phone
+            FROM radius_subscriptions s
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            LEFT JOIN customers c ON s.customer_id = c.id
+            WHERE s.mac_address = ?
+        ");
+        $stmt->execute([$mac]);
+        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($sub) {
+            $sub['is_expired'] = !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time();
+        }
+        
+        return $sub ?: null;
+    }
+    
     // ==================== Package Management ====================
     
     public function getPackages(?string $type = null): array {

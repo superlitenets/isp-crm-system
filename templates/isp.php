@@ -1775,6 +1775,22 @@ Generated: " . date('Y-m-d H:i:s') . "
             }
             break;
             
+        case 'add_device':
+            $subId = (int)$_POST['subscription_id'];
+            $macAddress = $_POST['mac_address'] ?? '';
+            $deviceName = $_POST['device_name'] ?? '';
+            $result = $radiusBilling->addSubscriptionDevice($subId, $macAddress, $deviceName);
+            $message = $result['success'] ? 'Device added successfully' : 'Error: ' . ($result['error'] ?? 'Failed to add device');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'remove_device':
+            $deviceId = (int)$_POST['device_id'];
+            $result = $radiusBilling->removeSubscriptionDevice($deviceId);
+            $message = $result['success'] ? 'Device removed' : 'Error: ' . ($result['error'] ?? 'Failed to remove device');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
         case 'change_expiry':
             $subId = (int)$_POST['id'];
             $newExpiry = $_POST['new_expiry_date'] ?? '';
@@ -3436,6 +3452,11 @@ try {
                                         <label class="form-label">Static IP <span class="text-danger">*</span></label>
                                         <input type="text" name="static_ip" id="static_ip_input" class="form-control" placeholder="e.g., 192.168.1.100">
                                     </div>
+                                    <div class="col-md-4 mb-3" id="mac_address_field" style="display: none;">
+                                        <label class="form-label">MAC Address</label>
+                                        <input type="text" name="mac_address" id="mac_address_input" class="form-control" placeholder="AA:BB:CC:DD:EE:FF">
+                                        <small class="text-muted">Device MAC for hotspot auth</small>
+                                    </div>
                                     <div class="col-md-4 mb-3" id="nas_field" style="display: none;">
                                         <label class="form-label">NAS Device <span class="text-danger">*</span></label>
                                         <select name="nas_id" id="nas_id_select" class="form-select">
@@ -3860,10 +3881,19 @@ try {
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3" id="traffic-tab" data-bs-toggle="tab" data-bs-target="#liveTrafficTab" type="button">
+                            <button class="nav-link rounded-0 py-3 border-end" id="traffic-tab" data-bs-toggle="tab" data-bs-target="#liveTrafficTab" type="button">
                                 <i class="bi bi-graph-up me-2"></i>Live Traffic
                             </button>
                         </li>
+                        <?php if (strtolower($subscriber['access_type']) === 'hotspot'): ?>
+                        <?php $devices = $radiusBilling->getSubscriptionDevices($subscriber['id']); ?>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devicesTab" type="button">
+                                <i class="bi bi-phone me-2"></i>Devices
+                                <span class="badge bg-secondary ms-1"><?= count($devices) ?>/<?= $package['max_devices'] ?? 1 ?></span>
+                            </button>
+                        </li>
+                        <?php endif; ?>
                     </ul>
                 </div>
                 
@@ -4968,6 +4998,98 @@ try {
                                 </div>
                             </div>
                         </div>
+                        
+                        <?php if (strtolower($subscriber['access_type']) === 'hotspot'): ?>
+                        <!-- Devices Tab -->
+                        <div class="tab-pane fade" id="devicesTab">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="mb-1"><i class="bi bi-phone me-2"></i>Registered Devices</h6>
+                                    <small class="text-muted">Package allows <?= $package['max_devices'] ?? 1 ?> device(s)</small>
+                                </div>
+                                <?php if (count($devices) < ($package['max_devices'] ?? 1)): ?>
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Device
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <?php if (empty($devices)): ?>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>No devices registered. Devices will auto-register when connecting via hotspot.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>MAC Address</th>
+                                            <th>Device Name</th>
+                                            <th>Last Seen</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($devices as $device): ?>
+                                        <tr>
+                                            <td><code><?= htmlspecialchars($device['mac_address']) ?></code></td>
+                                            <td><?= htmlspecialchars($device['device_name'] ?: '-') ?></td>
+                                            <td><?= $device['last_seen'] ? date('M j, g:i A', strtotime($device['last_seen'])) : 'Never' ?></td>
+                                            <td>
+                                                <?php if ($device['is_active']): ?>
+                                                <span class="badge bg-success">Active</span>
+                                                <?php else: ?>
+                                                <span class="badge bg-secondary">Inactive</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('Remove this device?')">
+                                                    <input type="hidden" name="action" value="remove_device">
+                                                    <input type="hidden" name="device_id" value="<?= $device['id'] ?>">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Add Device Modal -->
+                        <div class="modal fade" id="addDeviceModal" tabindex="-1">
+                            <div class="modal-dialog modal-sm">
+                                <div class="modal-content">
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="add_device">
+                                        <input type="hidden" name="subscription_id" value="<?= $subscriber['id'] ?>">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Add Device</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">MAC Address</label>
+                                                <input type="text" name="mac_address" class="form-control" placeholder="AA:BB:CC:DD:EE:FF" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Device Name (Optional)</label>
+                                                <input type="text" name="device_name" class="form-control" placeholder="e.g., John's Phone">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-primary">Add Device</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -10280,21 +10402,25 @@ try {
         const accessType = document.getElementById('access_type').value;
         const staticIpField = document.getElementById('static_ip_field');
         const nasField = document.getElementById('nas_field');
+        const macAddressField = document.getElementById('mac_address_field');
         const staticIpInput = document.getElementById('static_ip_input');
         const nasSelect = document.getElementById('nas_id_select');
+        
+        // Reset all
+        staticIpField.style.display = 'none';
+        macAddressField.style.display = 'none';
+        nasField.style.display = 'none';
+        staticIpInput.required = false;
+        nasSelect.required = false;
         
         if (accessType === 'static') {
             staticIpField.style.display = 'block';
             nasField.style.display = 'block';
             staticIpInput.required = true;
             nasSelect.required = true;
-        } else {
-            staticIpField.style.display = 'none';
-            nasField.style.display = 'none';
-            staticIpInput.required = false;
-            nasSelect.required = false;
-            staticIpInput.value = '';
-            nasSelect.value = '';
+        } else if (accessType === 'hotspot') {
+            macAddressField.style.display = 'block';
+            nasField.style.display = 'block';
         }
     }
     

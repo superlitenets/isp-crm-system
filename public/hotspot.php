@@ -89,9 +89,9 @@ if (empty($packages)) {
 // Check if MAC authentication is enabled
 $macAuthEnabled = $radiusBilling->getSetting('hotspot_mac_auth') === 'true';
 
-// Check device status by MAC
+// Check device status by MAC (using multi-device lookup)
 if (!empty($clientMAC) && $macAuthEnabled) {
-    $subscription = $radiusBilling->getSubscriptionByMAC($clientMAC);
+    $subscription = $radiusBilling->getSubscriptionByDeviceMAC($clientMAC);
     
     if ($subscription) {
         if (!$subscription['is_expired'] && $subscription['status'] === 'active') {
@@ -207,6 +207,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 } catch (Exception $e) {
                     $message = 'Payment service error. Please use a voucher instead.';
                     $messageType = 'warning';
+                }
+            }
+            break;
+            
+        case 'add_device':
+            // Customer adding another device to their subscription
+            $phone = $_POST['phone'] ?? '';
+            $newMAC = trim($_POST['new_mac'] ?? '');
+            $deviceName = trim($_POST['device_name'] ?? '');
+            
+            if (empty($phone) || empty($newMAC)) {
+                $message = 'Please provide phone number and device MAC address';
+                $messageType = 'danger';
+            } else {
+                // Find subscription by phone number
+                $stmt = $db->prepare("
+                    SELECT rs.*, rp.max_devices 
+                    FROM radius_subscriptions rs
+                    JOIN radius_packages rp ON rs.package_id = rp.id
+                    WHERE rs.phone = ? AND rs.access_type = 'hotspot' AND rs.status = 'active'
+                    ORDER BY rs.created_at DESC LIMIT 1
+                ");
+                $stmt->execute([$phone]);
+                $subByPhone = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$subByPhone) {
+                    $message = 'No active subscription found for this phone number';
+                    $messageType = 'danger';
+                } else {
+                    $result = $radiusBilling->addSubscriptionDevice(
+                        $subByPhone['id'], 
+                        strtoupper(preg_replace('/[^a-fA-F0-9:]/', '', $newMAC)),
+                        $deviceName
+                    );
+                    if ($result['success']) {
+                        $message = 'Device added successfully! You can now connect.';
+                        $messageType = 'success';
+                        $subscription = $radiusBilling->getSubscriptionByDeviceMAC($newMAC);
+                        $deviceStatus = 'active';
+                    } else {
+                        $message = $result['error'];
+                        $messageType = 'danger';
+                    }
                 }
             }
             break;
@@ -621,6 +664,26 @@ if ($errorMsg && empty($message)) {
                     <i class="bi bi-ticket me-2"></i>Redeem Voucher
                 </button>
             </form>
+            
+            <div class="section-divider"><span>already have a subscription?</span></div>
+            
+            <div class="bg-light rounded-3 p-3">
+                <h6 class="mb-2"><i class="bi bi-phone-fill me-2"></i>Add This Device</h6>
+                <p class="small text-muted mb-3">If you already have an active subscription and want to add this device, enter your phone number below.</p>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_device">
+                    <input type="hidden" name="new_mac" value="<?= htmlspecialchars($clientMAC) ?>">
+                    <div class="mb-2">
+                        <input type="tel" name="phone" class="form-control form-control-sm" placeholder="Registered phone number" required>
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" name="device_name" class="form-control form-control-sm" placeholder="Device name (optional)">
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-plus-circle me-1"></i>Add This Device
+                    </button>
+                </form>
+            </div>
             
             <?php endif; ?>
         </div>
