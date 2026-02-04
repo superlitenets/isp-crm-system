@@ -47,8 +47,24 @@ class PDFService {
         ];
     }
     
+    private function getDocSettings(): array {
+        return [
+            'currency' => $this->settings ? $this->settings->get('currency_symbol', 'KES') : 'KES',
+            'invoice_footer' => $this->settings ? $this->settings->get('invoice_footer_text', 'Thank you for your business!') : 'Thank you for your business!',
+            'quote_footer' => $this->settings ? $this->settings->get('quote_footer_text', 'Thank you for considering our services!') : 'Thank you for considering our services!',
+            'show_payment_info' => $this->settings ? $this->settings->get('show_payment_info_on_invoice', '1') === '1' : false,
+            'bank_name' => $this->settings ? $this->settings->get('payment_bank_name', '') : '',
+            'bank_account' => $this->settings ? $this->settings->get('payment_bank_account', '') : '',
+            'bank_branch' => $this->settings ? $this->settings->get('payment_bank_branch', '') : '',
+            'mpesa_paybill' => $this->settings ? $this->settings->get('payment_mpesa_paybill', '') : '',
+            'mpesa_account' => $this->settings ? $this->settings->get('payment_mpesa_account_name', '') : '',
+        ];
+    }
+    
     private function getInvoiceHTML(array $invoice): string {
         $company = $this->getCompanyInfo();
+        $docSettings = $this->getDocSettings();
+        $currency = $docSettings['currency'];
         $items = $invoice['items'] ?? [];
         $payments = $invoice['payments'] ?? [];
         
@@ -57,9 +73,41 @@ class PDFService {
             $itemsHtml .= '<tr>
                 <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">' . htmlspecialchars($item['description'] ?? '') . '</td>
                 <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: center;">' . number_format($item['quantity'] ?? 0, 0) . '</td>
-                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">KES ' . number_format($item['unit_price'] ?? 0, 2) . '</td>
-                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">KES ' . number_format($item['line_total'] ?? 0, 2) . '</td>
+                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">' . $currency . ' ' . number_format($item['unit_price'] ?? 0, 2) . '</td>
+                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">' . $currency . ' ' . number_format($item['line_total'] ?? 0, 2) . '</td>
             </tr>';
+        }
+        
+        $paymentInfoHtml = '';
+        if ($docSettings['show_payment_info'] && (!empty($docSettings['bank_name']) || !empty($docSettings['mpesa_paybill']))) {
+            $paymentInfoHtml = '<div class="payment-info-section" style="margin-top: 30px; padding: 20px; background: #f8fafc; border-radius: 10px; border: 1px solid #e5e7eb;">';
+            $paymentInfoHtml .= '<h3 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 15px; font-weight: 600;">Payment Methods</h3>';
+            $paymentInfoHtml .= '<div style="display: table; width: 100%;">';
+            
+            if (!empty($docSettings['bank_name'])) {
+                $paymentInfoHtml .= '<div style="display: table-cell; width: 50%; vertical-align: top; padding-right: 15px;">';
+                $paymentInfoHtml .= '<p style="font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 5px;">Bank Transfer</p>';
+                $paymentInfoHtml .= '<p style="font-size: 11px; color: #6b7280; margin: 2px 0;">Bank: ' . htmlspecialchars($docSettings['bank_name']) . '</p>';
+                if (!empty($docSettings['bank_account'])) {
+                    $paymentInfoHtml .= '<p style="font-size: 11px; color: #6b7280; margin: 2px 0;">Account: ' . htmlspecialchars($docSettings['bank_account']) . '</p>';
+                }
+                if (!empty($docSettings['bank_branch'])) {
+                    $paymentInfoHtml .= '<p style="font-size: 11px; color: #6b7280; margin: 2px 0;">Branch: ' . htmlspecialchars($docSettings['bank_branch']) . '</p>';
+                }
+                $paymentInfoHtml .= '</div>';
+            }
+            
+            if (!empty($docSettings['mpesa_paybill'])) {
+                $paymentInfoHtml .= '<div style="display: table-cell; width: 50%; vertical-align: top;">';
+                $paymentInfoHtml .= '<p style="font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 5px;">M-Pesa</p>';
+                $paymentInfoHtml .= '<p style="font-size: 11px; color: #6b7280; margin: 2px 0;">Paybill/Till: ' . htmlspecialchars($docSettings['mpesa_paybill']) . '</p>';
+                if (!empty($docSettings['mpesa_account'])) {
+                    $paymentInfoHtml .= '<p style="font-size: 11px; color: #6b7280; margin: 2px 0;">Account: ' . htmlspecialchars($docSettings['mpesa_account']) . '</p>';
+                }
+                $paymentInfoHtml .= '</div>';
+            }
+            
+            $paymentInfoHtml .= '</div></div>';
         }
         
         $statusColor = match($invoice['status'] ?? 'draft') {
@@ -176,27 +224,29 @@ class PDFService {
                 <div class="totals-box">
                     <div class="totals-row">
                         <span class="totals-label">Subtotal</span>
-                        <span class="totals-value">KES ' . number_format($invoice['subtotal'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($invoice['subtotal'] ?? 0, 2) . '</span>
                     </div>
                     <div class="totals-row">
                         <span class="totals-label">Tax</span>
-                        <span class="totals-value">KES ' . number_format($invoice['tax_amount'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($invoice['tax_amount'] ?? 0, 2) . '</span>
                     </div>
                     <div class="totals-row total">
                         <span class="totals-label">Total</span>
-                        <span class="totals-value">KES ' . number_format($invoice['total'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($invoice['total'] ?? 0, 2) . '</span>
                     </div>
                     <div class="totals-row">
                         <span class="totals-label">Amount Paid</span>
-                        <span class="totals-value">KES ' . number_format($invoice['amount_paid'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($invoice['amount_paid'] ?? 0, 2) . '</span>
                     </div>
                     <div class="totals-row balance">
                         <span class="totals-label">Balance Due</span>
-                        <span class="totals-value">KES ' . number_format($invoice['balance_due'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($invoice['balance_due'] ?? 0, 2) . '</span>
                     </div>
                 </div>
             </div>
         </div>
+        
+        ' . $paymentInfoHtml . '
         
         ' . (!empty($invoice['notes']) ? '
         <div class="notes-section">
@@ -205,7 +255,7 @@ class PDFService {
         </div>' : '') . '
         
         <div class="footer">
-            <p class="thank-you">Thank you for your business!</p>
+            <p class="thank-you">' . htmlspecialchars($docSettings['invoice_footer']) . '</p>
             <p>Generated on ' . date('M d, Y \a\t h:i A') . '</p>
         </div>
     </div>
@@ -215,6 +265,8 @@ class PDFService {
     
     private function getQuoteHTML(array $quote): string {
         $company = $this->getCompanyInfo();
+        $docSettings = $this->getDocSettings();
+        $currency = $docSettings['currency'];
         $items = $quote['items'] ?? [];
         
         $itemsHtml = '';
@@ -222,8 +274,8 @@ class PDFService {
             $itemsHtml .= '<tr>
                 <td style="padding: 12px 15px; border-bottom: 1px solid #eee;">' . htmlspecialchars($item['description'] ?? '') . '</td>
                 <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: center;">' . number_format($item['quantity'] ?? 0, 0) . '</td>
-                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">KES ' . number_format($item['unit_price'] ?? 0, 2) . '</td>
-                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">KES ' . number_format($item['line_total'] ?? 0, 2) . '</td>
+                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">' . $currency . ' ' . number_format($item['unit_price'] ?? 0, 2) . '</td>
+                <td style="padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right;">' . $currency . ' ' . number_format($item['line_total'] ?? 0, 2) . '</td>
             </tr>';
         }
         
@@ -343,15 +395,15 @@ class PDFService {
                 <div class="totals-box">
                     <div class="totals-row">
                         <span class="totals-label">Subtotal</span>
-                        <span class="totals-value">KES ' . number_format($quote['subtotal'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($quote['subtotal'] ?? 0, 2) . '</span>
                     </div>
                     <div class="totals-row">
                         <span class="totals-label">Tax</span>
-                        <span class="totals-value">KES ' . number_format($quote['tax_amount'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($quote['tax_amount'] ?? 0, 2) . '</span>
                     </div>
                     <div class="totals-row total">
                         <span class="totals-label">Total</span>
-                        <span class="totals-value">KES ' . number_format($quote['total'] ?? $quote['total_amount'] ?? 0, 2) . '</span>
+                        <span class="totals-value">' . $currency . ' ' . number_format($quote['total'] ?? $quote['total_amount'] ?? 0, 2) . '</span>
                     </div>
                 </div>
             </div>
@@ -370,7 +422,7 @@ class PDFService {
         </div>' : '') . '
         
         <div class="footer">
-            <p class="thank-you">Thank you for considering our services!</p>
+            <p class="thank-you">' . htmlspecialchars($docSettings['quote_footer']) . '</p>
             <p>Generated on ' . date('M d, Y \a\t h:i A') . '</p>
         </div>
     </div>

@@ -141,6 +141,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-database-down"></i> Database Backup
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'invoices_quotes' ? 'active' : '' ?>" href="?page=settings&subpage=invoices_quotes">
+            <i class="bi bi-receipt"></i> Invoices & Quotes
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -7122,5 +7127,216 @@ if (is_dir($backupDir)) {
         <p class="mt-3 mb-0 text-muted"><i class="bi bi-info-circle"></i> Always test backups on a staging environment before restoring to production.</p>
     </div>
 </div>
+
+<?php elseif ($subpage === 'invoices_quotes'): ?>
+
+<?php
+$invoicePrefix = $settings->get('invoice_prefix', 'INV-');
+$quotePrefix = $settings->get('quote_prefix', 'QUO-');
+$invoiceNextNumber = $settings->get('invoice_next_number', '1001');
+$quoteNextNumber = $settings->get('quote_next_number', '1001');
+$quoteValidityDays = $settings->get('quote_validity_days', '30');
+$invoiceDueDays = $settings->get('invoice_due_days', '14');
+$defaultTaxRate = $settings->get('default_tax_rate', '16');
+$currencySymbol = $settings->get('currency_symbol', 'KES');
+$invoiceTerms = $settings->get('invoice_default_terms', '');
+$quoteTerms = $settings->get('quote_default_terms', '');
+$invoiceNotes = $settings->get('invoice_default_notes', '');
+$quoteNotes = $settings->get('quote_default_notes', '');
+$invoiceFooter = $settings->get('invoice_footer_text', 'Thank you for your business!');
+$quoteFooter = $settings->get('quote_footer_text', 'Thank you for considering our services!');
+$showCompanyLogo = $settings->get('show_company_logo_on_docs', '1');
+$showPaymentInfo = $settings->get('show_payment_info_on_invoice', '1');
+$bankName = $settings->get('payment_bank_name', '');
+$bankAccount = $settings->get('payment_bank_account', '');
+$bankBranch = $settings->get('payment_bank_branch', '');
+$mpesaPaybill = $settings->get('payment_mpesa_paybill', '');
+$mpesaAccountName = $settings->get('payment_mpesa_account_name', '');
+?>
+
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+    <input type="hidden" name="action" value="save_invoice_quote_settings">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1"><i class="bi bi-receipt"></i> Invoice & Quote Settings</h4>
+            <p class="text-muted mb-0">Configure default settings for invoices and quotes</p>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save Settings
+        </button>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-file-text"></i> Invoice Settings
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Invoice Prefix</label>
+                                <input type="text" class="form-control" name="invoice_prefix" value="<?= htmlspecialchars($invoicePrefix) ?>" placeholder="INV-">
+                                <small class="text-muted">e.g., INV-, INVOICE-</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Next Invoice Number</label>
+                                <input type="number" class="form-control" name="invoice_next_number" value="<?= htmlspecialchars($invoiceNextNumber) ?>" min="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Due (Days)</label>
+                        <input type="number" class="form-control" name="invoice_due_days" value="<?= htmlspecialchars($invoiceDueDays) ?>" min="1" max="365">
+                        <small class="text-muted">Days after issue date when payment is due</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Invoice Notes</label>
+                        <textarea class="form-control" name="invoice_default_notes" rows="2" placeholder="Notes to appear on all invoices"><?= htmlspecialchars($invoiceNotes) ?></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Invoice Terms</label>
+                        <textarea class="form-control" name="invoice_default_terms" rows="2" placeholder="Payment terms and conditions"><?= htmlspecialchars($invoiceTerms) ?></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Invoice Footer Text</label>
+                        <input type="text" class="form-control" name="invoice_footer_text" value="<?= htmlspecialchars($invoiceFooter) ?>">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <i class="bi bi-bank"></i> Payment Information (for Invoices)
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="show_payment_info_on_invoice" id="showPaymentInfo" <?= $showPaymentInfo == '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="showPaymentInfo">Show payment details on invoices</label>
+                    </div>
+                    <h6 class="text-muted mb-3"><i class="bi bi-bank2"></i> Bank Details</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Bank Name</label>
+                        <input type="text" class="form-control" name="payment_bank_name" value="<?= htmlspecialchars($bankName) ?>" placeholder="e.g., Equity Bank">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Account Number</label>
+                                <input type="text" class="form-control" name="payment_bank_account" value="<?= htmlspecialchars($bankAccount) ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Branch</label>
+                                <input type="text" class="form-control" name="payment_bank_branch" value="<?= htmlspecialchars($bankBranch) ?>">
+                            </div>
+                        </div>
+                    </div>
+                    <h6 class="text-muted mb-3 mt-3"><i class="bi bi-phone"></i> M-Pesa Details</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Paybill/Till Number</label>
+                                <input type="text" class="form-control" name="payment_mpesa_paybill" value="<?= htmlspecialchars($mpesaPaybill) ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Account Name</label>
+                                <input type="text" class="form-control" name="payment_mpesa_account_name" value="<?= htmlspecialchars($mpesaAccountName) ?>" placeholder="e.g., Customer Name">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-file-earmark-text"></i> Quote Settings
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Quote Prefix</label>
+                                <input type="text" class="form-control" name="quote_prefix" value="<?= htmlspecialchars($quotePrefix) ?>" placeholder="QUO-">
+                                <small class="text-muted">e.g., QUO-, QUOTE-</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Next Quote Number</label>
+                                <input type="number" class="form-control" name="quote_next_number" value="<?= htmlspecialchars($quoteNextNumber) ?>" min="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quote Validity (Days)</label>
+                        <input type="number" class="form-control" name="quote_validity_days" value="<?= htmlspecialchars($quoteValidityDays) ?>" min="1" max="365">
+                        <small class="text-muted">Days after issue date when quote expires</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Quote Notes</label>
+                        <textarea class="form-control" name="quote_default_notes" rows="2" placeholder="Notes to appear on all quotes"><?= htmlspecialchars($quoteNotes) ?></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Quote Terms</label>
+                        <textarea class="form-control" name="quote_default_terms" rows="2" placeholder="Terms and conditions for quotes"><?= htmlspecialchars($quoteTerms) ?></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quote Footer Text</label>
+                        <input type="text" class="form-control" name="quote_footer_text" value="<?= htmlspecialchars($quoteFooter) ?>">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <i class="bi bi-gear"></i> General Document Settings
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Currency Symbol</label>
+                                <input type="text" class="form-control" name="currency_symbol" value="<?= htmlspecialchars($currencySymbol) ?>" placeholder="KES">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Default Tax Rate (%)</label>
+                                <input type="number" class="form-control" name="default_tax_rate" value="<?= htmlspecialchars($defaultTaxRate) ?>" min="0" max="100" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="show_company_logo_on_docs" id="showLogo" <?= $showCompanyLogo == '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="showLogo">Show company logo on documents</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card border-info">
+                <div class="card-body">
+                    <h6><i class="bi bi-info-circle text-info"></i> Tips</h6>
+                    <ul class="mb-0 small text-muted">
+                        <li>Invoice prefix and next number create the invoice number (e.g., INV-1001)</li>
+                        <li>Default notes and terms can be overridden on individual documents</li>
+                        <li>Company info (name, phone, email, address) is taken from Company Settings</li>
+                        <li>Payment info will appear on invoices if enabled above</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
 
 <?php endif; ?>

@@ -4929,6 +4929,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'save_invoice_quote_settings':
+                try {
+                    $settings->set('invoice_prefix', trim($_POST['invoice_prefix'] ?? 'INV-'));
+                    $settings->set('quote_prefix', trim($_POST['quote_prefix'] ?? 'QUO-'));
+                    $settings->set('invoice_next_number', (int)($_POST['invoice_next_number'] ?? 1001));
+                    $settings->set('quote_next_number', (int)($_POST['quote_next_number'] ?? 1001));
+                    $settings->set('quote_validity_days', (int)($_POST['quote_validity_days'] ?? 30));
+                    $settings->set('invoice_due_days', (int)($_POST['invoice_due_days'] ?? 14));
+                    $settings->set('default_tax_rate', (float)($_POST['default_tax_rate'] ?? 16));
+                    $settings->set('currency_symbol', trim($_POST['currency_symbol'] ?? 'KES'));
+                    $settings->set('invoice_default_terms', trim($_POST['invoice_default_terms'] ?? ''));
+                    $settings->set('quote_default_terms', trim($_POST['quote_default_terms'] ?? ''));
+                    $settings->set('invoice_default_notes', trim($_POST['invoice_default_notes'] ?? ''));
+                    $settings->set('quote_default_notes', trim($_POST['quote_default_notes'] ?? ''));
+                    $settings->set('invoice_footer_text', trim($_POST['invoice_footer_text'] ?? 'Thank you for your business!'));
+                    $settings->set('quote_footer_text', trim($_POST['quote_footer_text'] ?? 'Thank you for considering our services!'));
+                    $settings->set('show_company_logo_on_docs', isset($_POST['show_company_logo_on_docs']) ? '1' : '0');
+                    $settings->set('show_payment_info_on_invoice', isset($_POST['show_payment_info_on_invoice']) ? '1' : '0');
+                    $settings->set('payment_bank_name', trim($_POST['payment_bank_name'] ?? ''));
+                    $settings->set('payment_bank_account', trim($_POST['payment_bank_account'] ?? ''));
+                    $settings->set('payment_bank_branch', trim($_POST['payment_bank_branch'] ?? ''));
+                    $settings->set('payment_mpesa_paybill', trim($_POST['payment_mpesa_paybill'] ?? ''));
+                    $settings->set('payment_mpesa_account_name', trim($_POST['payment_mpesa_account_name'] ?? ''));
+                    \App\Settings::clearCache();
+                    $message = 'Invoice & Quote settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_sms_settings':
                 try {
                     $settings->saveSMSSettings($_POST);
