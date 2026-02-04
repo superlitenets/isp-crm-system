@@ -4518,7 +4518,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $accounting->createProduct($_POST);
                         $message = 'Product/service created successfully!';
                     } else {
-                        $accounting->updateProduct((int)$_POST['product_id'], $_POST);
+                        $accounting->updateProduct((int)($_POST['product_id'] ?? 0), $_POST);
                         $message = 'Product/service updated successfully!';
                     }
                     $messageType = 'success';
@@ -4635,7 +4635,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 try {
                     $accounting = new \App\Accounting(Database::getConnection());
-                    $quoteId = (int)$_POST['quote_id'];
+                    $quoteId = (int)($_POST['quote_id'] ?? 0);
                     $invoiceId = $accounting->convertQuoteToInvoice($quoteId);
                     $message = 'Quote converted to invoice successfully!';
                     $messageType = 'success';
