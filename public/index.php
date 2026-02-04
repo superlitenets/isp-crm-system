@@ -8224,6 +8224,95 @@ $csrfToken = \App\Auth::generateToken();
     </nav>
 
     <main class="main-content">
+        <?php
+        // Quick Dashboard Bar - Stats & Actions
+        $quickStats = [];
+        $alerts = [];
+        
+        try {
+            // Today's open tickets
+            $ticketStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('closed', 'resolved')");
+            $quickStats['open_tickets'] = $ticketStmt->fetchColumn() ?: 0;
+            
+            // Unassigned tickets (urgent)
+            $unassignedStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status NOT IN ('closed', 'resolved')");
+            $unassignedCount = $unassignedStmt->fetchColumn() ?: 0;
+            if ($unassignedCount > 0) {
+                $alerts[] = ['type' => 'warning', 'icon' => 'exclamation-triangle', 'text' => $unassignedCount . ' unassigned ticket(s)'];
+            }
+            
+            // Active RADIUS subscribers
+            $subStmt = $db->query("SELECT COUNT(*) FROM radius_subscriptions WHERE status = 'active'");
+            $quickStats['active_subs'] = $subStmt->fetchColumn() ?: 0;
+            
+            // Expiring subscriptions (next 3 days)
+            $expiringStmt = $db->query("SELECT COUNT(*) FROM radius_subscriptions WHERE status = 'active' AND expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '3 days'");
+            $expiringCount = $expiringStmt->fetchColumn() ?: 0;
+            if ($expiringCount > 0) {
+                $alerts[] = ['type' => 'info', 'icon' => 'clock', 'text' => $expiringCount . ' subscription(s) expiring soon'];
+            }
+            
+            // Today's revenue
+            $revenueStmt = $db->query("SELECT COALESCE(SUM(amount), 0) FROM mpesa_transactions WHERE status = 'completed' AND DATE(created_at) = CURRENT_DATE");
+            $quickStats['today_revenue'] = $revenueStmt->fetchColumn() ?: 0;
+            
+            // Overdue tickets (high priority)
+            $overdueStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('closed', 'resolved') AND priority IN ('high', 'critical') AND created_at < NOW() - INTERVAL '24 hours'");
+            $overdueCount = $overdueStmt->fetchColumn() ?: 0;
+            if ($overdueCount > 0) {
+                $alerts[] = ['type' => 'danger', 'icon' => 'alarm', 'text' => $overdueCount . ' overdue high-priority ticket(s)'];
+            }
+        } catch (Exception $e) {
+            // Silently fail if tables don't exist
+        }
+        
+        $userName = \App\Auth::user()['name'] ?? 'User';
+        $greeting = (date('H') < 12) ? 'Good morning' : ((date('H') < 17) ? 'Good afternoon' : 'Good evening');
+        ?>
+        
+        <div class="quick-dashboard-bar mb-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 py-2 px-3 bg-white border-bottom shadow-sm rounded">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="text-muted d-none d-md-inline"><i class="bi bi-person-circle me-1"></i><?= htmlspecialchars($greeting . ', ' . explode(' ', $userName)[0]) ?></span>
+                    
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="badge bg-primary-subtle text-primary px-2 py-1" title="Open Tickets">
+                            <i class="bi bi-ticket-detailed me-1"></i><?= $quickStats['open_tickets'] ?? 0 ?> Tickets
+                        </span>
+                        <span class="badge bg-success-subtle text-success px-2 py-1" title="Active Subscribers">
+                            <i class="bi bi-wifi me-1"></i><?= $quickStats['active_subs'] ?? 0 ?> Active
+                        </span>
+                        <span class="badge bg-info-subtle text-info px-2 py-1 d-none d-sm-inline" title="Today's Revenue">
+                            <i class="bi bi-cash me-1"></i>KES <?= number_format($quickStats['today_revenue'] ?? 0) ?>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center gap-2">
+                    <?php if (!empty($alerts)): ?>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-warning position-relative" data-bs-toggle="dropdown" title="Alerts">
+                                <i class="bi bi-bell"></i>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.6rem"><?= count($alerts) ?></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
+                                <li><h6 class="dropdown-header">Alerts</h6></li>
+                                <?php foreach ($alerts as $alert): ?>
+                                <li><a class="dropdown-item text-<?= $alert['type'] ?>" href="#"><i class="bi bi-<?= $alert['icon'] ?> me-2"></i><?= $alert['text'] ?></a></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <div class="btn-group">
+                        <a href="?page=tickets&action=new" class="btn btn-sm btn-primary" title="New Ticket"><i class="bi bi-plus-lg"></i><span class="d-none d-md-inline ms-1">Ticket</span></a>
+                        <a href="?page=customers&action=add" class="btn btn-sm btn-outline-primary" title="New Customer"><i class="bi bi-person-plus"></i></a>
+                        <a href="?page=isp" class="btn btn-sm btn-outline-success" title="ISP Billing"><i class="bi bi-router"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <?php if ($message): ?>
         <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
             <?= htmlspecialchars($message) ?>
