@@ -7787,7 +7787,7 @@ try {
                             <h5 class="modal-title">NAS Connectivity Test</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body text-center" id="testNASResultEdit">
+                        <div class="modal-body text-center" id="testNASResult">
                             <div class="spinner-border text-primary" role="status"></div>
                             <p class="mt-2">Testing connectivity...</p>
                         </div>
@@ -7803,38 +7803,38 @@ try {
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <ul class="nav nav-tabs mb-3" id="scriptTabsEdit">
+                            <ul class="nav nav-tabs mb-3" id="scriptTabs">
                                 <li class="nav-item">
-                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#radiusTabEdit">RADIUS Config</button>
+                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#radiusTab">RADIUS Config</button>
                                 </li>
                                 <li class="nav-item">
-                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#vpnTabEdit">WireGuard VPN</button>
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#vpnTab">WireGuard VPN</button>
                                 </li>
                                 <li class="nav-item">
-                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fullTabEdit">Full Script</button>
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fullTab">Full Script</button>
                                 </li>
                             </ul>
                             <div class="tab-content">
-                                <div class="tab-pane fade show active" id="radiusTabEdit">
+                                <div class="tab-pane fade show active" id="radiusTab">
                                     <div class="position-relative">
-                                        <pre class="bg-dark text-light p-3 rounded" id="radiusScriptEdit" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
-                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('radiusScriptEdit')">
+                                        <pre class="bg-dark text-light p-3 rounded" id="radiusScript" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('radiusScript')">
                                             <i class="bi bi-clipboard"></i> Copy
                                         </button>
                                     </div>
                                 </div>
-                                <div class="tab-pane fade" id="vpnTabEdit">
+                                <div class="tab-pane fade" id="vpnTab">
                                     <div class="position-relative">
-                                        <pre class="bg-dark text-light p-3 rounded" id="vpnScriptEdit" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
-                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('vpnScriptEdit')">
+                                        <pre class="bg-dark text-light p-3 rounded" id="vpnScript" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('vpnScript')">
                                             <i class="bi bi-clipboard"></i> Copy
                                         </button>
                                     </div>
                                 </div>
-                                <div class="tab-pane fade" id="fullTabEdit">
+                                <div class="tab-pane fade" id="fullTab">
                                     <div class="position-relative">
-                                        <pre class="bg-dark text-light p-3 rounded" id="fullScriptEdit" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></pre>
-                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('fullScriptEdit')">
+                                        <pre class="bg-dark text-light p-3 rounded" id="fullScript" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('fullScript')">
                                             <i class="bi bi-clipboard"></i> Copy
                                         </button>
                                     </div>
