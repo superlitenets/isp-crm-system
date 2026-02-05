@@ -10863,14 +10863,6 @@ try {
                     radiusServer = data.radius_server || radiusServer || '<?= gethostbyname(gethostname()) ?>';
                     const secret = data.secret || radiusSecret;
                     
-                    const expiredPoolName = '<?= $radiusBilling->getSetting('expired_ip_pool') ?: 'expired-pool' ?>';
-                    const expiredPageUrl = '<?= rtrim($_ENV['APP_URL'] ?? 'https://your-crm-domain.com', '/') ?>/expired.php';
-                    
-                    // Extract domain parts for MikroTik script
-                    const expiredDomain = expiredPageUrl.replace(/https?:\/\//, '').split('/')[0];
-                    const expiredPath = expiredPageUrl.replace(/https?:\/\//, '');
-                    const expiredBaseDomain = expiredDomain.split('.').slice(-2).join('.');
-                    
                     radiusScript = `# ============================================
 # RADIUS Configuration for ${nas.name}
 # Generated: ${new Date().toLocaleString()}
@@ -10896,63 +10888,32 @@ try {
 # ============================================
 # EXPIRED/DISABLED USERS REDIRECT CONFIGURATION
 # ============================================
-# This configuration redirects disabled/expired users to the CRM expired page
-# Using DISABLED_USERS address list managed by RADIUS
-
-# Add CRM server to address list (allow access)
-/ip firewall address-list add address=${expiredDomain} list=CRM_SERVERS comment="CRM Server for expired page"
-
-# ============================================
-# FIREWALL FILTER RULES
-# ============================================
-# Block disabled users except for allowed ports (80 for redirect, 3310 custom)
-/ip firewall filter add action=reject chain=forward dst-port=!80,3310 protocol=tcp reject-with=icmp-network-unreachable src-address-list=DISABLED_USERS comment="Reject disabled users traffic"
-
-# Allow DNS (TCP) for disabled users
-/ip firewall filter add action=accept chain=forward dst-port=53 protocol=tcp src-address-list=DISABLED_USERS comment="Allow DNS TCP for disabled users"
-
-# Allow DNS (UDP) for disabled users  
-/ip firewall filter add action=accept chain=forward dst-port=53 protocol=udp src-address-list=DISABLED_USERS comment="Allow DNS UDP for disabled users"
-
-# Drop all other traffic from disabled users
-/ip firewall filter add action=drop chain=forward src-address-list=DISABLED_USERS comment="Drop remaining disabled users traffic"
-
-# ============================================
-# NAT RULES FOR REDIRECT
-# ============================================
-# Masquerade to Google DNS for disabled users
-/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.8.8 src-address-list=DISABLED_USERS comment="Masq disabled to 8.8.8.8"
-/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.4.4 src-address-list=DISABLED_USERS comment="Masq disabled to 8.8.4.4"
-
-# Redirect HTTP traffic to proxy (port 3346)
-/ip firewall nat add action=redirect chain=dstnat dst-port=80 protocol=tcp src-address-list=DISABLED_USERS to-ports=3346 comment="Redirect disabled HTTP to proxy"
-
-# ============================================
-# WEB PROXY CONFIGURATION
-# ============================================
-/ip proxy set enabled=yes max-cache-size=none parent-proxy=0.0.0.0 port=3346 src-address=0.0.0.0
-
-# Redirect to expired page (RouterOS v6.x syntax)
-/ip proxy access add action=deny dst-host=!*.${expiredBaseDomain} redirect-to=${expiredPath} comment="Redirect to expired page v6"
-
-# ============================================
-# FOR RouterOS v7.x - Use this instead:
-# ============================================
-# /ip proxy access add dst-host=!*.${expiredBaseDomain} action=redirect action-data=${expiredPath} comment="Redirect to expired page v7"
-
-# ============================================
-# PPP PROFILE (Create or update)
-# ============================================
-# Note: RADIUS will return Framed-Pool attribute to assign users to expired-pool
-# Your default PPP profile should NOT have a fixed remote-address if using RADIUS pools
-# /ppp profile set [find name=default] remote-address=""
-
-# ============================================
-# WALLED GARDEN (for Hotspot only)
-# ============================================
-# If using Hotspot, add walled garden entries:
-# /ip hotspot walled-garden add dst-host=*${expiredDomain}* action=allow
-# /ip hotspot walled-garden ip add dst-address=${radiusServer} action=accept
+/ip firewall address-list
+add address=crm.superlite.co.ke
+/ip firewall filter
+add action=reject chain=forward dst-port=!80,3310 protocol=tcp reject-with=\\
+    icmp-network-unreachable src-address-list=DISABLED_USERS 
+add action=accept chain=forward dst-port=53 \\
+    protocol=tcp src-address-list=DISABLED_USERS 
+add action=accept chain=forward dst-port=53 protocol=udp src-address-list=DISABLED_USERS \\
+    
+add action=drop chain=forward src-address-list=DISABLED_USERS 
+/ip firewall nat
+add action=masquerade chain=srcnat dst-address=8.8.8.8 \\
+    src-address-list=DISABLED_USERS 
+add action=masquerade chain=srcnat dst-address=8.8.4.4 \\
+    src-address-list=DISABLED_USERS 
+add action=redirect chain=dstnat dst-port=80 protocol=tcp \\
+    src-address-list=DISABLED_USERS to-ports=3346 
+/ip proxy
+set enabled=yes max-cache-size=none parent-proxy=0.0.0.0 port=3346 src-address=0.0.0.0
+/ip proxy access
+add action=deny dst-host=!*.superlite.co.ke redirect-to=\\
+    crm.superlite.co.ke/expired
+####v7.X
+add action=redirect dst-host=!*.superlite.co.ke action-data=\\
+    crm.superlite.co.ke/expired
+####
 `;
                     document.getElementById('radiusScript').textContent = radiusScript;
                     document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
@@ -10979,27 +10940,34 @@ try {
 /radius incoming set accept=yes port=3799
 
 # ============================================
-# EXPIRED/DISABLED USERS REDIRECT (Update domain as needed)
+# EXPIRED/DISABLED USERS REDIRECT CONFIGURATION
 # ============================================
-# Using DISABLED_USERS address list managed by RADIUS
-
-/ip firewall address-list add address=YOUR_CRM_DOMAIN list=CRM_SERVERS comment="CRM Server"
-
-# Firewall filter rules
-/ip firewall filter add action=reject chain=forward dst-port=!80,3310 protocol=tcp reject-with=icmp-network-unreachable src-address-list=DISABLED_USERS
-/ip firewall filter add action=accept chain=forward dst-port=53 protocol=tcp src-address-list=DISABLED_USERS
-/ip firewall filter add action=accept chain=forward dst-port=53 protocol=udp src-address-list=DISABLED_USERS
-/ip firewall filter add action=drop chain=forward src-address-list=DISABLED_USERS
-
-# NAT rules
-/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.8.8 src-address-list=DISABLED_USERS
-/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.4.4 src-address-list=DISABLED_USERS
-/ip firewall nat add action=redirect chain=dstnat dst-port=80 protocol=tcp src-address-list=DISABLED_USERS to-ports=3346
-
-# Web proxy redirect
-/ip proxy set enabled=yes max-cache-size=none parent-proxy=0.0.0.0 port=3346 src-address=0.0.0.0
-/ip proxy access add action=deny dst-host=!*.YOUR_DOMAIN redirect-to=YOUR_CRM_DOMAIN/expired comment="v6 redirect"
-# For v7: /ip proxy access add dst-host=!*.YOUR_DOMAIN action=redirect action-data=YOUR_CRM_DOMAIN/expired
+/ip firewall address-list
+add address=crm.superlite.co.ke
+/ip firewall filter
+add action=reject chain=forward dst-port=!80,3310 protocol=tcp reject-with=\\
+    icmp-network-unreachable src-address-list=DISABLED_USERS 
+add action=accept chain=forward dst-port=53 \\
+    protocol=tcp src-address-list=DISABLED_USERS 
+add action=accept chain=forward dst-port=53 protocol=udp src-address-list=DISABLED_USERS \\
+    
+add action=drop chain=forward src-address-list=DISABLED_USERS 
+/ip firewall nat
+add action=masquerade chain=srcnat dst-address=8.8.8.8 \\
+    src-address-list=DISABLED_USERS 
+add action=masquerade chain=srcnat dst-address=8.8.4.4 \\
+    src-address-list=DISABLED_USERS 
+add action=redirect chain=dstnat dst-port=80 protocol=tcp \\
+    src-address-list=DISABLED_USERS to-ports=3346 
+/ip proxy
+set enabled=yes max-cache-size=none parent-proxy=0.0.0.0 port=3346 src-address=0.0.0.0
+/ip proxy access
+add action=deny dst-host=!*.superlite.co.ke redirect-to=\\
+    crm.superlite.co.ke/expired
+####v7.X
+add action=redirect dst-host=!*.superlite.co.ke action-data=\\
+    crm.superlite.co.ke/expired
+####
 `;
                 document.getElementById('radiusScript').textContent = radiusScript;
                 document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
