@@ -18,13 +18,29 @@ if (isset($_SESSION['user_id'])) {
     $userExtension = $callCenter->getExtensionByUserId($_SESSION['user_id']);
 }
 
+// Ensure call_center_settings table exists
+try {
+    $db->exec("CREATE TABLE IF NOT EXISTS call_center_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+    )");
+} catch (PDOException $e) {
+    // Table might already exist or DB doesn't support this syntax
+}
+
 // Load PBX settings from database (fallback to env vars)
 function getPbxSetting($db, $key, $envKey, $default = '') {
-    $stmt = $db->prepare("SELECT setting_value FROM call_center_settings WHERE setting_key = ?");
-    $stmt->execute([$key]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($result && !empty($result['setting_value'])) {
-        return $result['setting_value'];
+    try {
+        $stmt = $db->prepare("SELECT setting_value FROM call_center_settings WHERE setting_key = ?");
+        $stmt->execute([$key]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($result && !empty($result['setting_value'])) {
+            return $result['setting_value'];
+        }
+    } catch (PDOException $e) {
+        // Table doesn't exist, fall back to env var
     }
     return getenv($envKey) ?: $default;
 }
