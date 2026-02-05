@@ -1108,6 +1108,89 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
             </div>
         </div>
     </div>
+    
+    <!-- Softphone Setup Guide -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <i class="bi bi-headset me-2"></i>Softphone Setup Guide
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-4">
+                            <h5><i class="bi bi-star-fill text-warning me-2"></i>Zoiper (Recommended)</h5>
+                            <p class="text-muted small">Free, cross-platform, reliable</p>
+                            <div class="bg-light p-3 rounded">
+                                <p class="mb-2"><strong>Download:</strong></p>
+                                <ul class="small mb-3">
+                                    <li><a href="https://www.zoiper.com/en/voip-softphone/download/current" target="_blank">Desktop (Win/Mac/Linux)</a></li>
+                                    <li><a href="https://play.google.com/store/apps/details?id=com.zoiper.android.app" target="_blank">Android</a></li>
+                                    <li><a href="https://apps.apple.com/app/zoiper-lite/id438oiper949960" target="_blank">iOS</a></li>
+                                </ul>
+                                <p class="mb-2"><strong>Configuration:</strong></p>
+                                <table class="table table-sm table-bordered mb-0">
+                                    <tr><td class="fw-bold" width="40%">Username</td><td>Your extension (e.g., 1001)</td></tr>
+                                    <tr><td class="fw-bold">Password</td><td>Extension secret from FreePBX</td></tr>
+                                    <tr><td class="fw-bold">Domain/Host</td><td><?= htmlspecialchars($pbxSettings['host'] ?: 'Your PBX IP/Domain') ?></td></tr>
+                                    <tr><td class="fw-bold">Transport</td><td>UDP (default)</td></tr>
+                                    <tr><td class="fw-bold">Port</td><td>5060 (SIP)</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <h5><i class="bi bi-windows text-info me-2"></i>MicroSIP (Windows)</h5>
+                            <p class="text-muted small">Lightweight, free, open-source</p>
+                            <div class="bg-light p-3 rounded">
+                                <p class="mb-2"><strong>Download:</strong></p>
+                                <ul class="small mb-3">
+                                    <li><a href="https://www.microsip.org/downloads" target="_blank">Windows Only</a></li>
+                                </ul>
+                                <p class="mb-2"><strong>Configuration:</strong></p>
+                                <table class="table table-sm table-bordered mb-0">
+                                    <tr><td class="fw-bold" width="40%">Account Name</td><td>Any friendly name</td></tr>
+                                    <tr><td class="fw-bold">SIP Server</td><td><?= htmlspecialchars($pbxSettings['host'] ?: 'Your PBX IP') ?></td></tr>
+                                    <tr><td class="fw-bold">SIP Proxy</td><td><?= htmlspecialchars($pbxSettings['host'] ?: 'Your PBX IP') ?></td></tr>
+                                    <tr><td class="fw-bold">Username</td><td>Your extension number</td></tr>
+                                    <tr><td class="fw-bold">Domain</td><td><?= htmlspecialchars($pbxSettings['host'] ?: 'Your PBX IP') ?></td></tr>
+                                    <tr><td class="fw-bold">Password</td><td>Extension secret</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <h5><i class="bi bi-phone me-2"></i>Linphone (Free)</h5>
+                            <p class="text-muted small">Open-source, all platforms</p>
+                            <div class="bg-light p-3 rounded">
+                                <p class="mb-2"><strong>Download:</strong></p>
+                                <ul class="small mb-3">
+                                    <li><a href="https://www.linphone.org/technical-corner/linphone" target="_blank">All Platforms</a></li>
+                                </ul>
+                                <p class="mb-2"><strong>Configuration:</strong></p>
+                                <table class="table table-sm table-bordered mb-0">
+                                    <tr><td class="fw-bold" width="40%">Username</td><td>Your extension number</td></tr>
+                                    <tr><td class="fw-bold">Password</td><td>Extension secret</td></tr>
+                                    <tr><td class="fw-bold">Domain</td><td><?= htmlspecialchars($pbxSettings['host'] ?: 'Your PBX IP') ?></td></tr>
+                                    <tr><td class="fw-bold">Transport</td><td>UDP</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Tips:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Get your extension credentials from the <a href="?page=call_center&tab=extensions">Extensions</a> page</li>
+                            <li>Use UDP transport unless you're behind a strict firewall (then try TCP)</li>
+                            <li>Enable "STUN" if you're behind NAT for better connectivity</li>
+                            <li>For mobile apps, enable "Push Notifications" to receive calls when app is in background</li>
+                            <li>Recommended codecs: G.711 (best quality) or G.729 (lower bandwidth)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <?php elseif ($tab === 'inbound'): ?>
     <!-- Inbound Routes Tab -->
