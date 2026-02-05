@@ -77,7 +77,7 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
             width: var(--cc-sidebar-width);
             height: calc(100vh - 40px);
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            z-index: 1000;
+            z-index: 1050;
             padding-top: 1rem;
         }
         .cc-sidebar .brand {
