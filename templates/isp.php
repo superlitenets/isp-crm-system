@@ -10864,6 +10864,11 @@ try {
                     const expiredPoolName = '<?= $radiusBilling->getSetting('expired_ip_pool') ?: 'expired-pool' ?>';
                     const expiredPageUrl = '<?= rtrim($_ENV['APP_URL'] ?? 'https://your-crm-domain.com', '/') ?>/expired.php';
                     
+                    // Extract domain parts for MikroTik script
+                    const expiredDomain = expiredPageUrl.replace(/https?:\/\//, '').split('/')[0];
+                    const expiredPath = expiredPageUrl.replace(/https?:\/\//, '');
+                    const expiredBaseDomain = expiredDomain.split('.').slice(-2).join('.');
+                    
                     radiusScript = `# ============================================
 # RADIUS Configuration for ${nas.name}
 # Generated: ${new Date().toLocaleString()}
@@ -10893,7 +10898,7 @@ try {
 # Using DISABLED_USERS address list managed by RADIUS
 
 # Add CRM server to address list (allow access)
-/ip firewall address-list add address=${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0]} list=CRM_SERVERS comment="CRM Server for expired page"
+/ip firewall address-list add address=${expiredDomain} list=CRM_SERVERS comment="CRM Server for expired page"
 
 # ============================================
 # FIREWALL FILTER RULES
@@ -10926,12 +10931,12 @@ try {
 /ip proxy set enabled=yes max-cache-size=none parent-proxy=0.0.0.0 port=3346 src-address=0.0.0.0
 
 # Redirect to expired page (RouterOS v6.x syntax)
-/ip proxy access add action=deny dst-host=!*.${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0].split('.').slice(-2).join('.')} redirect-to=${expiredPageUrl.replace(/https?:\\/\\//, '')} comment="Redirect to expired page v6"
+/ip proxy access add action=deny dst-host=!*.${expiredBaseDomain} redirect-to=${expiredPath} comment="Redirect to expired page v6"
 
 # ============================================
 # FOR RouterOS v7.x - Use this instead:
 # ============================================
-# /ip proxy access add dst-host=!*.${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0].split('.').slice(-2).join('.')} action=redirect action-data=${expiredPageUrl.replace(/https?:\\/\\//, '')} comment="Redirect to expired page v7"
+# /ip proxy access add dst-host=!*.${expiredBaseDomain} action=redirect action-data=${expiredPath} comment="Redirect to expired page v7"
 
 # ============================================
 # PPP PROFILE (Create or update)
@@ -10944,7 +10949,7 @@ try {
 # WALLED GARDEN (for Hotspot only)
 # ============================================
 # If using Hotspot, add walled garden entries:
-# /ip hotspot walled-garden add dst-host=*${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0]}* action=allow
+# /ip hotspot walled-garden add dst-host=*${expiredDomain}* action=allow
 # /ip hotspot walled-garden ip add dst-address=${radiusServer} action=accept
 `;
                     document.getElementById('radiusScript').textContent = radiusScript;
