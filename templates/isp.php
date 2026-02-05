@@ -55,6 +55,189 @@ if ($action === 'get_nas_config' && isset($_GET['id'])) {
     exit;
 }
 
+if ($action === 'download_hotspot_files' && isset($_GET['nas_id'])) {
+    $nasId = (int)$_GET['nas_id'];
+    $nas = $radiusBilling->getNAS($nasId);
+    if (!$nas) {
+        header('HTTP/1.1 404 Not Found');
+        echo 'NAS not found';
+        exit;
+    }
+    
+    // Automatic portal URL based on server domain
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $portalUrl = $protocol . '://' . $host . '/hotspot.php';
+    $ispName = $radiusBilling->getSetting('isp_name') ?: 'WiFi Hotspot';
+    
+    // Generate hotspot files
+    $zip = new ZipArchive();
+    $zipFile = tempnam(sys_get_temp_dir(), 'hotspot_') . '.zip';
+    
+    if ($zip->open($zipFile, ZipArchive::CREATE) === TRUE) {
+        // login.html - redirects to external portal
+        $loginHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>' . htmlspecialchars($ispName) . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <meta http-equiv="refresh" content="0; url=' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)&chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)&dst=$(link-orig-esc)">
+</head>
+<body>
+    <p>Redirecting to login portal...</p>
+    <p><a href="' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)">Click here if not redirected</a></p>
+</body>
+</html>';
+        $zip->addFromString('login.html', $loginHtml);
+        
+        // alogin.html - after successful login
+        $aloginHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Connected - ' . htmlspecialchars($ispName) . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="refresh" content="3; url=$(link-orig)">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .success { color: #28a745; font-size: 48px; }
+        h1 { color: #333; }
+        p { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="success">&#10004;</div>
+    <h1>Connected!</h1>
+    <p>Welcome to ' . htmlspecialchars($ispName) . '</p>
+    <p>You will be redirected shortly...</p>
+    <p><a href="$(link-orig)">Click here to continue</a></p>
+</body>
+</html>';
+        $zip->addFromString('alogin.html', $aloginHtml);
+        
+        // logout.html - logout page
+        $logoutHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Logged Out - ' . htmlspecialchars($ispName) . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        h1 { color: #333; }
+        p { color: #666; }
+        .btn { display: inline-block; padding: 10px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Logged Out</h1>
+    <p>You have been disconnected from ' . htmlspecialchars($ispName) . '</p>
+    <a href="$(link-login)" class="btn">Login Again</a>
+</body>
+</html>';
+        $zip->addFromString('logout.html', $logoutHtml);
+        
+        // status.html - connection status
+        $statusHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Status - ' . htmlspecialchars($ispName) . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="refresh" content="60">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 30px; background: #f5f5f5; }
+        .card { background: white; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .info { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px; }
+        .btn { display: inline-block; padding: 10px 20px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Connection Status</h1>
+        <div class="info"><strong>Session:</strong> $(session-time-left)</div>
+        <div class="info"><strong>Data Used:</strong> $(bytes-in-nice) / $(bytes-out-nice)</div>
+        <div class="info"><strong>IP:</strong> $(ip)</div>
+        <p style="text-align: center;"><a href="$(link-logout)" class="btn">Logout</a></p>
+    </div>
+</body>
+</html>';
+        $zip->addFromString('status.html', $statusHtml);
+        
+        // error.html - error page
+        $errorHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Error - ' . htmlspecialchars($ispName) . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .error { color: #dc3545; font-size: 48px; }
+        h1 { color: #333; }
+        p { color: #666; }
+        .btn { display: inline-block; padding: 10px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="error">&#10008;</div>
+    <h1>Login Error</h1>
+    <p>$(error)</p>
+    <a href="$(link-login)" class="btn">Try Again</a>
+</body>
+</html>';
+        $zip->addFromString('error.html', $errorHtml);
+        
+        // rlogin.html - redirect login
+        $rloginHtml = '<!DOCTYPE html>
+<html>
+<head>
+    <title>Connecting... - ' . htmlspecialchars($ispName) . '</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="refresh" content="0; url=$(link-redirect)">
+</head>
+<body>
+    <p>Connecting...</p>
+</body>
+</html>';
+        $zip->addFromString('rlogin.html', $rloginHtml);
+        
+        // README.txt
+        $readme = "MikroTik Hotspot Files for: " . $nas['name'] . "
+=============================================
+
+Upload these files to your MikroTik hotspot directory:
+/ip hotspot profile set [find] html-directory=hotspot
+
+Files included:
+- login.html    : Redirects to external portal (" . $portalUrl . ")
+- alogin.html   : Shown after successful login
+- logout.html   : Shown after logout
+- status.html   : Shows connection status
+- error.html    : Shown on login errors
+- rlogin.html   : Redirect for MAC authentication
+
+Portal URL: " . $portalUrl . "
+NAS IP: " . $nas['ip_address'] . "
+
+Generated: " . date('Y-m-d H:i:s') . "
+";
+        $zip->addFromString('README.txt', $readme);
+        
+        $zip->close();
+        
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="hotspot_' . preg_replace('/[^a-zA-Z0-9]/', '_', $nas['name']) . '.zip"');
+        header('Content-Length: ' . filesize($zipFile));
+        readfile($zipFile);
+        unlink($zipFile);
+        exit;
+    } else {
+        header('HTTP/1.1 500 Internal Server Error');
+        echo 'Failed to create ZIP file';
+        exit;
+    }
+}
+
 if ($action === 'ping_nas' && isset($_GET['ip'])) {
     header('Content-Type: application/json');
     $ip = filter_var($_GET['ip'], FILTER_VALIDATE_IP);
@@ -839,196 +1022,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $packages = $radiusBilling->getNASPackageIds($nasId);
             echo json_encode(['packages' => $packages]);
             exit;
-            break;
-            
-        case 'download_hotspot_files':
-            $nasId = (int)($_GET['nas_id'] ?? 0);
-            $nas = $radiusBilling->getNAS($nasId);
-            if (!$nas) {
-                $message = 'NAS not found';
-                $messageType = 'danger';
-                break;
-            }
-            
-            // Automatic portal URL based on server domain
-            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $portalUrl = $protocol . '://' . $host . '/hotspot.php';
-            
-            $ispName = $radiusBilling->getSetting('isp_name') ?: 'WiFi Hotspot';
-            
-            // Generate hotspot files
-            $zip = new ZipArchive();
-            $zipFile = tempnam(sys_get_temp_dir(), 'hotspot_') . '.zip';
-            
-            if ($zip->open($zipFile, ZipArchive::CREATE) === TRUE) {
-                // login.html - redirects to external portal
-                $loginHtml = '<!DOCTYPE html>
-<html>
-<head>
-    <title>' . htmlspecialchars($ispName) . '</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta http-equiv="pragma" content="no-cache">
-    <meta http-equiv="expires" content="-1">
-    <meta http-equiv="refresh" content="0; url=' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)&chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)&dst=$(link-orig-esc)">
-</head>
-<body>
-    <p>Redirecting to login portal...</p>
-    <p><a href="' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)">Click here if not redirected</a></p>
-</body>
-</html>';
-                $zip->addFromString('login.html', $loginHtml);
-                
-                // alogin.html - after successful login
-                $aloginHtml = '<!DOCTYPE html>
-<html>
-<head>
-    <title>Connected - ' . htmlspecialchars($ispName) . '</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta http-equiv="refresh" content="3; url=$(link-orig)">
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
-        .success { color: #28a745; font-size: 48px; }
-        h1 { color: #333; }
-        p { color: #666; }
-    </style>
-</head>
-<body>
-    <div class="success">&#10004;</div>
-    <h1>Connected!</h1>
-    <p>Welcome to ' . htmlspecialchars($ispName) . '</p>
-    <p>You will be redirected shortly...</p>
-    <p><a href="$(link-orig)">Click here to continue</a></p>
-</body>
-</html>';
-                $zip->addFromString('alogin.html', $aloginHtml);
-                
-                // logout.html - logout page
-                $logoutHtml = '<!DOCTYPE html>
-<html>
-<head>
-    <title>Logged Out - ' . htmlspecialchars($ispName) . '</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
-        h1 { color: #333; }
-        p { color: #666; }
-        .btn { display: inline-block; padding: 10px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <h1>Logged Out</h1>
-    <p>You have been disconnected from ' . htmlspecialchars($ispName) . '</p>
-    <a href="$(link-login)" class="btn">Login Again</a>
-</body>
-</html>';
-                $zip->addFromString('logout.html', $logoutHtml);
-                
-                // status.html - connection status
-                $statusHtml = '<!DOCTYPE html>
-<html>
-<head>
-    <title>Status - ' . htmlspecialchars($ispName) . '</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta http-equiv="refresh" content="60">
-    <style>
-        body { font-family: Arial, sans-serif; padding: 30px; background: #f5f5f5; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { color: #333; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 8px 0; border-bottom: 1px solid #eee; }
-        td:first-child { color: #666; }
-        .btn { display: inline-block; padding: 10px 30px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>Connection Status</h2>
-        <table>
-            <tr><td>Username:</td><td>$(username)</td></tr>
-            <tr><td>IP Address:</td><td>$(ip)</td></tr>
-            <tr><td>MAC Address:</td><td>$(mac)</td></tr>
-            <tr><td>Session Time:</td><td>$(uptime)</td></tr>
-            <tr><td>Downloaded:</td><td>$(bytes-in)</td></tr>
-            <tr><td>Uploaded:</td><td>$(bytes-out)</td></tr>
-        </table>
-        <a href="$(link-logout)" class="btn">Logout</a>
-    </div>
-</body>
-</html>';
-                $zip->addFromString('status.html', $statusHtml);
-                
-                // error.html - error page
-                $errorHtml = '<!DOCTYPE html>
-<html>
-<head>
-    <title>Error - ' . htmlspecialchars($ispName) . '</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
-        .error { color: #dc3545; font-size: 48px; }
-        h1 { color: #333; }
-        p { color: #666; }
-        .btn { display: inline-block; padding: 10px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="error">&#10008;</div>
-    <h1>Login Failed</h1>
-    <p>$(error)</p>
-    <a href="$(link-login)" class="btn">Try Again</a>
-</body>
-</html>';
-                $zip->addFromString('error.html', $errorHtml);
-                
-                // rlogin.html - redirect login (for MAC auth)
-                $rloginHtml = '<!DOCTYPE html>
-<html>
-<head>
-    <title>Connecting... - ' . htmlspecialchars($ispName) . '</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta http-equiv="refresh" content="0; url=$(link-redirect)">
-</head>
-<body>
-    <p>Connecting...</p>
-</body>
-</html>';
-                $zip->addFromString('rlogin.html', $rloginHtml);
-                
-                // README.txt
-                $readme = "MikroTik Hotspot Files for: " . $nas['name'] . "
-=============================================
-
-Upload these files to your MikroTik hotspot directory:
-/ip hotspot profile set [find] html-directory=hotspot
-
-Files included:
-- login.html    : Redirects to external portal (" . $portalUrl . ")
-- alogin.html   : Shown after successful login
-- logout.html   : Shown after logout
-- status.html   : Shows connection status
-- error.html    : Shown on login errors
-- rlogin.html   : Redirect for MAC authentication
-
-Portal URL: " . $portalUrl . "
-NAS IP: " . $nas['ip_address'] . "
-
-Generated: " . date('Y-m-d H:i:s') . "
-";
-                $zip->addFromString('README.txt', $readme);
-                
-                $zip->close();
-                
-                header('Content-Type: application/zip');
-                header('Content-Disposition: attachment; filename="hotspot_' . preg_replace('/[^a-zA-Z0-9]/', '_', $nas['name']) . '.zip"');
-                header('Content-Length: ' . filesize($zipFile));
-                readfile($zipFile);
-                unlink($zipFile);
-                exit;
-            } else {
-                $message = 'Failed to create ZIP file';
-                $messageType = 'danger';
-            }
             break;
             
         case 'delete_nas':
@@ -7141,9 +7134,9 @@ try {
                     <button class="btn btn-outline-secondary" onclick="syncMikroTikBlocked()" id="syncBlockedBtn">
                         <i class="bi bi-arrow-repeat me-1"></i> Sync Blocked List
                     </button>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNASModal">
+                    <a href="?page=isp&view=nas_edit" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> Add NAS
-                    </button>
+                    </a>
                 </div>
             </div>
             
@@ -7224,9 +7217,9 @@ try {
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
                                             <?php endif; ?>
-                                            <button type="button" class="btn btn-outline-primary" onclick="editNAS(<?= htmlspecialchars(json_encode($nas)) ?>)" title="Edit">
+                                            <a href="?page=isp&view=nas_edit&id=<?= $nas['id'] ?>" class="btn btn-outline-primary" title="Edit">
                                                 <i class="bi bi-pencil"></i>
-                                            </button>
+                                            </a>
                                             <form method="post" class="d-inline" onsubmit="return confirm('Delete this NAS device?')">
                                                 <input type="hidden" name="action" value="delete_nas">
                                                 <input type="hidden" name="id" value="<?= $nas['id'] ?>">
@@ -7504,6 +7497,352 @@ try {
                         </div>
                         <div class="modal-footer">
                             <small class="text-muted me-auto">Paste this script into MikroTik terminal (Winbox > New Terminal)</small>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <?php elseif ($view === 'nas_edit'): ?>
+            <?php 
+            $nasId = (int)($_GET['id'] ?? 0);
+            $editNas = $nasId ? $radiusBilling->getNAS($nasId) : null;
+            $wireguardService = new \App\WireGuardService($db);
+            $vpnPeers = $wireguardService->getAllPeers();
+            $ispLocations = $radiusBilling->getLocations();
+            $ispSubLocations = $radiusBilling->getAllSubLocations();
+            $hotspotPackages = $radiusBilling->getPackages('hotspot');
+            $nasPackages = $nasId ? $radiusBilling->getNASPackageIds($nasId) : [];
+            
+            if (!$editNas && $nasId) {
+                header('Location: ?page=isp&view=nas');
+                exit;
+            }
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="?page=isp">ISP Billing</a></li>
+                            <li class="breadcrumb-item"><a href="?page=isp&view=nas">NAS Devices</a></li>
+                            <li class="breadcrumb-item active"><?= $editNas ? 'Edit' : 'Add' ?> NAS</li>
+                        </ol>
+                    </nav>
+                    <h4 class="page-title mb-0 mt-2">
+                        <i class="bi bi-hdd-network me-2"></i>
+                        <?= $editNas ? 'Edit NAS: ' . htmlspecialchars($editNas['name']) : 'Add New NAS Device' ?>
+                    </h4>
+                </div>
+                <div>
+                    <a href="?page=isp&view=nas" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Back to NAS List
+                    </a>
+                </div>
+            </div>
+            
+            <form method="post" action="?page=isp&view=nas">
+                <input type="hidden" name="action" value="<?= $editNas ? 'update_nas' : 'create_nas' ?>">
+                <?php if ($editNas): ?>
+                <input type="hidden" name="id" value="<?= $editNas['id'] ?>">
+                <?php endif; ?>
+                
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-hdd-network me-2"></i> Basic Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">NAS Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="name" class="form-control" required
+                                               value="<?= htmlspecialchars($editNas['name'] ?? '') ?>"
+                                               placeholder="e.g., Main Router, Branch1 MikroTik">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">IP Address <span class="text-danger">*</span></label>
+                                        <input type="text" name="ip_address" class="form-control" required
+                                               value="<?= htmlspecialchars($editNas['ip_address'] ?? '') ?>"
+                                               placeholder="e.g., 192.168.1.1">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">RADIUS Port</label>
+                                        <input type="number" name="ports" class="form-control"
+                                               value="<?= htmlspecialchars($editNas['ports'] ?? '1812') ?>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">RADIUS Secret <span class="text-danger">*</span></label>
+                                        <div class="input-group">
+                                            <input type="password" name="secret" id="nas_edit_secret" class="form-control"
+                                                   value="<?= htmlspecialchars($editNas['secret'] ?? '') ?>"
+                                                   placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Enter secret' ?>"
+                                                   <?= $editNas ? '' : 'required' ?>>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="toggleSecretVisibility('nas_edit_secret', this)">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="generateSecret('nas_edit_secret')">
+                                                <i class="bi bi-shuffle"></i>
+                                            </button>
+                                        </div>
+                                        <small class="text-muted">Shared secret between RADIUS server and NAS</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">NAS Type</label>
+                                        <select name="nas_type" class="form-select">
+                                            <option value="mikrotik" <?= ($editNas['nas_type'] ?? '') === 'mikrotik' ? 'selected' : '' ?>>MikroTik</option>
+                                            <option value="cisco" <?= ($editNas['nas_type'] ?? '') === 'cisco' ? 'selected' : '' ?>>Cisco</option>
+                                            <option value="other" <?= ($editNas['nas_type'] ?? '') === 'other' ? 'selected' : '' ?>>Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Description</label>
+                                        <textarea name="description" class="form-control" rows="2"
+                                                  placeholder="Optional notes about this device"><?= htmlspecialchars($editNas['description'] ?? '') ?></textarea>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch mt-2">
+                                            <input class="form-check-input" type="checkbox" name="is_active" id="nas_is_active" value="1"
+                                                   <?= ($editNas['is_active'] ?? true) ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="nas_is_active">
+                                                <strong>Active</strong> - Enable this NAS device
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-router me-2"></i> MikroTik API Configuration</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" name="api_enabled" id="api_enabled" value="1"
+                                           <?= ($editNas['api_enabled'] ?? false) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="api_enabled">
+                                        <strong>Enable RouterOS API</strong> - Allow direct management via API
+                                    </label>
+                                </div>
+                                <div class="row g-3" id="apiFields">
+                                    <div class="col-md-3">
+                                        <label class="form-label">API Port</label>
+                                        <input type="number" name="api_port" class="form-control"
+                                               value="<?= htmlspecialchars($editNas['api_port'] ?? '8728') ?>"
+                                               placeholder="8728">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">API Username</label>
+                                        <input type="text" name="api_username" class="form-control"
+                                               value="<?= htmlspecialchars($editNas['api_username'] ?? '') ?>"
+                                               placeholder="admin">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">API Password</label>
+                                        <input type="password" name="api_password" class="form-control"
+                                               placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Enter password' ?>">
+                                    </div>
+                                </div>
+                                <p class="text-muted small mt-3 mb-0">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Enable API access to allow session disconnect, live traffic monitoring, and router reboot functionality.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-purple text-white" style="background-color: #6f42c1 !important;">
+                                <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i> WireGuard VPN</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Link to VPN Peer</label>
+                                    <select name="wireguard_peer_id" class="form-select">
+                                        <option value="">-- No VPN (Direct Connection) --</option>
+                                        <?php foreach ($vpnPeers as $peer): ?>
+                                        <option value="<?= $peer['id'] ?>" <?= ($editNas['wireguard_peer_id'] ?? '') == $peer['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($peer['name']) ?> (<?= htmlspecialchars($peer['allowed_ips']) ?>)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <small class="text-muted">Link this NAS to a VPN peer for secure communication</small>
+                                </div>
+                                <?php if (empty($vpnPeers)): ?>
+                                <div class="alert alert-light mb-0">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    No VPN peers configured. <a href="?page=isp&view=vpn">Manage VPN</a>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-wifi me-2"></i> Hotspot Configuration</h5>
+                            </div>
+                            <div class="card-body">
+                                <?php if ($editNas): ?>
+                                <div class="d-grid mb-3">
+                                    <a href="?page=isp&view=nas&action=download_hotspot_files&nas_id=<?= $editNas['id'] ?>" 
+                                       class="btn btn-outline-primary">
+                                        <i class="bi bi-download me-2"></i> Download MikroTik Hotspot Files
+                                    </a>
+                                </div>
+                                <?php endif; ?>
+                                
+                                <label class="form-label fw-bold">Available Packages</label>
+                                <p class="text-muted small">Select which packages are shown on this NAS hotspot portal. If none selected, all packages are shown.</p>
+                                
+                                <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                    <?php if (empty($hotspotPackages)): ?>
+                                    <p class="text-muted small mb-0">No hotspot packages defined.</p>
+                                    <?php else: ?>
+                                    <?php foreach ($hotspotPackages as $pkg): ?>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="packages[]" value="<?= $pkg['id'] ?>" 
+                                               id="pkg_<?= $pkg['id'] ?>"
+                                               <?= in_array($pkg['id'], $nasPackages) ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="pkg_<?= $pkg['id'] ?>">
+                                            <strong><?= htmlspecialchars($pkg['name']) ?></strong>
+                                            <br><small class="text-muted">KES <?= number_format($pkg['price']) ?> / <?= $pkg['validity_days'] ?> days</small>
+                                        </label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <?php if ($editNas): ?>
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0"><i class="bi bi-terminal me-2"></i> Quick Actions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-outline-info" onclick="showMikroTikScript(<?= htmlspecialchars(json_encode($editNas)) ?>)">
+                                        <i class="bi bi-terminal me-2"></i> View MikroTik Script
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success" onclick="testNAS(<?= $editNas['id'] ?>, '<?= htmlspecialchars($editNas['ip_address']) ?>')">
+                                        <i class="bi bi-lightning me-2"></i> Test Connectivity
+                                    </button>
+                                    <?php if ($editNas['api_enabled']): ?>
+                                    <button type="button" class="btn btn-outline-warning" onclick="rebootNAS(<?= $editNas['id'] ?>, '<?= htmlspecialchars($editNas['name']) ?>')">
+                                        <i class="bi bi-arrow-clockwise me-2"></i> Reboot Router
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow-sm mb-4 border-info">
+                            <div class="card-body">
+                                <h6 class="text-info"><i class="bi bi-info-circle me-1"></i> NAS Details</h6>
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tr>
+                                        <td class="text-muted">ID:</td>
+                                        <td><code><?= $editNas['id'] ?></code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Created:</td>
+                                        <td><?= date('M d, Y', strtotime($editNas['created_at'] ?? 'now')) ?></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Status:</td>
+                                        <td>
+                                            <?php if ($editNas['is_active']): ?>
+                                            <span class="badge bg-success">Active</span>
+                                            <?php else: ?>
+                                            <span class="badge bg-secondary">Inactive</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <a href="?page=isp&view=nas" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-lg me-2"></i> <?= $editNas ? 'Save Changes' : 'Create NAS Device' ?>
+                        </button>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="modal fade" id="testNASModal" tabindex="-1">
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">NAS Connectivity Test</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center" id="testNASResultEdit">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2">Testing connectivity...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="mikrotikScriptModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-terminal me-2"></i>MikroTik Configuration Script</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <ul class="nav nav-tabs mb-3" id="scriptTabsEdit">
+                                <li class="nav-item">
+                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#radiusTabEdit">RADIUS Config</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#vpnTabEdit">WireGuard VPN</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fullTabEdit">Full Script</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content">
+                                <div class="tab-pane fade show active" id="radiusTabEdit">
+                                    <div class="position-relative">
+                                        <pre class="bg-dark text-light p-3 rounded" id="radiusScriptEdit" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('radiusScriptEdit')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="vpnTabEdit">
+                                    <div class="position-relative">
+                                        <pre class="bg-dark text-light p-3 rounded" id="vpnScriptEdit" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('vpnScriptEdit')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="fullTabEdit">
+                                    <div class="position-relative">
+                                        <pre class="bg-dark text-light p-3 rounded" id="fullScriptEdit" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('fullScriptEdit')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <small class="text-muted me-auto">Paste this script into MikroTik terminal</small>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>

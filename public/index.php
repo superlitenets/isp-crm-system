@@ -5230,6 +5230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'sms_template_ticket_updated',
                         'sms_template_ticket_resolved',
                         'sms_template_ticket_assigned',
+                        'sms_template_team_assigned',
                         'sms_template_technician_assigned',
                         'sms_template_complaint_received',
                         'sms_template_complaint_approved',
