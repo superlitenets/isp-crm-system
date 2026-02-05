@@ -476,6 +476,11 @@ if (isset($_SESSION['user_id'])) {
                                 <?php endif; ?>
                             </td>
                             <td>
+                                <?php if ($userExtension && $userExtension['extension'] !== $ext['extension']): ?>
+                                <button class="btn btn-sm btn-success me-1" onclick="callExtension('<?= htmlspecialchars($ext['extension']) ?>', '<?= htmlspecialchars($ext['name']) ?>')" title="Call this extension">
+                                    <i class="bi bi-telephone-fill"></i>
+                                </button>
+                                <?php endif; ?>
                                 <button class="btn btn-sm btn-outline-primary" onclick="editExtension(<?= $ext['id'] ?>)">
                                     <i class="bi bi-pencil"></i>
                                 </button>
@@ -487,6 +492,29 @@ if (isset($_SESSION['user_id'])) {
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Dial Modal -->
+    <div class="modal fade" id="quickDialModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-telephone-fill me-2"></i>Call Extension</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="mb-2">Calling:</p>
+                    <h4 id="dialExtName" class="mb-1"></h4>
+                    <p class="text-muted" id="dialExtNumber"></p>
+                    <div id="dialStatus" class="mt-3">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Calling...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Initiating call...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -878,6 +906,57 @@ function deleteTrunk(id) {
     if (confirm('Delete this trunk?')) {
         window.location = '?page=call_center&action=delete_trunk&id=' + id;
     }
+}
+
+function callExtension(extension, name) {
+    document.getElementById('dialExtName').textContent = name;
+    document.getElementById('dialExtNumber').textContent = 'Extension: ' + extension;
+    document.getElementById('dialStatus').innerHTML = `
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Calling...</span>
+        </div>
+        <p class="mt-2 text-muted">Initiating call...</p>
+    `;
+    
+    var modal = new bootstrap.Modal(document.getElementById('quickDialModal'));
+    modal.show();
+    
+    var formData = new FormData();
+    formData.append('phone', extension);
+    
+    fetch('?page=call_center&action=originate_call', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('dialStatus').innerHTML = `
+                <div class="text-success">
+                    <i class="bi bi-check-circle-fill" style="font-size: 3rem;"></i>
+                    <p class="mt-2">Call initiated successfully!</p>
+                    <p class="small text-muted">Your phone will ring first, then connect to ${name}</p>
+                </div>
+            `;
+        } else {
+            document.getElementById('dialStatus').innerHTML = `
+                <div class="text-danger">
+                    <i class="bi bi-x-circle-fill" style="font-size: 3rem;"></i>
+                    <p class="mt-2">Call failed</p>
+                    <p class="small text-muted">${data.error || 'Unknown error'}</p>
+                </div>
+            `;
+        }
+    })
+    .catch(err => {
+        document.getElementById('dialStatus').innerHTML = `
+            <div class="text-danger">
+                <i class="bi bi-x-circle-fill" style="font-size: 3rem;"></i>
+                <p class="mt-2">Connection error</p>
+                <p class="small text-muted">${err.message}</p>
+            </div>
+        `;
+    });
 }
 </script>
     </main>
