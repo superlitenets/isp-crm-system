@@ -2282,6 +2282,140 @@ if ($page === 'call_center') {
         exit;
     }
     
+    // Inbound Route CRUD
+    if ($action === 'save_inbound_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $data = [
+            'name' => $_POST['name'] ?? '',
+            'description' => $_POST['description'] ?? '',
+            'did_pattern' => $_POST['did_pattern'] ?? '',
+            'cid_pattern' => $_POST['cid_pattern'] ?? '',
+            'destination_type' => $_POST['destination_type'] ?? 'extension',
+            'destination_id' => $_POST['destination_id'] ?? '',
+            'priority' => (int)($_POST['priority'] ?? 0),
+            'is_active' => isset($_POST['is_active']) ? true : false
+        ];
+        if ($id) {
+            $stmt = $db->prepare("UPDATE call_center_inbound_routes SET name=?, description=?, did_pattern=?, cid_pattern=?, destination_type=?, destination_id=?, priority=?, is_active=?, updated_at=NOW() WHERE id=?");
+            $stmt->execute([$data['name'], $data['description'], $data['did_pattern'], $data['cid_pattern'], $data['destination_type'], $data['destination_id'], $data['priority'], $data['is_active'], $id]);
+        } else {
+            $stmt = $db->prepare("INSERT INTO call_center_inbound_routes (name, description, did_pattern, cid_pattern, destination_type, destination_id, priority, is_active) VALUES (?,?,?,?,?,?,?,?)");
+            $stmt->execute([$data['name'], $data['description'], $data['did_pattern'], $data['cid_pattern'], $data['destination_type'], $data['destination_id'], $data['priority'], $data['is_active']]);
+        }
+        header('Location: ?page=call_center&tab=inbound');
+        exit;
+    }
+    if ($action === 'delete_inbound_route') {
+        $stmt = $db->prepare("DELETE FROM call_center_inbound_routes WHERE id = ?");
+        $stmt->execute([(int)$_GET['id']]);
+        header('Location: ?page=call_center&tab=inbound');
+        exit;
+    }
+    
+    // Outbound Route CRUD
+    if ($action === 'save_outbound_route' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $data = [
+            'name' => $_POST['name'] ?? '',
+            'description' => $_POST['description'] ?? '',
+            'dial_pattern' => $_POST['dial_pattern'] ?? '',
+            'prepend' => $_POST['prepend'] ?? '',
+            'prefix' => $_POST['prefix'] ?? '',
+            'trunk_id' => !empty($_POST['trunk_id']) ? (int)$_POST['trunk_id'] : null,
+            'caller_id' => $_POST['caller_id'] ?? '',
+            'priority' => (int)($_POST['priority'] ?? 0),
+            'is_active' => isset($_POST['is_active']) ? true : false
+        ];
+        if ($id) {
+            $stmt = $db->prepare("UPDATE call_center_outbound_routes SET name=?, description=?, dial_pattern=?, prepend=?, prefix=?, trunk_id=?, caller_id=?, priority=?, is_active=?, updated_at=NOW() WHERE id=?");
+            $stmt->execute([$data['name'], $data['description'], $data['dial_pattern'], $data['prepend'], $data['prefix'], $data['trunk_id'], $data['caller_id'], $data['priority'], $data['is_active'], $id]);
+        } else {
+            $stmt = $db->prepare("INSERT INTO call_center_outbound_routes (name, description, dial_pattern, prepend, prefix, trunk_id, caller_id, priority, is_active) VALUES (?,?,?,?,?,?,?,?,?)");
+            $stmt->execute([$data['name'], $data['description'], $data['dial_pattern'], $data['prepend'], $data['prefix'], $data['trunk_id'], $data['caller_id'], $data['priority'], $data['is_active']]);
+        }
+        header('Location: ?page=call_center&tab=outbound');
+        exit;
+    }
+    if ($action === 'delete_outbound_route') {
+        $stmt = $db->prepare("DELETE FROM call_center_outbound_routes WHERE id = ?");
+        $stmt->execute([(int)$_GET['id']]);
+        header('Location: ?page=call_center&tab=outbound');
+        exit;
+    }
+    
+    // IVR CRUD
+    if ($action === 'save_ivr' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $data = [
+            'name' => $_POST['name'] ?? '',
+            'description' => $_POST['description'] ?? '',
+            'announcement' => $_POST['announcement'] ?? '',
+            'timeout' => (int)($_POST['timeout'] ?? 10),
+            'timeout_destination_type' => $_POST['timeout_destination_type'] ?? 'hangup',
+            'timeout_destination_id' => $_POST['timeout_destination_id'] ?? '',
+            'invalid_destination_type' => $_POST['invalid_destination_type'] ?? 'repeat',
+            'invalid_destination_id' => $_POST['invalid_destination_id'] ?? '',
+            'max_loops' => (int)($_POST['max_loops'] ?? 3),
+            'is_active' => isset($_POST['is_active']) ? true : false
+        ];
+        if ($id) {
+            $stmt = $db->prepare("UPDATE call_center_ivr SET name=?, description=?, announcement=?, timeout=?, timeout_destination_type=?, timeout_destination_id=?, invalid_destination_type=?, invalid_destination_id=?, max_loops=?, is_active=?, updated_at=NOW() WHERE id=?");
+            $stmt->execute([$data['name'], $data['description'], $data['announcement'], $data['timeout'], $data['timeout_destination_type'], $data['timeout_destination_id'], $data['invalid_destination_type'], $data['invalid_destination_id'], $data['max_loops'], $data['is_active'], $id]);
+        } else {
+            $stmt = $db->prepare("INSERT INTO call_center_ivr (name, description, announcement, timeout, timeout_destination_type, timeout_destination_id, invalid_destination_type, invalid_destination_id, max_loops, is_active) VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $stmt->execute([$data['name'], $data['description'], $data['announcement'], $data['timeout'], $data['timeout_destination_type'], $data['timeout_destination_id'], $data['invalid_destination_type'], $data['invalid_destination_id'], $data['max_loops'], $data['is_active']]);
+        }
+        header('Location: ?page=call_center&tab=ivr');
+        exit;
+    }
+    if ($action === 'get_ivr') {
+        header('Content-Type: application/json');
+        $stmt = $db->prepare("SELECT * FROM call_center_ivr WHERE id = ?");
+        $stmt->execute([(int)$_GET['id']]);
+        echo json_encode($stmt->fetch(PDO::FETCH_ASSOC));
+        exit;
+    }
+    if ($action === 'delete_ivr') {
+        $stmt = $db->prepare("DELETE FROM call_center_ivr WHERE id = ?");
+        $stmt->execute([(int)$_GET['id']]);
+        header('Location: ?page=call_center&tab=ivr');
+        exit;
+    }
+    
+    // IVR Options CRUD
+    if ($action === 'get_ivr_options') {
+        header('Content-Type: application/json');
+        $stmt = $db->prepare("SELECT * FROM call_center_ivr_options WHERE ivr_id = ? ORDER BY digit");
+        $stmt->execute([(int)$_GET['id']]);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        exit;
+    }
+    if ($action === 'save_ivr_option' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        $data = [
+            'ivr_id' => (int)($_POST['ivr_id'] ?? 0),
+            'digit' => $_POST['digit'] ?? '',
+            'destination_type' => $_POST['destination_type'] ?? 'extension',
+            'destination_id' => $_POST['destination_id'] ?? '',
+            'description' => $_POST['description'] ?? ''
+        ];
+        if ($data['ivr_id'] && $data['digit']) {
+            $stmt = $db->prepare("INSERT INTO call_center_ivr_options (ivr_id, digit, destination_type, destination_id, description) VALUES (?,?,?,?,?)");
+            $stmt->execute([$data['ivr_id'], $data['digit'], $data['destination_type'], $data['destination_id'], $data['description']]);
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Missing required fields']);
+        }
+        exit;
+    }
+    if ($action === 'delete_ivr_option') {
+        header('Content-Type: application/json');
+        $stmt = $db->prepare("DELETE FROM call_center_ivr_options WHERE id = ?");
+        $stmt->execute([(int)$_GET['id']]);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    
     include __DIR__ . '/../templates/call_center.php';
     exit;
 }

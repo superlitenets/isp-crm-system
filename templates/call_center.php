@@ -153,6 +153,15 @@ if (isset($_SESSION['user_id'])) {
             <a class="nav-link <?= $tab === 'trunks' ? 'active' : '' ?>" href="?page=call_center&tab=trunks">
                 <i class="bi bi-diagram-3"></i> Trunks
             </a>
+            <a class="nav-link <?= $tab === 'inbound' ? 'active' : '' ?>" href="?page=call_center&tab=inbound">
+                <i class="bi bi-telephone-inbound"></i> Inbound Routes
+            </a>
+            <a class="nav-link <?= $tab === 'outbound' ? 'active' : '' ?>" href="?page=call_center&tab=outbound">
+                <i class="bi bi-telephone-outbound"></i> Outbound Routes
+            </a>
+            <a class="nav-link <?= $tab === 'ivr' ? 'active' : '' ?>" href="?page=call_center&tab=ivr">
+                <i class="bi bi-menu-button-wide"></i> IVR
+            </a>
             <a class="nav-link <?= $tab === 'phonebook' ? 'active' : '' ?>" href="?page=call_center&tab=phonebook">
                 <i class="bi bi-book"></i> Phonebook
             </a>
@@ -911,6 +920,255 @@ if (isset($_SESSION['user_id'])) {
             </div>
         </div>
     </div>
+
+    <?php elseif ($tab === 'inbound'): ?>
+    <!-- Inbound Routes Tab -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <span><i class="bi bi-telephone-inbound me-2"></i>Inbound Routes</span>
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#inboundRouteModal" onclick="clearInboundForm()">
+            <i class="bi bi-plus-lg"></i> Add Inbound Route
+        </button>
+    </div>
+    
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>DID Pattern</th>
+                        <th>CID Pattern</th>
+                        <th>Destination</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th width="120">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $inboundRoutes = $db->query("SELECT * FROM call_center_inbound_routes ORDER BY priority DESC, name")->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($inboundRoutes as $route): 
+                    ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($route['name']) ?></strong></td>
+                        <td><code><?= htmlspecialchars($route['did_pattern'] ?: 'Any') ?></code></td>
+                        <td><code><?= htmlspecialchars($route['cid_pattern'] ?: 'Any') ?></code></td>
+                        <td>
+                            <span class="badge bg-info"><?= ucfirst($route['destination_type']) ?></span>
+                            <?= htmlspecialchars($route['destination_id']) ?>
+                        </td>
+                        <td><?= $route['priority'] ?></td>
+                        <td>
+                            <?php if ($route['is_active']): ?>
+                                <span class="badge bg-success">Active</span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">Disabled</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editInboundRoute(<?= htmlspecialchars(json_encode($route)) ?>)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteInboundRoute(<?= $route['id'] ?>)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($inboundRoutes)): ?>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox display-4"></i>
+                            <p class="mt-2">No inbound routes configured</p>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <?php elseif ($tab === 'outbound'): ?>
+    <!-- Outbound Routes Tab -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <span><i class="bi bi-telephone-outbound me-2"></i>Outbound Routes</span>
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#outboundRouteModal" onclick="clearOutboundForm()">
+            <i class="bi bi-plus-lg"></i> Add Outbound Route
+        </button>
+    </div>
+    
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Dial Pattern</th>
+                        <th>Prepend/Prefix</th>
+                        <th>Trunk</th>
+                        <th>Caller ID</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th width="120">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $outboundRoutes = $db->query("SELECT o.*, t.name as trunk_name FROM call_center_outbound_routes o LEFT JOIN call_center_trunks t ON o.trunk_id = t.id ORDER BY o.priority DESC, o.name")->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($outboundRoutes as $route): 
+                    ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($route['name']) ?></strong></td>
+                        <td><code><?= htmlspecialchars($route['dial_pattern']) ?></code></td>
+                        <td>
+                            <?php if ($route['prepend']): ?>
+                                <span class="badge bg-primary">+<?= htmlspecialchars($route['prepend']) ?></span>
+                            <?php endif; ?>
+                            <?php if ($route['prefix']): ?>
+                                <span class="badge bg-secondary">-<?= htmlspecialchars($route['prefix']) ?></span>
+                            <?php endif; ?>
+                            <?php if (!$route['prepend'] && !$route['prefix']): ?>-<?php endif; ?>
+                        </td>
+                        <td><?= htmlspecialchars($route['trunk_name'] ?: 'None') ?></td>
+                        <td><?= htmlspecialchars($route['caller_id'] ?: 'Default') ?></td>
+                        <td><?= $route['priority'] ?></td>
+                        <td>
+                            <?php if ($route['is_active']): ?>
+                                <span class="badge bg-success">Active</span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">Disabled</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editOutboundRoute(<?= htmlspecialchars(json_encode($route)) ?>)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteOutboundRoute(<?= $route['id'] ?>)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($outboundRoutes)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox display-4"></i>
+                            <p class="mt-2">No outbound routes configured</p>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <?php elseif ($tab === 'ivr'): ?>
+    <!-- IVR Tab -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <span><i class="bi bi-menu-button-wide me-2"></i>IVR Menus</span>
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#ivrModal" onclick="clearIvrForm()">
+            <i class="bi bi-plus-lg"></i> Add IVR Menu
+        </button>
+    </div>
+    
+    <div class="row">
+        <?php 
+        $ivrMenus = $db->query("SELECT * FROM call_center_ivr ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($ivrMenus as $ivr): 
+            $options = $db->prepare("SELECT * FROM call_center_ivr_options WHERE ivr_id = ? ORDER BY digit");
+            $options->execute([$ivr['id']]);
+            $ivrOptions = $options->fetchAll(PDO::FETCH_ASSOC);
+        ?>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="bi bi-menu-button-wide me-2"></i>
+                        <strong><?= htmlspecialchars($ivr['name']) ?></strong>
+                    </span>
+                    <span>
+                        <?php if ($ivr['is_active']): ?>
+                            <span class="badge bg-success">Active</span>
+                        <?php else: ?>
+                            <span class="badge bg-secondary">Disabled</span>
+                        <?php endif; ?>
+                    </span>
+                </div>
+                <div class="card-body">
+                    <?php if ($ivr['description']): ?>
+                    <p class="text-muted small"><?= htmlspecialchars($ivr['description']) ?></p>
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <small class="text-muted">Announcement:</small><br>
+                        <span><?= htmlspecialchars($ivr['announcement'] ?: 'None') ?></span>
+                    </div>
+                    
+                    <h6>Menu Options:</h6>
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th width="50">Key</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($ivrOptions as $opt): ?>
+                            <tr>
+                                <td class="text-center"><kbd><?= htmlspecialchars($opt['digit']) ?></kbd></td>
+                                <td>
+                                    <span class="badge bg-info"><?= ucfirst($opt['destination_type']) ?></span>
+                                    <?= htmlspecialchars($opt['destination_id']) ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($ivrOptions)): ?>
+                            <tr>
+                                <td colspan="2" class="text-center text-muted">No options defined</td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                    
+                    <div class="row text-muted small">
+                        <div class="col-6">
+                            <i class="bi bi-clock"></i> Timeout: <?= $ivr['timeout'] ?>s
+                        </div>
+                        <div class="col-6">
+                            <i class="bi bi-arrow-repeat"></i> Max Loops: <?= $ivr['max_loops'] ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-sm btn-outline-primary" onclick="editIvr(<?= $ivr['id'] ?>)">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" onclick="manageIvrOptions(<?= $ivr['id'] ?>, '<?= htmlspecialchars($ivr['name']) ?>')">
+                        <i class="bi bi-list-ol"></i> Options
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteIvr(<?= $ivr['id'] ?>)">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+        
+        <?php if (empty($ivrMenus)): ?>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center text-muted py-5">
+                    <i class="bi bi-menu-button-wide display-4"></i>
+                    <p class="mt-2">No IVR menus configured</p>
+                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#ivrModal" onclick="clearIvrForm()">
+                        <i class="bi bi-plus-lg"></i> Create Your First IVR
+                    </button>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+
     <?php endif; ?>
 
 <!-- Extension Modal -->
@@ -1096,6 +1354,272 @@ if (isset($_SESSION['user_id'])) {
                     <button type="submit" class="btn btn-primary">Save Queue</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Inbound Route Modal -->
+<div class="modal fade" id="inboundRouteModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-telephone-inbound me-2"></i>Inbound Route</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="inboundRouteForm" method="post" action="?page=call_center&action=save_inbound_route">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="inbound_id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Route Name *</label>
+                            <input type="text" class="form-control" name="name" id="inbound_name" required placeholder="e.g., Main Number">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Priority</label>
+                            <input type="number" class="form-control" name="priority" id="inbound_priority" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="inbound_description" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">DID Pattern</label>
+                            <input type="text" class="form-control" name="did_pattern" id="inbound_did_pattern" placeholder="e.g., 0722XXXXXXX or leave blank for any">
+                            <small class="text-muted">Leave blank to match any DID</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Caller ID Pattern</label>
+                            <input type="text" class="form-control" name="cid_pattern" id="inbound_cid_pattern" placeholder="e.g., 254XXXXXXXXX">
+                            <small class="text-muted">Leave blank to match any caller ID</small>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Destination Type *</label>
+                            <select class="form-select" name="destination_type" id="inbound_destination_type" required>
+                                <option value="extension">Extension</option>
+                                <option value="queue">Queue</option>
+                                <option value="ivr">IVR</option>
+                                <option value="ring_group">Ring Group</option>
+                                <option value="voicemail">Voicemail</option>
+                                <option value="hangup">Hangup</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Destination</label>
+                            <input type="text" class="form-control" name="destination_id" id="inbound_destination_id" placeholder="e.g., 101 or queue number">
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="inbound_is_active" checked>
+                        <label class="form-check-label" for="inbound_is_active">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Save Route</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Outbound Route Modal -->
+<div class="modal fade" id="outboundRouteModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-telephone-outbound me-2"></i>Outbound Route</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="outboundRouteForm" method="post" action="?page=call_center&action=save_outbound_route">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="outbound_id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Route Name *</label>
+                            <input type="text" class="form-control" name="name" id="outbound_name" required placeholder="e.g., Local Calls">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Priority</label>
+                            <input type="number" class="form-control" name="priority" id="outbound_priority" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="outbound_description" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dial Pattern *</label>
+                        <input type="text" class="form-control" name="dial_pattern" id="outbound_dial_pattern" required placeholder="e.g., 0XXXXXXXXX or _254XXXXXXXXX">
+                        <small class="text-muted">Use _ for pattern matching (e.g., _0X. matches 0 followed by any digits)</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Prepend</label>
+                            <input type="text" class="form-control" name="prepend" id="outbound_prepend" placeholder="Digits to add before dialing">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Prefix (Strip)</label>
+                            <input type="text" class="form-control" name="prefix" id="outbound_prefix" placeholder="Digits to remove from beginning">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Trunk *</label>
+                            <select class="form-select" name="trunk_id" id="outbound_trunk_id" required>
+                                <option value="">-- Select Trunk --</option>
+                                <?php foreach ($trunks as $trunk): ?>
+                                <option value="<?= $trunk['id'] ?>"><?= htmlspecialchars($trunk['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Caller ID Override</label>
+                            <input type="text" class="form-control" name="caller_id" id="outbound_caller_id" placeholder="Override caller ID">
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="outbound_is_active" checked>
+                        <label class="form-check-label" for="outbound_is_active">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Save Route</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- IVR Modal -->
+<div class="modal fade" id="ivrModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-menu-button-wide me-2"></i>IVR Menu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="ivrForm" method="post" action="?page=call_center&action=save_ivr">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="ivr_id">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">IVR Name *</label>
+                            <input type="text" class="form-control" name="name" id="ivr_name" required placeholder="e.g., Main Menu">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Timeout (sec)</label>
+                            <input type="number" class="form-control" name="timeout" id="ivr_timeout" value="10">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="ivr_description" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Announcement</label>
+                        <textarea class="form-control" name="announcement" id="ivr_announcement" rows="3" placeholder="e.g., Welcome to our company. Press 1 for Sales, 2 for Support..."></textarea>
+                        <small class="text-muted">Text to be played to callers (or path to audio file)</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Timeout Destination</label>
+                            <select class="form-select" name="timeout_destination_type" id="ivr_timeout_destination_type">
+                                <option value="hangup">Hangup</option>
+                                <option value="repeat">Repeat Menu</option>
+                                <option value="extension">Extension</option>
+                                <option value="queue">Queue</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Timeout Destination ID</label>
+                            <input type="text" class="form-control" name="timeout_destination_id" id="ivr_timeout_destination_id">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Invalid Destination</label>
+                            <select class="form-select" name="invalid_destination_type" id="ivr_invalid_destination_type">
+                                <option value="repeat">Repeat Menu</option>
+                                <option value="hangup">Hangup</option>
+                                <option value="extension">Extension</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Max Loops</label>
+                            <input type="number" class="form-control" name="max_loops" id="ivr_max_loops" value="3">
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="ivr_is_active" checked>
+                        <label class="form-check-label" for="ivr_is_active">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Save IVR</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- IVR Options Modal -->
+<div class="modal fade" id="ivrOptionsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-list-ol me-2"></i>IVR Options - <span id="ivrOptionsTitle"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="ivrOptionsId">
+                <div class="mb-4">
+                    <h6>Add New Option</h6>
+                    <form id="ivrOptionForm" class="row g-2">
+                        <div class="col-md-2">
+                            <input type="text" class="form-control" name="digit" id="option_digit" placeholder="Key" maxlength="2" required>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" name="destination_type" id="option_destination_type" required>
+                                <option value="extension">Extension</option>
+                                <option value="queue">Queue</option>
+                                <option value="ivr">IVR</option>
+                                <option value="voicemail">Voicemail</option>
+                                <option value="hangup">Hangup</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" name="destination_id" id="option_destination_id" placeholder="Destination">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" name="description" id="option_description" placeholder="Description">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn btn-success"><i class="bi bi-plus"></i></button>
+                        </div>
+                    </form>
+                </div>
+                <h6>Current Options</h6>
+                <table class="table table-sm" id="ivrOptionsTable">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Destination</th>
+                            <th>Description</th>
+                            <th width="60">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -1338,6 +1862,176 @@ function callExtension(extension, name) {
             </div>
         `;
     });
+}
+
+// Inbound Route Functions
+function clearInboundForm() {
+    document.getElementById('inbound_id').value = '';
+    document.getElementById('inbound_name').value = '';
+    document.getElementById('inbound_description').value = '';
+    document.getElementById('inbound_did_pattern').value = '';
+    document.getElementById('inbound_cid_pattern').value = '';
+    document.getElementById('inbound_destination_type').value = 'extension';
+    document.getElementById('inbound_destination_id').value = '';
+    document.getElementById('inbound_priority').value = '0';
+    document.getElementById('inbound_is_active').checked = true;
+}
+
+function editInboundRoute(data) {
+    document.getElementById('inbound_id').value = data.id;
+    document.getElementById('inbound_name').value = data.name;
+    document.getElementById('inbound_description').value = data.description || '';
+    document.getElementById('inbound_did_pattern').value = data.did_pattern || '';
+    document.getElementById('inbound_cid_pattern').value = data.cid_pattern || '';
+    document.getElementById('inbound_destination_type').value = data.destination_type;
+    document.getElementById('inbound_destination_id').value = data.destination_id || '';
+    document.getElementById('inbound_priority').value = data.priority;
+    document.getElementById('inbound_is_active').checked = data.is_active;
+    new bootstrap.Modal(document.getElementById('inboundRouteModal')).show();
+}
+
+function deleteInboundRoute(id) {
+    if (confirm('Delete this inbound route?')) {
+        window.location = '?page=call_center&action=delete_inbound_route&id=' + id;
+    }
+}
+
+// Outbound Route Functions
+function clearOutboundForm() {
+    document.getElementById('outbound_id').value = '';
+    document.getElementById('outbound_name').value = '';
+    document.getElementById('outbound_description').value = '';
+    document.getElementById('outbound_dial_pattern').value = '';
+    document.getElementById('outbound_prepend').value = '';
+    document.getElementById('outbound_prefix').value = '';
+    document.getElementById('outbound_trunk_id').value = '';
+    document.getElementById('outbound_caller_id').value = '';
+    document.getElementById('outbound_priority').value = '0';
+    document.getElementById('outbound_is_active').checked = true;
+}
+
+function editOutboundRoute(data) {
+    document.getElementById('outbound_id').value = data.id;
+    document.getElementById('outbound_name').value = data.name;
+    document.getElementById('outbound_description').value = data.description || '';
+    document.getElementById('outbound_dial_pattern').value = data.dial_pattern;
+    document.getElementById('outbound_prepend').value = data.prepend || '';
+    document.getElementById('outbound_prefix').value = data.prefix || '';
+    document.getElementById('outbound_trunk_id').value = data.trunk_id || '';
+    document.getElementById('outbound_caller_id').value = data.caller_id || '';
+    document.getElementById('outbound_priority').value = data.priority;
+    document.getElementById('outbound_is_active').checked = data.is_active;
+    new bootstrap.Modal(document.getElementById('outboundRouteModal')).show();
+}
+
+function deleteOutboundRoute(id) {
+    if (confirm('Delete this outbound route?')) {
+        window.location = '?page=call_center&action=delete_outbound_route&id=' + id;
+    }
+}
+
+// IVR Functions
+function clearIvrForm() {
+    document.getElementById('ivr_id').value = '';
+    document.getElementById('ivr_name').value = '';
+    document.getElementById('ivr_description').value = '';
+    document.getElementById('ivr_announcement').value = '';
+    document.getElementById('ivr_timeout').value = '10';
+    document.getElementById('ivr_timeout_destination_type').value = 'hangup';
+    document.getElementById('ivr_timeout_destination_id').value = '';
+    document.getElementById('ivr_invalid_destination_type').value = 'repeat';
+    document.getElementById('ivr_max_loops').value = '3';
+    document.getElementById('ivr_is_active').checked = true;
+}
+
+function editIvr(id) {
+    fetch('?page=call_center&action=get_ivr&id=' + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('ivr_id').value = data.id;
+            document.getElementById('ivr_name').value = data.name;
+            document.getElementById('ivr_description').value = data.description || '';
+            document.getElementById('ivr_announcement').value = data.announcement || '';
+            document.getElementById('ivr_timeout').value = data.timeout;
+            document.getElementById('ivr_timeout_destination_type').value = data.timeout_destination_type;
+            document.getElementById('ivr_timeout_destination_id').value = data.timeout_destination_id || '';
+            document.getElementById('ivr_invalid_destination_type').value = data.invalid_destination_type;
+            document.getElementById('ivr_max_loops').value = data.max_loops;
+            document.getElementById('ivr_is_active').checked = data.is_active;
+            new bootstrap.Modal(document.getElementById('ivrModal')).show();
+        });
+}
+
+function deleteIvr(id) {
+    if (confirm('Delete this IVR menu? All associated options will also be deleted.')) {
+        window.location = '?page=call_center&action=delete_ivr&id=' + id;
+    }
+}
+
+function manageIvrOptions(id, name) {
+    document.getElementById('ivrOptionsId').value = id;
+    document.getElementById('ivrOptionsTitle').textContent = name;
+    loadIvrOptions(id);
+    new bootstrap.Modal(document.getElementById('ivrOptionsModal')).show();
+}
+
+function loadIvrOptions(ivrId) {
+    fetch('?page=call_center&action=get_ivr_options&id=' + ivrId)
+        .then(r => r.json())
+        .then(options => {
+            const tbody = document.querySelector('#ivrOptionsTable tbody');
+            tbody.innerHTML = '';
+            options.forEach(opt => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><kbd>${opt.digit}</kbd></td>
+                        <td><span class="badge bg-info">${opt.destination_type}</span> ${opt.destination_id || ''}</td>
+                        <td>${opt.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteIvrOption(${opt.id}, ${ivrId})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            if (options.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No options defined</td></tr>';
+            }
+        });
+}
+
+document.getElementById('ivrOptionForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const ivrId = document.getElementById('ivrOptionsId').value;
+    const formData = new FormData(this);
+    formData.append('ivr_id', ivrId);
+    
+    fetch('?page=call_center&action=save_ivr_option', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadIvrOptions(ivrId);
+            this.reset();
+        } else {
+            alert(data.error || 'Failed to save option');
+        }
+    });
+});
+
+function deleteIvrOption(optionId, ivrId) {
+    if (confirm('Delete this option?')) {
+        fetch('?page=call_center&action=delete_ivr_option&id=' + optionId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    loadIvrOptions(ivrId);
+                }
+            });
+    }
 }
 </script>
     </main>
