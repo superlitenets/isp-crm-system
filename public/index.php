@@ -8458,6 +8458,22 @@ $csrfToken = \App\Auth::generateToken();
                         </a>
                     </li>
                     <?php endif; ?>
+                    <?php if (\App\Auth::can('settings.view')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center"
+                           style="border-radius: 0; background: <?= $page === 'call_center' ? '#fd7e14' : 'transparent' ?>; font-weight: <?= $page === 'call_center' ? '600' : '400' ?>;">
+                            <i class="bi bi-telephone me-1"></i>Call Centre
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                    <?php if ($moduleAccountingEnabled && \App\Auth::can('settings.view')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white <?= $page === 'finance' ? 'active' : '' ?>" href="?page=finance"
+                           style="border-radius: 0; background: <?= $page === 'finance' ? '#20c997' : 'transparent' ?>; font-weight: <?= $page === 'finance' ? '600' : '400' ?>;">
+                            <i class="bi bi-bank me-1"></i>Finance
+                        </a>
+                    </li>
+                    <?php endif; ?>
                 </ul>
             </div>
         </div>
@@ -8543,13 +8559,6 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (\App\Auth::can('settings.view')): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center">
-                        <i class="bi bi-telephone-fill text-success"></i> Call Center
-                    </a>
-                </li>
-                <?php endif; ?>
                 <?php if (\App\Auth::can('reports.view')): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'reports' ? 'active' : '' ?>" href="?page=reports">
@@ -8561,11 +8570,6 @@ $csrfToken = \App\Auth::generateToken();
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'accounting' ? 'active' : '' ?>" href="?page=accounting">
                         <i class="bi bi-calculator"></i> Accounting
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="?page=finance">
-                        <i class="bi bi-bank text-success"></i> Finance
                     </a>
                 </li>
                 <?php endif; ?>
@@ -8691,13 +8695,6 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
-            <?php if (\App\Auth::can('settings.view')): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center">
-                    <i class="bi bi-telephone-fill text-success"></i> Call Center
-                </a>
-            </li>
-            <?php endif; ?>
             <?php if (\App\Auth::can('reports.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'reports' ? 'active' : '' ?>" href="?page=reports">
@@ -8709,11 +8706,6 @@ $csrfToken = \App\Auth::generateToken();
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'accounting' ? 'active' : '' ?>" href="?page=accounting">
                     <i class="bi bi-calculator"></i> Accounting
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="?page=finance">
-                    <i class="bi bi-bank text-success"></i> Finance
                 </a>
             </li>
             <?php endif; ?>

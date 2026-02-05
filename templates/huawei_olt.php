@@ -6884,6 +6884,16 @@ try {
                             <i class="bi bi-router me-1"></i>OMS
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=call_center" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-telephone me-1"></i>Call Centre
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=finance" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-bank me-1"></i>Finance
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>
