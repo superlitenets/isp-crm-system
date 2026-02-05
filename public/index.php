@@ -3706,6 +3706,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $additions[] = 'late deductions';
                         }
                         
+                        if (!empty($_POST['include_absent_deductions'])) {
+                            $lateCalculator = new \App\LateDeductionCalculator($payrollDb);
+                            $lateCalculator->applyAbsentDeductionsToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
+                            $additions[] = 'absent deductions';
+                        }
+                        
                         if (!empty($_POST['include_ticket_commissions'])) {
                             $ticketCommission = new \App\TicketCommission($payrollDb);
                             $ticketCommission->applyToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
@@ -3792,6 +3798,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($_POST['include_late_deductions'])) {
                                 $lateCalculator = new \App\LateDeductionCalculator($payrollDb);
                                 $lateCalculator->applyDeductionsToPayroll($payrollId, $empId, $payPeriodMonth);
+                            }
+                            
+                            if (!empty($_POST['include_absent_deductions'])) {
+                                $lateCalculator = new \App\LateDeductionCalculator($payrollDb);
+                                $lateCalculator->applyAbsentDeductionsToPayroll($payrollId, $empId, $payPeriodMonth);
                             }
                             
                             if (!empty($_POST['include_ticket_commissions'])) {

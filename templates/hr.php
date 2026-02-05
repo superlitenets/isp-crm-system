@@ -1579,6 +1579,12 @@ function syncAllEmployeesToDevice(deviceId) {
                                 </label>
                             </div>
                             <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_absent_deductions" id="includeAbsentDeductions" value="1" checked>
+                                <label class="form-check-label" for="includeAbsentDeductions">
+                                    <i class="bi bi-calendar-x text-danger"></i> Include absenteeism deductions automatically
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
                                 <input class="form-check-input" type="checkbox" name="include_ticket_commissions" id="includeTicketCommissions" value="1" checked>
                                 <label class="form-check-label" for="includeTicketCommissions">
                                     <i class="bi bi-ticket-perforated text-success"></i> Include ticket commissions automatically
@@ -1653,6 +1659,12 @@ function syncAllEmployeesToDevice(deviceId) {
                                 <input class="form-check-input" type="checkbox" name="include_late_deductions" id="bulkIncludeLateDeductions" value="1" checked>
                                 <label class="form-check-label" for="bulkIncludeLateDeductions">
                                     <i class="bi bi-alarm text-warning"></i> Include late arrival deductions
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_absent_deductions" id="bulkIncludeAbsentDeductions" value="1" checked>
+                                <label class="form-check-label" for="bulkIncludeAbsentDeductions">
+                                    <i class="bi bi-calendar-x text-danger"></i> Include absenteeism deductions
                                 </label>
                             </div>
                             <div class="form-check mt-2">
