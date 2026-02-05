@@ -121,10 +121,57 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
         @media (max-width: 768px) {
             .cc-sidebar {
                 transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .cc-sidebar.show {
+                transform: translateX(0);
             }
             .cc-main {
                 margin-left: 0;
             }
+            .module-top-bar .nav {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+            }
+            .module-top-bar .nav-link {
+                white-space: nowrap;
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.85rem;
+            }
+            .mobile-menu-toggle {
+                display: flex !important;
+            }
+            .cc-sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 1049;
+            }
+            .cc-sidebar-overlay.show {
+                display: block;
+            }
+        }
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #fd7e14;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(253,126,20,0.4);
+            z-index: 1060;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
         }
     </style>
 </head>
@@ -165,7 +212,15 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
     </div>
 
     <!-- Call Center Sidebar -->
-    <aside class="cc-sidebar">
+    <!-- Mobile Overlay -->
+    <div class="cc-sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileMenu()"></div>
+    
+    <!-- Mobile Menu Toggle Button -->
+    <button class="mobile-menu-toggle" id="mobileMenuBtn" onclick="toggleMobileMenu()">
+        <i class="bi bi-list" id="mobileMenuIcon"></i>
+    </button>
+
+    <aside class="cc-sidebar" id="ccSidebar">
         <div class="brand">
             <h5><i class="bi bi-telephone-fill me-2"></i>Call Center</h5>
             <?php if ($userExtension): ?>
@@ -2442,6 +2497,33 @@ function removeRingGroupMember(memberId, groupId) {
             });
     }
 }
+
+// Mobile Menu Toggle
+function toggleMobileMenu() {
+    const sidebar = document.getElementById('ccSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const icon = document.getElementById('mobileMenuIcon');
+    
+    sidebar.classList.toggle('show');
+    overlay.classList.toggle('show');
+    
+    if (sidebar.classList.contains('show')) {
+        icon.classList.remove('bi-list');
+        icon.classList.add('bi-x-lg');
+    } else {
+        icon.classList.remove('bi-x-lg');
+        icon.classList.add('bi-list');
+    }
+}
+
+// Close mobile menu when clicking a nav link
+document.querySelectorAll('.cc-sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', function() {
+        if (window.innerWidth <= 768) {
+            toggleMobileMenu();
+        }
+    });
+});
 </script>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
