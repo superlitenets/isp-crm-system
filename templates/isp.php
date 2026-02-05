@@ -7205,27 +7205,9 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button type="button" class="btn btn-outline-info" onclick="showMikroTikScript(<?= htmlspecialchars(json_encode($nas)) ?>)" title="MikroTik Script">
-                                                <i class="bi bi-terminal"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-outline-success" onclick="testNAS(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['ip_address']) ?>')" title="Test Connectivity">
-                                                <i class="bi bi-lightning"></i>
-                                            </button>
-                                            <?php if ($nas['api_enabled']): ?>
-                                            <button type="button" class="btn btn-outline-warning" onclick="rebootNAS(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['name']) ?>')" title="Reboot Router">
-                                                <i class="bi bi-arrow-clockwise"></i>
-                                            </button>
-                                            <?php endif; ?>
-                                            <a href="?page=isp&view=nas_edit&id=<?= $nas['id'] ?>" class="btn btn-outline-primary" title="Edit">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <form method="post" class="d-inline" onsubmit="return confirm('Delete this NAS device?')">
-                                                <input type="hidden" name="action" value="delete_nas">
-                                                <input type="hidden" name="id" value="<?= $nas['id'] ?>">
-                                                <button type="submit" class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
-                                            </form>
-                                        </div>
+                                        <a href="?page=isp&view=nas_edit&id=<?= $nas['id'] ?>" class="btn btn-sm btn-outline-primary" title="View/Edit">
+                                            <i class="bi bi-eye me-1"></i> View
+                                        </a>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -10905,29 +10887,51 @@ try {
 /system identity set name="${nas.name}"
 
 # ============================================
-# EXPIRED POOL REDIRECT CONFIGURATION
+# EXPIRED/DISABLED USERS REDIRECT CONFIGURATION
 # ============================================
-# Create IP pool for expired/unknown users
-/ip pool add name=${expiredPoolName} ranges=10.255.255.2-10.255.255.254
+# This configuration redirects disabled/expired users to the CRM expired page
+# Using DISABLED_USERS address list managed by RADIUS
 
-# Create address list for expired users
-/ip firewall address-list remove [find list=expired-users]
+# Add CRM server to address list (allow access)
+/ip firewall address-list add address=${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0]} list=CRM_SERVERS comment="CRM Server for expired page"
 
-# NAT rule to redirect HTTP traffic from expired pool to payment page
-/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=80 protocol=tcp action=dst-nat to-addresses=${radiusServer.split(':')[0]} to-ports=5000 comment="Redirect expired users to payment page"
+# ============================================
+# FIREWALL FILTER RULES
+# ============================================
+# Block disabled users except for allowed ports (80 for redirect, 3310 custom)
+/ip firewall filter add action=reject chain=forward dst-port=!80,3310 protocol=tcp reject-with=icmp-network-unreachable src-address-list=DISABLED_USERS comment="Reject disabled users traffic"
 
-# NAT rule to redirect HTTPS (falls back to HTTP redirect page)
-/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=443 protocol=tcp action=dst-nat to-addresses=${radiusServer.split(':')[0]} to-ports=5000 comment="Redirect expired users HTTPS"
+# Allow DNS (TCP) for disabled users
+/ip firewall filter add action=accept chain=forward dst-port=53 protocol=tcp src-address-list=DISABLED_USERS comment="Allow DNS TCP for disabled users"
 
-# Allow expired pool to access DNS (important!)
-/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=udp action=accept comment="Allow expired users DNS"
-/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=tcp action=accept comment="Allow expired users DNS"
+# Allow DNS (UDP) for disabled users  
+/ip firewall filter add action=accept chain=forward dst-port=53 protocol=udp src-address-list=DISABLED_USERS comment="Allow DNS UDP for disabled users"
 
-# Allow expired pool to access CRM server only
-/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-address=${radiusServer} action=accept comment="Allow expired users to CRM"
+# Drop all other traffic from disabled users
+/ip firewall filter add action=drop chain=forward src-address-list=DISABLED_USERS comment="Drop remaining disabled users traffic"
 
-# Block all other traffic from expired pool
-/ip firewall filter add chain=forward src-address=10.255.255.0/24 action=drop comment="Block expired users internet"
+# ============================================
+# NAT RULES FOR REDIRECT
+# ============================================
+# Masquerade to Google DNS for disabled users
+/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.8.8 src-address-list=DISABLED_USERS comment="Masq disabled to 8.8.8.8"
+/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.4.4 src-address-list=DISABLED_USERS comment="Masq disabled to 8.8.4.4"
+
+# Redirect HTTP traffic to proxy (port 3346)
+/ip firewall nat add action=redirect chain=dstnat dst-port=80 protocol=tcp src-address-list=DISABLED_USERS to-ports=3346 comment="Redirect disabled HTTP to proxy"
+
+# ============================================
+# WEB PROXY CONFIGURATION
+# ============================================
+/ip proxy set enabled=yes max-cache-size=none parent-proxy=0.0.0.0 port=3346 src-address=0.0.0.0
+
+# Redirect to expired page (RouterOS v6.x syntax)
+/ip proxy access add action=deny dst-host=!*.${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0].split('.').slice(-2).join('.')} redirect-to=${expiredPageUrl.replace(/https?:\\/\\//, '')} comment="Redirect to expired page v6"
+
+# ============================================
+# FOR RouterOS v7.x - Use this instead:
+# ============================================
+# /ip proxy access add dst-host=!*.${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0].split('.').slice(-2).join('.')} action=redirect action-data=${expiredPageUrl.replace(/https?:\\/\\//, '')} comment="Redirect to expired page v7"
 
 # ============================================
 # PPP PROFILE (Create or update)
@@ -10940,7 +10944,7 @@ try {
 # WALLED GARDEN (for Hotspot only)
 # ============================================
 # If using Hotspot, add walled garden entries:
-# /ip hotspot walled-garden add dst-host=*your-crm-domain.com* action=allow
+# /ip hotspot walled-garden add dst-host=*${expiredPageUrl.replace(/https?:\\/\\//, '').split('/')[0]}* action=allow
 # /ip hotspot walled-garden ip add dst-address=${radiusServer} action=accept
 `;
                     document.getElementById('radiusScript').textContent = radiusScript;
@@ -10968,14 +10972,27 @@ try {
 /radius incoming set accept=yes port=3799
 
 # ============================================
-# EXPIRED POOL REDIRECT (Update IPs as needed)
+# EXPIRED/DISABLED USERS REDIRECT (Update domain as needed)
 # ============================================
-/ip pool add name=expired-pool ranges=10.255.255.2-10.255.255.254
-/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=80 protocol=tcp action=dst-nat to-addresses=YOUR_CRM_IP to-ports=5000 comment="Redirect expired to payment"
-/ip firewall nat add chain=dstnat src-address=10.255.255.0/24 dst-port=443 protocol=tcp action=dst-nat to-addresses=YOUR_CRM_IP to-ports=5000 comment="Redirect expired HTTPS"
-/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-port=53 protocol=udp action=accept comment="Allow DNS"
-/ip firewall filter add chain=forward src-address=10.255.255.0/24 dst-address=YOUR_CRM_IP action=accept comment="Allow CRM"
-/ip firewall filter add chain=forward src-address=10.255.255.0/24 action=drop comment="Block expired internet"
+# Using DISABLED_USERS address list managed by RADIUS
+
+/ip firewall address-list add address=YOUR_CRM_DOMAIN list=CRM_SERVERS comment="CRM Server"
+
+# Firewall filter rules
+/ip firewall filter add action=reject chain=forward dst-port=!80,3310 protocol=tcp reject-with=icmp-network-unreachable src-address-list=DISABLED_USERS
+/ip firewall filter add action=accept chain=forward dst-port=53 protocol=tcp src-address-list=DISABLED_USERS
+/ip firewall filter add action=accept chain=forward dst-port=53 protocol=udp src-address-list=DISABLED_USERS
+/ip firewall filter add action=drop chain=forward src-address-list=DISABLED_USERS
+
+# NAT rules
+/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.8.8 src-address-list=DISABLED_USERS
+/ip firewall nat add action=masquerade chain=srcnat dst-address=8.8.4.4 src-address-list=DISABLED_USERS
+/ip firewall nat add action=redirect chain=dstnat dst-port=80 protocol=tcp src-address-list=DISABLED_USERS to-ports=3346
+
+# Web proxy redirect
+/ip proxy set enabled=yes max-cache-size=none parent-proxy=0.0.0.0 port=3346 src-address=0.0.0.0
+/ip proxy access add action=deny dst-host=!*.YOUR_DOMAIN redirect-to=YOUR_CRM_DOMAIN/expired comment="v6 redirect"
+# For v7: /ip proxy access add dst-host=!*.YOUR_DOMAIN action=redirect action-data=YOUR_CRM_DOMAIN/expired
 `;
                 document.getElementById('radiusScript').textContent = radiusScript;
                 document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
