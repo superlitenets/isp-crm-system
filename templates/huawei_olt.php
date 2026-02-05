@@ -6440,6 +6440,28 @@ try {
             opacity: 0.7;
         }
         
+        /* Mobile module tabs scrolling */
+        @media (max-width: 768px) {
+            .module-top-bar .nav {
+                overflow-x: auto;
+                flex-wrap: nowrap !important;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .module-top-bar .nav::-webkit-scrollbar {
+                display: none;
+            }
+            .module-top-bar .nav-link {
+                white-space: nowrap;
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.8rem;
+            }
+            .module-top-bar .nav-item {
+                flex-shrink: 0;
+            }
+        }
+        
         /* Responsive */
         @media (max-width: 991.98px) {
             .sidebar {
