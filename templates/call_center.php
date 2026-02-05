@@ -1125,8 +1125,9 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
                                 <p class="mb-2"><strong>Download:</strong></p>
                                 <ul class="small mb-3">
                                     <li><a href="https://www.zoiper.com/en/voip-softphone/download/current" target="_blank">Desktop (Win/Mac/Linux)</a></li>
-                                    <li><a href="https://play.google.com/store/apps/details?id=com.zoiper.android.app" target="_blank">Android</a></li>
-                                    <li><a href="https://apps.apple.com/app/zoiper-lite/id438oiper949960" target="_blank">iOS</a></li>
+                                    <li><a href="https://play.google.com/store/apps/details?id=com.zoiper.android.app" target="_blank">Android (Play Store)</a></li>
+                                    <li><a href="https://www.zoiper.com/en/voip-softphone/download/zoiper5/for/android" target="_blank">Android APK (Direct)</a></li>
+                                    <li><a href="https://apps.apple.com/app/zoiper-lite/id438949960" target="_blank">iOS</a></li>
                                 </ul>
                                 <p class="mb-2"><strong>Configuration:</strong></p>
                                 <table class="table table-sm table-bordered mb-0">
@@ -1163,7 +1164,10 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
                             <div class="bg-light p-3 rounded">
                                 <p class="mb-2"><strong>Download:</strong></p>
                                 <ul class="small mb-3">
-                                    <li><a href="https://www.linphone.org/technical-corner/linphone" target="_blank">All Platforms</a></li>
+                                    <li><a href="https://www.linphone.org/technical-corner/linphone" target="_blank">Desktop (All Platforms)</a></li>
+                                    <li><a href="https://play.google.com/store/apps/details?id=org.linphone" target="_blank">Android (Play Store)</a></li>
+                                    <li><a href="https://download.linphone.org/releases/android/" target="_blank">Android APK (Direct)</a></li>
+                                    <li><a href="https://apps.apple.com/app/linphone/id360065638" target="_blank">iOS</a></li>
                                 </ul>
                                 <p class="mb-2"><strong>Configuration:</strong></p>
                                 <table class="table table-sm table-bordered mb-0">
