@@ -11,10 +11,22 @@ class CallCenter {
 
     public function __construct($db) {
         $this->db = $db;
-        $this->ami_host = getenv('FREEPBX_HOST') ?: 'localhost';
-        $this->ami_port = getenv('FREEPBX_AMI_PORT') ?: 5038;
-        $this->ami_user = getenv('FREEPBX_AMI_USER') ?: 'crmadmin';
-        $this->ami_pass = getenv('FREEPBX_AMI_PASS') ?: 'crmami2025';
+        // Load settings from database first, fallback to env vars
+        $this->ami_host = $this->getSetting('pbx_host') ?: (getenv('FREEPBX_HOST') ?: 'localhost');
+        $this->ami_port = $this->getSetting('ami_port') ?: (getenv('FREEPBX_AMI_PORT') ?: 5038);
+        $this->ami_user = $this->getSetting('ami_user') ?: (getenv('FREEPBX_AMI_USER') ?: 'crmadmin');
+        $this->ami_pass = $this->getSetting('ami_pass') ?: (getenv('FREEPBX_AMI_PASS') ?: '');
+    }
+    
+    private function getSetting($key) {
+        try {
+            $stmt = $this->db->prepare("SELECT setting_value FROM call_center_settings WHERE setting_key = ?");
+            $stmt->execute([$key]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ? $result['setting_value'] : null;
+        } catch (PDOException $e) {
+            return null;
+        }
     }
 
     public function connectAMI() {
