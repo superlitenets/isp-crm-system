@@ -1541,15 +1541,20 @@ if (isset($_SESSION['user_id'])) {
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">Invalid Destination</label>
                             <select class="form-select" name="invalid_destination_type" id="ivr_invalid_destination_type">
                                 <option value="repeat">Repeat Menu</option>
                                 <option value="hangup">Hangup</option>
                                 <option value="extension">Extension</option>
+                                <option value="queue">Queue</option>
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Invalid Destination ID</label>
+                            <input type="text" class="form-control" name="invalid_destination_id" id="ivr_invalid_destination_id" placeholder="e.g., 101 or queue number">
+                        </div>
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">Max Loops</label>
                             <input type="number" class="form-control" name="max_loops" id="ivr_max_loops" value="3">
                         </div>
@@ -1940,6 +1945,7 @@ function clearIvrForm() {
     document.getElementById('ivr_timeout_destination_type').value = 'hangup';
     document.getElementById('ivr_timeout_destination_id').value = '';
     document.getElementById('ivr_invalid_destination_type').value = 'repeat';
+    document.getElementById('ivr_invalid_destination_id').value = '';
     document.getElementById('ivr_max_loops').value = '3';
     document.getElementById('ivr_is_active').checked = true;
 }
@@ -1956,6 +1962,7 @@ function editIvr(id) {
             document.getElementById('ivr_timeout_destination_type').value = data.timeout_destination_type;
             document.getElementById('ivr_timeout_destination_id').value = data.timeout_destination_id || '';
             document.getElementById('ivr_invalid_destination_type').value = data.invalid_destination_type;
+            document.getElementById('ivr_invalid_destination_id').value = data.invalid_destination_id || '';
             document.getElementById('ivr_max_loops').value = data.max_loops;
             document.getElementById('ivr_is_active').checked = data.is_active;
             new bootstrap.Modal(document.getElementById('ivrModal')).show();
