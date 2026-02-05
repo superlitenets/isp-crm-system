@@ -6462,6 +6462,38 @@ try {
             }
         }
         
+        /* Floating mobile menu button */
+        .oms-mobile-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #6f42c1;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(111,66,193,0.4);
+            z-index: 1060;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .oms-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+        .oms-sidebar-overlay.show {
+            display: block;
+        }
+        
         /* Responsive */
         @media (max-width: 991.98px) {
             .sidebar {
@@ -6469,13 +6501,17 @@ try {
             }
             
             .oms-mobile-header {
+                display: none !important;
+            }
+            
+            .oms-mobile-toggle {
                 display: flex !important;
             }
             
             .main-content {
                 margin-left: 0;
                 padding: 1rem;
-                padding-top: 76px;
+                padding-top: 50px;
             }
             
             .page-title {
@@ -6960,6 +6996,14 @@ try {
     </style>
     
     <!-- OMS Mobile Header -->
+    <!-- OMS Mobile Overlay -->
+    <div class="oms-sidebar-overlay" id="omsSidebarOverlay" onclick="toggleOmsMobileMenu()"></div>
+    
+    <!-- Floating Mobile Menu Button -->
+    <button class="oms-mobile-toggle" id="omsMobileMenuBtn" onclick="toggleOmsMobileMenu()">
+        <i class="bi bi-list" id="omsMobileMenuIcon"></i>
+    </button>
+    
     <div class="oms-mobile-header">
         <div class="brand-mobile">
             <div style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--oms-accent), var(--oms-accent-light)); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
@@ -22529,6 +22573,37 @@ function saveDeviceStatus() {
         });
         console.log('[WAN] Form submit handler attached');
     }
+    </script>
+    <script>
+    // OMS Mobile Menu Toggle
+    function toggleOmsMobileMenu() {
+        const offcanvas = document.getElementById('omsMobileSidebar');
+        const overlay = document.getElementById('omsSidebarOverlay');
+        const icon = document.getElementById('omsMobileMenuIcon');
+        const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvas);
+        
+        if (offcanvas.classList.contains('show')) {
+            bsOffcanvas.hide();
+            overlay.classList.remove('show');
+            icon.classList.remove('bi-x-lg');
+            icon.classList.add('bi-list');
+        } else {
+            bsOffcanvas.show();
+            overlay.classList.add('show');
+            icon.classList.remove('bi-list');
+            icon.classList.add('bi-x-lg');
+        }
+    }
+
+    // Listen for offcanvas close events
+    document.getElementById('omsMobileSidebar')?.addEventListener('hidden.bs.offcanvas', function() {
+        document.getElementById('omsSidebarOverlay')?.classList.remove('show');
+        const icon = document.getElementById('omsMobileMenuIcon');
+        if (icon) {
+            icon.classList.remove('bi-x-lg');
+            icon.classList.add('bi-list');
+        }
+    });
     </script>
 </body>
 </html>

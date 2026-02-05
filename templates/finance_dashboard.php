@@ -479,17 +479,52 @@ if ($view === 'c2b' || $view === 'dashboard') {
             }
         }
         
+        /* Floating mobile menu button */
+        .finance-mobile-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #20c997;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(32,201,151,0.4);
+            z-index: 1060;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .finance-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+        .finance-sidebar-overlay.show {
+            display: block;
+        }
+        
         @media (max-width: 991.98px) {
             .mpesa-sidebar {
                 display: none !important;
             }
             .finance-mobile-header {
+                display: none !important;
+            }
+            .finance-mobile-toggle {
                 display: flex !important;
             }
             .mpesa-content {
                 margin-left: 0 !important;
                 padding: 1rem !important;
-                padding-top: 70px !important;
+                padding-top: 50px !important;
             }
             .stat-value {
                 font-size: 1.5rem !important;
@@ -548,7 +583,15 @@ if ($view === 'c2b' || $view === 'dashboard') {
         </div>
     </div>
 
-    <!-- Finance Mobile Header -->
+    <!-- Finance Mobile Overlay -->
+    <div class="finance-sidebar-overlay" id="financeSidebarOverlay" onclick="toggleFinanceMobileMenu()"></div>
+    
+    <!-- Floating Mobile Menu Button -->
+    <button class="finance-mobile-toggle" id="financeMobileMenuBtn" onclick="toggleFinanceMobileMenu()">
+        <i class="bi bi-list" id="financeMobileMenuIcon"></i>
+    </button>
+    
+    <!-- Finance Mobile Header (hidden) -->
     <div class="finance-mobile-header">
         <div class="brand-mobile">
             <i class="bi bi-bank"></i> Finance
@@ -1276,5 +1319,36 @@ if ($view === 'c2b' || $view === 'dashboard') {
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // Finance Mobile Menu Toggle
+    function toggleFinanceMobileMenu() {
+        const offcanvas = document.getElementById('financeMobileSidebar');
+        const overlay = document.getElementById('financeSidebarOverlay');
+        const icon = document.getElementById('financeMobileMenuIcon');
+        const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvas);
+        
+        if (offcanvas.classList.contains('show')) {
+            bsOffcanvas.hide();
+            overlay.classList.remove('show');
+            icon.classList.remove('bi-x-lg');
+            icon.classList.add('bi-list');
+        } else {
+            bsOffcanvas.show();
+            overlay.classList.add('show');
+            icon.classList.remove('bi-list');
+            icon.classList.add('bi-x-lg');
+        }
+    }
+
+    // Listen for offcanvas close events
+    document.getElementById('financeMobileSidebar')?.addEventListener('hidden.bs.offcanvas', function() {
+        document.getElementById('financeSidebarOverlay')?.classList.remove('show');
+        const icon = document.getElementById('financeMobileMenuIcon');
+        if (icon) {
+            icon.classList.remove('bi-x-lg');
+            icon.classList.add('bi-list');
+        }
+    });
+    </script>
 </body>
 </html>

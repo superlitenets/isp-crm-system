@@ -8549,18 +8549,52 @@ $csrfToken = \App\Auth::generateToken();
                 flex-shrink: 0;
             }
         }
+        /* Floating mobile menu button */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #0d6efd;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(13,110,253,0.4);
+            z-index: 1060;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .crm-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+        .crm-sidebar-overlay.show {
+            display: block;
+        }
         /* Responsive adjustments */
         @media (max-width: 991.98px) {
             .sidebar-desktop {
                 display: none !important;
             }
             .mobile-header {
+                display: none !important;
+            }
+            .mobile-menu-toggle {
                 display: flex !important;
             }
             .main-content {
                 margin-left: 0;
                 padding: 1rem;
-                padding-top: 70px;
+                padding-top: 50px;
             }
             /* Smaller cards on mobile */
             .stat-card .stat-icon {
@@ -8876,7 +8910,15 @@ $csrfToken = \App\Auth::generateToken();
         </div>
     </div>
     
-    <!-- Mobile Header with Hamburger -->
+    <!-- Mobile Overlay -->
+    <div class="crm-sidebar-overlay" id="crmSidebarOverlay" onclick="toggleCrmMobileMenu()"></div>
+    
+    <!-- Floating Mobile Menu Button -->
+    <button class="mobile-menu-toggle" id="crmMobileMenuBtn" onclick="toggleCrmMobileMenu()">
+        <i class="bi bi-list" id="crmMobileMenuIcon"></i>
+    </button>
+    
+    <!-- Mobile Header with Hamburger (hidden, kept for fallback) -->
     <div class="mobile-header">
         <div class="brand-mobile">
             <?php if (!empty($sidebarLogo)): ?>
@@ -9573,6 +9615,36 @@ function getActivityIcon(type) {
     };
     return icons[type] || '<i class="bi bi-circle text-muted"></i>';
 }
+
+// CRM Mobile Menu Toggle
+function toggleCrmMobileMenu() {
+    const offcanvas = document.getElementById('mobileSidebar');
+    const overlay = document.getElementById('crmSidebarOverlay');
+    const icon = document.getElementById('crmMobileMenuIcon');
+    const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvas);
+    
+    if (offcanvas.classList.contains('show')) {
+        bsOffcanvas.hide();
+        overlay.classList.remove('show');
+        icon.classList.remove('bi-x-lg');
+        icon.classList.add('bi-list');
+    } else {
+        bsOffcanvas.show();
+        overlay.classList.add('show');
+        icon.classList.remove('bi-list');
+        icon.classList.add('bi-x-lg');
+    }
+}
+
+// Listen for offcanvas close events
+document.getElementById('mobileSidebar')?.addEventListener('hidden.bs.offcanvas', function() {
+    document.getElementById('crmSidebarOverlay')?.classList.remove('show');
+    const icon = document.getElementById('crmMobileMenuIcon');
+    if (icon) {
+        icon.classList.remove('bi-x-lg');
+        icon.classList.add('bi-list');
+    }
+});
 </script>
 </body>
 </html>

@@ -2289,6 +2289,38 @@ try {
             gap: 0.5rem;
         }
         
+        /* Floating mobile menu button */
+        .isp-mobile-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #198754;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(25,135,84,0.4);
+            z-index: 1060;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .isp-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+        .isp-sidebar-overlay.show {
+            display: block;
+        }
+        
         .isp-mobile-header {
             display: none;
             position: fixed;
@@ -2350,11 +2382,46 @@ try {
         }
         
         @media (max-width: 991.98px) {
-            .isp-mobile-header {
-                display: flex;
+            /* Floating mobile menu button */
+        .isp-mobile-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #198754;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(25,135,84,0.4);
+            z-index: 1060;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .isp-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+        .isp-sidebar-overlay.show {
+            display: block;
+        }
+        
+        .isp-mobile-header {
+                display: none !important;
+            }
+            .isp-mobile-toggle {
+                display: flex !important;
             }
             .main-content {
-                padding-top: 70px !important;
+                padding-top: 50px !important;
                 padding-left: 1rem !important;
                 padding-right: 1rem !important;
             }
@@ -2466,6 +2533,14 @@ try {
         </div>
     </div>
 
+    <!-- ISP Mobile Overlay -->
+    <div class="isp-sidebar-overlay" id="ispSidebarOverlay" onclick="toggleIspMobileMenu()"></div>
+    
+    <!-- Floating Mobile Menu Button -->
+    <button class="isp-mobile-toggle" id="ispMobileMenuBtn" onclick="toggleIspMobileMenu()">
+        <i class="bi bi-list" id="ispMobileMenuIcon"></i>
+    </button>
+    
     <div class="isp-mobile-header" style="top: 40px;">
         <div class="brand-mobile">
             <div style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--isp-accent), var(--isp-accent-light)); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
