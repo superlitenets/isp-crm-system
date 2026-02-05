@@ -5737,7 +5737,7 @@ try {
             top: 0;
             left: 0;
             width: var(--sidebar-width);
-            height: calc(100vh - 40px);
+            height: 100vh;
             background: linear-gradient(180deg, var(--oms-primary) 0%, var(--oms-primary-light) 50%, var(--oms-primary) 100%);
             overflow-y: auto;
             overflow-x: hidden;
@@ -5843,7 +5843,7 @@ try {
         /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
-            min-height: calc(100vh - 40px);
+            min-height: 100vh;
             padding: 1.5rem 2rem;
         }
         
@@ -6986,31 +6986,6 @@ try {
         </div>
     </div>
     
-    
-    <!-- Module Navigation Tabs - Top Bar -->
-    <div class="module-top-bar" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1100; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 0;">
-        <div class="container-fluid px-0">
-            <div class="d-flex align-items-center ps-3">
-                <ul class="nav nav-pills mb-0" style="gap: 2px;">
-                    <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white" href="?page=dashboard" style="border-radius: 0; background: transparent;">
-                            <i class="bi bi-grid-3x3-gap me-1"></i>CRM
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white" href="?page=isp" style="border-radius: 0; background: transparent;">
-                            <i class="bi bi-broadcast me-1"></i>ISP
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white active" href="?page=huawei-olt" style="border-radius: 0; background: #6f42c1; font-weight: 600;">
-                            <i class="bi bi-router me-1"></i>OMS
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </div>
     <div class="d-flex">
         <div class="sidebar d-none d-lg-flex flex-column p-3" style="width: 260px;">
             <div class="d-flex gap-2 small mb-3 px-2">
@@ -7080,6 +7055,8 @@ try {
             </nav>
         </div>
         
+        <div class="main-content flex-grow-1 p-4">
+            <?php if ($message): ?>
             <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
                 <?= htmlspecialchars($message) ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>

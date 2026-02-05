@@ -2079,7 +2079,6 @@ try {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         
-        body { padding-top: 40px; }
         .sidebar { 
             background: linear-gradient(180deg, var(--isp-primary) 0%, var(--isp-primary-light) 100%); 
             min-height: 100vh;
@@ -2498,31 +2497,6 @@ try {
         </div>
     </div>
     
-    
-    <!-- Module Navigation Tabs - Top Bar -->
-    <div class="module-top-bar" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1100; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 0;">
-        <div class="container-fluid px-0">
-            <div class="d-flex align-items-center ps-3">
-                <ul class="nav nav-pills mb-0" style="gap: 2px;">
-                    <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white" href="?page=dashboard" style="border-radius: 0; background: transparent;">
-                            <i class="bi bi-grid-3x3-gap me-1"></i>CRM
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white active" href="?page=isp" style="border-radius: 0; background: #198754; font-weight: 600;">
-                            <i class="bi bi-broadcast me-1"></i>ISP
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white" href="?page=huawei-olt" style="border-radius: 0; background: transparent;">
-                            <i class="bi bi-router me-1"></i>OMS
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </div>
     <div class="d-flex">
         <div class="sidebar d-none d-lg-flex flex-column p-3" style="width: 220px;">
             <a href="?page=dashboard" class="text-decoration-none small mb-3 px-2 d-flex align-items-center" style="color: rgba(255,255,255,0.5);">
@@ -2592,6 +2566,8 @@ try {
             </nav>
         </div>
         
+        <div class="main-content flex-grow-1 p-4">
+            <?php if ($message): ?>
             <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
                 <?= htmlspecialchars($message) ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
