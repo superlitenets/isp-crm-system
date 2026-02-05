@@ -2566,31 +2566,6 @@ try {
             </nav>
         </div>
         
-        <!-- Module Navigation Tabs -->
-        <div class="module-nav-tabs bg-white border-bottom shadow-sm" style="z-index: 1020; position: sticky; top: 0;">
-            <div class="container-fluid px-4">
-                <ul class="nav nav-tabs border-0" style="margin-bottom: -1px;">
-                    <li class="nav-item">
-                        <a class="nav-link px-4 py-3 text-muted" href="?page=dashboard" style="border-radius: 0; border-bottom: 3px solid transparent;">
-                            <i class="bi bi-grid-3x3-gap me-2"></i>CRM
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link px-4 py-3 active bg-white fw-bold" href="?page=isp" style="border-radius: 0; border-bottom: 3px solid #198754;">
-                            <i class="bi bi-broadcast me-2"></i>ISP
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link px-4 py-3 text-muted" href="?page=huawei-olt" style="border-radius: 0; border-bottom: 3px solid transparent;">
-                            <i class="bi bi-router me-2"></i>OMS
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-        
-        <div class="main-content flex-grow-1 p-4">
-            <?php if ($message): ?>
             <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
                 <?= htmlspecialchars($message) ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
