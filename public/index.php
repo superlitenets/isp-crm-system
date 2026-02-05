@@ -8025,13 +8025,14 @@ $csrfToken = \App\Auth::generateToken();
         }
         body {
             background-color: #f8f9fa;
+            padding-top: 40px;
         }
         /* Desktop sidebar - hidden on mobile */
         .sidebar-desktop {
             position: fixed;
-            top: 0;
+            top: 40px;
             left: 0;
-            height: 100vh;
+            height: calc(100vh - 40px);
             width: var(--sidebar-width);
             background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%);
             padding-top: 1rem;
@@ -8423,7 +8424,44 @@ $csrfToken = \App\Auth::generateToken();
     $moduleIspEnabled = $sidebarSettings->get('module_isp_enabled', '1') === '1';
     $moduleAccountingEnabled = $sidebarSettings->get('module_accounting_enabled', '1') === '1';
     $moduleInventoryEnabled = $sidebarSettings->get('module_inventory_enabled', '1') === '1';
+    
+    // Determine current module for top bar highlighting
+    $isCrmPage = !in_array($page, ['isp', 'huawei-olt']);
+    $isIspPage = ($page === 'isp');
+    $isOmsPage = ($page === 'huawei-olt');
     ?>
+    
+    <!-- Module Navigation Tabs - Top Bar -->
+    <div class="module-top-bar" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1100; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 0;">
+        <div class="container-fluid px-0">
+            <div class="d-flex align-items-center ps-3">
+                <ul class="nav nav-pills mb-0" style="gap: 2px;">
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white <?= $isCrmPage ? 'active' : '' ?>" href="?page=dashboard" 
+                           style="border-radius: 0; background: <?= $isCrmPage ? '#0d6efd' : 'transparent' ?>; font-weight: <?= $isCrmPage ? '600' : '400' ?>;">
+                            <i class="bi bi-grid-3x3-gap me-1"></i>CRM
+                        </a>
+                    </li>
+                    <?php if ($moduleIspEnabled && \App\Auth::can('settings.view')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white <?= $isIspPage ? 'active' : '' ?>" href="?page=isp"
+                           style="border-radius: 0; background: <?= $isIspPage ? '#198754' : 'transparent' ?>; font-weight: <?= $isIspPage ? '600' : '400' ?>;">
+                            <i class="bi bi-broadcast me-1"></i>ISP
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                    <?php if ($moduleOmsEnabled && \App\Auth::can('settings.view')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white <?= $isOmsPage ? 'active' : '' ?>" href="?page=huawei-olt"
+                           style="border-radius: 0; background: <?= $isOmsPage ? '#6f42c1' : 'transparent' ?>; font-weight: <?= $isOmsPage ? '600' : '400' ?>;">
+                            <i class="bi bi-router me-1"></i>OMS
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+        </div>
+    </div>
     
     <!-- Mobile Header with Hamburger -->
     <div class="mobile-header">
