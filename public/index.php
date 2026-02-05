@@ -8505,20 +8505,6 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (\App\Auth::can('settings.view') && $moduleOmsEnabled): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
-                        <i class="bi bi-router text-primary"></i> OMS
-                    </a>
-                </li>
-                <?php endif; ?>
-                <?php if (\App\Auth::can('settings.view') && $moduleIspEnabled): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
-                        <i class="bi bi-broadcast text-info"></i> ISP
-                    </a>
-                </li>
-                <?php endif; ?>
                 <?php if (\App\Auth::can('settings.view')): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center">
@@ -8667,20 +8653,6 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
-            <?php if (\App\Auth::can('settings.view') && $moduleOmsEnabled): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
-                    <i class="bi bi-router text-primary"></i> OMS
-                </a>
-            </li>
-            <?php endif; ?>
-            <?php if (\App\Auth::can('settings.view') && $moduleIspEnabled): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
-                    <i class="bi bi-broadcast text-info"></i> ISP
-                </a>
-            </li>
-            <?php endif; ?>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center">
@@ -8746,6 +8718,40 @@ $csrfToken = \App\Auth::generateToken();
     </nav>
 
     <main class="main-content">
+        <?php
+        // Check if we're in CRM, ISP, or OMS mode
+        $isCrmPage = !in_array($page, ['isp', 'huawei-olt']);
+        $isIspPage = ($page === 'isp');
+        $isOmsPage = ($page === 'huawei-olt');
+        ?>
+        
+        <!-- Module Navigation Tabs -->
+        <div class="module-nav-tabs bg-white border-bottom shadow-sm sticky-top" style="z-index: 1020;">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0" style="margin-bottom: -1px;">
+                    <li class="nav-item">
+                        <a class="nav-link px-4 py-3 <?= $isCrmPage ? 'active bg-white fw-bold' : 'text-muted' ?>" href="?page=dashboard" style="border-radius: 0; border-bottom: 3px solid <?= $isCrmPage ? '#0d6efd' : 'transparent' ?>;">
+                            <i class="bi bi-grid-3x3-gap me-2"></i>CRM
+                        </a>
+                    </li>
+                    <?php if ($moduleIspEnabled && \App\Auth::can('settings.view')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link px-4 py-3 <?= $isIspPage ? 'active bg-white fw-bold' : 'text-muted' ?>" href="?page=isp" style="border-radius: 0; border-bottom: 3px solid <?= $isIspPage ? '#198754' : 'transparent' ?>;">
+                            <i class="bi bi-broadcast me-2"></i>ISP
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                    <?php if ($moduleOmsEnabled && \App\Auth::can('settings.view')): ?>
+                    <li class="nav-item">
+                        <a class="nav-link px-4 py-3 <?= $isOmsPage ? 'active bg-white fw-bold' : 'text-muted' ?>" href="?page=huawei-olt" style="border-radius: 0; border-bottom: 3px solid <?= $isOmsPage ? '#6f42c1' : 'transparent' ?>;">
+                            <i class="bi bi-router me-2"></i>OMS
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+        </div>
+        
         <?php
         // Quick Dashboard Bar - Stats & Actions
         $quickStats = [];
