@@ -18,38 +18,147 @@ if (isset($_SESSION['user_id'])) {
     $userExtension = $callCenter->getExtensionByUserId($_SESSION['user_id']);
 }
 ?>
-
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">
-            <i class="bi bi-telephone-fill me-2"></i>Call Center
-        </h1>
-        <div class="btn-group">
-            <?php if ($userExtension): ?>
-            <span class="badge bg-success me-2 d-flex align-items-center">
-                <i class="bi bi-headset me-1"></i>
-                Ext: <?= htmlspecialchars($userExtension['extension']) ?>
-            </span>
-            <?php endif; ?>
-            <a href="?page=call_center&tab=dashboard" class="btn btn-<?= $tab === 'dashboard' ? 'primary' : 'outline-primary' ?>">
-                <i class="bi bi-speedometer2"></i> Dashboard
-            </a>
-            <a href="?page=call_center&tab=calls" class="btn btn-<?= $tab === 'calls' ? 'primary' : 'outline-primary' ?>">
-                <i class="bi bi-telephone"></i> Calls
-            </a>
-            <a href="?page=call_center&tab=extensions" class="btn btn-<?= $tab === 'extensions' ? 'primary' : 'outline-primary' ?>">
-                <i class="bi bi-person-badge"></i> Extensions
-            </a>
-            <a href="?page=call_center&tab=queues" class="btn btn-<?= $tab === 'queues' ? 'primary' : 'outline-primary' ?>">
-                <i class="bi bi-people"></i> Queues
-            </a>
-            <a href="?page=call_center&tab=trunks" class="btn btn-<?= $tab === 'trunks' ? 'primary' : 'outline-primary' ?>">
-                <i class="bi bi-diagram-3"></i> Trunks
-            </a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call Center - ISP CRM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --cc-sidebar-width: 220px;
+            --cc-primary: #fd7e14;
+        }
+        body {
+            padding-top: 40px;
+            background-color: #f8f9fa;
+        }
+        .cc-sidebar {
+            position: fixed;
+            top: 40px;
+            left: 0;
+            width: var(--cc-sidebar-width);
+            height: calc(100vh - 40px);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            z-index: 1000;
+            padding-top: 1rem;
+        }
+        .cc-sidebar .brand {
+            padding: 0.5rem 1rem 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 1rem;
+        }
+        .cc-sidebar .brand h5 {
+            color: #fff;
+            margin: 0;
+            font-weight: 600;
+        }
+        .cc-sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .cc-sidebar .nav-link:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.05);
+        }
+        .cc-sidebar .nav-link.active {
+            color: #fff;
+            background: rgba(253, 126, 20, 0.15);
+            border-left-color: var(--cc-primary);
+        }
+        .cc-sidebar .nav-link i {
+            font-size: 1.1rem;
+            width: 24px;
+            text-align: center;
+        }
+        .cc-main {
+            margin-left: var(--cc-sidebar-width);
+            padding: 1.5rem;
+            min-height: calc(100vh - 40px);
+        }
+        @media (max-width: 768px) {
+            .cc-sidebar {
+                transform: translateX(-100%);
+            }
+            .cc-main {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Module Navigation Tabs - Top Bar -->
+    <div class="module-top-bar" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1100; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 0;">
+        <div class="container-fluid px-0">
+            <div class="d-flex align-items-center ps-3">
+                <ul class="nav nav-pills mb-0" style="gap: 2px;">
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=dashboard" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-grid-3x3-gap me-1"></i>CRM
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=isp" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-broadcast me-1"></i>ISP
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=huawei-olt" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-router me-1"></i>OMS
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white active" href="?page=call_center" style="border-radius: 0; background: #fd7e14; font-weight: 600;">
+                            <i class="bi bi-telephone me-1"></i>Call Centre
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=finance" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-bank me-1"></i>Finance
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
 
-    <?php if ($tab === 'dashboard'): ?>
+    <!-- Call Center Sidebar -->
+    <aside class="cc-sidebar">
+        <div class="brand">
+            <h5><i class="bi bi-telephone-fill me-2"></i>Call Center</h5>
+            <?php if ($userExtension): ?>
+            <small class="text-success"><i class="bi bi-headset me-1"></i>Ext: <?= htmlspecialchars($userExtension['extension']) ?></small>
+            <?php endif; ?>
+        </div>
+        <nav class="nav flex-column">
+            <a class="nav-link <?= $tab === 'dashboard' ? 'active' : '' ?>" href="?page=call_center&tab=dashboard">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a class="nav-link <?= $tab === 'calls' ? 'active' : '' ?>" href="?page=call_center&tab=calls">
+                <i class="bi bi-telephone"></i> Calls
+            </a>
+            <a class="nav-link <?= $tab === 'extensions' ? 'active' : '' ?>" href="?page=call_center&tab=extensions">
+                <i class="bi bi-person-badge"></i> Extensions
+            </a>
+            <a class="nav-link <?= $tab === 'queues' ? 'active' : '' ?>" href="?page=call_center&tab=queues">
+                <i class="bi bi-people"></i> Queues
+            </a>
+            <a class="nav-link <?= $tab === 'trunks' ? 'active' : '' ?>" href="?page=call_center&tab=trunks">
+                <i class="bi bi-diagram-3"></i> Trunks
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="cc-main">
+        <?php if ($tab === 'dashboard'): ?>
     <!-- Dashboard Tab -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -771,3 +880,7 @@ function deleteTrunk(id) {
     }
 }
 </script>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
