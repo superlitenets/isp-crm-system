@@ -17,6 +17,25 @@ $userExtension = null;
 if (isset($_SESSION['user_id'])) {
     $userExtension = $callCenter->getExtensionByUserId($_SESSION['user_id']);
 }
+
+// Load PBX settings from database (fallback to env vars)
+function getPbxSetting($db, $key, $envKey, $default = '') {
+    $stmt = $db->prepare("SELECT setting_value FROM call_center_settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($result && !empty($result['setting_value'])) {
+        return $result['setting_value'];
+    }
+    return getenv($envKey) ?: $default;
+}
+
+$pbxSettings = [
+    'host' => getPbxSetting($db, 'pbx_host', 'FREEPBX_HOST', 'localhost'),
+    'port' => getPbxSetting($db, 'ami_port', 'FREEPBX_AMI_PORT', '5038'),
+    'user' => getPbxSetting($db, 'ami_user', 'FREEPBX_AMI_USER', ''),
+    'pass' => getPbxSetting($db, 'ami_pass', 'FREEPBX_AMI_SECRET', '')
+];
+$pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) && !empty($pbxSettings['pass']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -838,27 +857,28 @@ if (isset($_SESSION['user_id'])) {
                     <i class="bi bi-server me-2"></i>PBX Connection
                 </div>
                 <div class="card-body">
-                    <form id="pbxSettingsForm">
+                    <form id="pbxSettingsForm" method="post" action="?page=call_center&action=save_pbx_settings">
                         <div class="mb-3">
                             <label class="form-label">FreePBX/Asterisk Host</label>
-                            <input type="text" class="form-control" name="pbx_host" value="<?= htmlspecialchars(getenv('FREEPBX_HOST') ?: 'localhost') ?>">
+                            <input type="text" class="form-control" name="pbx_host" value="<?= htmlspecialchars($pbxSettings['host']) ?>" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">AMI Port</label>
-                            <input type="number" class="form-control" name="ami_port" value="<?= htmlspecialchars(getenv('FREEPBX_AMI_PORT') ?: '5038') ?>">
+                            <input type="number" class="form-control" name="ami_port" value="<?= htmlspecialchars($pbxSettings['port']) ?>" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">AMI Username</label>
-                            <input type="text" class="form-control" name="ami_user" value="<?= htmlspecialchars(getenv('FREEPBX_AMI_USER') ?: '') ?>">
+                            <input type="text" class="form-control" name="ami_user" value="<?= htmlspecialchars($pbxSettings['user']) ?>" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">AMI Password</label>
-                            <input type="password" class="form-control" name="ami_pass">
+                            <input type="password" class="form-control" name="ami_pass" placeholder="<?= !empty($pbxSettings['pass']) ? '••••••••' : 'Enter password' ?>">
+                            <small class="text-muted"><?= !empty($pbxSettings['pass']) ? 'Leave blank to keep current password' : 'Password required for connection' ?></small>
                         </div>
                         <button type="button" class="btn btn-secondary" onclick="testPBXConnection()">
                             <i class="bi bi-plug"></i> Test Connection
                         </button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-warning">
                             <i class="bi bi-save"></i> Save Settings
                         </button>
                     </form>
@@ -901,7 +921,13 @@ if (isset($_SESSION['user_id'])) {
                     <table class="table table-sm">
                         <tr>
                             <td>PBX Connection</td>
-                            <td><span class="badge bg-warning">Not Configured</span></td>
+                            <td>
+                                <?php if ($pbxConfigured): ?>
+                                    <span class="badge bg-success">Configured</span>
+                                <?php else: ?>
+                                    <span class="badge bg-warning">Not Configured</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                         <tr>
                             <td>Active Extensions</td>

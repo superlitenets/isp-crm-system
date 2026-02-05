@@ -2382,6 +2382,31 @@ if ($page === 'call_center') {
         exit;
     }
     
+    // PBX Settings Save
+    if ($action === 'save_pbx_settings' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $settings = [
+            'pbx_host' => $_POST['pbx_host'] ?? '',
+            'ami_port' => $_POST['ami_port'] ?? '5038',
+            'ami_user' => $_POST['ami_user'] ?? '',
+            'ami_pass' => $_POST['ami_pass'] ?? ''
+        ];
+        
+        foreach ($settings as $key => $value) {
+            if ($key === 'ami_pass' && empty($value)) {
+                continue; // Skip empty password (keep existing)
+            }
+            $stmt = $db->prepare("INSERT INTO call_center_settings (setting_key, setting_value, updated_at) 
+                                  VALUES (?, ?, NOW()) 
+                                  ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?, updated_at = NOW()");
+            $stmt->execute([$key, $value, $value]);
+        }
+        
+        $_SESSION['flash_message'] = 'PBX settings saved successfully!';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: ?page=call_center&tab=settings');
+        exit;
+    }
+    
     // IVR Options CRUD
     if ($action === 'get_ivr_options') {
         header('Content-Type: application/json');
