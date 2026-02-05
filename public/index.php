@@ -8426,9 +8426,11 @@ $csrfToken = \App\Auth::generateToken();
     $moduleInventoryEnabled = $sidebarSettings->get('module_inventory_enabled', '1') === '1';
     
     // Determine current module for top bar highlighting
-    $isCrmPage = !in_array($page, ['isp', 'huawei-olt']);
+    $isCrmPage = !in_array($page, ['isp', 'huawei-olt', 'call_center', 'finance']);
     $isIspPage = ($page === 'isp');
     $isOmsPage = ($page === 'huawei-olt');
+    $isCallCenterPage = ($page === 'call_center');
+    $isFinancePage = ($page === 'finance');
     ?>
     
     <!-- Module Navigation Tabs - Top Bar -->
@@ -8460,16 +8462,16 @@ $csrfToken = \App\Auth::generateToken();
                     <?php endif; ?>
                     <?php if (\App\Auth::can('settings.view')): ?>
                     <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center"
-                           style="border-radius: 0; background: <?= $page === 'call_center' ? '#fd7e14' : 'transparent' ?>; font-weight: <?= $page === 'call_center' ? '600' : '400' ?>;">
+                        <a class="nav-link py-2 px-4 text-white <?= $isCallCenterPage ? 'active' : '' ?>" href="?page=call_center"
+                           style="border-radius: 0; background: <?= $isCallCenterPage ? '#fd7e14' : 'transparent' ?>; font-weight: <?= $isCallCenterPage ? '600' : '400' ?>;">
                             <i class="bi bi-telephone me-1"></i>Call Centre
                         </a>
                     </li>
                     <?php endif; ?>
                     <?php if ($moduleAccountingEnabled && \App\Auth::can('settings.view')): ?>
                     <li class="nav-item">
-                        <a class="nav-link py-2 px-4 text-white <?= $page === 'finance' ? 'active' : '' ?>" href="?page=finance"
-                           style="border-radius: 0; background: <?= $page === 'finance' ? '#20c997' : 'transparent' ?>; font-weight: <?= $page === 'finance' ? '600' : '400' ?>;">
+                        <a class="nav-link py-2 px-4 text-white <?= $isFinancePage ? 'active' : '' ?>" href="?page=finance"
+                           style="border-radius: 0; background: <?= $isFinancePage ? '#20c997' : 'transparent' ?>; font-weight: <?= $isFinancePage ? '600' : '400' ?>;">
                             <i class="bi bi-bank me-1"></i>Finance
                         </a>
                     </li>

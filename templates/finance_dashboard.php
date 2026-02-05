@@ -490,7 +490,42 @@ if ($view === 'c2b' || $view === 'dashboard') {
         }
     </style>
 </head>
-<body>
+<body style="padding-top: 40px;">
+    <!-- Module Navigation Tabs - Top Bar -->
+    <div class="module-top-bar" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1100; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 0;">
+        <div class="container-fluid px-0">
+            <div class="d-flex align-items-center ps-3">
+                <ul class="nav nav-pills mb-0" style="gap: 2px;">
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=dashboard" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-grid-3x3-gap me-1"></i>CRM
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=isp" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-broadcast me-1"></i>ISP
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=huawei-olt" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-router me-1"></i>OMS
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=call_center" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-telephone me-1"></i>Call Centre
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white active" href="?page=finance" style="border-radius: 0; background: #20c997; font-weight: 600;">
+                            <i class="bi bi-bank me-1"></i>Finance
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <!-- Finance Mobile Header -->
     <div class="finance-mobile-header">
         <div class="brand-mobile">
