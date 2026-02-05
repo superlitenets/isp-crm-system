@@ -8543,20 +8543,6 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (\App\Auth::can('settings.view') && $moduleOmsEnabled): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
-                        <i class="bi bi-router text-primary"></i> OMS
-                    </a>
-                </li>
-                <?php endif; ?>
-                <?php if (\App\Auth::can('settings.view') && $moduleIspEnabled): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
-                        <i class="bi bi-broadcast text-info"></i> ISP
-                    </a>
-                </li>
-                <?php endif; ?>
                 <?php if (\App\Auth::can('settings.view')): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center">
@@ -8702,20 +8688,6 @@ $csrfToken = \App\Auth::generateToken();
                     <?php if ($pendingComplaintsCount > 0): ?>
                     <span class="badge bg-warning text-dark rounded-pill ms-1"><?= $pendingComplaintsCount ?></span>
                     <?php endif; ?>
-                </a>
-            </li>
-            <?php endif; ?>
-            <?php if (\App\Auth::can('settings.view') && $moduleOmsEnabled): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
-                    <i class="bi bi-router text-primary"></i> OMS
-                </a>
-            </li>
-            <?php endif; ?>
-            <?php if (\App\Auth::can('settings.view') && $moduleIspEnabled): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
-                    <i class="bi bi-broadcast text-info"></i> ISP
                 </a>
             </li>
             <?php endif; ?>
