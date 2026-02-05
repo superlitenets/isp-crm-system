@@ -7489,17 +7489,19 @@ try {
             <?php 
             $nasId = (int)($_GET['id'] ?? 0);
             $editNas = $nasId ? $radiusBilling->getNAS($nasId) : null;
+            
+            if (!$editNas && $nasId) {
+                header('Location: ?page=isp&view=nas');
+                exit;
+            }
+            
+            // Load these only when form is displayed
             $wireguardService = new \App\WireGuardService($db);
             $vpnPeers = $wireguardService->getAllPeers();
             $ispLocations = $radiusBilling->getLocations();
             $ispSubLocations = $radiusBilling->getAllSubLocations();
             $hotspotPackages = $radiusBilling->getPackages('hotspot');
             $nasPackages = $nasId ? $radiusBilling->getNASPackageIds($nasId) : [];
-            
-            if (!$editNas && $nasId) {
-                header('Location: ?page=isp&view=nas');
-                exit;
-            }
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
