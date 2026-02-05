@@ -1101,6 +1101,9 @@ if (isset($_SESSION['user_id'])) {
 </div>
 
 <script>
+// Current user's extension for internal calls
+const myExtension = <?= json_encode($userExtension ? $userExtension['extension'] : null) ?>;
+
 // Quick dial
 document.getElementById('quickDialForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -1273,20 +1276,36 @@ function deleteTrunk(id) {
 function callExtension(extension, name) {
     document.getElementById('dialExtName').textContent = name;
     document.getElementById('dialExtNumber').textContent = 'Extension: ' + extension;
+    
+    // Check if user has an extension assigned
+    if (!myExtension) {
+        document.getElementById('dialStatus').innerHTML = `
+            <div class="text-danger">
+                <i class="bi bi-x-circle-fill" style="font-size: 3rem;"></i>
+                <p class="mt-2">No Extension Assigned</p>
+                <p class="small text-muted">Contact your administrator to assign an extension to your account</p>
+            </div>
+        `;
+        var modal = new bootstrap.Modal(document.getElementById('quickDialModal'));
+        modal.show();
+        return;
+    }
+    
     document.getElementById('dialStatus').innerHTML = `
         <div class="spinner-border text-success" role="status">
             <span class="visually-hidden">Calling...</span>
         </div>
-        <p class="mt-2 text-muted">Initiating call...</p>
+        <p class="mt-2 text-muted">Initiating call from Ext ${myExtension}...</p>
     `;
     
     var modal = new bootstrap.Modal(document.getElementById('quickDialModal'));
     modal.show();
     
     var formData = new FormData();
-    formData.append('phone', extension);
+    formData.append('from_extension', myExtension);
+    formData.append('to_extension', extension);
     
-    fetch('?page=call_center&action=originate_call', {
+    fetch('?page=call_center&action=internal_call', {
         method: 'POST',
         body: formData
     })
@@ -1297,7 +1316,7 @@ function callExtension(extension, name) {
                 <div class="text-success">
                     <i class="bi bi-check-circle-fill" style="font-size: 3rem;"></i>
                     <p class="mt-2">Call initiated successfully!</p>
-                    <p class="small text-muted">Your phone will ring first, then connect to ${name}</p>
+                    <p class="small text-muted">Your phone (Ext ${myExtension}) will ring first, then connect to ${name}</p>
                 </div>
             `;
         } else {

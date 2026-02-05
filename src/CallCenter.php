@@ -73,14 +73,18 @@ class CallCenter {
             if (!$result['success']) return $result;
         }
 
+        // Try PJSIP first (modern FreePBX), fall back to SIP
+        $channelType = getenv('FREEPBX_CHANNEL_TYPE') ?: 'PJSIP';
+        
         $params = [
             'Action' => 'Originate',
-            'Channel' => "SIP/$extension",
+            'Channel' => "$channelType/$extension",
             'Exten' => $destination,
             'Context' => 'from-internal',
             'Priority' => 1,
             'Async' => 'true',
-            'Timeout' => 30000
+            'Timeout' => 30000,
+            'ActionID' => uniqid('originate_')
         ];
 
         if ($callerid) {
@@ -88,9 +92,23 @@ class CallCenter {
         }
 
         $response = $this->sendCommand($params);
+        
+        // Read additional responses to get the actual result
+        $fullResponse = $response;
+        $timeout = time() + 3;
+        while (time() < $timeout && $this->socket) {
+            stream_set_timeout($this->socket, 1);
+            $line = @fgets($this->socket, 1024);
+            if ($line === false) break;
+            $fullResponse .= $line;
+            if (strpos($fullResponse, 'Response:') !== false) break;
+        }
+        
         $this->disconnectAMI();
 
-        if (strpos($response, 'Success') !== false) {
+        // Check for success in the full response
+        if (strpos($fullResponse, 'Response: Success') !== false || 
+            strpos($fullResponse, 'Originate successfully queued') !== false) {
             $this->logCall($extension, $destination, 'outbound', [
                 'customer_id' => $customerId,
                 'ticket_id' => $ticketId,
@@ -99,7 +117,12 @@ class CallCenter {
             return ['success' => true, 'message' => 'Call initiated'];
         }
 
-        return ['success' => false, 'error' => 'Failed to originate call'];
+        // Extract error message if available
+        if (preg_match('/Message:\s*(.+)/i', $fullResponse, $matches)) {
+            return ['success' => false, 'error' => trim($matches[1]), 'debug' => $fullResponse];
+        }
+
+        return ['success' => false, 'error' => 'Failed to originate call', 'debug' => $fullResponse];
     }
 
     public function getQueueStatus($queue = null) {
@@ -237,6 +260,12 @@ class CallCenter {
     public function getExtensionByUserId($userId) {
         $stmt = $this->db->prepare("SELECT * FROM call_center_extensions WHERE user_id = ? AND is_active = true");
         $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function getExtensionByNumber($extension) {
+        $stmt = $this->db->prepare("SELECT * FROM call_center_extensions WHERE extension = ? AND is_active = true");
+        $stmt->execute([$extension]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 

@@ -2171,6 +2171,37 @@ if ($page === 'call_center') {
         exit;
     }
     
+    // Handle internal extension-to-extension calls
+    if ($action === 'internal_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/CallCenter.php';
+        $callCenter = new CallCenter($db);
+        $fromExtension = $_POST['from_extension'] ?? '';
+        $toExtension = $_POST['to_extension'] ?? '';
+        
+        if (empty($fromExtension) || empty($toExtension)) {
+            echo json_encode(['success' => false, 'error' => 'Both from and to extensions are required']);
+            exit;
+        }
+        
+        // Validate extensions exist
+        $fromExt = $callCenter->getExtensionByNumber($fromExtension);
+        $toExt = $callCenter->getExtensionByNumber($toExtension);
+        
+        if (!$fromExt) {
+            echo json_encode(['success' => false, 'error' => "Source extension $fromExtension not found"]);
+            exit;
+        }
+        if (!$toExt) {
+            echo json_encode(['success' => false, 'error' => "Destination extension $toExtension not found"]);
+            exit;
+        }
+        
+        $result = $callCenter->originateCall($fromExtension, $toExtension, null, null, $fromExt['name'] . " <$fromExtension>");
+        echo json_encode($result);
+        exit;
+    }
+    
     if (!\App\Auth::can('settings.view')) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
