@@ -153,6 +153,12 @@ if (isset($_SESSION['user_id'])) {
             <a class="nav-link <?= $tab === 'trunks' ? 'active' : '' ?>" href="?page=call_center&tab=trunks">
                 <i class="bi bi-diagram-3"></i> Trunks
             </a>
+            <a class="nav-link <?= $tab === 'phonebook' ? 'active' : '' ?>" href="?page=call_center&tab=phonebook">
+                <i class="bi bi-book"></i> Phonebook
+            </a>
+            <a class="nav-link <?= $tab === 'settings' ? 'active' : '' ?>" href="?page=call_center&tab=settings">
+                <i class="bi bi-gear"></i> Settings
+            </a>
         </nav>
     </aside>
 
@@ -333,6 +339,112 @@ if (isset($_SESSION['user_id'])) {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Speed Dial & Agent Status Row -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-lightning-fill me-2"></i>Speed Dial</span>
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#speedDialModal">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <?php foreach ($extensions as $ext): ?>
+                        <div class="col-6 col-md-4">
+                            <button class="btn btn-outline-secondary w-100 text-start py-2" 
+                                    onclick="callExtension('<?= htmlspecialchars($ext['extension']) ?>', '<?= htmlspecialchars($ext['name']) ?>')"
+                                    <?= !$userExtension ? 'disabled' : '' ?>>
+                                <i class="bi bi-person-circle me-1"></i>
+                                <strong><?= htmlspecialchars($ext['extension']) ?></strong>
+                                <small class="d-block text-muted"><?= htmlspecialchars($ext['name']) ?></small>
+                            </button>
+                        </div>
+                        <?php endforeach; ?>
+                        <?php if (empty($extensions)): ?>
+                        <div class="col-12 text-center text-muted py-3">
+                            <i class="bi bi-telephone-x"></i> No extensions configured
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-people-fill me-2"></i>Agent Status
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="sticky-top bg-white">
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Extension</th>
+                                    <th>Status</th>
+                                    <th>Since</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($extensions as $ext): 
+                                    $status = $ext['agent_status'] ?? 'available';
+                                    $statusColors = [
+                                        'available' => 'success',
+                                        'busy' => 'danger',
+                                        'away' => 'warning',
+                                        'offline' => 'secondary',
+                                        'on_call' => 'primary'
+                                    ];
+                                ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($ext['name']) ?></td>
+                                    <td><strong><?= htmlspecialchars($ext['extension']) ?></strong></td>
+                                    <td>
+                                        <span class="badge bg-<?= $statusColors[$status] ?? 'secondary' ?>">
+                                            <?= ucfirst(str_replace('_', ' ', $status)) ?>
+                                        </span>
+                                    </td>
+                                    <td><small class="text-muted">-</small></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Row -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h4 class="text-success mb-1"><?= count(array_filter($extensions, fn($e) => ($e['agent_status'] ?? 'available') === 'available')) ?></h4>
+                    <small class="text-muted">Agents Available</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h4 class="text-primary mb-1">0</h4>
+                    <small class="text-muted">Calls in Progress</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h4 class="text-warning mb-1">0</h4>
+                    <small class="text-muted">Calls Waiting</small>
                 </div>
             </div>
         </div>
@@ -628,8 +740,178 @@ if (isset($_SESSION['user_id'])) {
             </div>
         </div>
     </div>
+
+    <?php elseif ($tab === 'phonebook'): ?>
+    <!-- Phonebook Tab -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-book me-2"></i>Phonebook</span>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#phonebookModal">
+                <i class="bi bi-plus"></i> Add Contact
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <input type="text" class="form-control" id="phonebookSearch" placeholder="Search contacts...">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="phonebookCategory">
+                        <option value="">All Categories</option>
+                        <option value="customer">Customer</option>
+                        <option value="vendor">Vendor</option>
+                        <option value="internal">Internal</option>
+                        <option value="emergency">Emergency</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover" id="phonebookTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Mobile</th>
+                            <th>Category</th>
+                            <th>Company</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><i class="bi bi-person-circle me-2"></i>Emergency Services</td>
+                            <td><strong>999</strong></td>
+                            <td>-</td>
+                            <td><span class="badge bg-danger">Emergency</span></td>
+                            <td>-</td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="callNumber('999', 'Emergency Services')" <?= !$userExtension ? 'disabled' : '' ?>>
+                                    <i class="bi bi-telephone-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-person-circle me-2"></i>Police</td>
+                            <td><strong>112</strong></td>
+                            <td>-</td>
+                            <td><span class="badge bg-danger">Emergency</span></td>
+                            <td>-</td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="callNumber('112', 'Police')" <?= !$userExtension ? 'disabled' : '' ?>>
+                                    <i class="bi bi-telephone-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-building me-2"></i>ISP NOC</td>
+                            <td><strong>+254700000001</strong></td>
+                            <td>+254700000002</td>
+                            <td><span class="badge bg-info">Internal</span></td>
+                            <td>ISP Company</td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="callNumber('+254700000001', 'ISP NOC')" <?= !$userExtension ? 'disabled' : '' ?>>
+                                    <i class="bi bi-telephone-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($tab === 'settings'): ?>
+    <!-- Settings Tab -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-server me-2"></i>PBX Connection
+                </div>
+                <div class="card-body">
+                    <form id="pbxSettingsForm">
+                        <div class="mb-3">
+                            <label class="form-label">FreePBX/Asterisk Host</label>
+                            <input type="text" class="form-control" name="pbx_host" value="<?= htmlspecialchars(getenv('FREEPBX_HOST') ?: 'localhost') ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">AMI Port</label>
+                            <input type="number" class="form-control" name="ami_port" value="<?= htmlspecialchars(getenv('FREEPBX_AMI_PORT') ?: '5038') ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">AMI Username</label>
+                            <input type="text" class="form-control" name="ami_user" value="<?= htmlspecialchars(getenv('FREEPBX_AMI_USER') ?: '') ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">AMI Password</label>
+                            <input type="password" class="form-control" name="ami_pass">
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="testPBXConnection()">
+                            <i class="bi bi-plug"></i> Test Connection
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Settings
+                        </button>
+                    </form>
+                    <div id="pbxTestResult" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-sliders me-2"></i>Call Settings
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Default Ring Timeout (seconds)</label>
+                        <input type="number" class="form-control" value="30">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Recording Storage Path</label>
+                        <input type="text" class="form-control" value="/var/spool/asterisk/monitor">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="enableRecording" checked>
+                        <label class="form-check-label" for="enableRecording">Enable Call Recording</label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="enableVoicemail" checked>
+                        <label class="form-check-label" for="enableVoicemail">Enable Voicemail</label>
+                    </div>
+                    <button class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save Settings
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-info-circle me-2"></i>System Status
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td>PBX Connection</td>
+                            <td><span class="badge bg-warning">Not Configured</span></td>
+                        </tr>
+                        <tr>
+                            <td>Active Extensions</td>
+                            <td><strong><?= count($extensions) ?></strong></td>
+                        </tr>
+                        <tr>
+                            <td>Active Queues</td>
+                            <td><strong><?= count($queues) ?></strong></td>
+                        </tr>
+                        <tr>
+                            <td>Active Trunks</td>
+                            <td><strong><?= count($trunks) ?></strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
     <?php endif; ?>
-</div>
 
 <!-- Extension Modal -->
 <div class="modal fade" id="extensionModal" tabindex="-1">
@@ -851,6 +1133,86 @@ document.getElementById('trunk_type')?.addEventListener('change', function() {
 function callBack(number) {
     document.getElementById('dialNumber').value = number;
     document.getElementById('quickDialForm').dispatchEvent(new Event('submit'));
+}
+
+function callNumber(number, name) {
+    callExtension(number, name);
+}
+
+function linkCustomer(callId) {
+    const customerId = prompt('Enter Customer ID to link:');
+    if (customerId) {
+        fetch('?page=call_center&action=link_customer', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({call_id: callId, customer_id: customerId})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Customer linked successfully', 'success');
+                location.reload();
+            } else {
+                showToast(data.error || 'Failed to link customer', 'danger');
+            }
+        });
+    }
+}
+
+function playRecording(file) {
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div class="modal fade show" style="display:block; background:rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-play-circle me-2"></i>Call Recording</h5>
+                        <button type="button" class="btn-close" onclick="this.closest('.modal').parentElement.remove()"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <audio controls autoplay style="width:100%">
+                            <source src="${file}" type="audio/wav">
+                            Your browser does not support audio playback.
+                        </audio>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function testPBXConnection() {
+    document.getElementById('pbxTestResult').innerHTML = `
+        <div class="alert alert-info">
+            <i class="bi bi-hourglass-split me-2"></i>Testing connection...
+        </div>
+    `;
+    
+    fetch('?page=call_center&action=test_connection')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('pbxTestResult').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle me-2"></i>Connection successful! PBX is online.
+                    </div>
+                `;
+            } else {
+                document.getElementById('pbxTestResult').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle me-2"></i>${data.error || 'Connection failed'}
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            document.getElementById('pbxTestResult').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle me-2"></i>Error: ${err.message}
+                </div>
+            `;
+        });
 }
 
 function showToast(message, type) {

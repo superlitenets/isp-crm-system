@@ -2227,6 +2227,29 @@ if ($page === 'call_center') {
         header('Location: ?page=call_center&tab=trunks');
         exit;
     }
+    if ($action === 'test_connection') {
+        header('Content-Type: application/json');
+        $result = $callCenter->connectAMI();
+        if ($result['success']) {
+            $callCenter->disconnectAMI();
+        }
+        echo json_encode($result);
+        exit;
+    }
+    if ($action === 'link_customer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        $input = json_decode(file_get_contents('php://input'), true);
+        $callId = (int)($input['call_id'] ?? 0);
+        $customerId = (int)($input['customer_id'] ?? 0);
+        if ($callId && $customerId) {
+            $stmt = $db->prepare("UPDATE call_center_calls SET customer_id = ? WHERE id = ?");
+            $stmt->execute([$customerId, $callId]);
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Invalid call or customer ID']);
+        }
+        exit;
+    }
     
     include __DIR__ . '/../templates/call_center.php';
     exit;
