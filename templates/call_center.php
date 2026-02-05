@@ -197,6 +197,9 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
             <a class="nav-link <?= $tab === 'ivr' ? 'active' : '' ?>" href="?page=call_center&tab=ivr">
                 <i class="bi bi-menu-button-wide"></i> IVR
             </a>
+            <a class="nav-link <?= $tab === 'ring_groups' ? 'active' : '' ?>" href="?page=call_center&tab=ring_groups">
+                <i class="bi bi-diagram-3"></i> Ring Groups
+            </a>
             <a class="nav-link <?= $tab === 'phonebook' ? 'active' : '' ?>" href="?page=call_center&tab=phonebook">
                 <i class="bi bi-book"></i> Phonebook
             </a>
@@ -782,6 +785,86 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <?php elseif ($tab === 'ring_groups'): ?>
+    <!-- Ring Groups Tab -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <span><i class="bi bi-diagram-3 me-2"></i>Ring Groups</span>
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#ringGroupModal" onclick="clearRingGroupForm()">
+            <i class="bi bi-plus-lg"></i> Add Ring Group
+        </button>
+    </div>
+    
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Extension</th>
+                        <th>Members</th>
+                        <th>Ring Strategy</th>
+                        <th>Ring Time</th>
+                        <th>Status</th>
+                        <th width="150">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $ringGroups = $db->query("SELECT rg.*, 
+                        (SELECT COUNT(*) FROM call_center_ring_group_members WHERE ring_group_id = rg.id) as member_count
+                        FROM call_center_ring_groups rg ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($ringGroups as $group): 
+                    ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($group['name']) ?></strong></td>
+                        <td><code><?= htmlspecialchars($group['extension'] ?: '-') ?></code></td>
+                        <td><span class="badge bg-info"><?= $group['member_count'] ?> extensions</span></td>
+                        <td>
+                            <?php
+                            $strategies = [
+                                'ringall' => 'Ring All',
+                                'hunt' => 'Hunt',
+                                'memoryhunt' => 'Memory Hunt',
+                                'firstunavail' => 'First Unavailable',
+                                'random' => 'Random'
+                            ];
+                            echo $strategies[$group['ring_strategy']] ?? ucfirst($group['ring_strategy']);
+                            ?>
+                        </td>
+                        <td><?= $group['ring_time'] ?>s</td>
+                        <td>
+                            <?php if ($group['is_active']): ?>
+                                <span class="badge bg-success">Active</span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">Disabled</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info" onclick="manageRingGroupMembers(<?= $group['id'] ?>, '<?= htmlspecialchars($group['name']) ?>')">
+                                <i class="bi bi-people"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editRingGroup(<?= htmlspecialchars(json_encode($group)) ?>)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteRingGroup(<?= $group['id'] ?>)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($ringGroups)): ?>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="bi bi-diagram-3 display-4"></i>
+                            <p class="mt-2">No ring groups configured</p>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -1439,6 +1522,27 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
+                            <label class="form-label">Trunk</label>
+                            <select class="form-select" name="trunk_id" id="inbound_trunk_id">
+                                <option value="">Any Trunk</option>
+                                <?php foreach ($trunks as $trunk): ?>
+                                <option value="<?= $trunk['id'] ?>"><?= htmlspecialchars($trunk['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Select trunk this route applies to</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ringback Tone</label>
+                            <select class="form-select" name="ringback_tone" id="inbound_ringback_tone">
+                                <option value="default">Default</option>
+                                <option value="ring">Ring</option>
+                                <option value="music">Music on Hold</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Destination Type *</label>
                             <select class="form-select" name="destination_type" id="inbound_destination_type" required>
                                 <option value="extension">Extension</option>
@@ -1658,6 +1762,153 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
                             <th>Key</th>
                             <th>Destination</th>
                             <th>Description</th>
+                            <th width="60">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ring Group Modal -->
+<div class="modal fade" id="ringGroupModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Ring Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="ringGroupForm" method="post" action="?page=call_center&action=save_ring_group">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="rg_id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Group Name *</label>
+                            <input type="text" class="form-control" name="name" id="rg_name" required placeholder="e.g., Sales Team">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Group Extension</label>
+                            <input type="text" class="form-control" name="extension" id="rg_extension" placeholder="e.g., 600">
+                            <small class="text-muted">Extension number to reach this group</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="rg_description" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Ring Strategy *</label>
+                            <select class="form-select" name="ring_strategy" id="rg_ring_strategy" required>
+                                <option value="ringall">Ring All - All phones ring simultaneously</option>
+                                <option value="hunt">Hunt - Ring one at a time in order</option>
+                                <option value="memoryhunt">Memory Hunt - Ring first, then first+second, etc</option>
+                                <option value="firstunavail">First Unavailable - Ring first unavailable</option>
+                                <option value="random">Random - Ring random extension</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Ring Time (seconds)</label>
+                            <input type="number" class="form-control" name="ring_time" id="rg_ring_time" value="20" min="5" max="120">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Ringback Tone</label>
+                            <select class="form-select" name="ringback_tone" id="rg_ringback_tone">
+                                <option value="default">Default</option>
+                                <option value="ring">Ring</option>
+                                <option value="music">Music on Hold</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">If No Answer - Destination Type</label>
+                            <select class="form-select" name="destination_if_no_answer_type" id="rg_no_answer_type">
+                                <option value="hangup">Hangup</option>
+                                <option value="voicemail">Voicemail</option>
+                                <option value="extension">Extension</option>
+                                <option value="queue">Queue</option>
+                                <option value="ivr">IVR</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">No Answer Destination</label>
+                            <input type="text" class="form-control" name="destination_if_no_answer_id" id="rg_no_answer_id" placeholder="e.g., 101 or queue number">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="skip_busy" id="rg_skip_busy">
+                                <label class="form-check-label" for="rg_skip_busy">Skip Busy Extensions</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="enable_recording" id="rg_enable_recording">
+                                <label class="form-check-label" for="rg_enable_recording">Enable Recording</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="is_active" id="rg_is_active" checked>
+                                <label class="form-check-label" for="rg_is_active">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Save Ring Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Ring Group Members Modal -->
+<div class="modal fade" id="ringGroupMembersModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-people me-2"></i>Ring Group Members - <span id="rgMembersTitle"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="rgMembersId">
+                <div class="mb-4">
+                    <h6>Add Extension to Group</h6>
+                    <form id="rgMemberForm" class="row g-2">
+                        <div class="col-md-6">
+                            <select class="form-select" name="extension_id" id="member_extension_id" required>
+                                <option value="">Select Extension</option>
+                                <?php foreach ($extensions as $ext): ?>
+                                <option value="<?= $ext['id'] ?>"><?= htmlspecialchars($ext['extension'] . ' - ' . $ext['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="number" class="form-control" name="priority" id="member_priority" placeholder="Priority (0=first)" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-success w-100"><i class="bi bi-plus"></i> Add</button>
+                        </div>
+                    </form>
+                </div>
+                <hr>
+                <h6>Current Members</h6>
+                <table class="table table-sm" id="rgMembersTable">
+                    <thead>
+                        <tr>
+                            <th>Extension</th>
+                            <th>Name</th>
+                            <th>Priority</th>
                             <th width="60">Action</th>
                         </tr>
                     </thead>
@@ -1918,6 +2169,8 @@ function clearInboundForm() {
     document.getElementById('inbound_description').value = '';
     document.getElementById('inbound_did_pattern').value = '';
     document.getElementById('inbound_cid_pattern').value = '';
+    document.getElementById('inbound_trunk_id').value = '';
+    document.getElementById('inbound_ringback_tone').value = 'default';
     document.getElementById('inbound_destination_type').value = 'extension';
     document.getElementById('inbound_destination_id').value = '';
     document.getElementById('inbound_priority').value = '0';
@@ -1930,6 +2183,8 @@ function editInboundRoute(data) {
     document.getElementById('inbound_description').value = data.description || '';
     document.getElementById('inbound_did_pattern').value = data.did_pattern || '';
     document.getElementById('inbound_cid_pattern').value = data.cid_pattern || '';
+    document.getElementById('inbound_trunk_id').value = data.trunk_id || '';
+    document.getElementById('inbound_ringback_tone').value = data.ringback_tone || 'default';
     document.getElementById('inbound_destination_type').value = data.destination_type;
     document.getElementById('inbound_destination_id').value = data.destination_id || '';
     document.getElementById('inbound_priority').value = data.priority;
@@ -2078,6 +2333,111 @@ function deleteIvrOption(optionId, ivrId) {
             .then(data => {
                 if (data.success) {
                     loadIvrOptions(ivrId);
+                }
+            });
+    }
+}
+
+// Ring Group Functions
+function clearRingGroupForm() {
+    document.getElementById('rg_id').value = '';
+    document.getElementById('rg_name').value = '';
+    document.getElementById('rg_extension').value = '';
+    document.getElementById('rg_description').value = '';
+    document.getElementById('rg_ring_strategy').value = 'ringall';
+    document.getElementById('rg_ring_time').value = '20';
+    document.getElementById('rg_ringback_tone').value = 'default';
+    document.getElementById('rg_no_answer_type').value = 'hangup';
+    document.getElementById('rg_no_answer_id').value = '';
+    document.getElementById('rg_skip_busy').checked = false;
+    document.getElementById('rg_enable_recording').checked = false;
+    document.getElementById('rg_is_active').checked = true;
+}
+
+function editRingGroup(data) {
+    document.getElementById('rg_id').value = data.id;
+    document.getElementById('rg_name').value = data.name;
+    document.getElementById('rg_extension').value = data.extension || '';
+    document.getElementById('rg_description').value = data.description || '';
+    document.getElementById('rg_ring_strategy').value = data.ring_strategy;
+    document.getElementById('rg_ring_time').value = data.ring_time;
+    document.getElementById('rg_ringback_tone').value = data.ringback_tone || 'default';
+    document.getElementById('rg_no_answer_type').value = data.destination_if_no_answer_type || 'hangup';
+    document.getElementById('rg_no_answer_id').value = data.destination_if_no_answer_id || '';
+    document.getElementById('rg_skip_busy').checked = data.skip_busy;
+    document.getElementById('rg_enable_recording').checked = data.enable_recording;
+    document.getElementById('rg_is_active').checked = data.is_active;
+    new bootstrap.Modal(document.getElementById('ringGroupModal')).show();
+}
+
+function deleteRingGroup(id) {
+    if (confirm('Delete this ring group? All member assignments will also be removed.')) {
+        window.location = '?page=call_center&action=delete_ring_group&id=' + id;
+    }
+}
+
+function manageRingGroupMembers(id, name) {
+    document.getElementById('rgMembersId').value = id;
+    document.getElementById('rgMembersTitle').textContent = name;
+    loadRingGroupMembers(id);
+    new bootstrap.Modal(document.getElementById('ringGroupMembersModal')).show();
+}
+
+function loadRingGroupMembers(groupId) {
+    fetch('?page=call_center&action=get_ring_group_members&id=' + groupId)
+        .then(r => r.json())
+        .then(members => {
+            const tbody = document.querySelector('#rgMembersTable tbody');
+            tbody.innerHTML = '';
+            members.forEach(member => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><code>${member.extension}</code></td>
+                        <td>${member.name}</td>
+                        <td>${member.priority}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeRingGroupMember(${member.id}, ${groupId})">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            if (members.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No members assigned</td></tr>';
+            }
+        });
+}
+
+document.getElementById('rgMemberForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const groupId = document.getElementById('rgMembersId').value;
+    const formData = new FormData(this);
+    formData.append('ring_group_id', groupId);
+    
+    fetch('?page=call_center&action=add_ring_group_member', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadRingGroupMembers(groupId);
+            document.getElementById('member_extension_id').value = '';
+            document.getElementById('member_priority').value = '0';
+        } else {
+            alert(data.error || 'Failed to add member');
+        }
+    });
+});
+
+function removeRingGroupMember(memberId, groupId) {
+    if (confirm('Remove this extension from the ring group?')) {
+        fetch('?page=call_center&action=remove_ring_group_member&id=' + memberId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    loadRingGroupMembers(groupId);
                 }
             });
     }

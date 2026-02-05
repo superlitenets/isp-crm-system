@@ -2290,17 +2290,19 @@ if ($page === 'call_center') {
             'description' => $_POST['description'] ?? '',
             'did_pattern' => $_POST['did_pattern'] ?? '',
             'cid_pattern' => $_POST['cid_pattern'] ?? '',
+            'trunk_id' => !empty($_POST['trunk_id']) ? (int)$_POST['trunk_id'] : null,
+            'ringback_tone' => $_POST['ringback_tone'] ?? 'default',
             'destination_type' => $_POST['destination_type'] ?? 'extension',
             'destination_id' => $_POST['destination_id'] ?? '',
             'priority' => (int)($_POST['priority'] ?? 0),
             'is_active' => isset($_POST['is_active']) ? true : false
         ];
         if ($id) {
-            $stmt = $db->prepare("UPDATE call_center_inbound_routes SET name=?, description=?, did_pattern=?, cid_pattern=?, destination_type=?, destination_id=?, priority=?, is_active=?, updated_at=NOW() WHERE id=?");
-            $stmt->execute([$data['name'], $data['description'], $data['did_pattern'], $data['cid_pattern'], $data['destination_type'], $data['destination_id'], $data['priority'], $data['is_active'], $id]);
+            $stmt = $db->prepare("UPDATE call_center_inbound_routes SET name=?, description=?, did_pattern=?, cid_pattern=?, trunk_id=?, ringback_tone=?, destination_type=?, destination_id=?, priority=?, is_active=?, updated_at=NOW() WHERE id=?");
+            $stmt->execute([$data['name'], $data['description'], $data['did_pattern'], $data['cid_pattern'], $data['trunk_id'], $data['ringback_tone'], $data['destination_type'], $data['destination_id'], $data['priority'], $data['is_active'], $id]);
         } else {
-            $stmt = $db->prepare("INSERT INTO call_center_inbound_routes (name, description, did_pattern, cid_pattern, destination_type, destination_id, priority, is_active) VALUES (?,?,?,?,?,?,?,?)");
-            $stmt->execute([$data['name'], $data['description'], $data['did_pattern'], $data['cid_pattern'], $data['destination_type'], $data['destination_id'], $data['priority'], $data['is_active']]);
+            $stmt = $db->prepare("INSERT INTO call_center_inbound_routes (name, description, did_pattern, cid_pattern, trunk_id, ringback_tone, destination_type, destination_id, priority, is_active) VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $stmt->execute([$data['name'], $data['description'], $data['did_pattern'], $data['cid_pattern'], $data['trunk_id'], $data['ringback_tone'], $data['destination_type'], $data['destination_id'], $data['priority'], $data['is_active']]);
         }
         header('Location: ?page=call_center&tab=inbound');
         exit;
@@ -2436,6 +2438,77 @@ if ($page === 'call_center') {
     if ($action === 'delete_ivr_option') {
         header('Content-Type: application/json');
         $stmt = $db->prepare("DELETE FROM call_center_ivr_options WHERE id = ?");
+        $stmt->execute([(int)$_GET['id']]);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    
+    // Ring Group CRUD
+    if ($action === 'save_ring_group' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $data = [
+            'name' => $_POST['name'] ?? '',
+            'description' => $_POST['description'] ?? '',
+            'extension' => $_POST['extension'] ?? '',
+            'ring_strategy' => $_POST['ring_strategy'] ?? 'ringall',
+            'ring_time' => (int)($_POST['ring_time'] ?? 20),
+            'ringback_tone' => $_POST['ringback_tone'] ?? 'default',
+            'skip_busy' => isset($_POST['skip_busy']) ? true : false,
+            'enable_recording' => isset($_POST['enable_recording']) ? true : false,
+            'destination_if_no_answer_type' => $_POST['destination_if_no_answer_type'] ?? 'hangup',
+            'destination_if_no_answer_id' => $_POST['destination_if_no_answer_id'] ?? '',
+            'is_active' => isset($_POST['is_active']) ? true : false
+        ];
+        if ($id) {
+            $stmt = $db->prepare("UPDATE call_center_ring_groups SET name=?, description=?, extension=?, ring_strategy=?, ring_time=?, ringback_tone=?, skip_busy=?, enable_recording=?, destination_if_no_answer_type=?, destination_if_no_answer_id=?, is_active=?, updated_at=NOW() WHERE id=?");
+            $stmt->execute([$data['name'], $data['description'], $data['extension'], $data['ring_strategy'], $data['ring_time'], $data['ringback_tone'], $data['skip_busy'], $data['enable_recording'], $data['destination_if_no_answer_type'], $data['destination_if_no_answer_id'], $data['is_active'], $id]);
+        } else {
+            $stmt = $db->prepare("INSERT INTO call_center_ring_groups (name, description, extension, ring_strategy, ring_time, ringback_tone, skip_busy, enable_recording, destination_if_no_answer_type, destination_if_no_answer_id, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt->execute([$data['name'], $data['description'], $data['extension'], $data['ring_strategy'], $data['ring_time'], $data['ringback_tone'], $data['skip_busy'], $data['enable_recording'], $data['destination_if_no_answer_type'], $data['destination_if_no_answer_id'], $data['is_active']]);
+        }
+        header('Location: ?page=call_center&tab=ring_groups');
+        exit;
+    }
+    if ($action === 'delete_ring_group') {
+        $stmt = $db->prepare("DELETE FROM call_center_ring_groups WHERE id = ?");
+        $stmt->execute([(int)$_GET['id']]);
+        header('Location: ?page=call_center&tab=ring_groups');
+        exit;
+    }
+    
+    // Ring Group Members
+    if ($action === 'get_ring_group_members') {
+        header('Content-Type: application/json');
+        $stmt = $db->prepare("SELECT m.id, m.priority, e.extension, e.name 
+            FROM call_center_ring_group_members m 
+            JOIN call_center_extensions e ON m.extension_id = e.id 
+            WHERE m.ring_group_id = ? 
+            ORDER BY m.priority, e.extension");
+        $stmt->execute([(int)$_GET['id']]);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        exit;
+    }
+    if ($action === 'add_ring_group_member' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        $groupId = (int)($_POST['ring_group_id'] ?? 0);
+        $extensionId = (int)($_POST['extension_id'] ?? 0);
+        $priority = (int)($_POST['priority'] ?? 0);
+        if ($groupId && $extensionId) {
+            try {
+                $stmt = $db->prepare("INSERT INTO call_center_ring_group_members (ring_group_id, extension_id, priority) VALUES (?, ?, ?)");
+                $stmt->execute([$groupId, $extensionId, $priority]);
+                echo json_encode(['success' => true]);
+            } catch (PDOException $e) {
+                echo json_encode(['success' => false, 'error' => 'Extension already in group']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Invalid data']);
+        }
+        exit;
+    }
+    if ($action === 'remove_ring_group_member') {
+        header('Content-Type: application/json');
+        $stmt = $db->prepare("DELETE FROM call_center_ring_group_members WHERE id = ?");
         $stmt->execute([(int)$_GET['id']]);
         echo json_encode(['success' => true]);
         exit;
