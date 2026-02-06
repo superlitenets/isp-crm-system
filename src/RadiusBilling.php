@@ -896,6 +896,20 @@ class RadiusBilling {
                 $expiryDate = date('Y-m-d', strtotime("+{$package['validity_days']} days"));
             }
             
+            $locationId = !empty($data['location_id']) ? (int)$data['location_id'] : null;
+            $subLocationId = !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null;
+            
+            if ($locationId) {
+                $chk = $this->db->prepare("SELECT id FROM huawei_zones WHERE id = ?");
+                $chk->execute([$locationId]);
+                if (!$chk->fetch()) $locationId = null;
+            }
+            if ($subLocationId) {
+                $chk = $this->db->prepare("SELECT id FROM huawei_subzones WHERE id = ?");
+                $chk->execute([$subLocationId]);
+                if (!$chk->fetch()) $subLocationId = null;
+            }
+            
             $stmt = $this->db->prepare("
                 INSERT INTO radius_subscriptions (customer_id, package_id, username, password, password_encrypted,
                     access_type, static_ip, mac_address, status, start_date, expiry_date, nas_id, notes, location_id, sub_location_id)
@@ -905,7 +919,7 @@ class RadiusBilling {
                 $data['customer_id'],
                 $data['package_id'],
                 $data['username'],
-                $data['password'], // Cleartext for RADIUS CHAP/MS-CHAP
+                $data['password'],
                 $this->encrypt($data['password']),
                 $data['access_type'] ?? $package['package_type'],
                 !empty($data['static_ip']) ? $data['static_ip'] : null,
@@ -915,8 +929,8 @@ class RadiusBilling {
                 $expiryDate,
                 !empty($data['nas_id']) ? (int)$data['nas_id'] : null,
                 $data['notes'] ?? '',
-                !empty($data['location_id']) ? (int)$data['location_id'] : null,
-                !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null
+                $locationId,
+                $subLocationId
             ]);
             
             $subscriptionId = $this->db->lastInsertId();
