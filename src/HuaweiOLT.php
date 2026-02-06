@@ -6611,15 +6611,27 @@ class HuaweiOLT {
             }
         }
         
-        // ==== STAGE 1C: BIND NATIVE VLAN TO ETH PORT (only for line profile 1) ====
+        // ==== STAGE 1C: BIND NATIVE VLAN TO ETH PORT(s) (only for line profile 1) ====
         // SmartOLT profile (line profile 2) handles port VLAN config in the profile itself
         $needsPortVlanConfig = ((int)$lineProfileId !== 2);
+        $onuMode = $options['onu_mode'] ?? 'router';
+        $isBridgeMode = (strtolower($onuMode) === 'bridge');
+        
         if ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
-            $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
+            if ($isBridgeMode) {
+                $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\n";
+                for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
+                    $nativeVlanCmd .= "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0\r\n";
+                }
+                $nativeVlanCmd .= "quit";
+                $output .= "\n[Native VLAN - Bridge Mode: All 4 ETH ports]\n";
+            } else {
+                $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
+                $output .= "\n[Native VLAN - Router Mode: ETH 1 only]\n";
+            }
             $nativeResult = $this->executeCommand($oltId, $nativeVlanCmd);
-            $output .= "\n[Native VLAN]\n" . ($nativeResult['output'] ?? '');
+            $output .= ($nativeResult['output'] ?? '');
             
-            // Check for errors in native VLAN binding
             $nativeOutput = $nativeResult['output'] ?? '';
             if (preg_match('/Failure|Error:/i', $nativeOutput) && !preg_match('/already exist/i', $nativeOutput)) {
                 $output .= "\n[Warning] Native VLAN binding may have failed";
@@ -6675,10 +6687,16 @@ class HuaweiOLT {
             $stmt->execute([$onu['sn'], $oltId]);
         } catch (\Exception $e) {}
         
+        $bridgeInfo = $isBridgeMode ? " [Bridge mode: VLAN {$vlanId} on all 4 ETH ports]" : '';
+        
+        if ($isBridgeMode) {
+            $this->updateONU($onuId, ['onu_mode' => 'bridge']);
+        }
+        
         $this->addLog([
             'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
             'status' => 'success',
-            'message' => "Stage 1 complete: ONU {$onu['sn']} authorized as ID {$assignedOnuId}" . ($vlanId ? ", VLAN {$vlanId}" : ''),
+            'message' => "Stage 1 complete: ONU {$onu['sn']} authorized as ID {$assignedOnuId}" . ($vlanId ? ", VLAN {$vlanId}" : '') . $bridgeInfo,
             'command_sent' => $cliScript, 'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
@@ -6689,12 +6707,13 @@ class HuaweiOLT {
         return [
             'success' => true,
             'stage' => 1,
-            'message' => "Stage 1 complete: ONU authorized as ID {$assignedOnuId}" . ($servicePortSuccess ? ", service-port created" : '') . ($tr069Status['success'] ? ", TR-069 configured" : ''),
+            'message' => "Stage 1 complete: ONU authorized as ID {$assignedOnuId}" . ($servicePortSuccess ? ", service-port created" : '') . ($tr069Status['success'] ? ", TR-069 configured" : '') . $bridgeInfo,
             'onu_id' => $assignedOnuId,
             'description' => $description,
             'vlan_id' => $vlanId,
             'service_port_success' => $servicePortSuccess,
             'tr069_status' => $tr069Status,
+            'is_bridge_mode' => $isBridgeMode,
             'output' => $output,
             'next_stage' => 2
         ];

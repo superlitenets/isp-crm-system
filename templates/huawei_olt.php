@@ -1392,6 +1392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $frameSlotPort = trim($_POST['frame_slot_port'] ?? '');
                 $oltIdInput = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $onuTypeId = !empty($_POST['onu_type_id']) ? (int)$_POST['onu_type_id'] : null;
+                $onuMode = $_POST['onu_mode'] ?? 'router';
                 
                 // Auto-generate description from zone if not provided
                 if (empty($description) && !empty($zone)) {
@@ -1470,7 +1471,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 try {
                     $result = $huaweiOLT->authorizeONUStage1($onuId, $defaultProfile['id'], [
                         'description' => $description,
-                        'vlan_id' => $vlanId
+                        'vlan_id' => $vlanId,
+                        'onu_mode' => $onuMode
                     ]);
                     
                     if ($result['success']) {
@@ -1631,7 +1633,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 try {
                     $result = $huaweiOLT->authorizeONUStage1($onuId, $defaultProfile['id'], [
                         'description' => $name ?: $sn,
-                        'vlan_id' => $vlanId
+                        'vlan_id' => $vlanId,
+                        'onu_mode' => $onuMode
                     ]);
                     
                     if ($result['success']) {
@@ -8233,7 +8236,16 @@ try {
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= htmlspecialchars($onu['name'] ?: '-') ?></td>
+                                    <td>
+                                        <?= htmlspecialchars($onu['name'] ?: '-') ?>
+                                        <?php
+                                        $onuModeVal = strtolower($onu['onu_mode'] ?? '');
+                                        if ($onuModeVal === 'bridge'): ?>
+                                            <span class="badge bg-warning text-dark ms-1">Bridge</span>
+                                        <?php elseif ($onuModeVal === 'router'): ?>
+                                            <span class="badge bg-info ms-1">Router</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= htmlspecialchars($onu['zone_name'] ?? '-') ?></td>
                                     <td>
                                         <?php if (!empty($onu['vlan_id'])): ?>
@@ -8910,8 +8922,24 @@ try {
                         <div class="col-auto border-start ps-2">
                             <small class="text-muted">Mode</small>
                             <div class="fw-medium">
-                                <?php $ipMode = $currentOnu['ip_mode'] ?? 'Router'; ?>
-                                <span id="onuModeDisplay" class="badge bg-<?= strtolower($ipMode) === 'bridge' ? 'secondary' : (strtolower($ipMode) === 'pppoe' ? 'success' : 'info') ?>"><?= htmlspecialchars($ipMode ?: 'Router') ?></span>
+                                <?php 
+    $ipMode = $currentOnu['ip_mode'] ?? '';
+    $onuMode = $currentOnu['onu_mode'] ?? '';
+    $displayMode = '';
+    if (strtolower($onuMode) === 'bridge' || strtolower($ipMode) === 'bridge') {
+        $displayMode = 'Bridge';
+    } elseif (strtolower($ipMode) === 'pppoe') {
+        $displayMode = 'PPPoE';
+    } else {
+        $displayMode = 'Router';
+    }
+    $modeBadgeClass = match(strtolower($displayMode)) {
+        'bridge' => 'bg-warning text-dark',
+        'pppoe' => 'bg-success',
+        default => 'bg-info',
+    };
+?>
+                                <span id="onuModeDisplay" class="badge <?= $modeBadgeClass ?> fs-6"><?= htmlspecialchars($displayMode) ?></span>
                                 <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-bs-toggle="modal" data-bs-target="#onuModeModal" title="Configure Mode">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
