@@ -9124,7 +9124,11 @@ class HuaweiOLT {
             $undoCmd = "undo service-port {$spId}";
             $undoResult = $this->executeCommand($oltId, $undoCmd);
             $allOutput .= "[Delete SP {$spId}]\n" . ($undoResult['output'] ?? '') . "\n";
+            usleep(300000); // 300ms between service-port deletes
         }
+        
+        // Brief pause to let SSH session settle before delete
+        usleep(500000);
         
         // Step 2: Delete the ONU
         $result = $this->executeCommand($oltId, $command);

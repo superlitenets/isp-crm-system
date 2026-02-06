@@ -202,6 +202,14 @@ class SSHSession {
         this.buffer = '';
     }
     
+    stripAnsi(str) {
+        return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+                  .replace(/\x1b\[[0-9;]*[?]?[a-zA-Z]/g, '')
+                  .replace(/\x1b[()][A-Z0-9]/g, '')
+                  .replace(/\x1b[>=<]/g, '')
+                  .replace(/[\x00-\x08\x0e-\x1f]/g, '');
+    }
+
     async sendSingleCommand(command, timeout = 60000) {
         await this.flushBuffer();
         
@@ -214,12 +222,14 @@ class SSHSession {
             let resolved = false;
             let timeoutId = null;
             let commandSeen = false;
+            let confirmationSent = false;
             const cmdPrefix = command.substring(0, Math.min(20, command.length));
 
             const dataHandler = (chunk) => {
                 response += chunk;
+                const cleanResponse = this.stripAnsi(response);
                 
-                if (!commandSeen && response.includes(cmdPrefix)) {
+                if (!commandSeen && cleanResponse.includes(cmdPrefix)) {
                     commandSeen = true;
                 }
                 
@@ -229,7 +239,27 @@ class SSHSession {
                     response = response.replace(/--More--/gi, '');
                 }
                 
-                if (commandSeen && this.promptPattern.test(response)) {
+                if (!confirmationSent && commandSeen) {
+                    const confirmPatterns = [
+                        /\[y\/n\]/i,
+                        /\(y\/n\)/i,
+                        /y or n/i,
+                        /Are you sure/i,
+                        /confirm.*\?/i,
+                        /delete this ont/i,
+                        /to delete\?/i
+                    ];
+                    const needsConfirmation = confirmPatterns.some(p => p.test(cleanResponse));
+                    if (needsConfirmation) {
+                        confirmationSent = true;
+                        console.log(`[OLT ${this.oltId}] SSH confirmation prompt detected, sending 'y'`);
+                        setTimeout(() => {
+                            this.stream.write('y\r');
+                        }, 100);
+                    }
+                }
+                
+                if (commandSeen && this.promptPattern.test(cleanResponse)) {
                     if (!resolved) {
                         resolved = true;
                         clearTimeout(timeoutId);
