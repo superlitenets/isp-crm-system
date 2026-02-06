@@ -182,9 +182,12 @@ class SSHSession {
         if (lines.length > 1) {
             console.log(`[OLT ${this.oltId}] SSH multi-line command (${lines.length} lines)`);
             let fullResponse = '';
-            for (const line of lines) {
-                const response = await this.sendSingleCommand(line, timeout);
+            for (let i = 0; i < lines.length; i++) {
+                const response = await this.sendSingleCommand(lines[i], timeout);
                 fullResponse += response;
+                if (i < lines.length - 1) {
+                    await new Promise(r => setTimeout(r, 500));
+                }
             }
             return fullResponse;
         }
@@ -192,7 +195,16 @@ class SSHSession {
         return this.sendSingleCommand(command, timeout);
     }
 
+    async flushBuffer() {
+        this.buffer = '';
+        this.dataListeners = [];
+        await new Promise(r => setTimeout(r, 100));
+        this.buffer = '';
+    }
+    
     async sendSingleCommand(command, timeout = 60000) {
+        await this.flushBuffer();
+        
         return new Promise((resolve, reject) => {
             if (!this.stream || !this.connected) {
                 return reject(new Error('SSH not connected'));
@@ -202,15 +214,15 @@ class SSHSession {
             let resolved = false;
             let timeoutId = null;
             let commandSeen = false;
+            const cmdPrefix = command.substring(0, Math.min(20, command.length));
 
             const dataHandler = (chunk) => {
                 response += chunk;
                 
-                if (!commandSeen && response.includes(command.substring(0, 20))) {
+                if (!commandSeen && response.includes(cmdPrefix)) {
                     commandSeen = true;
                 }
                 
-                // Handle pagination
                 if (response.includes('---- More') || response.includes('--More--')) {
                     this.stream.write(' ');
                     response = response.replace(/---- More.*?----/gi, '');
@@ -243,15 +255,11 @@ class SSHSession {
                 }
             }, timeout);
 
-            // Clear buffer and send command
             this.buffer = '';
             response = '';
             
             console.log(`[OLT ${this.oltId}] SSH sending: "${command}"`);
             
-            // Send command as single write - simpler approach
-            // Note: Some Huawei OLT VTY configurations strip spaces between numeric args
-            // This is a VTY limitation, not SSH - commands like "ont internet-config 0 1" may fail
             this.stream.write(command + '\r');
         });
     }

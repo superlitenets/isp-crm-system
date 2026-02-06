@@ -4,7 +4,7 @@ const snmp = require('net-snmp');
 const axios = require('axios');
 
 class SNMPPollingWorker {
-    constructor(sessionManager = null) {
+    constructor(sessionManager = null, discoveryWorker = null) {
         this.pool = new Pool({
             connectionString: process.env.DATABASE_URL
         });
@@ -13,6 +13,7 @@ class SNMPPollingWorker {
             client.query("SET timezone TO 'Africa/Nairobi'");
         });
         this.sessionManager = sessionManager;
+        this.discoveryWorker = discoveryWorker;
         this.isRunning = false;
         this.cronJob = null;
         this.pollInterval = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
@@ -109,8 +110,14 @@ class SNMPPollingWorker {
         return result.rows;
     }
 
+    isOltPaused(oltId) {
+        return this.discoveryWorker && this.discoveryWorker.isOltPaused(oltId);
+    }
+    
     async pollOlt(olt) {
         return new Promise(async (resolve, reject) => {
+            const paused = this.isOltPaused(olt.id);
+            
             const session = snmp.createSession(olt.ip_address, olt.snmp_community, {
                 port: olt.snmp_port,
                 version: olt.snmp_version === 'v1' ? snmp.Version1 : snmp.Version2c,
@@ -128,8 +135,7 @@ class SNMPPollingWorker {
                 
                 session.close();
                 
-                // If SNMP returned 0 ONUs but we have ONUs in DB, try CLI fallback
-                if (onuStatuses.length === 0) {
+                if (onuStatuses.length === 0 && !paused) {
                     const dbOnuCount = await this.pool.query(
                         'SELECT COUNT(*) as cnt FROM huawei_onus WHERE olt_id = $1 AND is_authorized = true',
                         [olt.id]
@@ -138,19 +144,27 @@ class SNMPPollingWorker {
                     
                     if (hasDbOnus) {
                         console.log(`[SNMP] OLT ${olt.name} returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh`);
-                        // Trigger CLI refresh in background (don't wait)
                         this.pollOltViaCli(olt).catch(e => {
                             console.log(`[SNMP] CLI fallback for ${olt.name} failed: ${e.message}`);
                         });
                     }
+                } else if (onuStatuses.length === 0 && paused) {
+                    console.log(`[SNMP] OLT ${olt.name} paused for authorization - skipping all CLI activity`);
                 }
                 
                 resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length, method: 'snmp' });
             } catch (snmpError) {
                 session.close();
+                
+                if (paused) {
+                    console.log(`[SNMP] OLT ${olt.name} SNMP failed but paused for authorization - skipping CLI fallback`);
+                    await this.updatePollingStats(olt.id, false, 'Paused for authorization');
+                    resolve({ olt: olt.name, onuCount: 0, method: 'skipped-paused' });
+                    return;
+                }
+                
                 console.log(`[SNMP] OLT ${olt.name} SNMP failed, trying CLI fallback...`);
                 
-                // Try CLI fallback for status polling
                 try {
                     const cliResult = await this.pollOltViaCli(olt);
                     await this.updatePollingStats(olt.id, true, null, 'cli');
@@ -164,7 +178,12 @@ class SNMPPollingWorker {
     }
     
     async pollOltViaCli(olt) {
-        // Get ONUs from database
+        const isPaused = this.discoveryWorker && this.discoveryWorker.isOltPaused(olt.id);
+        if (isPaused) {
+            console.log(`[CLI] OLT ${olt.name} paused for authorization - skipping CLI poll`);
+            return { onuCount: 0, method: 'cli-skipped' };
+        }
+        
         const onuResult = await this.pool.query(`
             SELECT id, frame, slot, port, onu_id FROM huawei_onus 
             WHERE olt_id = $1 AND is_authorized = true
