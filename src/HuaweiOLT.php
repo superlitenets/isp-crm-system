@@ -6617,18 +6617,24 @@ class HuaweiOLT {
         $onuMode = $options['onu_mode'] ?? 'router';
         $isBridgeMode = (strtolower($onuMode) === 'bridge');
         
-        if ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
-            if ($isBridgeMode) {
-                $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\n";
-                for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
-                    $nativeVlanCmd .= "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0\r\n";
-                }
-                $nativeVlanCmd .= "quit";
-                $output .= "\n[Native VLAN - Bridge Mode: All 4 ETH ports]\n";
-            } else {
-                $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
-                $output .= "\n[Native VLAN - Router Mode: ETH 1 only]\n";
+        // Bridge mode ALWAYS needs native VLAN on all 4 ETH ports, regardless of line profile
+        if ($vlanId && $assignedOnuId !== null && $isBridgeMode) {
+            $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\n";
+            for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
+                $nativeVlanCmd .= "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0\r\n";
             }
+            $nativeVlanCmd .= "quit";
+            $output .= "\n[Native VLAN - Bridge Mode: All 4 ETH ports]\n";
+            $nativeResult = $this->executeCommand($oltId, $nativeVlanCmd);
+            $output .= ($nativeResult['output'] ?? '');
+            
+            $nativeOutput = $nativeResult['output'] ?? '';
+            if (preg_match('/Failure|Error:/i', $nativeOutput) && !preg_match('/already exist/i', $nativeOutput)) {
+                $output .= "\n[Warning] Native VLAN binding may have failed";
+            }
+        } elseif ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
+            $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
+            $output .= "\n[Native VLAN - Router Mode: ETH 1 only]\n";
             $nativeResult = $this->executeCommand($oltId, $nativeVlanCmd);
             $output .= ($nativeResult['output'] ?? '');
             
