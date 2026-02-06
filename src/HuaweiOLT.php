@@ -6616,16 +6616,18 @@ class HuaweiOLT {
         $needsPortVlanConfig = ((int)$lineProfileId !== 2);
         $onuMode = $options['onu_mode'] ?? 'router';
         $isBridgeMode = (strtolower($onuMode) === 'bridge');
+        $ethPortCount = (int)($onu['type_eth_ports'] ?? 4);
+        if ($ethPortCount < 1) $ethPortCount = 1;
         
-        // Bridge mode ALWAYS needs native VLAN on all 4 ETH ports, regardless of line profile
+        // Bridge mode needs native VLAN on all ETH ports (from ONU type config)
         if ($vlanId && $assignedOnuId !== null && $isBridgeMode) {
             $scriptLines = [];
             $scriptLines[] = "interface gpon {$frame}/{$slot}";
-            for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
+            for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
                 $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0";
             }
             $scriptLines[] = "quit";
-            $output .= "\n[Native VLAN - Bridge Mode: All 4 ETH ports]\n";
+            $output .= "\n[Native VLAN - Bridge Mode: {$ethPortCount} ETH ports]\n";
             $nativeResult = $this->callOLTService('/execute-raw', [
                 'oltId' => (string)$oltId,
                 'script' => implode("\n", $scriptLines),
@@ -6881,14 +6883,16 @@ class HuaweiOLT {
         $onuMode = $onu['onu_mode'] ?? 'router';
         $isBridgeMode = (strtolower($ipMode) === 'bridge' || strtolower($onuMode) === 'bridge');
         $serviceVlan = $options['service_vlan'] ?? $onu['vlan_id'] ?? null;
+        $ethPortCount = (int)($onu['type_eth_ports'] ?? 4);
+        if ($ethPortCount < 1) $ethPortCount = 1;
         
-        $output .= "[Bridge Mode Check] ip_mode='{$ipMode}', onu_mode='{$onuMode}', service_vlan='{$serviceVlan}'\n";
+        $output .= "[Bridge Mode Check] ip_mode='{$ipMode}', onu_mode='{$onuMode}', service_vlan='{$serviceVlan}', eth_ports={$ethPortCount}\n";
         
         if ($isBridgeMode && $serviceVlan) {
-            $output .= "[Bridge Mode: Native VLAN on all ETH ports]\n";
+            $output .= "[Bridge Mode: Native VLAN on {$ethPortCount} ETH ports]\n";
             $bridgeScriptLines = [];
             $bridgeScriptLines[] = "interface gpon {$frame}/{$slot}";
-            for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
+            for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
                 $bridgeScriptLines[] = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$serviceVlan} priority 0";
             }
             $bridgeScriptLines[] = "quit";
@@ -7190,32 +7194,29 @@ class HuaweiOLT {
             return false;
         };
         
-        // Step 1: Enter interface mode
-        $output .= "[Step 1: Enter GPON interface]\n";
-        $result1 = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
-        $output .= ($result1['output'] ?? '') . "\n";
-        usleep(300000);
+        // Get ETH port count from ONU type config
+        $ethPortCount = (int)($onu['type_eth_ports'] ?? 4);
+        if ($ethPortCount < 1) $ethPortCount = 1;
         
-        // Step 2: Configure bridge mode on LAN ports 1-4
-        // Set native VLAN on each port - this bridges traffic transparently
-        // Syntax: ont port native-vlan {port} {onu_id} eth {eth_port} vlan {vlan_id} priority 0
-        for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
-            $output .= "[Step 2.{$ethPort}: Native VLAN on ETH{$ethPort}]\n";
-            $cmd = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority 0";
-            $result = $this->executeCommand($oltId, $cmd);
-            $cmdOutput = $result['output'] ?? '';
-            $output .= $cmdOutput . "\n";
-            
-            if ($hasRealError($cmdOutput)) {
-                $errors[] = "Failed to set native VLAN on ETH{$ethPort}";
-            }
-            usleep(200000);
+        // Configure bridge mode: native VLAN on all ETH ports via raw script
+        $output .= "[Bridge Mode: Native VLAN on {$ethPortCount} ETH ports]\n";
+        $scriptLines = [];
+        $scriptLines[] = "interface gpon {$frame}/{$slot}";
+        for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
+            $scriptLines[] = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority 0";
         }
+        $scriptLines[] = "quit";
+        $resultBridge = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => implode("\n", $scriptLines),
+            'timeout' => 30000
+        ]);
+        $bridgeOutput = $resultBridge['output'] ?? '';
+        $output .= $bridgeOutput . "\n";
         
-        // Step 3: Exit interface mode
-        $output .= "[Step 3: Exit interface]\n";
-        $result3 = $this->executeCommand($oltId, "quit");
-        $output .= ($result3['output'] ?? '') . "\n";
+        if ($hasRealError($bridgeOutput)) {
+            $errors[] = "Failed to set native VLAN on ETH ports";
+        }
         
         // Log the operation
         $this->addLog([
