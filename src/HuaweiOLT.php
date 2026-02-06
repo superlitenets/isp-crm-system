@@ -6638,6 +6638,15 @@ class HuaweiOLT {
             
             if (preg_match('/Failure|Error:/i', $nativeOutput) && !preg_match('/already exist/i', $nativeOutput)) {
                 $output .= "\n[Warning] Native VLAN binding may have failed";
+            } else {
+                $portConfig = [];
+                for ($pc = 1; $pc <= $ethPortCount; $pc++) {
+                    $portConfig[$pc] = ['mode' => 'access', 'vlan_id' => (int)$vlanId];
+                }
+                try {
+                    $stmt = $this->db->prepare("UPDATE huawei_onus SET port_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([json_encode($portConfig), $onuId]);
+                } catch (\Exception $e) {}
             }
         } elseif ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
             $scriptLines = [];
@@ -6906,6 +6915,15 @@ class HuaweiOLT {
             $bridgeOutput = $resultBridge['output'] ?? '';
             if ($hasRealError($bridgeOutput)) {
                 $errors[] = "Bridge mode native VLAN config had issues";
+            } else {
+                $portConfig = [];
+                for ($pc = 1; $pc <= $ethPortCount; $pc++) {
+                    $portConfig[$pc] = ['mode' => 'access', 'vlan_id' => (int)$serviceVlan];
+                }
+                try {
+                    $stmt = $this->db->prepare("UPDATE huawei_onus SET port_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([json_encode($portConfig), $onuDbId]);
+                } catch (\Exception $e) {}
             }
         }
         
@@ -7216,6 +7234,18 @@ class HuaweiOLT {
         
         if ($hasRealError($bridgeOutput)) {
             $errors[] = "Failed to set native VLAN on ETH ports";
+        }
+        
+        // Save port_config so Ethernet ports table shows the configured VLAN
+        if (empty($errors)) {
+            $portConfig = [];
+            for ($i = 1; $i <= $ethPortCount; $i++) {
+                $portConfig[$i] = ['mode' => 'access', 'vlan_id' => $vlanId];
+            }
+            try {
+                $stmt = $this->db->prepare("UPDATE huawei_onus SET port_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([json_encode($portConfig), $onuDbId]);
+            } catch (\Exception $e) {}
         }
         
         // Log the operation

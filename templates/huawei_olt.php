@@ -9388,11 +9388,16 @@ try {
                             <?php 
                             $ethPorts = $currentOnu['type_eth_ports'] ?? 4;
                             $portConfig = !empty($currentOnu['port_config']) ? json_decode($currentOnu['port_config'], true) : [];
+                            $onuIsBridge = (strtolower($currentOnu['ip_mode'] ?? '') === 'bridge' || strtolower($currentOnu['onu_mode'] ?? '') === 'bridge');
+                            $onuServiceVlan = !empty($currentOnu['vlan_id']) ? (int)$currentOnu['vlan_id'] : null;
                             for ($i = 1; $i <= $ethPorts; $i++): 
                                 $pConfig = $portConfig[$i] ?? null;
                                 $mode = $pConfig['mode'] ?? 'transparent';
                                 $vlanId = $pConfig['vlan_id'] ?? null;
-                                // Format mode display
+                                if (!$vlanId && $onuIsBridge && $onuServiceVlan) {
+                                    $vlanId = $onuServiceVlan;
+                                    $mode = 'access';
+                                }
                                 if ($mode === 'access' && $vlanId) {
                                     $modeDisplay = 'Access VLAN: ' . $vlanId;
                                 } elseif ($mode === 'trunk') {
