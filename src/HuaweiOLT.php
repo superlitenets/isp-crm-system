@@ -9091,11 +9091,25 @@ class HuaweiOLT {
             return ['success' => true, 'message' => "ONU {$onu['sn']} deleted from database (was not authorized on OLT)"];
         }
         
-        // Build combined command for delete (with service-port cleanup and confirmation)
-        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
-        
         if ($async && $this->isOLTServiceAvailable()) {
-            // Async execution via OLT service - but verify command first
+            // Step 1: Find all service-ports for this ONU first
+            $spCommand = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
+            $spResult = $this->executeCommand($oltId, $spCommand);
+            $spOutput = $spResult['output'] ?? '';
+            
+            // Parse service-port IDs from output
+            $servicePortIds = [];
+            if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
+                $servicePortIds = array_map('intval', $matches[1]);
+            }
+            
+            // Step 2: Build compound command: undo service-ports first, then delete ONU
+            $command = '';
+            foreach ($servicePortIds as $spId) {
+                $command .= "undo service-port {$spId}\r\n";
+            }
+            $command .= "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
+            
             $result = $this->executeAsyncViaService($oltId, $command);
             
             // Only delete from DB if command was accepted
@@ -9103,22 +9117,31 @@ class HuaweiOLT {
                 $this->deleteONU($onuId, false);
             }
             
+            $spCount = count($servicePortIds);
             $this->addLog([
                 'olt_id' => $oltId,
                 'onu_id' => $onuId,
                 'action' => 'delete',
                 'status' => ($result['success'] ?? false) ? 'success' : 'failed',
-                'message' => ($result['success'] ?? false) ? "ONU {$onu['sn']} delete command sent (async)" : ($result['error'] ?? 'Failed'),
+                'message' => ($result['success'] ?? false) 
+                    ? "ONU {$onu['sn']} delete command sent (async)" . ($spCount > 0 ? ", {$spCount} service-ports removed" : '')
+                    : ($result['error'] ?? 'Failed'),
                 'command_sent' => $command,
                 'user_id' => $_SESSION['user_id'] ?? null
             ]);
             
             return [
                 'success' => $result['success'] ?? false, 
-                'message' => ($result['success'] ?? false) ? "Delete command sent for ONU {$onu['sn']}" : ('Delete failed: ' . ($result['error'] ?? 'Unknown error')),
-                'async' => true
+                'message' => ($result['success'] ?? false) 
+                    ? "Delete command sent for ONU {$onu['sn']}" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
+                    : ('Delete failed: ' . ($result['error'] ?? 'Unknown error')),
+                'async' => true,
+                'service_ports_deleted' => $spCount
             ];
         }
+        
+        // Build combined command for synchronous delete
+        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
         
         // Synchronous execution
         $allOutput = '';
