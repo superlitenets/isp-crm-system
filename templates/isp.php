@@ -1323,12 +1323,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 try {
-                    $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address) VALUES (?, ?, ?, ?) RETURNING id");
+                    $acctNum = 'ISP-' . strtoupper(substr(md5(uniqid()), 0, 8));
+                    $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address, account_number, service_plan) VALUES (?, ?, ?, ?, ?, ?) RETURNING id");
                     $stmt->execute([
                         $newName,
                         $phone,
                         trim($_POST['new_customer_email'] ?? '') ?: null,
-                        trim($_POST['new_customer_address'] ?? '') ?: null
+                        trim($_POST['new_customer_address'] ?? '') ?: 'N/A',
+                        $acctNum,
+                        'ISP Subscriber'
                     ]);
                     $newCustomerId = $stmt->fetchColumn();
                     $postData['customer_id'] = $newCustomerId;
