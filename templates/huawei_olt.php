@@ -284,6 +284,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 if ($onuTypeId) $updateFields['onu_type_id'] = $onuTypeId;
                 if (!empty($pppoeUsername)) $updateFields['pppoe_username'] = $pppoeUsername;
                 if (!empty($pppoePassword)) $updateFields['pppoe_password'] = $pppoePassword;
+                if (!empty($onuMode)) $updateFields['onu_mode'] = $onuMode;
                 $updateFields['installation_date'] = date('Y-m-d');
                 $huaweiOLT->updateONU($onuId, $updateFields);
                 
@@ -292,6 +293,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $response['next_stage'] = 2;
                 $response['onu_id'] = $onuId;
                 $response['vlan_id'] = $vlanId;
+                $response['onu_mode'] = $onuMode;
                 break;
                 
             case 2: // Authorize on OLT
@@ -299,6 +301,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
                 $name = trim($_POST['name'] ?? '');
                 $sn = trim($_POST['sn'] ?? '');
+                $onuMode = $_POST['onu_mode'] ?? null;
+                
+                // If onu_mode not in POST, read from database
+                if (!$onuMode) {
+                    $onuData = $huaweiOLT->getONU($onuId);
+                    $onuMode = $onuData['onu_mode'] ?? 'router';
+                }
                 
                 $defaultProfile = $huaweiOLT->getDefaultServiceProfile();
                 if (!$defaultProfile) {
@@ -312,6 +321,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $result = $huaweiOLT->authorizeONUStage1($onuId, $defaultProfile['id'], [
                     'description' => $name ?: $sn,
                     'vlan_id' => $vlanId,
+                    'onu_mode' => $onuMode,
                     'skip_service_port' => true // We'll do this in stage 3
                 ]);
                 
@@ -1613,6 +1623,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 if ($onuTypeId) $updateFields['onu_type_id'] = $onuTypeId;
                 if (!empty($pppoeUsername)) $updateFields['pppoe_username'] = $pppoeUsername;
                 if (!empty($pppoePassword)) $updateFields['pppoe_password'] = $pppoePassword;
+                if (!empty($onuMode)) $updateFields['onu_mode'] = $onuMode;
                 $updateFields['installation_date'] = date('Y-m-d'); // Auto-set installation date
                 $huaweiOLT->updateONU($onuId, $updateFields);
                 
@@ -16066,6 +16077,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         
         let currentOnuId = formData.get('onu_id');
         let currentVlanId = formData.get('vlan_id');
+        let currentOnuMode = formData.get('onu_mode') || 'router';
         
         for (let stage = 1; stage <= 4; stage++) {
             const stageItem = document.getElementById('stage' + stage);
@@ -16091,6 +16103,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     stageData.append('vlan_id', currentVlanId);
                     stageData.append('name', formData.get('name'));
                     stageData.append('sn', formData.get('sn'));
+                    stageData.append('onu_mode', currentOnuMode);
                 }
                 
                 const response = await fetch('?page=huawei-olt&ajax=authorize_staged', {
@@ -16131,6 +16144,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 // Update data for next stage
                 if (result.onu_id) currentOnuId = result.onu_id;
                 if (result.vlan_id) currentVlanId = result.vlan_id;
+                if (result.onu_mode) currentOnuMode = result.onu_mode;
                 
                 // Show warning if any
                 if (result.warning) {

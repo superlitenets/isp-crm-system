@@ -6619,26 +6619,38 @@ class HuaweiOLT {
         
         // Bridge mode ALWAYS needs native VLAN on all 4 ETH ports, regardless of line profile
         if ($vlanId && $assignedOnuId !== null && $isBridgeMode) {
-            $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\n";
+            $scriptLines = [];
+            $scriptLines[] = "interface gpon {$frame}/{$slot}";
             for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
-                $nativeVlanCmd .= "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0\r\n";
+                $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0";
             }
-            $nativeVlanCmd .= "quit";
+            $scriptLines[] = "quit";
             $output .= "\n[Native VLAN - Bridge Mode: All 4 ETH ports]\n";
-            $nativeResult = $this->executeCommand($oltId, $nativeVlanCmd);
-            $output .= ($nativeResult['output'] ?? '');
-            
+            $nativeResult = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => implode("\n", $scriptLines),
+                'timeout' => 30000
+            ]);
             $nativeOutput = $nativeResult['output'] ?? '';
+            $output .= $nativeOutput;
+            
             if (preg_match('/Failure|Error:/i', $nativeOutput) && !preg_match('/already exist/i', $nativeOutput)) {
                 $output .= "\n[Warning] Native VLAN binding may have failed";
             }
         } elseif ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
-            $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
+            $scriptLines = [];
+            $scriptLines[] = "interface gpon {$frame}/{$slot}";
+            $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0";
+            $scriptLines[] = "quit";
             $output .= "\n[Native VLAN - Router Mode: ETH 1 only]\n";
-            $nativeResult = $this->executeCommand($oltId, $nativeVlanCmd);
-            $output .= ($nativeResult['output'] ?? '');
-            
+            $nativeResult = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => implode("\n", $scriptLines),
+                'timeout' => 30000
+            ]);
             $nativeOutput = $nativeResult['output'] ?? '';
+            $output .= $nativeOutput;
+            
             if (preg_match('/Failure|Error:/i', $nativeOutput) && !preg_match('/already exist/i', $nativeOutput)) {
                 $output .= "\n[Warning] Native VLAN binding may have failed";
             }
@@ -6665,13 +6677,18 @@ class HuaweiOLT {
             }
             
             // TR-069 OMCI config (ipconfig + tr069-server-config)
-            $tr069OmciCmd = "interface gpon {$frame}/{$slot}\r\n";
-            $tr069OmciCmd .= "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
+            $tr069ScriptLines = [];
+            $tr069ScriptLines[] = "interface gpon {$frame}/{$slot}";
+            $tr069ScriptLines[] = "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}";
             if ($tr069ProfileId) {
-                $tr069OmciCmd .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
+                $tr069ScriptLines[] = "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}";
             }
-            $tr069OmciCmd .= "quit";
-            $tr069OmciResult = $this->executeCommand($oltId, $tr069OmciCmd);
+            $tr069ScriptLines[] = "quit";
+            $tr069OmciResult = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => implode("\n", $tr069ScriptLines),
+                'timeout' => 30000
+            ]);
             $output .= "\n[TR-069 OMCI]\n" . ($tr069OmciResult['output'] ?? '');
             
             // TR-069 Service-port (CRITICAL - without this, ONU cannot reach ACS via VLAN 69)
@@ -6817,31 +6834,24 @@ class HuaweiOLT {
             return false;
         };
         
-        // Step 1: Configure IPHOST/WAN with DHCP on TR-069 VLAN
+        // Step 1 + 2: Configure IPHOST/WAN with DHCP on TR-069 VLAN + TR-069 profile
         $tr069Priority = $options['tr069_priority'] ?? 2;
-        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
-        $cmd1 .= "quit";
-        $result1 = $this->executeCommand($oltId, $cmd1);
-        $output .= "[TR-069 WAN DHCP]\n" . ($result1['output'] ?? '') . "\n";
-        if (!$result1['success'] || $hasRealError($result1['output'] ?? '')) {
-            $errors[] = "WAN DHCP config failed";
-        }
-        
-        // Step 2: Configure TR-069 server (profile ID only - VLAN already configured)
-        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
+        $tr069ScriptLines = [];
+        $tr069ScriptLines[] = "interface gpon {$frame}/{$slot}";
+        $tr069ScriptLines[] = "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}";
         if ($tr069ProfileId) {
-            $cmd2 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
+            $tr069ScriptLines[] = "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}";
         }
-        $cmd2 .= "quit";
-        $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[TR-069 Profile Binding]\n" . ($result2['output'] ?? '') . "\n";
-        // Only check for real errors, ignore "already configured" type messages
-        $out2 = $result2['output'] ?? '';
-        if (!$result2['success'] || (preg_match('/Failure|failed|Invalid/i', $out2) && !preg_match('/already|repeatedly|success/i', $out2))) {
-            if ($tr069ProfileId) {
-                $errors[] = "TR-069 profile binding failed";
-            }
+        $tr069ScriptLines[] = "quit";
+        $result1 = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => implode("\n", $tr069ScriptLines),
+            'timeout' => 30000
+        ]);
+        $output .= "[TR-069 WAN DHCP + Profile]\n" . ($result1['output'] ?? '') . "\n";
+        $out1 = $result1['output'] ?? '';
+        if ($hasRealError($out1)) {
+            $errors[] = "TR-069 OMCI config had issues";
         }
         
         // Step 3: Create service-port for TR-069 VLAN
@@ -6876,15 +6886,19 @@ class HuaweiOLT {
         
         if ($isBridgeMode && $serviceVlan) {
             $output .= "[Bridge Mode: Native VLAN on all ETH ports]\n";
-            $bridgeCmd = "interface gpon {$frame}/{$slot}\r\n";
+            $bridgeScriptLines = [];
+            $bridgeScriptLines[] = "interface gpon {$frame}/{$slot}";
             for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
-                $bridgeCmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$serviceVlan} priority 0\r\n";
+                $bridgeScriptLines[] = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$serviceVlan} priority 0";
             }
-            $bridgeCmd .= "quit";
-            $resultBridge = $this->executeCommand($oltId, $bridgeCmd);
+            $bridgeScriptLines[] = "quit";
+            $resultBridge = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => implode("\n", $bridgeScriptLines),
+                'timeout' => 30000
+            ]);
             $output .= ($resultBridge['output'] ?? '') . "\n";
             
-            // Only log warning if there's a real error, not "already exists"
             $bridgeOutput = $resultBridge['output'] ?? '';
             if ($hasRealError($bridgeOutput)) {
                 $errors[] = "Bridge mode native VLAN config had issues";
