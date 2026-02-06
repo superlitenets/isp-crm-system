@@ -226,43 +226,73 @@ VALUES
     ('Hotspot Daily', 'Hotspot voucher - 24 hours', 'hotspot', 'daily', 150.00, 1, '5M', '2M', 1)
 ON CONFLICT DO NOTHING;
 
--- Locations for organizing NAS devices and subscribers
-CREATE TABLE IF NOT EXISTS isp_locations (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Sub-locations under main locations
-CREATE TABLE IF NOT EXISTS isp_sub_locations (
-    id SERIAL PRIMARY KEY,
-    location_id INTEGER NOT NULL REFERENCES isp_locations(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Add location_id to radius_nas if not exists
+-- Add location_id to radius_nas if not exists (references huawei_zones)
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'radius_nas' AND column_name = 'location_id') THEN
-        ALTER TABLE radius_nas ADD COLUMN location_id INTEGER REFERENCES isp_locations(id) ON DELETE SET NULL;
+        ALTER TABLE radius_nas ADD COLUMN location_id INTEGER REFERENCES huawei_zones(id) ON DELETE SET NULL;
     END IF;
 END $$;
 
--- Add location and sub_location to radius_subscriptions if not exists
+-- Add location and sub_location to radius_subscriptions if not exists (references huawei_zones/huawei_subzones)
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'radius_subscriptions' AND column_name = 'location_id') THEN
-        ALTER TABLE radius_subscriptions ADD COLUMN location_id INTEGER REFERENCES isp_locations(id) ON DELETE SET NULL;
+        ALTER TABLE radius_subscriptions ADD COLUMN location_id INTEGER REFERENCES huawei_zones(id) ON DELETE SET NULL;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'radius_subscriptions' AND column_name = 'sub_location_id') THEN
-        ALTER TABLE radius_subscriptions ADD COLUMN sub_location_id INTEGER REFERENCES isp_sub_locations(id) ON DELETE SET NULL;
+        ALTER TABLE radius_subscriptions ADD COLUMN sub_location_id INTEGER REFERENCES huawei_subzones(id) ON DELETE SET NULL;
     END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_isp_sub_locations_location ON isp_sub_locations(location_id);
+-- Fix any existing foreign keys that still reference old isp_locations/isp_sub_locations tables
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+        WHERE tc.table_name = 'radius_subscriptions' AND tc.constraint_type = 'FOREIGN KEY'
+        AND ccu.table_name = 'isp_locations' AND ccu.column_name = 'id'
+    ) THEN
+        ALTER TABLE radius_subscriptions DROP CONSTRAINT IF EXISTS radius_subscriptions_location_id_fkey;
+        ALTER TABLE radius_subscriptions ADD CONSTRAINT radius_subscriptions_location_id_fkey 
+            FOREIGN KEY (location_id) REFERENCES huawei_zones(id) ON DELETE SET NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+        WHERE tc.table_name = 'radius_subscriptions' AND tc.constraint_type = 'FOREIGN KEY'
+        AND ccu.table_name = 'isp_sub_locations' AND ccu.column_name = 'id'
+    ) THEN
+        ALTER TABLE radius_subscriptions DROP CONSTRAINT IF EXISTS radius_subscriptions_sub_location_id_fkey;
+        ALTER TABLE radius_subscriptions ADD CONSTRAINT radius_subscriptions_sub_location_id_fkey 
+            FOREIGN KEY (sub_location_id) REFERENCES huawei_subzones(id) ON DELETE SET NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+        WHERE tc.table_name = 'radius_nas' AND tc.constraint_type = 'FOREIGN KEY'
+        AND ccu.table_name = 'isp_locations' AND ccu.column_name = 'id'
+    ) THEN
+        ALTER TABLE radius_nas DROP CONSTRAINT IF EXISTS radius_nas_location_id_fkey;
+        ALTER TABLE radius_nas ADD CONSTRAINT radius_nas_location_id_fkey 
+            FOREIGN KEY (location_id) REFERENCES huawei_zones(id) ON DELETE SET NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+        WHERE tc.table_name = 'radius_nas' AND tc.constraint_type = 'FOREIGN KEY'
+        AND ccu.table_name = 'isp_sub_locations' AND ccu.column_name = 'id'
+    ) THEN
+        ALTER TABLE radius_nas DROP CONSTRAINT IF EXISTS radius_nas_sub_location_id_fkey;
+        ALTER TABLE radius_nas ADD CONSTRAINT radius_nas_sub_location_id_fkey 
+            FOREIGN KEY (sub_location_id) REFERENCES huawei_subzones(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_radius_nas_location ON radius_nas(location_id);
 CREATE INDEX IF NOT EXISTS idx_radius_subscriptions_location ON radius_subscriptions(location_id);
 
