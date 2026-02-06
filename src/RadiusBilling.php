@@ -1796,47 +1796,80 @@ class RadiusBilling {
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
+    private function resolveCoATarget(int $subscriptionId, ?array $sub = null): ?array {
+        if (!$sub) {
+            $sub = $this->getSubscription($subscriptionId);
+        }
+        if (!$sub) return null;
+        
+        $sessionNasIp = null;
+        $nasSecret = null;
+        
+        $stmt = $this->db->prepare("
+            SELECT rs.nas_ip_address, rs.nas_id
+            FROM radius_sessions rs
+            WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+            ORDER BY rs.session_start DESC LIMIT 1
+        ");
+        $stmt->execute([$subscriptionId]);
+        $session = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($session && !empty($session['nas_ip_address'])) {
+            $sessionNasIp = $session['nas_ip_address'];
+            
+            if (!empty($session['nas_id'])) {
+                $stmt2 = $this->db->prepare("SELECT secret FROM radius_nas WHERE id = ?");
+                $stmt2->execute([$session['nas_id']]);
+                $row = $stmt2->fetch(\PDO::FETCH_ASSOC);
+                if ($row) $nasSecret = $row['secret'];
+            }
+            
+            if (!$nasSecret) {
+                $stmt2 = $this->db->prepare("SELECT secret FROM radius_nas WHERE ip_address = ? LIMIT 1");
+                $stmt2->execute([$sessionNasIp]);
+                $row = $stmt2->fetch(\PDO::FETCH_ASSOC);
+                if ($row) $nasSecret = $row['secret'];
+            }
+        }
+        
+        if (!$nasSecret && !empty($sub['nas_id'])) {
+            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+            $stmt->execute([$sub['nas_id']]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($nas) {
+                $nasSecret = $nas['secret'];
+                if (!$sessionNasIp) $sessionNasIp = $nas['ip_address'];
+            }
+        }
+        
+        if (!$nasSecret) {
+            $stmt = $this->db->query("SELECT ip_address, secret FROM radius_nas WHERE is_active = true ORDER BY id LIMIT 1");
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($nas) {
+                $nasSecret = $nas['secret'];
+                if (!$sessionNasIp) $sessionNasIp = $nas['ip_address'];
+            }
+        }
+        
+        if (!$sessionNasIp || !$nasSecret) return null;
+        
+        return ['ip_address' => $sessionNasIp, 'secret' => $nasSecret];
+    }
+    
     public function sendSpeedUpdateCoA(int $subscriptionId, ?string $customRateLimit = null): array {
         $sub = $this->getSubscription($subscriptionId);
         if (!$sub) {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get NAS info - try subscription's nas_id first
-        $nas = null;
-        if (!empty($sub['nas_id'])) {
-            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-            $stmt->execute([$sub['nas_id']]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
-        
-        // If not found, try to get NAS from active session
-        if (!$nas) {
-            $stmt = $this->db->prepare("
-                SELECT rn.ip_address, rn.secret 
-                FROM radius_sessions rs
-                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
-                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
-                ORDER BY rs.session_start DESC LIMIT 1
-            ");
-            $stmt->execute([$subscriptionId]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
-        
-        // If still not found, try default active NAS
-        if (!$nas) {
-            $stmt = $this->db->query("SELECT ip_address, secret FROM radius_nas WHERE is_active = true ORDER BY id LIMIT 1");
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
+        $nas = $this->resolveCoATarget($subscriptionId, $sub);
         
         if (!$nas) {
             return ['success' => false, 'error' => 'NAS not found - please assign a NAS to this subscription or add an active NAS device'];
         }
         
-        // Build CoA with new rate limit (use custom if provided, otherwise build from package)
         $rateLimit = $customRateLimit ?: $this->buildRateLimit($sub);
         
-        // Send CoA via OLT service (routes through WireGuard VPN)
         $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
         
         $payload = [
@@ -2460,25 +2493,7 @@ class RadiusBilling {
         $poolName = $poolName ?: $this->getSetting('expired_ip_pool') ?: 'expired-pool';
         $rateLimit = $rateLimit ?: $this->getSetting('expired_rate_limit') ?: '64k/64k';
         
-        // Get NAS info
-        $nas = null;
-        if (!empty($sub['nas_id'])) {
-            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-            $stmt->execute([$sub['nas_id']]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
-        
-        if (!$nas) {
-            $stmt = $this->db->prepare("
-                SELECT rn.ip_address, rn.secret 
-                FROM radius_sessions rs
-                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
-                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
-                ORDER BY rs.session_start DESC LIMIT 1
-            ");
-            $stmt->execute([$subscriptionId]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
+        $nas = $this->resolveCoATarget($subscriptionId, $sub);
         
         if (!$nas) {
             return ['success' => false, 'error' => 'NAS not found'];
@@ -2536,25 +2551,7 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Package not found'];
         }
         
-        // Get NAS info
-        $nas = null;
-        if (!empty($sub['nas_id'])) {
-            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-            $stmt->execute([$sub['nas_id']]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
-        
-        if (!$nas) {
-            $stmt = $this->db->prepare("
-                SELECT rn.ip_address, rn.secret 
-                FROM radius_sessions rs
-                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
-                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
-                ORDER BY rs.session_start DESC LIMIT 1
-            ");
-            $stmt->execute([$subscriptionId]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
+        $nas = $this->resolveCoATarget($subscriptionId, $sub);
         
         if (!$nas) {
             return ['success' => false, 'error' => 'NAS not found'];
@@ -2911,22 +2908,22 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get active sessions with NAS info - use session's nas_ip_address to lookup NAS
+        $nas = $this->resolveCoATarget($subscriptionId, $sub);
         $stmt = $this->db->prepare("
             SELECT rs.id, rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
-                   rs.nas_ip_address,
-                   sub.username, 
-                   COALESCE(rn.ip_address, nas_by_ip.ip_address, sub_nas.ip_address) as nas_ip, 
-                   COALESCE(rn.secret, nas_by_ip.secret, sub_nas.secret) as nas_secret
+                   rs.nas_ip_address, sub.username
             FROM radius_sessions rs
-            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
-            LEFT JOIN radius_nas nas_by_ip ON rs.nas_ip_address = nas_by_ip.ip_address
             LEFT JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
-            LEFT JOIN radius_nas sub_nas ON sub.nas_id = sub_nas.id
             WHERE rs.subscription_id = ? AND rs.session_end IS NULL
         ");
         $stmt->execute([$subscriptionId]);
         $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        foreach ($sessions as &$session) {
+            $session['nas_ip'] = !empty($session['nas_ip_address']) ? $session['nas_ip_address'] : ($nas['ip_address'] ?? null);
+            $session['nas_secret'] = $nas['secret'] ?? null;
+        }
+        unset($session);
         
         $disconnected = 0;
         $errors = [];
@@ -2957,17 +2954,12 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
+        $nas = $this->resolveCoATarget($subscriptionId, $sub);
         $stmt = $this->db->prepare("
             SELECT rs.id, rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
-                   rs.nas_ip_address,
-                   sub.username, 
-                   COALESCE(rn.ip_address, nas_by_ip.ip_address, sub_nas.ip_address) as nas_ip, 
-                   COALESCE(rn.secret, nas_by_ip.secret, sub_nas.secret) as nas_secret
+                   rs.nas_ip_address, sub.username
             FROM radius_sessions rs
-            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
-            LEFT JOIN radius_nas nas_by_ip ON rs.nas_ip_address = nas_by_ip.ip_address
             LEFT JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
-            LEFT JOIN radius_nas sub_nas ON sub.nas_id = sub_nas.id
             WHERE rs.subscription_id = ? AND rs.session_end IS NULL
         ");
         $stmt->execute([$subscriptionId]);
@@ -2976,6 +2968,12 @@ class RadiusBilling {
         if (empty($sessions)) {
             return ['success' => true, 'disconnected' => 0, 'note' => 'No active sessions'];
         }
+        
+        foreach ($sessions as &$s) {
+            $s['nas_ip'] = !empty($s['nas_ip_address']) ? $s['nas_ip_address'] : ($nas['ip_address'] ?? null);
+            $s['nas_secret'] = $nas['secret'] ?? null;
+        }
+        unset($s);
         
         $sent = 0;
         foreach ($sessions as $session) {
@@ -3325,24 +3323,25 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Find active session for this subscription
-        $stmt = $this->db->prepare("
-            SELECT rs.*, rn.ip_address as nas_ip, rn.secret as nas_secret
-            FROM radius_sessions rs
-            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
-            WHERE rs.subscription_id = ? AND rs.session_end IS NULL
-            ORDER BY rs.session_start DESC LIMIT 1
-        ");
-        $stmt->execute([$subscriptionId]);
-        $session = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $nas = $this->resolveCoATarget($subscriptionId, $sub);
         
-        if ($session && !empty($session['nas_ip'])) {
-            // Disconnect the active session
-            return $this->sendCoADisconnect($session);
+        if ($nas) {
+            $stmt = $this->db->prepare("
+                SELECT rs.*
+                FROM radius_sessions rs
+                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+                ORDER BY rs.session_start DESC LIMIT 1
+            ");
+            $stmt->execute([$subscriptionId]);
+            $session = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($session) {
+                $session['nas_ip'] = !empty($session['nas_ip_address']) ? $session['nas_ip_address'] : $nas['ip_address'];
+                $session['nas_secret'] = $nas['secret'];
+                return $this->sendCoADisconnect($session);
+            }
         }
         
-        // No active session, try sending a general CoA with just the username
-        // This helps trigger any session that might exist but isn't tracked
         return $this->sendCoA($subscriptionId, []);
     }
     
@@ -3352,38 +3351,12 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get NAS info - try subscription's nas_id first
-        $nas = null;
-        if (!empty($sub['nas_id'])) {
-            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-            $stmt->execute([$sub['nas_id']]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
-        
-        // If not found, try to get NAS from active session
-        if (!$nas) {
-            $stmt = $this->db->prepare("
-                SELECT rn.ip_address, rn.secret 
-                FROM radius_sessions rs
-                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
-                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
-                ORDER BY rs.session_start DESC LIMIT 1
-            ");
-            $stmt->execute([$subscriptionId]);
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
-        
-        // If still not found, try default active NAS
-        if (!$nas) {
-            $stmt = $this->db->query("SELECT ip_address, secret FROM radius_nas WHERE is_active = true ORDER BY id LIMIT 1");
-            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
+        $nas = $this->resolveCoATarget($subscriptionId, $sub);
         
         if (!$nas) {
             return ['success' => false, 'error' => 'NAS not found - please assign a NAS to this subscription or add an active NAS device'];
         }
         
-        // Send CoA via OLT service (routes through WireGuard VPN)
         $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
         
         $payload = [
