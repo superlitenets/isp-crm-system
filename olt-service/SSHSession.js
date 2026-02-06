@@ -294,6 +294,95 @@ class SSHSession {
         });
     }
 
+    async sendRawScript(script, timeout = 60000) {
+        await this.flushBuffer();
+        
+        return new Promise((resolve, reject) => {
+            if (!this.stream || !this.connected) {
+                return reject(new Error('SSH not connected'));
+            }
+
+            let response = '';
+            let resolved = false;
+            let timeoutId = null;
+            let firstChunkSeen = false;
+            let confirmationSent = false;
+
+            const dataHandler = (chunk) => {
+                response += chunk;
+                firstChunkSeen = true;
+                const cleanResponse = this.stripAnsi(response);
+                
+                if (response.includes('---- More') || response.includes('--More--')) {
+                    this.stream.write(' ');
+                    response = response.replace(/---- More.*?----/gi, '');
+                    response = response.replace(/--More--/gi, '');
+                }
+                
+                if (!confirmationSent) {
+                    const confirmPatterns = [
+                        /\[y\/n\]/i, /\(y\/n\)/i, /y or n/i,
+                        /Are you sure/i, /confirm.*\?/i,
+                        /delete this ont/i, /to delete\?/i
+                    ];
+                    if (confirmPatterns.some(p => p.test(cleanResponse))) {
+                        confirmationSent = true;
+                        console.log(`[OLT ${this.oltId}] SSH raw script: auto-confirming y/n`);
+                        setTimeout(() => this.stream.write('y\r'), 200);
+                    }
+                }
+                
+                if (firstChunkSeen && this.promptPattern.test(cleanResponse)) {
+                    const lines = cleanResponse.split(/\r?\n/);
+                    const lastLine = lines[lines.length - 1] || lines[lines.length - 2] || '';
+                    if (this.promptPattern.test(lastLine) && !lastLine.includes('interface') && !lastLine.includes('gpon')) {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeoutId);
+                            this.removeDataListener(dataHandler);
+                            this.lastActivity = Date.now();
+                            console.log(`[OLT ${this.oltId}] SSH raw script completed (${response.length} bytes)`);
+                            resolve(response);
+                        }
+                    }
+                }
+            };
+
+            this.addDataListener(dataHandler);
+
+            timeoutId = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    this.removeDataListener(dataHandler);
+                    console.log(`[OLT ${this.oltId}] SSH raw script timeout, got ${response.length} bytes`);
+                    console.log(`[OLT ${this.oltId}] Last 500 chars: ${response.slice(-500).replace(/\r?\n/g, '\\n')}`);
+                    if (response.length > 50) {
+                        resolve(response);
+                    } else {
+                        reject(new Error('SSH raw script timeout'));
+                    }
+                }
+            }, timeout);
+
+            this.buffer = '';
+            response = '';
+            
+            const lines = script.split(/\r?\n/).filter(l => l.trim());
+            console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
+            
+            let delay = 0;
+            for (const line of lines) {
+                setTimeout(() => {
+                    if (this.stream && this.connected) {
+                        console.log(`[OLT ${this.oltId}] SSH raw> ${line}`);
+                        this.stream.write(line + '\r');
+                    }
+                }, delay);
+                delay += 800;
+            }
+        });
+    }
+
     addDataListener(handler) {
         this.dataListeners.push(handler);
     }

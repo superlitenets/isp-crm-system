@@ -632,6 +632,31 @@ class OLTSessionManager {
         return await executionPromise;
     }
 
+    async executeRaw(oltId, script, options = {}) {
+        const session = this.sessions.get(oltId);
+        if (!session) {
+            throw new Error(`No session for OLT ${oltId}. Connect first.`);
+        }
+
+        if (!this.commandLocks.has(oltId)) {
+            this.commandLocks.set(oltId, Promise.resolve());
+        }
+
+        const currentLock = this.commandLocks.get(oltId);
+        const timeout = options.timeout || 60000;
+        
+        const executionPromise = currentLock.then(async () => {
+            if (typeof session.sendRawScript === 'function') {
+                return await session.sendRawScript(script, timeout);
+            }
+            return await session.execute(script, { timeout });
+        });
+
+        this.commandLocks.set(oltId, executionPromise.catch(() => {}));
+        
+        return await executionPromise;
+    }
+
     async executeBatch(oltId, commands, options = {}) {
         const results = [];
         for (const command of commands) {

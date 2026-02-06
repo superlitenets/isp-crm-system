@@ -9099,15 +9099,11 @@ class HuaweiOLT {
         
         // Pause discovery to prevent command interleaving on shared SSH session
         $this->pauseDiscovery($oltId, 60000);
-        usleep(500000); // Wait 500ms for any in-flight commands to complete
+        usleep(1000000); // Wait 1s for any in-flight commands to complete
         
-        // Build combined command for synchronous delete
-        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
-        
-        // Synchronous execution
         $allOutput = '';
         
-        // Step 1: Find and delete all service-ports for this ONU
+        // Step 1: Find all service-ports for this ONU
         $spCommand = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
         $spResult = $this->executeCommand($oltId, $spCommand);
         $spOutput = $spResult['output'] ?? '';
@@ -9119,33 +9115,42 @@ class HuaweiOLT {
             $servicePortIds = array_map('intval', $matches[1]);
         }
         
-        // Delete each service-port
+        // Step 2: Build complete delete script as raw lines
+        // Each line is sent separately with delays, only final prompt is awaited
+        $scriptLines = [];
         foreach ($servicePortIds as $spId) {
-            $undoCmd = "undo service-port {$spId}";
-            $undoResult = $this->executeCommand($oltId, $undoCmd);
-            $allOutput .= "[Delete SP {$spId}]\n" . ($undoResult['output'] ?? '') . "\n";
-            usleep(300000); // 300ms between service-port deletes
+            $scriptLines[] = "undo service-port {$spId}";
         }
+        $scriptLines[] = "interface gpon {$frame}/{$slot}";
+        $scriptLines[] = "ont delete {$port} {$onuIdNum}";
+        $scriptLines[] = "quit";
+        $script = implode("\n", $scriptLines);
         
-        // Brief pause to let SSH session settle before delete
-        usleep(500000);
-        
-        // Step 2: Delete the ONU
-        $result = $this->executeCommand($oltId, $command);
+        // Use raw script execution - sends all commands with delays, handles y/n auto-confirm
+        // This avoids the multi-line prompt detection issue with interface context prompts
+        $result = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => $script,
+            'timeout' => 45000
+        ]);
         
         $output = $result['output'] ?? '';
         $allOutput .= "[Delete ONU]\n{$output}";
-        $success = $result['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid|Unknown command)/i', $output);
+        $success = ($result['success'] ?? false) && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $output);
+        
+        // Also check for success indicators
+        if (!$success && preg_match('/success/i', $output)) {
+            $success = true;
+        }
         
         if ($success) {
-            // Pass false to avoid infinite recursion (don't call deleteONUFromOLT again)
             $this->deleteONU($onuId, false);
         }
         
         $spCount = count($servicePortIds);
         $message = $success 
             ? "ONU {$onu['sn']} deleted from OLT" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
-            : ($result['message'] ?? 'Delete command failed');
+            : ($result['error'] ?? $result['message'] ?? 'Delete command failed');
         
         $this->addLog([
             'olt_id' => $oltId,
@@ -9153,7 +9158,7 @@ class HuaweiOLT {
             'action' => 'delete',
             'status' => $success ? 'success' : 'failed',
             'message' => $message,
-            'command_sent' => $command,
+            'command_sent' => $script,
             'command_response' => $allOutput,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);

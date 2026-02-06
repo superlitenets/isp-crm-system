@@ -89,6 +89,21 @@ app.post('/execute-async', async (req, res) => {
     }
 });
 
+app.post('/execute-raw', async (req, res) => {
+    try {
+        const { oltId, script, timeout } = req.body;
+        console.log(`[Raw] Received script for OLT ${oltId}: ${(script || '').substring(0, 100)}...`);
+        if (!oltId || !script) {
+            return res.status(400).json({ success: false, error: 'Missing oltId or script' });
+        }
+        const result = await sessionManager.executeRaw(oltId, script, { timeout: timeout || 60000 });
+        res.json({ success: true, output: result });
+    } catch (error) {
+        console.log(`[Raw] Error: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.post('/pause-discovery', async (req, res) => {
     try {
         const { oltId, duration } = req.body;
