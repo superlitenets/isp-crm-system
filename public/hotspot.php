@@ -179,6 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             $message = "Payment request sent! Enter your M-Pesa PIN on your phone.";
                             $messageType = 'success';
                             $stkPushSent = true;
+                            $_SESSION['pending_subscription_id'] = $result['subscription_id'];
                             $subscription = $radiusBilling->getSubscriptionByMAC($clientMAC);
                             $deviceStatus = 'pending';
                         } else {
@@ -219,6 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             $message = "Payment request sent! Enter your M-Pesa PIN on your phone.";
                             $messageType = 'success';
                             $stkPushSent = true;
+                            $_SESSION['pending_subscription_id'] = $subscription['id'];
                         } else {
                             $message = $stkResult['message'] ?? 'Failed to send payment request. Use voucher instead.';
                             $messageType = 'warning';
@@ -689,6 +691,10 @@ function formatValidity($days, $pkg = null) {
             40% { transform: rotate(3deg); }
             50% { transform: rotate(0deg); }
         }
+        @keyframes progressPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
 
         /* Payment Modal */
         .modal-overlay {
@@ -882,7 +888,8 @@ function formatValidity($days, $pkg = null) {
         </div>
 
         <?php elseif ($stkPushSent): ?>
-        <!-- STK PUSH WAITING -->
+        <!-- STK PUSH WAITING - Auto-polls for payment confirmation -->
+        <?php $pendingSubId = $_SESSION['pending_subscription_id'] ?? 0; ?>
         <div class="hero" style="padding-bottom: 40px;">
             <div class="hero-content">
                 <div class="wifi-icon"><?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt=""><?php else: ?><i class="bi bi-wifi"></i><?php endif; ?></div>
@@ -890,18 +897,22 @@ function formatValidity($days, $pkg = null) {
             </div>
         </div>
         <div class="main-content">
-            <div class="card">
+            <div class="card" id="stkWaitingCard">
                 <div class="stk-waiting">
                     <div class="phone-anim"><i class="bi bi-phone-vibrate"></i></div>
                     <h2 style="font-size: 22px; font-weight: 700; margin: 16px 0 8px;">Check Your Phone</h2>
                     <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Enter your M-Pesa PIN to complete payment</p>
                     
-                    <div class="alert-banner alert-success-custom" style="margin-bottom: 20px;">
-                        <div class="alert-icon" style="background: #a7f3d0;"><i class="bi bi-check-circle"></i></div>
-                        <div>After payment, tap <strong>Refresh</strong> below to connect</div>
+                    <div class="alert-banner alert-info-custom" style="margin-bottom: 20px;" id="stkStatusBanner">
+                        <div class="alert-icon" style="background: #bfdbfe;"><i class="bi bi-hourglass-split" id="stkStatusIcon"></i></div>
+                        <div id="stkStatusText">Waiting for payment confirmation... <span id="pollTimer"></span></div>
                     </div>
                     
-                    <a href="<?= $_SERVER['REQUEST_URI'] ?>" class="btn-main btn-primary" style="text-decoration: none;">
+                    <div id="stkProgressBar" style="background: #e2e8f0; border-radius: 100px; height: 6px; margin-bottom: 20px; overflow: hidden;">
+                        <div id="stkProgressFill" style="background: linear-gradient(90deg, #6366f1, #8b5cf6); height: 100%; width: 0%; border-radius: 100px; transition: width 3s linear;"></div>
+                    </div>
+                    
+                    <a href="<?= $_SERVER['REQUEST_URI'] ?>" class="btn-main btn-primary" style="text-decoration: none; display: none;" id="stkRefreshBtn">
                         <i class="bi bi-arrow-clockwise"></i> Refresh Page
                     </a>
                     
@@ -917,7 +928,108 @@ function formatValidity($days, $pkg = null) {
                     </form>
                 </div>
             </div>
+            
+            <div class="card" id="stkSuccessCard" style="display: none;">
+                <div class="success-state">
+                    <div class="success-ring"><i class="bi bi-check-lg"></i></div>
+                    <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 6px;">Payment Received!</h2>
+                    <p style="color: #64748b; margin-bottom: 16px;" id="stkSuccessPkg"></p>
+                    <div style="margin-bottom: 20px;" id="stkSuccessInfo"></div>
+                    <p style="color: #94a3b8; font-size: 13px; margin-bottom: 12px;">Connecting you to the internet...</p>
+                    <div style="background: #e2e8f0; border-radius: 100px; height: 4px; overflow: hidden;">
+                        <div style="background: linear-gradient(90deg, #059669, #10b981); height: 100%; width: 100%; animation: progressPulse 1.5s ease-in-out infinite;"></div>
+                    </div>
+                </div>
+            </div>
         </div>
+        <script>
+        (function() {
+            var subId = <?= (int)$pendingSubId ?>;
+            var mac = '<?= htmlspecialchars($clientMAC) ?>';
+            var pollInterval = 3000;
+            var maxPolls = 40; // 2 minutes max
+            var pollCount = 0;
+            var confirmed = false;
+            
+            function updateProgress() {
+                var pct = Math.min((pollCount / maxPolls) * 100, 100);
+                var fill = document.getElementById('stkProgressFill');
+                if (fill) fill.style.width = pct + '%';
+            }
+            
+            function showSuccess(data) {
+                confirmed = true;
+                document.getElementById('stkWaitingCard').style.display = 'none';
+                var successCard = document.getElementById('stkSuccessCard');
+                successCard.style.display = 'block';
+                
+                if (data.package_name) {
+                    document.getElementById('stkSuccessPkg').textContent = data.package_name + ' activated!';
+                }
+                
+                var infoHtml = '';
+                if (data.download_speed) {
+                    infoHtml += '<span class="info-pill"><i class="bi bi-speedometer2"></i> ' + data.download_speed + '</span>';
+                }
+                if (data.expiry_date) {
+                    infoHtml += '<span class="info-pill"><i class="bi bi-clock"></i> ' + new Date(data.expiry_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + '</span>';
+                }
+                if (data.max_devices > 1) {
+                    infoHtml += '<span class="info-pill"><i class="bi bi-people"></i> ' + data.max_devices + ' devices</span>';
+                }
+                document.getElementById('stkSuccessInfo').innerHTML = infoHtml;
+                
+                setTimeout(function() {
+                    window.location.href = '<?= $_SERVER['REQUEST_URI'] ?>';
+                }, 3000);
+            }
+            
+            function showTimeout() {
+                var banner = document.getElementById('stkStatusBanner');
+                banner.className = 'alert-banner alert-warning-custom';
+                banner.querySelector('.alert-icon').style.background = '#fde68a';
+                document.getElementById('stkStatusIcon').className = 'bi bi-exclamation-triangle';
+                document.getElementById('stkStatusText').innerHTML = 'Payment not yet confirmed. Tap <strong>Refresh</strong> to check again.';
+                document.getElementById('stkRefreshBtn').style.display = 'flex';
+                document.getElementById('stkProgressBar').style.display = 'none';
+            }
+            
+            function pollStatus() {
+                if (confirmed) return;
+                pollCount++;
+                updateProgress();
+                
+                var url = '/api/hotspot-payment-status.php?';
+                if (subId) url += 'sid=' + subId + '&';
+                if (mac) url += 'mac=' + encodeURIComponent(mac);
+                
+                fetch(url)
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.activated) {
+                            showSuccess(data);
+                        } else if (data.status === 'error' && data.message === 'Unauthorized') {
+                            showTimeout();
+                        } else if (data.status === 'not_found' && pollCount > 10) {
+                            showTimeout();
+                        } else if (pollCount >= maxPolls) {
+                            showTimeout();
+                        } else {
+                            setTimeout(pollStatus, pollInterval);
+                        }
+                    })
+                    .catch(function() {
+                        if (pollCount >= maxPolls) {
+                            showTimeout();
+                        } else {
+                            setTimeout(pollStatus, pollInterval);
+                        }
+                    });
+            }
+            
+            setTimeout(pollStatus, pollInterval);
+        })();
+        </script>
 
         <?php elseif ($deviceStatus === 'expired'): ?>
         <!-- EXPIRED STATE -->
