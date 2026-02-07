@@ -506,6 +506,19 @@ function formatValidity($days, $pkg = null) {
             color: #4338ca;
         }
         .pkg-card.selected .pkg-tag i { color: #4338ca; }
+        .pkg-multi-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .pkg-multi-badge i { font-size: 12px; }
         .pkg-buy-btn {
             display: block;
             width: 100%;
@@ -958,8 +971,12 @@ function formatValidity($days, $pkg = null) {
                         $validityText = formatValidity($pkg['validity_days'], $pkg);
                         $hasData = !empty($pkg['data_quota_mb']);
                         $dataText = $hasData ? number_format($pkg['data_quota_mb'] / 1024, 1) . ' GB' : 'Unlimited';
+                        $maxDevices = (int)($pkg['max_devices'] ?? 1);
                     ?>
-                    <div class="pkg-card <?= empty($clientMAC) ? 'pkg-card-faded' : '' ?>" <?= !empty($clientMAC) ? 'onclick="openPayment(' . $pkg['id'] . ', \'' . htmlspecialchars(addslashes($pkg['name'])) . '\', ' . $pkg['price'] . ', \'' . htmlspecialchars(addslashes($pkg['download_speed'] ?? '')) . '\', \'' . htmlspecialchars($validityText) . '\', \'' . htmlspecialchars($dataText) . '\')"' : '' ?>>
+                    <div class="pkg-card <?= empty($clientMAC) ? 'pkg-card-faded' : '' ?>" <?= !empty($clientMAC) ? 'onclick="openPayment(' . $pkg['id'] . ', \'' . htmlspecialchars(addslashes($pkg['name'])) . '\', ' . $pkg['price'] . ', \'' . htmlspecialchars(addslashes($pkg['download_speed'] ?? '')) . '\', \'' . htmlspecialchars($validityText) . '\', \'' . htmlspecialchars($dataText) . '\', ' . $maxDevices . ')"' : '' ?>>
+                        <?php if ($maxDevices > 1): ?>
+                        <div class="pkg-multi-badge"><i class="bi bi-people-fill"></i> <?= $maxDevices ?> Devices</div>
+                        <?php endif; ?>
                         <div class="pkg-top">
                             <div class="pkg-name"><?= htmlspecialchars($pkg['name']) ?></div>
                             <div class="pkg-price">KES <?= number_format($pkg['price']) ?></div>
@@ -969,6 +986,9 @@ function formatValidity($days, $pkg = null) {
                             <span class="pkg-tag"><i class="bi bi-clock"></i> <?= $validityText ?></span>
                             <?php if ($hasData): ?>
                             <span class="pkg-tag"><i class="bi bi-database"></i> <?= $dataText ?></span>
+                            <?php endif; ?>
+                            <?php if ($maxDevices > 1): ?>
+                            <span class="pkg-tag"><i class="bi bi-phone"></i> <?= $maxDevices ?> devices</span>
                             <?php endif; ?>
                         </div>
                         <?php if (!empty($clientMAC)): ?>
@@ -1007,14 +1027,25 @@ function formatValidity($days, $pkg = null) {
             <div class="card">
                 <div class="card-body">
                     <div class="add-device-section">
-                        <div class="section-title" style="font-size: 14px;"><i class="bi bi-phone-fill"></i> Already have a subscription?</div>
-                        <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Add this device to your existing plan</p>
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                            <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <i class="bi bi-phone-fill" style="color: white; font-size: 20px;"></i>
+                            </div>
+                            <div>
+                                <div style="font-size: 15px; font-weight: 700; color: #0f172a;">Already have a plan?</div>
+                                <div style="font-size: 12px; color: #64748b;">Add this device to your existing subscription</div>
+                            </div>
+                        </div>
+                        <p style="font-size: 12px; color: #64748b; margin-bottom: 12px; background: #f1f5f9; padding: 10px 12px; border-radius: 10px;">
+                            <i class="bi bi-info-circle" style="color: #6366f1;"></i>
+                            If someone shared their plan with you, enter their registered phone number below to connect this device.
+                        </p>
                         <form method="POST">
                             <input type="hidden" name="action" value="add_device">
                             <input type="hidden" name="new_mac" value="<?= htmlspecialchars($clientMAC) ?>">
                             <input type="tel" name="phone" class="form-input" placeholder="Registered phone number" required style="margin-bottom: 8px; padding: 12px 14px; font-size: 14px;">
-                            <input type="text" name="device_name" class="form-input" placeholder="Device name (optional)" style="margin-bottom: 10px; padding: 12px 14px; font-size: 14px;">
-                            <button type="submit" class="btn-main btn-outline" style="font-size: 14px; padding: 12px;">
+                            <input type="text" name="device_name" class="form-input" placeholder="Device name (e.g., My Phone)" style="margin-bottom: 10px; padding: 12px 14px; font-size: 14px;">
+                            <button type="submit" class="btn-main btn-primary" style="font-size: 14px; padding: 12px;">
                                 <i class="bi bi-plus-circle"></i> Add This Device
                             </button>
                         </form>
@@ -1049,6 +1080,15 @@ function formatValidity($days, $pkg = null) {
                     </div>
                     <div id="modalPkgPrice" class="pkg-price"></div>
                 </div>
+                <div id="modalMultiDevice" style="display: none; margin-top: 12px; background: linear-gradient(135deg, #eef2ff, #f5f3ff); border-radius: 10px; padding: 10px 14px; border: 1px solid #c7d2fe;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="bi bi-people-fill" style="color: #6366f1; font-size: 16px;"></i>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600; color: #4338ca;" id="modalDeviceText"></div>
+                            <div style="font-size: 11px; color: #6366f1;">You can add more devices after purchase</div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <form method="POST" id="paymentForm">
@@ -1069,11 +1109,18 @@ function formatValidity($days, $pkg = null) {
     <?php endif; ?>
 
     <script>
-    function openPayment(pkgId, name, price, speed, validity, data) {
+    function openPayment(pkgId, name, price, speed, validity, data, maxDevices) {
         document.getElementById('modalPackageId').value = pkgId;
         document.getElementById('modalPkgName').textContent = name;
         document.getElementById('modalPkgPrice').textContent = 'KES ' + price.toLocaleString();
         document.getElementById('modalPkgDetails').textContent = speed + ' \u00b7 ' + validity + (data !== 'Unlimited' ? ' \u00b7 ' + data : '');
+        var multiEl = document.getElementById('modalMultiDevice');
+        if (maxDevices > 1) {
+            multiEl.style.display = 'block';
+            document.getElementById('modalDeviceText').textContent = 'Supports up to ' + maxDevices + ' devices';
+        } else {
+            multiEl.style.display = 'none';
+        }
         document.getElementById('paymentModal').classList.add('active');
         document.body.style.overflow = 'hidden';
         setTimeout(() => document.getElementById('phoneInput').focus(), 300);
