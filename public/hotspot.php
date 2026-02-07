@@ -64,8 +64,14 @@ $mpesaPaybill = $radiusBilling->getSetting('mpesa_paybill') ?: '';
 $mpesa = new \App\Mpesa();
 $mpesaEnabled = $mpesa->isConfigured();
 
-// Detect NAS device (from URL parameter or gateway IP)
+// Detect NAS device from URL path (/hotspot/{nas_ip}), query params, or session
 $nasIP = $_GET['nas'] ?? $_GET['server'] ?? $_GET['nasip'] ?? '';
+if (empty($nasIP)) {
+    $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    if (preg_match('#/hotspot/([0-9.:]+)#', $requestUri, $matches)) {
+        $nasIP = $matches[1];
+    }
+}
 if ($nasIP) {
     $nasIP = preg_replace('/:\d+$/', '', $nasIP);
     $_SESSION['nasIP'] = $nasIP;
