@@ -5447,6 +5447,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 if (isset($_POST['name'])) $updateData['name'] = $_POST['name'];
                 if (isset($_POST['description'])) $updateData['description'] = $_POST['description'];
                 if (isset($_POST['zone_id'])) $updateData['zone_id'] = $_POST['zone_id'] ?: null;
+                if (isset($_POST['customer_id'])) {
+                    $updateData['customer_id'] = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                    if (!empty($_POST['customer_id'])) {
+                        $custStmt = $db->prepare("SELECT name, phone FROM customers WHERE id = ?");
+                        $custStmt->execute([(int)$_POST['customer_id']]);
+                        $custData = $custStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($custData) {
+                            $updateData['customer_name'] = $custData['name'];
+                            if (!empty($custData['phone'])) $updateData['phone'] = $custData['phone'];
+                        }
+                    } else {
+                        $updateData['customer_name'] = null;
+                    }
+                }
                 
                 $result = $huaweiOLT->updateONU($onuId, $updateData);
                 $message = $result['success'] ? "ONU info updated" : ($result['message'] ?? 'Update failed');
@@ -9027,17 +9041,21 @@ try {
                                 <label class="form-label mb-0 small text-muted">Description</label>
                                 <input type="text" name="description" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" placeholder="Address or comment">
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-3">
                                 <label class="form-label mb-0 small text-muted">Customer</label>
-                                <div class="form-control-plaintext form-control-sm py-1">
+                                <div class="input-group input-group-sm">
+                                    <select name="customer_id" id="onuDetailCustomerId" class="form-select form-select-sm">
+                                        <option value="">-- Not linked --</option>
+                                        <?php if ($currentOnu['customer_id']): ?>
+                                        <option value="<?= $currentOnu['customer_id'] ?>" selected><?= htmlspecialchars($currentOnu['customer_name'] ?? 'Customer #'.$currentOnu['customer_id']) ?></option>
+                                        <?php endif; ?>
+                                    </select>
                                     <?php if ($currentOnu['customer_id']): ?>
-                                    <a href="?page=customers&action=view&id=<?= $currentOnu['customer_id'] ?>"><?= htmlspecialchars($currentOnu['customer_name'] ?? 'View') ?></a>
-                                    <?php else: ?>
-                                    <span class="text-muted">Not linked</span>
+                                    <a href="?page=customers&action=view&id=<?= $currentOnu['customer_id'] ?>" class="btn btn-outline-secondary btn-sm" title="View customer"><i class="bi bi-eye"></i></a>
                                     <?php endif; ?>
                                 </div>
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-1">
                                 <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-check me-1"></i>Save</button>
                             </div>
                         </form>
@@ -9054,6 +9072,46 @@ try {
             const onuSn = '<?= htmlspecialchars($currentOnu['sn'] ?? '') ?>';
             const onuDbId = <?= $currentOnu['id'] ?? 'null' ?>;
             let liveIntervalId = null;
+
+            (function(){
+                const sel = document.getElementById('onuDetailCustomerId');
+                if (!sel) return;
+                const currentVal = sel.value;
+                fetch('?page=huawei-olt&ajax=get_customers_for_auth')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data.success || !data.customers) return;
+                        const existing = new Set();
+                        for (const opt of sel.options) { if (opt.value) existing.add(opt.value); }
+                        data.customers.forEach(c => {
+                            if (existing.has(String(c.id))) return;
+                            const opt = document.createElement('option');
+                            opt.value = c.id;
+                            opt.textContent = c.name + ' - ' + (c.phone || 'No phone') + ' (' + (c.account_number || 'N/A') + ')';
+                            sel.appendChild(opt);
+                        });
+                        if (currentVal) sel.value = currentVal;
+                    })
+                    .catch(e => console.log('Customer load failed:', e));
+                sel.addEventListener('change', function(){
+                    const viewBtn = sel.parentElement.querySelector('a.btn');
+                    if (this.value) {
+                        if (viewBtn) {
+                            viewBtn.href = '?page=customers&action=view&id=' + this.value;
+                            viewBtn.style.display = '';
+                        } else {
+                            const a = document.createElement('a');
+                            a.href = '?page=customers&action=view&id=' + this.value;
+                            a.className = 'btn btn-outline-secondary btn-sm';
+                            a.title = 'View customer';
+                            a.innerHTML = '<i class="bi bi-eye"></i>';
+                            sel.parentElement.appendChild(a);
+                        }
+                    } else if (viewBtn) {
+                        viewBtn.style.display = 'none';
+                    }
+                });
+            })();
             
             async function fetchLiveOnuData() {
                 if (!onuOltId || onuSlot === null) {
