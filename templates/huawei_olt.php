@@ -4952,6 +4952,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 try {
                     // Update ONU mode in database
                     $updateData = ['ip_mode' => $ipMode];
+                    if (strtolower($ipMode) === 'bridge') {
+                        $updateData['onu_mode'] = 'bridge';
+                    } else {
+                        $updateData['onu_mode'] = 'router';
+                    }
                     if ($serviceVlan) {
                         $updateData['vlan_id'] = (int)$serviceVlan;
                     }
@@ -9151,7 +9156,7 @@ try {
                     
                     if (data.success) {
                         const display = document.getElementById('onuModeDisplay');
-                        const badgeClass = mode === 'Bridge' ? 'secondary' : 'info';
+                        const badgeClass = mode === 'Bridge' ? 'warning' : 'info';
                         let displayText = `<span class="badge bg-${badgeClass}">${mode}</span>`;
                         if (mode === 'Router') {
                             const wanType = document.getElementById('routerWanType').value;
