@@ -5463,8 +5463,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 $result = $huaweiOLT->updateONU($onuId, $updateData);
-                $message = $result['success'] ? "ONU info updated" : ($result['message'] ?? 'Update failed');
-                $messageType = $result['success'] ? 'success' : 'danger';
+                $message = $result ? "ONU info updated" : 'Update failed';
+                $messageType = $result ? 'success' : 'danger';
                 break;
             case 'delete_service_port':
                 $result = $huaweiOLT->deleteServicePort((int)$_POST['olt_id'], (int)$_POST['service_port_index']);
