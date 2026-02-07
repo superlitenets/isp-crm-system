@@ -15,6 +15,20 @@ if ($action === 'get_mikrotik_script' && isset($_GET['peer_id'])) {
     exit;
 }
 
+if ($action === 'get_scheduler_scripts' && isset($_GET['nas_id'])) {
+    header('Content-Type: application/json');
+    $result = $radiusBilling->generateSchedulerScripts((int)$_GET['nas_id']);
+    echo json_encode($result);
+    exit;
+}
+
+if ($action === 'push_scheduler_scripts' && isset($_GET['nas_id'])) {
+    header('Content-Type: application/json');
+    $result = $radiusBilling->pushSchedulerScripts((int)$_GET['nas_id']);
+    echo json_encode($result);
+    exit;
+}
+
 if ($action === 'get_nas_config' && isset($_GET['id'])) {
     header('Content-Type: application/json');
     $nasData = $radiusBilling->getNASWithVPN((int)$_GET['id']);
@@ -7596,6 +7610,9 @@ try {
                                 <li class="nav-item">
                                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fullTab">Full Script</button>
                                 </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#schedulerTab">Scheduler Scripts</button>
+                                </li>
                             </ul>
                             <div class="tab-content">
                                 <div class="tab-pane fade show active" id="radiusTab">
@@ -7624,6 +7641,25 @@ try {
                                             <i class="bi bi-clipboard"></i> Copy
                                         </button>
                                     </div>
+                                </div>
+                                <div class="tab-pane fade" id="schedulerTab">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <p class="text-muted small mb-0">Scheduler scripts for automated static subscriber management (sync blocked list, process expired):</p>
+                                        <button class="btn btn-sm btn-success" id="pushSchedulerBtn" onclick="pushSchedulerScripts()" style="display:none;">
+                                            <i class="bi bi-cloud-upload me-1"></i> Push to Router
+                                        </button>
+                                    </div>
+                                    <div id="schedulerLoading" class="text-center py-4">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                        <span class="ms-2 text-muted">Loading scheduler scripts...</span>
+                                    </div>
+                                    <div class="position-relative" id="schedulerScriptContainer" style="display:none;">
+                                        <pre class="bg-dark text-light p-3 rounded" id="schedulerScript" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('schedulerScript')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                    <div id="pushResult" class="mt-2" style="display:none;"></div>
                                 </div>
                             </div>
                         </div>
@@ -7954,6 +7990,9 @@ try {
                                 <li class="nav-item">
                                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fullTab">Full Script</button>
                                 </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#schedulerTab">Scheduler Scripts</button>
+                                </li>
                             </ul>
                             <div class="tab-content">
                                 <div class="tab-pane fade show active" id="radiusTab">
@@ -7979,6 +8018,25 @@ try {
                                             <i class="bi bi-clipboard"></i> Copy
                                         </button>
                                     </div>
+                                </div>
+                                <div class="tab-pane fade" id="schedulerTab">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <p class="text-muted small mb-0">Scheduler scripts for automated static subscriber management:</p>
+                                        <button class="btn btn-sm btn-success" id="pushSchedulerBtn" onclick="pushSchedulerScripts()" style="display:none;">
+                                            <i class="bi bi-cloud-upload me-1"></i> Push to Router
+                                        </button>
+                                    </div>
+                                    <div id="schedulerLoading" class="text-center py-4">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                        <span class="ms-2 text-muted">Loading scheduler scripts...</span>
+                                    </div>
+                                    <div class="position-relative" id="schedulerScriptContainer" style="display:none;">
+                                        <pre class="bg-dark text-light p-3 rounded" id="schedulerScript" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('schedulerScript')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                    <div id="pushResult" class="mt-2" style="display:none;"></div>
                                 </div>
                             </div>
                         </div>
@@ -11021,12 +11079,15 @@ try {
         }
     }
     
+    var currentScriptNasId = null;
+    var schedulerScriptLoaded = false;
+    
     function showMikroTikScript(nas) {
+        currentScriptNasId = nas.id;
+        schedulerScriptLoaded = false;
         const radiusSecret = nas.secret || 'YOUR_SECRET_HERE';
-        // Use VPN server address if linked, otherwise use env or fallback
         let radiusServer = '<?= $_ENV['RADIUS_SERVER_IP'] ?? '' ?>';
         
-        // Default script while loading
         let radiusScript = '# Loading RADIUS configuration...';
         let vpnScript = '# No VPN configured for this NAS device\n# Link a VPN peer to this NAS to generate WireGuard configuration';
         
@@ -11153,6 +11214,77 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
             });
         
         new bootstrap.Modal(document.getElementById('mikrotikScriptModal')).show();
+        
+        document.querySelector('[data-bs-target="#schedulerTab"]').addEventListener('click', function() {
+            if (!schedulerScriptLoaded && currentScriptNasId) {
+                loadSchedulerScripts(currentScriptNasId);
+            }
+        });
+    }
+    
+    function loadSchedulerScripts(nasId) {
+        document.getElementById('schedulerLoading').style.display = 'block';
+        document.getElementById('schedulerScriptContainer').style.display = 'none';
+        document.getElementById('pushSchedulerBtn').style.display = 'none';
+        document.getElementById('pushResult').style.display = 'none';
+        
+        fetch('/index.php?page=isp&action=get_scheduler_scripts&nas_id=' + nasId)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('schedulerLoading').style.display = 'none';
+                if (data.success) {
+                    document.getElementById('schedulerScript').textContent = data.full_script;
+                    document.getElementById('schedulerScriptContainer').style.display = 'block';
+                    if (data.api_enabled) {
+                        document.getElementById('pushSchedulerBtn').style.display = 'inline-block';
+                    } else {
+                        document.getElementById('pushSchedulerBtn').style.display = 'none';
+                        let noApiMsg = document.getElementById('pushResult');
+                        noApiMsg.style.display = 'block';
+                        noApiMsg.innerHTML = '<div class="alert alert-info mb-0 py-2"><i class="bi bi-info-circle me-1"></i> API not configured for this NAS. Copy the script and paste it in the MikroTik terminal manually.</div>';
+                    }
+                    schedulerScriptLoaded = true;
+                } else {
+                    document.getElementById('schedulerScript').textContent = '# Error: ' + (data.error || 'Failed to generate scripts');
+                    document.getElementById('schedulerScriptContainer').style.display = 'block';
+                }
+            })
+            .catch(err => {
+                document.getElementById('schedulerLoading').style.display = 'none';
+                document.getElementById('schedulerScript').textContent = '# Error loading scripts: ' + err.message;
+                document.getElementById('schedulerScriptContainer').style.display = 'block';
+            });
+    }
+    
+    function pushSchedulerScripts() {
+        if (!currentScriptNasId) return;
+        
+        const btn = document.getElementById('pushSchedulerBtn');
+        const resultDiv = document.getElementById('pushResult');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Pushing...';
+        resultDiv.style.display = 'none';
+        
+        fetch('/index.php?page=isp&action=push_scheduler_scripts&nas_id=' + currentScriptNasId)
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i> Push to Router';
+                resultDiv.style.display = 'block';
+                
+                if (data.success) {
+                    let details = Object.entries(data.results || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+                    resultDiv.innerHTML = '<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-circle me-1"></i> Scripts pushed to <strong>' + (data.nas_name || 'router') + '</strong> successfully!<br><small class="text-muted">' + details + '</small></div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger mb-0 py-2"><i class="bi bi-exclamation-triangle me-1"></i> Failed: ' + (data.error || 'Unknown error') + '</div>';
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i> Push to Router';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-danger mb-0 py-2"><i class="bi bi-exclamation-triangle me-1"></i> Connection error: ' + err.message + '</div>';
+            });
     }
     
     function copyScript(elementId) {

@@ -808,6 +808,85 @@ class MikroTikAPI {
         return true;
     }
     
+    public function getSchedulers(): array {
+        return $this->command('/system/scheduler/print');
+    }
+    
+    public function getSchedulerByName(string $name): ?array {
+        $schedulers = $this->command('/system/scheduler/print', ['?name' => $name]);
+        return !empty($schedulers) ? $schedulers[0] : null;
+    }
+    
+    public function createScheduler(string $name, string $interval, string $onEvent, ?string $startDate = null, ?string $startTime = null, ?string $comment = null): array {
+        $params = [
+            'name' => $name,
+            'interval' => $interval,
+            'on-event' => $onEvent,
+            'policy' => 'ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon'
+        ];
+        if ($startDate) $params['start-date'] = $startDate;
+        if ($startTime) $params['start-time'] = $startTime;
+        if ($comment) $params['comment'] = $comment;
+        return $this->command('/system/scheduler/add', $params);
+    }
+    
+    public function updateScheduler(string $name, array $updates): array {
+        $scheduler = $this->getSchedulerByName($name);
+        if (!$scheduler || !isset($scheduler['.id'])) {
+            return ['error' => 'Scheduler not found: ' . $name];
+        }
+        $params = array_merge(['.id' => $scheduler['.id']], $updates);
+        return $this->command('/system/scheduler/set', $params);
+    }
+    
+    public function removeScheduler(string $name): bool {
+        $scheduler = $this->getSchedulerByName($name);
+        if (!$scheduler || !isset($scheduler['.id'])) {
+            return true;
+        }
+        $this->command('/system/scheduler/remove', ['.id' => $scheduler['.id']]);
+        return true;
+    }
+    
+    public function getScripts(): array {
+        return $this->command('/system/script/print');
+    }
+    
+    public function getScriptByName(string $name): ?array {
+        $scripts = $this->command('/system/script/print', ['?name' => $name]);
+        return !empty($scripts) ? $scripts[0] : null;
+    }
+    
+    public function createScript(string $name, string $source, ?string $comment = null): array {
+        $params = [
+            'name' => $name,
+            'source' => $source,
+            'policy' => 'ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon'
+        ];
+        if ($comment) $params['comment'] = $comment;
+        return $this->command('/system/script/add', $params);
+    }
+    
+    public function updateScript(string $name, string $source): array {
+        $script = $this->getScriptByName($name);
+        if (!$script || !isset($script['.id'])) {
+            return ['error' => 'Script not found: ' . $name];
+        }
+        return $this->command('/system/script/set', [
+            '.id' => $script['.id'],
+            'source' => $source
+        ]);
+    }
+    
+    public function removeScript(string $name): bool {
+        $script = $this->getScriptByName($name);
+        if (!$script || !isset($script['.id'])) {
+            return true;
+        }
+        $this->command('/system/script/remove', ['.id' => $script['.id']]);
+        return true;
+    }
+    
     public function __destruct() {
         $this->disconnect();
     }

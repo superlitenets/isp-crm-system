@@ -5421,4 +5421,230 @@ class RadiusBilling {
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
+    
+    public function generateSchedulerScripts(int $nasId): array {
+        $nas = $this->getNAS($nasId);
+        if (!$nas) {
+            return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        $cronSecret = $this->getSetting('cron_secret') ?: 'isp-crm-cron-2024';
+        $serverUrl = $this->getSetting('system_url') ?: ($_ENV['APP_URL'] ?? 'https://crm.superlite.co.ke');
+        $serverUrl = rtrim($serverUrl, '/');
+        $blockedList = $this->getSetting('mikrotik_blocked_list') ?: 'DISABLED_USERS';
+        
+        $fetchMode = (parse_url($serverUrl, PHP_URL_SCHEME) === 'https') ? 'https' : 'http';
+        $crmHost = parse_url($serverUrl, PHP_URL_HOST);
+        $crmIp = gethostbyname($crmHost);
+        $firewallDst = ($crmIp !== $crmHost) ? $crmIp : $crmHost;
+        
+        $syncUrl = $serverUrl . '/isp-cron.php?action=sync_blocked_list&nas_id=' . $nasId . '&secret=' . $cronSecret;
+        $expiredUrl = $serverUrl . '/isp-cron.php?action=process_expired&secret=' . $cronSecret;
+        
+        $syncScript = ':local crmUrl "' . $syncUrl . '"' . "\n";
+        $syncScript .= ':local listName "' . $blockedList . '"' . "\n";
+        $syncScript .= ':log info "ISP-CRM: Starting blocked list sync..."' . "\n";
+        $syncScript .= ':do {' . "\n";
+        $syncScript .= '  /tool fetch url=$crmUrl mode=' . $fetchMode . ' dst-path="isp_blocked.txt" as-value' . "\n";
+        $syncScript .= '  :log info "ISP-CRM: Sync triggered successfully"' . "\n";
+        $syncScript .= '} on-error={' . "\n";
+        $syncScript .= '  :log warning "ISP-CRM: Failed to reach CRM server for sync"' . "\n";
+        $syncScript .= '}' . "\n";
+
+        $expiredCheckScript = ':local crmUrl "' . $expiredUrl . '"' . "\n";
+        $expiredCheckScript .= ':log info "ISP-CRM: Processing expired subscriptions..."' . "\n";
+        $expiredCheckScript .= ':do {' . "\n";
+        $expiredCheckScript .= '  /tool fetch url=$crmUrl mode=' . $fetchMode . ' dst-path="isp_expired.txt" as-value' . "\n";
+        $expiredCheckScript .= '  :log info "ISP-CRM: Expired subscriptions processed"' . "\n";
+        $expiredCheckScript .= '} on-error={' . "\n";
+        $expiredCheckScript .= '  :log warning "ISP-CRM: Failed to process expired subscriptions"' . "\n";
+        $expiredCheckScript .= '}' . "\n";
+
+        $fullScript = "# ============================================\n";
+        $fullScript .= "# ISP CRM - MikroTik Scheduler Scripts\n";
+        $fullScript .= "# NAS: " . $nas['name'] . " (" . $nas['ip_address'] . ")\n";
+        $fullScript .= "# Generated: " . date('Y-m-d H:i:s') . "\n";
+        $fullScript .= "# ============================================\n\n";
+
+        $fullScript .= "# ---- STEP 1: Create Scripts ----\n\n";
+        
+        $fullScript .= "# Script: Sync blocked users list from CRM\n";
+        $fullScript .= "/system script remove [find name=\"isp-crm-sync-blocked\"]\n";
+        $fullScript .= "/system script add name=\"isp-crm-sync-blocked\" policy=ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon source=\"\\\n";
+        $fullScript .= $this->escapeScriptForMikroTik($syncScript);
+        $fullScript .= "\"\n\n";
+
+        $fullScript .= "# Script: Process expired subscriptions\n";
+        $fullScript .= "/system script remove [find name=\"isp-crm-process-expired\"]\n";
+        $fullScript .= "/system script add name=\"isp-crm-process-expired\" policy=ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon source=\"\\\n";
+        $fullScript .= $this->escapeScriptForMikroTik($expiredCheckScript);
+        $fullScript .= "\"\n\n";
+
+        $fullScript .= "# ---- STEP 2: Create Schedulers ----\n\n";
+        
+        $fullScript .= "# Scheduler: Sync blocked list every 5 minutes\n";
+        $fullScript .= "/system scheduler remove [find name=\"isp-crm-sync-blocked\"]\n";
+        $fullScript .= "/system scheduler add name=\"isp-crm-sync-blocked\" interval=5m on-event=\"/system script run isp-crm-sync-blocked\" policy=ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon comment=\"ISP CRM - Sync DISABLED_USERS list\"\n\n";
+        
+        $fullScript .= "# Scheduler: Process expired subscriptions every 10 minutes\n";
+        $fullScript .= "/system scheduler remove [find name=\"isp-crm-process-expired\"]\n";
+        $fullScript .= "/system scheduler add name=\"isp-crm-process-expired\" interval=10m on-event=\"/system script run isp-crm-process-expired\" policy=ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon comment=\"ISP CRM - Process expired subscriptions\"\n\n";
+
+        $fullScript .= "# ---- STEP 3: Firewall Rules for DISABLED_USERS ----\n\n";
+        
+        $fullScript .= "# Allow DNS for disabled users (so redirect pages work)\n";
+        $fullScript .= "/ip firewall filter add chain=forward src-address-list=" . $blockedList . " dst-port=53 protocol=udp action=accept comment=\"ISP CRM - Allow DNS for disabled users\" place-before=0\n";
+        $fullScript .= "/ip firewall filter add chain=forward src-address-list=" . $blockedList . " dst-port=53 protocol=tcp action=accept comment=\"ISP CRM - Allow DNS for disabled users\"\n";
+        
+        $fullScript .= "# Allow access to CRM server for payment portal\n";
+        $fullScript .= "/ip firewall filter add chain=forward src-address-list=" . $blockedList . " dst-address=" . $firewallDst . " protocol=tcp action=accept comment=\"ISP CRM - Allow CRM access for disabled users\"\n";
+        
+        $fullScript .= "# Block all other traffic for disabled users\n";
+        $fullScript .= "/ip firewall filter add chain=forward src-address-list=" . $blockedList . " action=drop comment=\"ISP CRM - Block disabled users\"\n\n";
+
+        $fullScript .= "# ---- STEP 4: HTTP Redirect for Expired Users (Optional) ----\n";
+        $fullScript .= "# Uncomment these lines to redirect expired users to the payment portal\n";
+        $fullScript .= "# /ip firewall nat add chain=dstnat src-address-list=" . $blockedList . " dst-port=80 protocol=tcp action=dst-nat to-addresses=" . $firewallDst . " to-ports=80 comment=\"ISP CRM - Redirect expired to portal\"\n\n";
+
+        $fullScript .= "# ---- VERIFICATION ----\n";
+        $fullScript .= "# Run these commands to verify everything is set up:\n";
+        $fullScript .= "# /system script print where name~\"isp-crm\"\n";
+        $fullScript .= "# /system scheduler print where name~\"isp-crm\"\n";
+        $fullScript .= "# /ip firewall address-list print where list=\"" . $blockedList . "\"\n";
+        $fullScript .= "# /ip firewall filter print where comment~\"ISP CRM\"\n";
+
+        return [
+            'success' => true,
+            'full_script' => $fullScript,
+            'sync_script' => $syncScript,
+            'expired_script' => $expiredCheckScript,
+            'nas_name' => $nas['name'],
+            'nas_ip' => $nas['ip_address'],
+            'server_url' => $serverUrl,
+            'blocked_list' => $blockedList,
+            'api_enabled' => !empty($nas['api_port']) && !empty($nas['api_username'])
+        ];
+    }
+    
+    private function escapeScriptForMikroTik(string $source): string {
+        $lines = explode("\n", trim($source));
+        $escaped = [];
+        foreach ($lines as $i => $line) {
+            $line = str_replace('"', '\\"', $line);
+            if ($i < count($lines) - 1) {
+                $escaped[] = $line . "\\n\\";
+            } else {
+                $escaped[] = $line . "\\n";
+            }
+        }
+        return implode("\n", $escaped);
+    }
+    
+    public function pushSchedulerScripts(int $nasId): array {
+        try {
+            $nas = $this->getNAS($nasId);
+            if (!$nas || !$nas['api_enabled']) {
+                return ['success' => false, 'error' => 'NAS not found or API not enabled'];
+            }
+            
+            $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+            if (!$apiPassword) {
+                return ['success' => false, 'error' => 'Failed to decrypt API password'];
+            }
+            
+            $mikrotik = new \App\MikroTikAPI(
+                $nas['ip_address'],
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
+            );
+            $mikrotik->connect();
+            
+            $cronSecret = $this->getSetting('cron_secret') ?: 'isp-crm-cron-2024';
+            $serverUrl = $this->getSetting('system_url') ?: ($_ENV['APP_URL'] ?? 'https://crm.superlite.co.ke');
+            $serverUrl = rtrim($serverUrl, '/');
+            
+            $syncUrl = $serverUrl . '/isp-cron.php?action=sync_blocked_list&nas_id=' . $nasId . '&secret=' . $cronSecret;
+            $expiredUrl = $serverUrl . '/isp-cron.php?action=process_expired&secret=' . $cronSecret;
+            
+            $syncSource = ":log info \"ISP-CRM: Starting blocked list sync...\"\n";
+            $syncSource .= ":do {\n";
+            $syncSource .= "  /tool fetch url=\"{$syncUrl}\" mode=https dst-path=\"isp_blocked.txt\" as-value\n";
+            $syncSource .= "  :log info \"ISP-CRM: Sync triggered successfully\"\n";
+            $syncSource .= "} on-error={\n";
+            $syncSource .= "  :log warning \"ISP-CRM: Failed to reach CRM server for sync\"\n";
+            $syncSource .= "}\n";
+            
+            $expiredSource = ":log info \"ISP-CRM: Processing expired subscriptions...\"\n";
+            $expiredSource .= ":do {\n";
+            $expiredSource .= "  /tool fetch url=\"{$expiredUrl}\" mode=https dst-path=\"isp_expired.txt\" as-value\n";
+            $expiredSource .= "  :log info \"ISP-CRM: Expired subscriptions processed\"\n";
+            $expiredSource .= "} on-error={\n";
+            $expiredSource .= "  :log warning \"ISP-CRM: Failed to process expired subscriptions\"\n";
+            $expiredSource .= "}\n";
+            
+            $results = [];
+            
+            $existing = $mikrotik->getScriptByName('isp-crm-sync-blocked');
+            if ($existing) {
+                $mikrotik->updateScript('isp-crm-sync-blocked', $syncSource);
+                $results['sync_script'] = 'updated';
+            } else {
+                $mikrotik->createScript('isp-crm-sync-blocked', $syncSource, 'ISP CRM - Sync DISABLED_USERS list');
+                $results['sync_script'] = 'created';
+            }
+            
+            $existing = $mikrotik->getScriptByName('isp-crm-process-expired');
+            if ($existing) {
+                $mikrotik->updateScript('isp-crm-process-expired', $expiredSource);
+                $results['expired_script'] = 'updated';
+            } else {
+                $mikrotik->createScript('isp-crm-process-expired', $expiredSource, 'ISP CRM - Process expired subscriptions');
+                $results['expired_script'] = 'created';
+            }
+            
+            $existingSched = $mikrotik->getSchedulerByName('isp-crm-sync-blocked');
+            if ($existingSched) {
+                $mikrotik->updateScheduler('isp-crm-sync-blocked', [
+                    'interval' => '00:05:00',
+                    'on-event' => '/system script run isp-crm-sync-blocked'
+                ]);
+                $results['sync_scheduler'] = 'updated';
+            } else {
+                $mikrotik->createScheduler(
+                    'isp-crm-sync-blocked',
+                    '00:05:00',
+                    '/system script run isp-crm-sync-blocked',
+                    null, null,
+                    'ISP CRM - Sync DISABLED_USERS list every 5 min'
+                );
+                $results['sync_scheduler'] = 'created';
+            }
+            
+            $existingSched = $mikrotik->getSchedulerByName('isp-crm-process-expired');
+            if ($existingSched) {
+                $mikrotik->updateScheduler('isp-crm-process-expired', [
+                    'interval' => '00:10:00',
+                    'on-event' => '/system script run isp-crm-process-expired'
+                ]);
+                $results['expired_scheduler'] = 'updated';
+            } else {
+                $mikrotik->createScheduler(
+                    'isp-crm-process-expired',
+                    '00:10:00',
+                    '/system script run isp-crm-process-expired',
+                    null, null,
+                    'ISP CRM - Process expired subscriptions every 10 min'
+                );
+                $results['expired_scheduler'] = 'created';
+            }
+            
+            $mikrotik->disconnect();
+            
+            return ['success' => true, 'results' => $results, 'nas_name' => $nas['name']];
+            
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
 }
