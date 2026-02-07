@@ -59,6 +59,12 @@ switch ($action) {
         echo json_encode($result);
         break;
         
+    case 'sync_blocked_list':
+        $nasId = $isCli ? ($argv[2] ?? null) : ($_GET['nas_id'] ?? null);
+        $result = $radiusBilling->syncMikroTikBlockedList($nasId ? (int)$nasId : null);
+        echo json_encode($result);
+        break;
+        
     case 'all':
         $results = [];
         $results['expired'] = processExpiredSubscriptions($radiusBilling, $db, $settings);
@@ -67,13 +73,14 @@ switch ($action) {
         $results['auto_renew'] = $radiusBilling->processAutoRenewals();
         $results['disconnects'] = processScheduledDisconnects($radiusBilling, $db);
         $results['speed_overrides'] = applySpeedOverrides($radiusBilling, $db);
+        $results['blocked_list_sync'] = $radiusBilling->syncMikroTikBlockedList();
         echo json_encode(['success' => true, 'results' => $results]);
         break;
         
     default:
         echo json_encode([
             'error' => 'Unknown action',
-            'available' => ['process_expired', 'send_expiry_alerts', 'send_quota_alerts', 'auto_renew', 'scheduled_disconnect', 'sync_sessions', 'apply_speed_overrides', 'all']
+            'available' => ['process_expired', 'send_expiry_alerts', 'send_quota_alerts', 'auto_renew', 'scheduled_disconnect', 'sync_sessions', 'apply_speed_overrides', 'sync_blocked_list', 'all']
         ]);
 }
 
