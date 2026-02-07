@@ -778,11 +778,21 @@ function formatValidity($days, $pkg = null) {
             $mikrotikLoginUrl = $linkLoginOnly . (strpos($linkLoginOnly, '?') !== false ? '&' : '?') . http_build_query($loginParams);
         }
         ?>
+        <?php
+        $subMaxDevices = (int)($subscription['max_devices'] ?? 1);
+        $subDevices = [];
+        $subDeviceCount = 1;
+        if ($subscription && $subMaxDevices > 1) {
+            $subDevices = $radiusBilling->getSubscriptionDevices($subscription['id']);
+            $subDeviceCount = count($subDevices);
+        }
+        $canAddMore = $subMaxDevices > 1 && $subDeviceCount < $subMaxDevices;
+        ?>
         <?php if (!empty($mikrotikLoginUrl)): ?>
         <script>
             setTimeout(function() {
                 window.location.href = '<?= htmlspecialchars($mikrotikLoginUrl) ?>';
-            }, 2000);
+            }, <?= $canAddMore ? '4000' : '2000' ?>);
         </script>
         <?php endif; ?>
         
@@ -805,6 +815,9 @@ function formatValidity($days, $pkg = null) {
                         <?php if (!empty($subscription['expiry_date'])): ?>
                         <div class="info-pill"><i class="bi bi-clock"></i> <?= date('M j, g:i A', strtotime($subscription['expiry_date'])) ?></div>
                         <?php endif; ?>
+                        <?php if ($subMaxDevices > 1): ?>
+                        <div class="info-pill"><i class="bi bi-people"></i> <?= $subDeviceCount ?>/<?= $subMaxDevices ?> devices</div>
+                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
                     
@@ -820,6 +833,52 @@ function formatValidity($days, $pkg = null) {
                     <?php endif; ?>
                 </div>
             </div>
+            
+            <?php if ($canAddMore): ?>
+            <div class="card">
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+                        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="bi bi-people-fill" style="color: white; font-size: 20px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 15px; font-weight: 700; color: #0f172a;">Add More Devices</div>
+                            <div style="font-size: 12px; color: #64748b;">Your plan supports <?= $subMaxDevices ?> devices (<?= $subMaxDevices - $subDeviceCount ?> slots left)</div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #eef2ff, #f5f3ff); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; border: 1px solid #c7d2fe;">
+                        <p style="font-size: 13px; color: #4338ca; margin: 0;">
+                            <i class="bi bi-info-circle"></i>
+                            Share your phone number <strong><?= htmlspecialchars($subscription['customer_phone'] ?? '') ?></strong> with others so they can connect their devices to your plan.
+                        </p>
+                    </div>
+                    
+                    <?php if (!empty($subDevices)): ?>
+                    <div style="margin-bottom: 14px;">
+                        <div style="font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Connected Devices:</div>
+                        <?php foreach ($subDevices as $dev): ?>
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 10px; margin-bottom: 6px; border: 1px solid #e2e8f0;">
+                            <i class="bi bi-phone" style="color: #6366f1;"></i>
+                            <div style="flex: 1;">
+                                <div style="font-size: 13px; font-weight: 500; color: #0f172a;"><?= htmlspecialchars($dev['device_name'] ?: 'Device') ?></div>
+                                <div style="font-size: 11px; color: #94a3b8;"><?= htmlspecialchars($dev['mac_address']) ?></div>
+                            </div>
+                            <?php if ($dev['mac_address'] === strtoupper(preg_replace('/[^A-Fa-f0-9:]/', '', $clientMAC))): ?>
+                            <span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 6px;">This device</span>
+                            <?php endif; ?>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <p style="font-size: 12px; color: #64748b; margin-bottom: 0;">
+                        <i class="bi bi-lightbulb" style="color: #f59e0b;"></i>
+                        Other devices can connect by visiting this WiFi page and tapping <strong>"Already have a plan?"</strong>
+                    </p>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
 
         <?php elseif ($stkPushSent): ?>
