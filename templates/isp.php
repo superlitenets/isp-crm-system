@@ -67,7 +67,7 @@ if ($action === 'download_hotspot_files' && isset($_GET['nas_id'])) {
     // Automatic portal URL based on server domain
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $portalUrl = $protocol . '://' . $host . '/hotspot.php';
+    $portalBaseUrl = $protocol . '://' . $host . '/hotspot/' . $nas['ip_address'];
     $ispName = $radiusBilling->getSetting('isp_name') ?: 'WiFi Hotspot';
     
     // Generate hotspot files
@@ -83,11 +83,11 @@ if ($action === 'download_hotspot_files' && isset($_GET['nas_id'])) {
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="pragma" content="no-cache">
     <meta http-equiv="expires" content="-1">
-    <meta http-equiv="refresh" content="0; url=' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)&chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)&dst=$(link-orig-esc)">
+    <meta http-equiv="refresh" content="0; url=' . htmlspecialchars($portalBaseUrl) . '/$(mac)?chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)&dst=$(link-orig-esc)">
 </head>
 <body>
     <p>Redirecting to login portal...</p>
-    <p><a href="' . htmlspecialchars($portalUrl) . '?mac=$(mac)&nas=$(server-address)">Click here if not redirected</a></p>
+    <p><a href="' . htmlspecialchars($portalBaseUrl) . '/$(mac)">Click here if not redirected</a></p>
 </body>
 </html>';
         $zip->addFromString('login.html', $loginHtml);
@@ -209,15 +209,18 @@ Upload these files to your MikroTik hotspot directory:
 /ip hotspot profile set [find] html-directory=hotspot
 
 Files included:
-- login.html    : Redirects to external portal (" . $portalUrl . ")
+- login.html    : Redirects to external portal
 - alogin.html   : Shown after successful login
 - logout.html   : Shown after logout
 - status.html   : Shows connection status
 - error.html    : Shown on login errors
 - rlogin.html   : Redirect for MAC authentication
 
-Portal URL: " . $portalUrl . "
+Portal URL: " . $portalBaseUrl . "/\$(mac)
 NAS IP: " . $nas['ip_address'] . "
+
+MikroTik Login Redirect URL:
+" . $portalBaseUrl . "/\$(mac)?chapID=\$(chap-id)&chapChallenge=\$(chap-challenge)&loginLink=\$(link-login-only)
 
 Generated: " . date('Y-m-d H:i:s') . "
 ";
@@ -10508,12 +10511,33 @@ try {
                                     <input type="text" class="form-control" name="hotspot_welcome" value="<?= htmlspecialchars($radiusBilling->getSetting('hotspot_welcome') ?: '') ?>" placeholder="Welcome! Please login to access the internet.">
                                 </div>
                                 
-                                <div class="alert alert-info small mb-0">
-                                    <i class="bi bi-link-45deg me-1"></i>
-                                    <strong>Hotspot Login URL:</strong><br>
-                                    <code>/hotspot.php</code>
-                                    <br><small>Point your MikroTik hotspot login page to this URL</small>
+                                <?php
+                                $hotspotBaseUrl = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'yourdomain.com');
+                                $allNasDevices = $db->query("SELECT id, name, ip_address FROM radius_nas WHERE is_active = true ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+                                ?>
+                                <?php if (!empty($allNasDevices)): ?>
+                                <div class="mb-0">
+                                    <label class="form-label"><i class="bi bi-link-45deg me-1"></i><strong>MikroTik Hotspot Login URLs</strong></label>
+                                    <small class="text-muted d-block mb-2">Copy and use in your MikroTik login.html redirect</small>
+                                    <?php foreach ($allNasDevices as $nasItem): ?>
+                                    <?php $nasHotspotUrl = $hotspotBaseUrl . '/hotspot/' . $nasItem['ip_address'] . '/$(mac)?chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)'; ?>
+                                    <div class="bg-light rounded p-2 mb-2">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <strong class="small"><?= htmlspecialchars($nasItem['name']) ?></strong>
+                                            <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($nasHotspotUrl) ?>'); this.innerHTML='<i class=\'bi bi-check\'></i> Copied'; setTimeout(() => this.innerHTML='<i class=\'bi bi-clipboard\'></i> Copy', 2000);">
+                                                <i class="bi bi-clipboard"></i> Copy
+                                            </button>
+                                        </div>
+                                        <code class="small text-break d-block" style="font-size: 0.75em;"><?= htmlspecialchars($nasHotspotUrl) ?></code>
+                                    </div>
+                                    <?php endforeach; ?>
                                 </div>
+                                <?php else: ?>
+                                <div class="alert alert-warning small mb-0">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    No active NAS devices found. Add a NAS device first to get hotspot login URLs.
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                         
