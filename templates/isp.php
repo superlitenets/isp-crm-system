@@ -7369,13 +7369,18 @@ try {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-8 mb-3">
-                                        <label class="form-label">IP Address</label>
-                                        <input type="text" name="ip_address" class="form-control" required placeholder="e.g., 192.168.1.1">
+                                        <label class="form-label">IP Address (Public/WireGuard)</label>
+                                        <input type="text" name="ip_address" class="form-control" required placeholder="e.g., 102.205.239.250">
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label">RADIUS Port</label>
                                         <input type="number" name="ports" class="form-control" value="1812">
                                     </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Local/Hotspot IP</label>
+                                    <input type="text" name="local_ip" class="form-control" placeholder="e.g., 10.30.0.1">
+                                    <small class="text-muted">The MikroTik hotspot server's local LAN IP (used for captive portal NAS matching)</small>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">RADIUS Secret</label>
@@ -7453,13 +7458,18 @@ try {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-8 mb-3">
-                                        <label class="form-label">IP Address</label>
+                                        <label class="form-label">IP Address (Public/WireGuard)</label>
                                         <input type="text" name="ip_address" id="edit_nas_ip" class="form-control" required>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label">RADIUS Port</label>
                                         <input type="number" name="ports" id="edit_nas_ports" class="form-control">
                                     </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Local/Hotspot IP</label>
+                                    <input type="text" name="local_ip" id="edit_nas_local_ip" class="form-control" placeholder="e.g., 10.30.0.1">
+                                    <small class="text-muted">The MikroTik hotspot server's local LAN IP (used for captive portal NAS matching)</small>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">RADIUS Secret</label>
@@ -7680,15 +7690,22 @@ try {
                                                placeholder="e.g., Main Router, Branch1 MikroTik">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label">IP Address <span class="text-danger">*</span></label>
+                                        <label class="form-label">IP Address (Public/WireGuard) <span class="text-danger">*</span></label>
                                         <input type="text" name="ip_address" class="form-control" required
                                                value="<?= htmlspecialchars($editNas['ip_address'] ?? '') ?>"
-                                               placeholder="e.g., 192.168.1.1">
+                                               placeholder="e.g., 102.205.239.250">
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label">RADIUS Port</label>
                                         <input type="number" name="ports" class="form-control"
                                                value="<?= htmlspecialchars($editNas['ports'] ?? '1812') ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Local/Hotspot IP</label>
+                                        <input type="text" name="local_ip" class="form-control"
+                                               value="<?= htmlspecialchars($editNas['local_ip'] ?? '') ?>"
+                                               placeholder="e.g., 10.30.0.1">
+                                        <small class="text-muted">MikroTik hotspot server's LAN IP (for captive portal NAS matching)</small>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label">RADIUS Secret <span class="text-danger">*</span></label>
@@ -10865,6 +10882,7 @@ try {
         document.getElementById('edit_nas_id').value = nas.id;
         document.getElementById('edit_nas_name').value = nas.name;
         document.getElementById('edit_nas_ip').value = nas.ip_address;
+        document.getElementById('edit_nas_local_ip').value = nas.local_ip || '';
         document.getElementById('edit_nas_ports').value = nas.ports;
         document.getElementById('edit_nas_description').value = nas.description || '';
         document.getElementById('edit_nas_active').checked = nas.is_active == 1;

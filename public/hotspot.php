@@ -66,7 +66,10 @@ $mpesaEnabled = $mpesa->isConfigured();
 
 // Detect NAS device (from URL parameter or gateway IP)
 $nasIP = $_GET['nas'] ?? $_GET['server'] ?? $_GET['nasip'] ?? '';
-if ($nasIP) $_SESSION['nasIP'] = $nasIP;
+if ($nasIP) {
+    $nasIP = preg_replace('/:\d+$/', '', $nasIP);
+    $_SESSION['nasIP'] = $nasIP;
+}
 $nasIP = $nasIP ?: ($_SESSION['nasIP'] ?? '');
 
 $currentNAS = null;

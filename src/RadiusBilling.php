@@ -142,9 +142,25 @@ class RadiusBilling {
     }
     
     public function getNASByIP(string $ipAddress): ?array {
-        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE ip_address = ? AND is_active = true");
-        $stmt->execute([$ipAddress]);
-        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+        $cleanIP = preg_replace('/:\d+$/', '', $ipAddress);
+        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE (ip_address = ? OR local_ip = ?) AND is_active = true LIMIT 1");
+        $stmt->execute([$cleanIP, $cleanIP]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($result) return $result;
+
+        $stmt2 = $this->db->prepare("
+            SELECT n.* FROM radius_nas n
+            JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
+            WHERE n.is_active = true 
+              AND ?::inet <<= wp.allowed_ips::inet
+            LIMIT 1
+        ");
+        try {
+            $stmt2->execute([$cleanIP]);
+            return $stmt2->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            return null;
+        }
     }
     
     public function getNASPackages(int $nasId): array {
@@ -194,8 +210,8 @@ class RadiusBilling {
             $stmt = $this->db->prepare("
                 INSERT INTO radius_nas (name, ip_address, secret, nas_type, ports, description, 
                                         api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id,
-                                        location_id, sub_location_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?)
+                                        location_id, sub_location_id, local_ip)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['name'],
@@ -211,7 +227,8 @@ class RadiusBilling {
                 $isActive,
                 !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null,
                 !empty($data['location_id']) ? (int)$data['location_id'] : null,
-                !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null
+                !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null,
+                !empty($data['local_ip']) ? $data['local_ip'] : null
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -222,7 +239,7 @@ class RadiusBilling {
     public function updateNAS(int $id, array $data): array {
         try {
             $fields = ['name', 'ip_address', 'secret', 'nas_type', 'ports', 'description', 
-                       'api_port', 'api_username'];
+                       'api_port', 'api_username', 'local_ip'];
             $boolFields = ['api_enabled', 'is_active'];
             $intFields = ['location_id', 'sub_location_id'];
             $updates = [];

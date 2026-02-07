@@ -2149,6 +2149,12 @@ function runMigrations(PDO $db): void {
         error_log("RADIUS NAS table error: " . $e->getMessage());
     }
     
+    try {
+        $db->exec("ALTER TABLE radius_nas ADD COLUMN IF NOT EXISTS local_ip VARCHAR(255) DEFAULT NULL");
+    } catch (PDOException $e) {
+        // Column may already exist
+    }
+    
     // RADIUS Packages
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS radius_packages (
