@@ -7272,6 +7272,84 @@ class HuaweiOLT {
     }
     
     /**
+     * Clear bridge mode native VLAN bindings from all ETH ports
+     * Used when switching from Bridge to Router mode
+     */
+    public function clearBridgeNativeVlans(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
+            return ['success' => false, 'message' => 'ONU must be authorized first'];
+        }
+        
+        $vlanId = !empty($onu['vlan_id']) ? (int)$onu['vlan_id'] : null;
+        if (!$vlanId) {
+            return ['success' => true, 'message' => 'No VLAN configured, nothing to clear'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuOltId = $onu['onu_id'];
+        $ethPortCount = (int)($onu['type_eth_ports'] ?? 4);
+        if ($ethPortCount < 1) $ethPortCount = 1;
+        
+        $scriptLines = [];
+        $scriptLines[] = "interface gpon {$frame}/{$slot}";
+        for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
+            $scriptLines[] = "undo ont port native-vlan {$port} {$onuOltId} eth {$ethPort}";
+        }
+        $scriptLines[] = "quit";
+        
+        $result = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => implode("\n", $scriptLines),
+            'timeout' => 30000
+        ]);
+        
+        $output = $result['output'] ?? '';
+        
+        // Clear port_config in database
+        try {
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET port_config = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$onuDbId]);
+        } catch (\Exception $e) {}
+        
+        // Re-apply native VLAN on ETH 1 only (router mode)
+        $routerScript = [];
+        $routerScript[] = "interface gpon {$frame}/{$slot}";
+        $routerScript[] = "ont port native-vlan {$port} {$onuOltId} eth 1 vlan {$vlanId} priority 0";
+        $routerScript[] = "quit";
+        
+        $routerResult = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => implode("\n", $routerScript),
+            'timeout' => 30000
+        ]);
+        $output .= "\n" . ($routerResult['output'] ?? '');
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'clear_bridge_vlans',
+            'status' => 'success',
+            'message' => "Cleared bridge native VLANs on {$ethPortCount} ports, re-applied ETH 1 for router mode",
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'message' => "Bridge VLANs cleared, router mode ETH 1 configured",
+            'output' => $output
+        ];
+    }
+    
+    /**
      * Configure DHCP/IPoE WAN via OMCI commands on the OLT
      * Uses ont ipconfig + ont internet-config (not ont wan-config with profile)
      * This creates the WAN structure that TR-069 can then configure

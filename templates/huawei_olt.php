@@ -4969,7 +4969,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         if ($pppoePass) $updateData['pppoe_password'] = $pppoePass;
                     }
                     
+                    // Check if switching FROM bridge to another mode - clear native VLANs
+                    $previousOnu = $huaweiOLT->getONU($onuId);
+                    $wasBridge = (strtolower($previousOnu['onu_mode'] ?? '') === 'bridge' || strtolower($previousOnu['ip_mode'] ?? '') === 'bridge');
+                    $nowBridge = (strtolower($ipMode) === 'bridge');
+                    
                     $huaweiOLT->updateONU($onuId, $updateData);
+                    
+                    // If switching from Bridge to Router, clear bridge native VLANs on OLT
+                    $bridgeClearResult = null;
+                    if ($wasBridge && !$nowBridge && $previousOnu['is_authorized'] && $previousOnu['onu_id'] !== null) {
+                        $bridgeClearResult = $huaweiOLT->clearBridgeNativeVlans($onuId);
+                    }
+                    // If switching TO Bridge, configure native VLANs on all ports
+                    if (!$wasBridge && $nowBridge && $previousOnu['is_authorized'] && $previousOnu['onu_id'] !== null) {
+                        $bridgeVlan = $serviceVlan ? (int)$serviceVlan : (!empty($previousOnu['vlan_id']) ? (int)$previousOnu['vlan_id'] : null);
+                        if ($bridgeVlan) {
+                            $huaweiOLT->configureBridgeMode($onuId, $bridgeVlan);
+                        }
+                    }
                     
                     // Optionally configure via TR-069 if device is online
                     $onu = $huaweiOLT->getONU($onuId);
@@ -5000,6 +5018,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     $message = "Mode set to {$ipMode}";
+                    if ($bridgeClearResult && $bridgeClearResult['success']) {
+                        $message .= " (bridge VLANs cleared)";
+                    }
                     if ($tr069Configured) {
                         $message .= " (TR-069 configured)";
                     }
