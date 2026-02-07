@@ -5650,7 +5650,7 @@ $zones = [];
 $subzones = [];
 $apartments = [];
 $odbs = [];
-if (in_array($view, ["locations", "onus"])) {
+if (in_array($view, ["locations", "onus", "onu_detail"])) {
 $zones = $huaweiOLT->getZones(false);
 $subzones = $huaweiOLT->getSubzones();
 $apartments = $huaweiOLT->getApartments();

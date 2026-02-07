@@ -8387,8 +8387,10 @@ class HuaweiOLT {
         ]);
         
         if ($success) {
+            error_log("WiFi TR-069 success for ONU {$onuDbId} (SN: {$serial}), SSID: {$ssid} - attempting notification");
             try {
-                $this->sendWiFiChangeNotification($onu, $ssid, $password ?: '(unchanged)', $wlanIndex);
+                $notifResult = $this->sendWiFiChangeNotification($onu, $ssid, $password ?: '(unchanged)', $wlanIndex);
+                error_log("WiFi notification result: " . ($notifResult ? 'sent' : 'not sent'));
             } catch (\Exception $e) {
                 error_log("WiFi notification failed (non-critical): " . $e->getMessage());
             }
@@ -11433,7 +11435,7 @@ class HuaweiOLT {
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
             $branchCode = $olt['branch_code'] ?? '';
             $customerName = $onu['customer_name'] ?? 'Unknown Customer';
-            $customerPhone = $onu['phone'] ?? $onu['customer_phone'] ?? '';
+            $customerPhone = !empty($onu['phone']) ? $onu['phone'] : (!empty($onu['customer_phone']) ? $onu['customer_phone'] : '');
             $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             
             $defaultTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
@@ -11479,7 +11481,7 @@ class HuaweiOLT {
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
             $branchCode = $olt['branch_code'] ?? '';
             $customerName = $onu['customer_name'] ?? '';
-            $customerPhone = $onu['phone'] ?? $onu['customer_phone'] ?? '';
+            $customerPhone = !empty($onu['phone']) ? $onu['phone'] : (!empty($onu['customer_phone']) ? $onu['customer_phone'] : '');
             $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             
             $defaultTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
@@ -11517,11 +11519,17 @@ class HuaweiOLT {
             $whatsapp = new \App\WhatsApp($this->db);
             $settings = new \App\Settings();
 
-            $customerPhone = $onu['phone'] ?? $onu['customer_phone'] ?? '';
+            $customerPhone = !empty($onu['phone']) ? $onu['phone'] : (!empty($onu['customer_phone']) ? $onu['customer_phone'] : '');
+            if (empty($customerPhone) && !empty($onu['customer_id'])) {
+                $phoneStmt = $this->db->prepare("SELECT phone FROM customers WHERE id = ?");
+                $phoneStmt->execute([$onu['customer_id']]);
+                $customerPhone = $phoneStmt->fetchColumn() ?: '';
+            }
             if (empty($customerPhone)) {
-                error_log("OMS WiFi Notification: No customer phone for ONU {$onu['sn']}");
+                error_log("OMS WiFi Notification: No customer phone for ONU {$onu['sn']} (customer_id: " . ($onu['customer_id'] ?? 'none') . ")");
                 return false;
             }
+            error_log("OMS WiFi Notification: Sending to {$customerPhone} for ONU {$onu['sn']}, SSID: {$ssid}");
 
             $customerName = $onu['customer_name'] ?? 'Customer';
             $onuName = $onu['name'] ?? 'N/A';
