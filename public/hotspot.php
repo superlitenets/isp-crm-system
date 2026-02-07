@@ -631,35 +631,57 @@ if ($errorMsg && empty($message)) {
             <div class="alert alert-<?= $messageType ?> py-2 small"><?= htmlspecialchars($message) ?></div>
             <?php endif; ?>
             
+            <?php if (empty($clientMAC)): ?>
+            <div class="alert alert-warning d-flex align-items-start mb-3">
+                <i class="bi bi-wifi-off me-2 mt-1" style="font-size: 1.2em;"></i>
+                <div>
+                    <strong>Device not detected</strong>
+                    <p class="mb-0 small mt-1">Please connect to the <strong><?= htmlspecialchars($ispName) ?></strong> WiFi network first, then this page will load automatically.</p>
+                </div>
+            </div>
+            <?php endif; ?>
+            
             <?php if (!empty($packages)): ?>
-            <h6 class="mb-3">Select a Package</h6>
-            <form method="POST" id="registerForm">
+            <h6 class="mb-3">Available Packages</h6>
+            <?php foreach ($packages as $i => $pkg): ?>
+            <div class="package-card <?= $i === 0 && !empty($clientMAC) ? 'selected' : '' ?>" <?= empty($clientMAC) ? 'style="opacity: 0.7;"' : '' ?>>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong><?= htmlspecialchars($pkg['name']) ?></strong>
+                        <div class="small text-muted">
+                            <?= htmlspecialchars($pkg['download_speed'] ?? '') ?> • <?= $pkg['validity_days'] ?> day<?= $pkg['validity_days'] > 1 ? 's' : '' ?>
+                            <?php if (!empty($pkg['data_quota_mb'])): ?> • <?= number_format($pkg['data_quota_mb'] / 1024, 1) ?>GB<?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="price">KES <?= number_format($pkg['price']) ?></div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            
+            <?php if (!empty($clientMAC)): ?>
+            <form method="POST" id="registerForm" class="mt-3">
                 <input type="hidden" name="action" value="register">
                 <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
                 
                 <?php foreach ($packages as $i => $pkg): ?>
-                <label class="package-card d-block <?= $i === 0 ? 'selected' : '' ?>">
-                    <input type="radio" name="package_id" value="<?= $pkg['id'] ?>" <?= $i === 0 ? 'checked' : '' ?>>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong><?= htmlspecialchars($pkg['name']) ?></strong>
-                            <div class="small text-muted">
-                                <?= htmlspecialchars($pkg['download_speed'] ?? '') ?> • <?= $pkg['validity_days'] ?> day<?= $pkg['validity_days'] > 1 ? 's' : '' ?>
-                                <?php if (!empty($pkg['data_quota_mb'])): ?> • <?= number_format($pkg['data_quota_mb'] / 1024, 1) ?>GB<?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="price">KES <?= number_format($pkg['price']) ?></div>
-                    </div>
-                </label>
+                <input type="hidden" class="package-radio" name="package_id_<?= $pkg['id'] ?>" value="<?= $pkg['id'] ?>">
                 <?php endforeach; ?>
+                <select name="package_id" class="form-control mb-3" required>
+                    <?php foreach ($packages as $pkg): ?>
+                    <option value="<?= $pkg['id'] ?>">
+                        <?= htmlspecialchars($pkg['name']) ?> - KES <?= number_format($pkg['price']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
                 
-                <div class="mb-3 mt-3">
+                <div class="mb-3">
                     <input type="tel" name="phone" class="form-control" placeholder="M-Pesa Phone Number (e.g., 0712345678)" required>
                 </div>
                 <button type="submit" class="btn btn-mpesa btn-primary-custom">
                     <i class="bi bi-phone me-2"></i>Pay with M-Pesa
                 </button>
             </form>
+            <?php endif; ?>
             <?php else: ?>
             <div class="alert alert-info">
                 <i class="bi bi-info-circle me-2"></i>
@@ -667,6 +689,7 @@ if ($errorMsg && empty($message)) {
             </div>
             <?php endif; ?>
             
+            <?php if (!empty($clientMAC)): ?>
             <div class="section-divider"><span>or use voucher</span></div>
             
             <form method="POST">
@@ -680,7 +703,6 @@ if ($errorMsg && empty($message)) {
                 </button>
             </form>
             
-            <?php if (!empty($clientMAC)): ?>
             <div class="section-divider"><span>already have a subscription?</span></div>
             
             <div class="bg-light rounded-3 p-3">
