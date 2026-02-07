@@ -1,13 +1,8 @@
 <?php
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// Hotspot portal routing:
-// /hotspot/{nas_ip}/{mac}
-// /hotspot/{nas_ip}
-// /hs/{isp-slug}/{nas_ip}/{mac}
-// /hs/{isp-slug}/{nas_ip}
-if (preg_match('#^/hs/[^/]+/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?/?$#', $uri, $matches)
-    || preg_match('#^/hotspot/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?/?$#', $uri, $matches)) {
+// Hotspot portal routing: /hotspot/{nas_ip}/{mac} or /hotspot/{nas_ip}
+if (preg_match('#^/hotspot/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?/?$#', $uri, $matches)) {
     $_GET['nas'] = $matches[1];
     $qs = 'nas=' . $matches[1];
     if (!empty($matches[2])) {

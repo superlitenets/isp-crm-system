@@ -6,9 +6,7 @@
     # RewriteCond %{HTTPS} off
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     
-    # Hotspot portal: /hs/{isp-slug}/{nas_ip}/{mac} or /hotspot/{nas_ip}/{mac}
-    RewriteRule ^hs/[^/]+/([0-9.:]+)/([0-9a-fA-F:.-]+)/?$ hotspot.php?nas=$1&mac=$2 [L,QSA]
-    RewriteRule ^hs/[^/]+/([0-9.:]+)/?$ hotspot.php?nas=$1 [L,QSA]
+    # Hotspot portal: /hotspot/{nas_ip}/{mac} or /hotspot/{nas_ip}
     RewriteRule ^hotspot/([0-9.:]+)/([0-9a-fA-F:.-]+)/?$ hotspot.php?nas=$1&mac=$2 [L,QSA]
     RewriteRule ^hotspot/([0-9.:]+)/?$ hotspot.php?nas=$1 [L,QSA]
     
