@@ -59,7 +59,7 @@ class HuaweiOLT {
     // ==================== OLT Management ====================
     
     public function getOLTs(bool $activeOnly = true): array {
-        $sql = "SELECT o.*, b.name as branch_name, b.whatsapp_group as branch_whatsapp_group 
+        $sql = "SELECT o.*, b.name as branch_name, b.code as branch_code, b.whatsapp_group as branch_whatsapp_group 
                 FROM huawei_olts o 
                 LEFT JOIN branches b ON o.branch_id = b.id";
         if ($activeOnly) {
@@ -72,7 +72,7 @@ class HuaweiOLT {
     
     public function getOLT(int $id): ?array {
         $stmt = $this->db->prepare("
-            SELECT o.*, b.name as branch_name, b.whatsapp_group as branch_whatsapp_group 
+            SELECT o.*, b.name as branch_name, b.code as branch_code, b.whatsapp_group as branch_whatsapp_group 
             FROM huawei_olts o 
             LEFT JOIN branches b ON o.branch_id = b.id 
             WHERE o.id = ?
@@ -6397,6 +6397,23 @@ class HuaweiOLT {
         // Resume discovery after authorization completes
         $this->resumeDiscovery($oltId);
         
+        // Send authorization notification
+        try {
+            $updatedOnu = $this->getONU($onuId);
+            $olt = $this->getOLT($oltId);
+            if ($updatedOnu && $olt) {
+                $authorizedBy = '';
+                if (!empty($_SESSION['user_name'])) {
+                    $authorizedBy = $_SESSION['user_name'];
+                } elseif (!empty($_SESSION['user_id'])) {
+                    $authorizedBy = 'User #' . $_SESSION['user_id'];
+                }
+                $this->sendOnuAuthorizedNotification($updatedOnu, $olt, $authorizedBy);
+            }
+        } catch (\Exception $e) {
+            error_log("Failed to send authorization notification: " . $e->getMessage());
+        }
+        
         return [
             'success' => true,
             'message' => $statusMessage,
@@ -11410,7 +11427,7 @@ class HuaweiOLT {
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
             $branchCode = $olt['branch_code'] ?? '';
             $customerName = $onu['customer_name'] ?? 'Unknown Customer';
-            $customerPhone = $onu['customer_phone'] ?? '';
+            $customerPhone = $onu['phone'] ?? $onu['customer_phone'] ?? '';
             $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             
             $defaultTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
@@ -11454,7 +11471,7 @@ class HuaweiOLT {
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
             $branchCode = $olt['branch_code'] ?? '';
             $customerName = $onu['customer_name'] ?? '';
-            $customerPhone = $onu['customer_phone'] ?? '';
+            $customerPhone = $onu['phone'] ?? $onu['customer_phone'] ?? '';
             $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             
             $defaultTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
@@ -11471,7 +11488,7 @@ class HuaweiOLT {
                 '{auth_time}' => date('Y-m-d H:i:s'),
                 '{customer_name}' => $customerName,
                 '{customer_phone}' => $customerPhone,
-                '{service_profile}' => $onu['service_profile'] ?? '',
+                '{service_profile}' => $onu['srv_profile'] ?? $onu['service_profile'] ?? '',
                 '{authorized_by}' => $authorizedBy
             ];
             
