@@ -67,7 +67,7 @@ if ($action === 'download_hotspot_files' && isset($_GET['nas_id'])) {
     // Automatic portal URL based on server domain
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $portalBaseUrl = $protocol . '://' . $host . '/hotspot/' . $nas['ip_address'];
+    $portalBaseUrl = $protocol . '://' . $host;
     $ispName = $radiusBilling->getSetting('isp_name') ?: 'WiFi Hotspot';
     
     // Generate hotspot files
@@ -75,7 +75,9 @@ if ($action === 'download_hotspot_files' && isset($_GET['nas_id'])) {
     $zipFile = tempnam(sys_get_temp_dir(), 'hotspot_') . '.zip';
     
     if ($zip->open($zipFile, ZipArchive::CREATE) === TRUE) {
-        // login.html - redirects to external portal
+        // login.html - redirects to external portal using direct hotspot.php (works on any web server)
+        $portalUrl = $portalBaseUrl . '/hotspot.php?nas=' . urlencode($nas['ip_address']) . '&mac=$(mac)&chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)&dst=$(link-orig-esc)';
+        $portalUrlSimple = $portalBaseUrl . '/hotspot.php?nas=' . urlencode($nas['ip_address']) . '&mac=$(mac)';
         $loginHtml = '<!DOCTYPE html>
 <html>
 <head>
@@ -83,11 +85,11 @@ if ($action === 'download_hotspot_files' && isset($_GET['nas_id'])) {
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="pragma" content="no-cache">
     <meta http-equiv="expires" content="-1">
-    <meta http-equiv="refresh" content="0; url=' . htmlspecialchars($portalBaseUrl) . '/$(mac)?chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)&dst=$(link-orig-esc)">
+    <meta http-equiv="refresh" content="0; url=' . htmlspecialchars($portalUrl) . '">
 </head>
 <body>
     <p>Redirecting to login portal...</p>
-    <p><a href="' . htmlspecialchars($portalBaseUrl) . '/$(mac)">Click here if not redirected</a></p>
+    <p><a href="' . htmlspecialchars($portalUrlSimple) . '">Click here if not redirected</a></p>
 </body>
 </html>';
         $zip->addFromString('login.html', $loginHtml);
@@ -216,11 +218,11 @@ Files included:
 - error.html    : Shown on login errors
 - rlogin.html   : Redirect for MAC authentication
 
-Portal URL: " . $portalBaseUrl . "/\$(mac)
+Portal URL: " . $portalBaseUrl . "/hotspot.php?nas=" . $nas['ip_address'] . "&mac=\$(mac)
 NAS IP: " . $nas['ip_address'] . "
 
 MikroTik Login Redirect URL:
-" . $portalBaseUrl . "/\$(mac)?chapID=\$(chap-id)&chapChallenge=\$(chap-challenge)&loginLink=\$(link-login-only)
+" . $portalBaseUrl . "/hotspot.php?nas=" . $nas['ip_address'] . "&mac=\$(mac)&chapID=\$(chap-id)&chapChallenge=\$(chap-challenge)&loginLink=\$(link-login-only)
 
 Generated: " . date('Y-m-d H:i:s') . "
 ";
@@ -10518,9 +10520,9 @@ try {
                                 <?php if (!empty($allNasDevices)): ?>
                                 <div class="mb-0">
                                     <label class="form-label"><i class="bi bi-link-45deg me-1"></i><strong>MikroTik Hotspot Login URLs</strong></label>
-                                    <small class="text-muted d-block mb-2">Copy and use in your MikroTik login.html redirect</small>
+                                    <small class="text-muted d-block mb-2">Copy and use in your MikroTik login.html redirect. Or just download hotspot files from each NAS.</small>
                                     <?php foreach ($allNasDevices as $nasItem): ?>
-                                    <?php $nasHotspotUrl = $hotspotBaseUrl . '/hotspot/' . $nasItem['ip_address'] . '/$(mac)?chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)'; ?>
+                                    <?php $nasHotspotUrl = $hotspotBaseUrl . '/hotspot.php?nas=' . urlencode($nasItem['ip_address']) . '&mac=$(mac)&chapID=$(chap-id)&chapChallenge=$(chap-challenge)&loginLink=$(link-login-only)'; ?>
                                     <div class="bg-light rounded p-2 mb-2">
                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                             <strong class="small"><?= htmlspecialchars($nasItem['name']) ?></strong>
