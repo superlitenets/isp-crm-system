@@ -642,9 +642,39 @@ if ($errorMsg && empty($message)) {
             <?php endif; ?>
             
             <?php if (!empty($packages)): ?>
-            <h6 class="mb-3">Available Packages</h6>
+            <h6 class="mb-3"><?= !empty($clientMAC) ? 'Select a Package' : 'Available Packages' ?></h6>
+            
+            <?php if (!empty($clientMAC)): ?>
+            <form method="POST" id="registerForm">
+                <input type="hidden" name="action" value="register">
+                <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
+                
+                <?php foreach ($packages as $i => $pkg): ?>
+                <label class="package-card d-block <?= $i === 0 ? 'selected' : '' ?>">
+                    <input type="radio" name="package_id" value="<?= $pkg['id'] ?>" <?= $i === 0 ? 'checked' : '' ?>>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><?= htmlspecialchars($pkg['name']) ?></strong>
+                            <div class="small text-muted">
+                                <?= htmlspecialchars($pkg['download_speed'] ?? '') ?> • <?= $pkg['validity_days'] ?> day<?= $pkg['validity_days'] > 1 ? 's' : '' ?>
+                                <?php if (!empty($pkg['data_quota_mb'])): ?> • <?= number_format($pkg['data_quota_mb'] / 1024, 1) ?>GB<?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="price">KES <?= number_format($pkg['price']) ?></div>
+                    </div>
+                </label>
+                <?php endforeach; ?>
+                
+                <div class="mb-3 mt-3">
+                    <input type="tel" name="phone" class="form-control" placeholder="M-Pesa Phone Number (e.g., 0712345678)" required>
+                </div>
+                <button type="submit" class="btn btn-mpesa btn-primary-custom">
+                    <i class="bi bi-phone me-2"></i>Pay with M-Pesa
+                </button>
+            </form>
+            <?php else: ?>
             <?php foreach ($packages as $i => $pkg): ?>
-            <div class="package-card <?= $i === 0 && !empty($clientMAC) ? 'selected' : '' ?>" <?= empty($clientMAC) ? 'style="opacity: 0.7;"' : '' ?>>
+            <div class="package-card" style="opacity: 0.7;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <strong><?= htmlspecialchars($pkg['name']) ?></strong>
@@ -657,30 +687,6 @@ if ($errorMsg && empty($message)) {
                 </div>
             </div>
             <?php endforeach; ?>
-            
-            <?php if (!empty($clientMAC)): ?>
-            <form method="POST" id="registerForm" class="mt-3">
-                <input type="hidden" name="action" value="register">
-                <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
-                
-                <?php foreach ($packages as $i => $pkg): ?>
-                <input type="hidden" class="package-radio" name="package_id_<?= $pkg['id'] ?>" value="<?= $pkg['id'] ?>">
-                <?php endforeach; ?>
-                <select name="package_id" class="form-control mb-3" required>
-                    <?php foreach ($packages as $pkg): ?>
-                    <option value="<?= $pkg['id'] ?>">
-                        <?= htmlspecialchars($pkg['name']) ?> - KES <?= number_format($pkg['price']) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-                
-                <div class="mb-3">
-                    <input type="tel" name="phone" class="form-control" placeholder="M-Pesa Phone Number (e.g., 0712345678)" required>
-                </div>
-                <button type="submit" class="btn btn-mpesa btn-primary-custom">
-                    <i class="bi bi-phone me-2"></i>Pay with M-Pesa
-                </button>
-            </form>
             <?php endif; ?>
             <?php else: ?>
             <div class="alert alert-info">
