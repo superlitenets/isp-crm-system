@@ -188,8 +188,8 @@ async function initializeClient() {
                 
                 // Send webhook to PHP
                 try {
-                    const domain = process.env.REPL_SLUG + '.' + process.env.REPL_OWNER + '.repl.co';
-                    const webhookUrl = `https://${domain}/webhooks/whatsapp.php`;
+                    const webhookBase = process.env.APP_URL || 'http://isp_crm_nginx';
+                    const webhookUrl = `${webhookBase}/webhooks/whatsapp.php`;
                     
                     fetch(webhookUrl, {
                         method: 'POST',
