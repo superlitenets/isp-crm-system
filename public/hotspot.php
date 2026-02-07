@@ -631,14 +631,7 @@ if ($errorMsg && empty($message)) {
             <div class="alert alert-<?= $messageType ?> py-2 small"><?= htmlspecialchars($message) ?></div>
             <?php endif; ?>
             
-            <?php if (empty($clientMAC)): ?>
-            <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                Unable to detect your device. Please reconnect to the WiFi network.
-            </div>
-            <?php else: ?>
-            
-            <?php if ($mpesaEnabled && !empty($packages)): ?>
+            <?php if (!empty($packages)): ?>
             <h6 class="mb-3">Select a Package</h6>
             <form method="POST" id="registerForm">
                 <input type="hidden" name="action" value="register">
@@ -651,8 +644,8 @@ if ($errorMsg && empty($message)) {
                         <div>
                             <strong><?= htmlspecialchars($pkg['name']) ?></strong>
                             <div class="small text-muted">
-                                <?= htmlspecialchars($pkg['download_speed']) ?> • <?= $pkg['validity_days'] ?> day<?= $pkg['validity_days'] > 1 ? 's' : '' ?>
-                                <?php if ($pkg['data_quota_mb']): ?> • <?= number_format($pkg['data_quota_mb'] / 1024, 1) ?>GB<?php endif; ?>
+                                <?= htmlspecialchars($pkg['download_speed'] ?? '') ?> • <?= $pkg['validity_days'] ?> day<?= $pkg['validity_days'] > 1 ? 's' : '' ?>
+                                <?php if (!empty($pkg['data_quota_mb'])): ?> • <?= number_format($pkg['data_quota_mb'] / 1024, 1) ?>GB<?php endif; ?>
                             </div>
                         </div>
                         <div class="price">KES <?= number_format($pkg['price']) ?></div>
@@ -667,6 +660,11 @@ if ($errorMsg && empty($message)) {
                     <i class="bi bi-phone me-2"></i>Pay with M-Pesa
                 </button>
             </form>
+            <?php else: ?>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                No packages available for this hotspot.
+            </div>
             <?php endif; ?>
             
             <div class="section-divider"><span>or use voucher</span></div>
@@ -682,6 +680,7 @@ if ($errorMsg && empty($message)) {
                 </button>
             </form>
             
+            <?php if (!empty($clientMAC)): ?>
             <div class="section-divider"><span>already have a subscription?</span></div>
             
             <div class="bg-light rounded-3 p-3">
@@ -701,7 +700,6 @@ if ($errorMsg && empty($message)) {
                     </button>
                 </form>
             </div>
-            
             <?php endif; ?>
         </div>
         <?php endif; ?>
