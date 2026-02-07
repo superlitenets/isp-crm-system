@@ -990,18 +990,19 @@ class RadiusBilling {
             ");
             $stmt->execute([$startDate, $expiryDate, $id]);
             
-            // Create billing record for activation
             $this->createBillingRecord($id, $sub['package_id'], $package['price'], 'activation', $startDate, $expiryDate);
             
-            // Send CoA to update speed (in case device tried connecting before)
             $coaResult = $this->sendSpeedUpdateCoA($id);
+            
+            $mikrotikResult = $this->manageStaticSubscriberOnMikroTik($id, 'activate');
             
             return [
                 'success' => true, 
                 'message' => 'Subscription activated successfully',
                 'start_date' => $startDate,
                 'expiry_date' => $expiryDate,
-                'coa_result' => $coaResult
+                'coa_result' => $coaResult,
+                'mikrotik_result' => $mikrotikResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
@@ -1060,8 +1061,7 @@ class RadiusBilling {
                 $coaResult = $this->disconnectUserAsync($id);
             }
             
-            // Unblock IP on MikroTik for static/DHCP accounts
-            $mikrotikResult = $this->updateMikroTikBlockedStatus($id, false);
+            $mikrotikResult = $this->manageStaticSubscriberOnMikroTik($id, 'renew');
             
             return [
                 'success' => true, 
@@ -1110,8 +1110,7 @@ class RadiusBilling {
             // Also disconnect addon internet services
             $addonResult = $this->disconnectSubscriptionAddons($id);
             
-            // Block IP on MikroTik for static/DHCP accounts
-            $mikrotikResult = $this->updateMikroTikBlockedStatus($id, true, "Suspended: $reason");
+            $mikrotikResult = $this->manageStaticSubscriberOnMikroTik($id, 'suspend', $reason);
             
             return [
                 'success' => true, 
@@ -1165,8 +1164,7 @@ class RadiusBilling {
                 $id
             ]);
             
-            // Unblock IP on MikroTik for static/DHCP accounts
-            $mikrotikResult = $this->updateMikroTikBlockedStatus($id, false);
+            $mikrotikResult = $this->manageStaticSubscriberOnMikroTik($id, 'unsuspend');
             
             return [
                 'success' => true, 
@@ -2478,33 +2476,28 @@ class RadiusBilling {
         
         while ($sub = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             if ($useExpiredPool) {
-                // Send CoA to move user to expired pool (don't disconnect, redirect to captive portal)
                 $coaResult = $this->sendExpiredPoolCoA($sub['id'], $expiredPoolName, $expiredRateLimit);
                 if ($coaResult['success']) {
                     $coaSent++;
                 }
             } else {
-                // Disconnect active sessions async
                 $this->disconnectUserAsync($sub['id']);
             }
             
-            // Release static IP back to pool if assigned
             $releaseIp = !empty($sub['static_ip']);
             
-            // Update subscription: set expired and clear static IP
+            if ($releaseIp) {
+                $this->manageStaticSubscriberOnMikroTik($sub['id'], 'expire', 'Subscription expired');
+            }
+            
             $this->db->prepare("
                 UPDATE radius_subscriptions 
                 SET status = 'expired', 
-                    static_ip = NULL,
                     updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ?
             ")->execute([$sub['id']]);
             
-            // Also cancel and disconnect all addon internet services
             $this->disconnectSubscriptionAddons($sub['id']);
-            
-            // Block IP on MikroTik for static/DHCP accounts
-            $this->updateMikroTikBlockedStatus($sub['id'], true, "Expired");
             
             if ($releaseIp) {
                 $ipsReleased++;
@@ -4654,6 +4647,126 @@ class RadiusBilling {
         }
     }
     
+    public function manageStaticSubscriberOnMikroTik(int $subscriptionId, string $action, ?string $reason = ''): array {
+        try {
+            $sub = $this->getSubscription($subscriptionId);
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+
+            if (!in_array($sub['access_type'], ['static', 'dhcp'])) {
+                return ['success' => true, 'skipped' => true, 'reason' => 'Not a static/DHCP subscriber'];
+            }
+
+            $ipAddress = $sub['static_ip'] ?? null;
+            if (!$ipAddress) {
+                return ['success' => false, 'error' => 'No static IP assigned'];
+            }
+
+            $nas = null;
+            if (!empty($sub['nas_id'])) {
+                $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE id = ? AND api_enabled = true AND is_active = true");
+                $stmt->execute([$sub['nas_id']]);
+                $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+            }
+            if (!$nas) {
+                $stmt = $this->db->query("SELECT * FROM radius_nas WHERE api_enabled = true AND is_active = true ORDER BY id LIMIT 1");
+                $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+            }
+            if (!$nas) {
+                return ['success' => false, 'error' => 'No NAS with API enabled found'];
+            }
+
+            $apiPassword = $this->decryptApiPassword($nas['api_password_encrypted']);
+            if (!$apiPassword) {
+                return ['success' => false, 'error' => 'Failed to decrypt API password'];
+            }
+
+            $mikrotik = new \App\MikroTikAPI(
+                $nas['ip_address'],
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'],
+                $apiPassword
+            );
+            $mikrotik->connect();
+
+            $listName = $this->getSetting('mikrotik_blocked_list') ?: 'DISABLED_USERS';
+            $target = $ipAddress . '/32';
+            $comment = $sub['username'] . ' - ' . ($sub['customer_name'] ?? 'Customer');
+            $results = [];
+
+            switch ($action) {
+                case 'activate':
+                    $mikrotik->removeFromBlockedList($ipAddress, $listName);
+                    $results['unblocked'] = true;
+
+                    $download = $sub['download_speed'] ?? '10M';
+                    $upload = $sub['upload_speed'] ?? '5M';
+                    $maxLimit = $upload . '/' . $download;
+
+                    $existingQueues = $mikrotik->getSimpleQueues($target);
+                    if (!empty($existingQueues)) {
+                        $mikrotik->updateSimpleQueue($target, [
+                            'max-limit' => $maxLimit,
+                            'comment' => $comment,
+                            'disabled' => 'no'
+                        ]);
+                        $results['queue'] = 'updated';
+                    } else {
+                        $mikrotik->createSimpleQueue($sub['username'], $target, $maxLimit, $comment);
+                        $results['queue'] = 'created';
+                    }
+                    break;
+
+                case 'suspend':
+                case 'expire':
+                    $mikrotik->addToBlockedList($ipAddress, $comment . ' - ' . ucfirst($action) . ($reason ? ": $reason" : '') . ' (' . date('Y-m-d H:i') . ')', $listName);
+                    $results['blocked'] = true;
+
+                    $mikrotik->disableSimpleQueue($target, true);
+                    $results['queue'] = 'disabled';
+                    break;
+
+                case 'unsuspend':
+                case 'renew':
+                    $mikrotik->removeFromBlockedList($ipAddress, $listName);
+                    $results['unblocked'] = true;
+
+                    $download = $sub['download_speed'] ?? '10M';
+                    $upload = $sub['upload_speed'] ?? '5M';
+                    $maxLimit = $upload . '/' . $download;
+
+                    $existingQueues = $mikrotik->getSimpleQueues($target);
+                    if (!empty($existingQueues)) {
+                        $mikrotik->updateSimpleQueue($target, [
+                            'max-limit' => $maxLimit,
+                            'comment' => $comment,
+                            'disabled' => 'no'
+                        ]);
+                        $results['queue'] = 'updated';
+                    } else {
+                        $mikrotik->createSimpleQueue($sub['username'], $target, $maxLimit, $comment);
+                        $results['queue'] = 'created';
+                    }
+                    break;
+
+                case 'deprovision':
+                    $mikrotik->removeFromBlockedList($ipAddress, $listName);
+                    $mikrotik->removeSimpleQueue($target);
+                    $results['queue'] = 'removed';
+                    $results['unblocked'] = true;
+                    break;
+            }
+
+            $mikrotik->disconnect();
+
+            return ['success' => true, 'action' => $action, 'ip' => $ipAddress, 'results' => $results];
+
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     public function syncMikroTikBlockedList(?int $nasId = null): array {
         try {
             // Get NAS device(s) with API enabled

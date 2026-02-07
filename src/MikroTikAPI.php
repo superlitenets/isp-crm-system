@@ -755,6 +755,59 @@ class MikroTikAPI {
         return $this->command('/interface/bridge/print');
     }
     
+    public function getSimpleQueues(?string $target = null): array {
+        if ($target) {
+            return $this->command('/queue/simple/print', ['?target' => $target]);
+        }
+        return $this->command('/queue/simple/print');
+    }
+    
+    public function createSimpleQueue(string $name, string $target, string $maxLimit, ?string $comment = null): array {
+        $params = [
+            'name' => $name,
+            'target' => $target,
+            'max-limit' => $maxLimit
+        ];
+        if ($comment) {
+            $params['comment'] = $comment;
+        }
+        return $this->command('/queue/simple/add', $params);
+    }
+    
+    public function updateSimpleQueue(string $target, array $updates): array {
+        $queues = $this->command('/queue/simple/print', ['?target' => $target]);
+        if (empty($queues) || !isset($queues[0]['.id'])) {
+            return ['error' => 'Queue not found for target: ' . $target];
+        }
+        $params = array_merge(['.id' => $queues[0]['.id']], $updates);
+        return $this->command('/queue/simple/set', $params);
+    }
+    
+    public function removeSimpleQueue(string $target): bool {
+        $queues = $this->command('/queue/simple/print', ['?target' => $target]);
+        if (empty($queues)) {
+            return true;
+        }
+        foreach ($queues as $queue) {
+            if (isset($queue['.id'])) {
+                $this->command('/queue/simple/remove', ['.id' => $queue['.id']]);
+            }
+        }
+        return true;
+    }
+    
+    public function disableSimpleQueue(string $target, bool $disabled = true): bool {
+        $queues = $this->command('/queue/simple/print', ['?target' => $target]);
+        if (empty($queues) || !isset($queues[0]['.id'])) {
+            return false;
+        }
+        $this->command('/queue/simple/set', [
+            '.id' => $queues[0]['.id'],
+            'disabled' => $disabled ? 'yes' : 'no'
+        ]);
+        return true;
+    }
+    
     public function __destruct() {
         $this->disconnect();
     }
