@@ -2751,7 +2751,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'save_oms_templates':
                 $templates = [
                     'wa_template_oms_new_onu' => trim($_POST['wa_template_oms_new_onu'] ?? ''),
-                    'wa_template_oms_fault' => trim($_POST['wa_template_oms_fault'] ?? '')
+                    'wa_template_oms_los_alert' => trim($_POST['wa_template_oms_los_alert'] ?? ''),
+                    'wa_template_oms_onu_authorized' => trim($_POST['wa_template_oms_onu_authorized'] ?? '')
                 ];
                 foreach ($templates as $key => $value) {
                     if (empty($value)) continue;
@@ -14039,14 +14040,15 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             
             $templateSettings = [];
             try {
-                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_fault')");
+                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_los_alert', 'wa_template_oms_onu_authorized')");
                 while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
                     $templateSettings[$row['setting_key']] = $row['setting_value'];
                 }
             } catch (Exception $e) {}
             
-            $defaultDiscoveryTemplate = "*🆕 New ONU Discovery*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\nFound {onu_count} unconfigured ONU(s):\n{onu_list}\n\nDiscovered at: {discovery_time}";
-            $defaultFaultTemplate = "*⚠️ ONU Fault Alert*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\n{fault_count} ONU(s) went offline:\n{fault_list}\n\nDetected at: {detection_time}";
+            $defaultDiscoveryTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel.";
+            $defaultLosTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
+            $defaultAuthorizedTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
             
             $waGroups = [];
             try {
@@ -14217,12 +14219,16 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <li><code>{olt_ip}</code> - OLT IP address</li>
                                             <li><code>{branch_name}</code> - Branch name</li>
                                             <li><code>{fault_count}</code> - Number of faults</li>
-                                            <li><code>{fault_list}</code> - List of faults with status icons</li>
-                                            <li><code>{detection_time}</code> - Detection timestamp</li>
+                                            <li><code>{onu_name}</code> - ONU name</li>
+                                            <li><code>{onu_sn}</code> - ONU serial number</li>
+                                            <li><code>{onu_port}</code> - ONU port (F/S/P:ID)</li>
+                                            <li><code>{alert_time}</code> - Alert timestamp</li>
+                                            <li><code>{previous_status}</code> - Previous ONU status</li>
+                                            <li><code>{customer_name}</code> - Customer name</li>
+                                            <li><code>{customer_phone}</code> - Customer phone</li>
+                                            <li><code>{auth_time}</code> - Authorization timestamp</li>
+                                            <li><code>{service_profile}</code> - Service profile name</li>
                                         </ul>
-                                        <div class="mt-2 small text-muted">
-                                            <strong>Status Icons:</strong> 🔴 LOS, ⚡ Power, ❌ Offline
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -14232,27 +14238,42 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <input type="hidden" name="action" value="save_oms_templates">
                                 
                                 <div class="row">
-                                    <div>
+                                    <div class="col-12 mb-4">
                                         <div class="mb-3">
                                             <label class="form-label">
                                                 <i class="bi bi-broadcast text-primary me-1"></i>
                                                 New ONU Discovery Template
                                             </label>
                                             <textarea name="wa_template_oms_new_onu" class="form-control font-monospace" rows="8" placeholder="Enter discovery notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_new_onu'] ?? $defaultDiscoveryTemplate) ?></textarea>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_count}, {discovery_time}, {onu_locations}, {onu_serials}</small>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_new_onu]').value = <?= htmlspecialchars(json_encode($defaultDiscoveryTemplate)) ?>">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
                                         </button>
                                     </div>
-                                    <div>
+                                    <div class="col-12 mb-4">
                                         <div class="mb-3">
                                             <label class="form-label">
                                                 <i class="bi bi-exclamation-triangle text-danger me-1"></i>
-                                                ONU Fault/LOS Alert Template
+                                                ONU LOS (Loss of Signal) Alert Template
                                             </label>
-                                            <textarea name="wa_template_oms_fault" class="form-control font-monospace" rows="8" placeholder="Enter fault notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_fault'] ?? $defaultFaultTemplate) ?></textarea>
+                                            <textarea name="wa_template_oms_los_alert" class="form-control font-monospace" rows="8" placeholder="Enter LOS alert template..."><?= htmlspecialchars($templateSettings['wa_template_oms_los_alert'] ?? $defaultLosTemplate) ?></textarea>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {alert_time}, {previous_status}, {customer_name}, {customer_phone}</small>
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_fault]').value = <?= htmlspecialchars(json_encode($defaultFaultTemplate)) ?>">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_los_alert]').value = <?= htmlspecialchars(json_encode($defaultLosTemplate)) ?>">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+                                        </button>
+                                    </div>
+                                    <div class="col-12 mb-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-check-circle text-success me-1"></i>
+                                                ONU Authorization Successful Template
+                                            </label>
+                                            <textarea name="wa_template_oms_onu_authorized" class="form-control font-monospace" rows="8" placeholder="Enter authorization notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_onu_authorized'] ?? $defaultAuthorizedTemplate) ?></textarea>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {auth_time}, {customer_name}, {customer_phone}, {service_profile}</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_onu_authorized]').value = <?= htmlspecialchars(json_encode($defaultAuthorizedTemplate)) ?>">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
                                         </button>
                                     </div>

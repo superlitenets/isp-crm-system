@@ -1021,24 +1021,7 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                         <div class="accordion-body">
                             <div class="alert alert-info mb-3">
                                 <i class="bi bi-info-circle me-2"></i>
-                                <strong>Note:</strong> OMS notifications are sent to branch WhatsApp groups. Each OLT must be linked to a branch with a WhatsApp Group ID configured.
-                            </div>
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <label class="form-label fw-bold">New ONU Discovery</label>
-                                    <textarea class="form-control" name="wa_template_oms_new_onu" rows="8"><?= htmlspecialchars($settings->get('wa_template_oms_new_onu', "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel.")) ?></textarea>
-                                    <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_count}, {discovery_time}, {onu_locations}, {onu_serials}</small>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-bold">ONU LOS (Loss of Signal) Alert</label>
-                                    <textarea class="form-control" name="wa_template_oms_los_alert" rows="8"><?= htmlspecialchars($settings->get('wa_template_oms_los_alert', "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.")) ?></textarea>
-                                    <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {alert_time}, {previous_status}, {customer_name}, {customer_phone}</small>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-bold">ONU Authorization Successful</label>
-                                    <textarea class="form-control" name="wa_template_oms_onu_authorized" rows="8"><?= htmlspecialchars($settings->get('wa_template_oms_onu_authorized', "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.")) ?></textarea>
-                                    <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {auth_time}, {customer_name}, {customer_phone}, {service_profile}</small>
-                                </div>
+                                ONU notification templates (New Discovery, LOS Alert, Authorization) are now managed in the <strong>OMS Settings &gt; Notifications</strong> tab. Go to <a href="?page=huawei-olt&view=settings&tab=notifications">OMS Notification Settings</a> to edit them.
                             </div>
                         </div>
                     </div>
@@ -1147,9 +1130,6 @@ function resetToDefaults() {
         'sms_template_hr_notice': 'ISP HR Notice - {subject}: {message}',
         'wa_template_branch_ticket_assigned': '🎫 *NEW TICKET ASSIGNED*\n\n📋 *Ticket:* #{ticket_number}\n📌 *Subject:* {subject}\n🏷️ *Category:* {category}\n⚡ *Priority:* {priority}\n🕐 *Created:* {created_at}\n\n👤 *Customer Details:*\n• Name: {customer_name}\n• Phone: {customer_phone}\n• Email: {customer_email}\n• Account: {customer_account}\n• Username: {customer_username}\n• Address: {customer_address}\n• Location: {customer_location}\n• GPS: {customer_coordinates}\n• Plan: {service_plan}\n\n👷 *{assignment_info}*\n📞 Tech Phone: {technician_phone}\n👥 Team: {team_name}\n👥 Members: {team_members}\n\n🏢 Branch: {branch_name}',
         'wa_template_branch_daily_summary': '📊 *DAILY BRANCH SUMMARY*\n🏢 Branch: {branch_name}\n📅 Date: {date}\n\n📈 *Ticket Statistics:*\n• New Tickets: {new_tickets}\n• Resolved: {resolved_tickets}\n• In Progress: {in_progress_tickets}\n• Open: {open_tickets}\n• SLA Breached: {sla_breached}\n\n👥 *Team Performance:*\n{team_performance}\n\n⏰ Generated at {time}',
-        'wa_template_oms_new_onu': '🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel.',
-        'wa_template_oms_los_alert': '⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.',
-        'wa_template_oms_onu_authorized': '✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.'
     };
     
     for (const [name, value] of Object.entries(defaults)) {

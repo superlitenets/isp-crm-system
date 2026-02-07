@@ -52,7 +52,7 @@ try {
     
     if ($type === 'new_onu_discovery') {
         $template = $settings->get('wa_template_oms_new_onu', 
-            "*🆕 New ONU Discovery*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\nFound {onu_count} unconfigured ONU(s):\n{onu_list}\n\nDiscovered at: {discovery_time}"
+            "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel."
         );
         
         $oltName = $discoveries[0]['olt_name'] ?? 'Unknown';
@@ -60,13 +60,16 @@ try {
         $branchCode = $discoveries[0]['branch_code'] ?? '';
         $oltIp = $discoveries[0]['olt_ip'] ?? '';
         
-        $onuList = [];
+        $onuLocations = [];
         $onuSerials = [];
         foreach ($discoveries as $d) {
             $eqid = !empty($d['equipment_id']) ? " ({$d['equipment_id']})" : '';
-            $onuList[] = "• SN: {$d['serial_number']}{$eqid} @ {$d['frame_slot_port']}";
-            $onuSerials[] = $d['serial_number'];
+            $onuLocations[] = "• {$d['frame_slot_port']}{$eqid}";
+            $onuSerials[] = "• {$d['serial_number']}";
         }
+        
+        $locationsStr = implode("\n", $onuLocations);
+        $serialsStr = implode("\n", $onuSerials);
         
         $message = str_replace([
             '{olt_name}',
@@ -74,6 +77,7 @@ try {
             '{branch_name}',
             '{branch_code}',
             '{onu_count}',
+            '{onu_locations}',
             '{onu_list}',
             '{onu_serials}',
             '{discovery_time}'
@@ -83,8 +87,9 @@ try {
             $branchName,
             $branchCode,
             count($discoveries),
-            implode("\n", $onuList),
-            implode(", ", $onuSerials),
+            $locationsStr,
+            $locationsStr,
+            $serialsStr,
             date('Y-m-d H:i:s')
         ], $template);
         
@@ -157,35 +162,44 @@ try {
             }
         }
         
-        // Send WhatsApp notification
-        $template = $settings->get('wa_template_oms_fault', 
-            "*⚠️ ONU Fault Alert*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\n{fault_count} ONU(s) went offline:\n{fault_list}\n\nDetected at: {detection_time}"
+        // Send WhatsApp LOS notification per ONU using unified template
+        $losTemplate = $settings->get('wa_template_oms_los_alert', 
+            "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site."
         );
         
-        $faultList = [];
+        $messages = [];
         foreach ($faults as $f) {
-            $customerInfo = !empty($f['customer_name']) ? " - {$f['customer_name']}" : '';
-            $statusIcon = $f['new_status'] === 'los' ? '🔴 LOS' : ($f['new_status'] === 'dying-gasp' ? '⚡ Power' : '❌ Offline');
-            $faultList[] = "• {$statusIcon}: {$f['name']} (0/{$f['slot']}/{$f['port']}/{$f['onu_id']}){$customerInfo}";
+            $onuPort = "0/{$f['slot']}/{$f['port']}:{$f['onu_id']}";
+            $message = str_replace([
+                '{olt_name}',
+                '{olt_ip}',
+                '{branch_name}',
+                '{branch_code}',
+                '{onu_name}',
+                '{onu_sn}',
+                '{onu_port}',
+                '{alert_time}',
+                '{previous_status}',
+                '{customer_name}',
+                '{customer_phone}'
+            ], [
+                $oltName,
+                $oltIp,
+                $branchName,
+                $input['branch_code'] ?? '',
+                $f['name'] ?: $f['sn'],
+                $f['sn'],
+                $onuPort,
+                date('Y-m-d H:i:s'),
+                $f['prev_status'] ?? 'online',
+                $f['customer_name'] ?? 'Unknown',
+                $f['customer_phone'] ?? ''
+            ], $losTemplate);
+            $messages[] = $message;
         }
         
-        $message = str_replace([
-            '{olt_name}',
-            '{olt_ip}',
-            '{branch_name}',
-            '{fault_count}',
-            '{fault_list}',
-            '{detection_time}'
-        ], [
-            $oltName,
-            $oltIp,
-            $branchName,
-            count($faults),
-            implode("\n", $faultList),
-            date('Y-m-d H:i:s')
-        ], $template);
-        
-        $result = $whatsapp->sendToGroup($groupId, $message);
+        $combinedMessage = implode("\n\n---\n\n", $messages);
+        $result = $whatsapp->sendToGroup($groupId, $combinedMessage);
         
         echo json_encode([
             'success' => true, 
