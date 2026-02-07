@@ -51,11 +51,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                         throw new Exception('Resolution notes are required.');
                     }
                     
+                    $resolvedByUserId = null;
+                    if (!empty($tokenRecord['employee_id'])) {
+                        $userStmt = $pdo->prepare("SELECT u.id FROM users u JOIN employees e ON e.user_id = u.id WHERE e.id = ? LIMIT 1");
+                        $userStmt->execute([$tokenRecord['employee_id']]);
+                        $resolvedByUserId = $userStmt->fetchColumn() ?: null;
+                    }
+                    
                     $stmt = $pdo->prepare("
                         INSERT INTO ticket_resolutions 
                         (ticket_id, resolved_by, resolution_notes, router_serial, power_levels, cable_used, equipment_installed, additional_notes)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT (ticket_id) DO UPDATE SET
+                            resolved_by = EXCLUDED.resolved_by,
                             resolution_notes = EXCLUDED.resolution_notes,
                             router_serial = EXCLUDED.router_serial,
                             power_levels = EXCLUDED.power_levels,
@@ -63,11 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                             equipment_installed = EXCLUDED.equipment_installed,
                             additional_notes = EXCLUDED.additional_notes,
                             updated_at = CURRENT_TIMESTAMP
-                        RETURNING id
                     ");
                     $stmt->execute([
                         $tokenRecord['ticket_id'],
-                        $tokenRecord['employee_id'],
+                        $resolvedByUserId,
                         $resolutionNotes,
                         $routerSerial,
                         $powerLevels,
@@ -75,54 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                         $equipmentInstalled,
                         $additionalNotes
                     ]);
-                    $resolutionId = $stmt->fetchColumn();
-                    
-                    $uploadDir = __DIR__ . '/uploads/ticket_resolutions/';
-                    if (!is_dir($uploadDir)) {
-                        mkdir($uploadDir, 0755, true);
-                    }
-                    
-                    $maxFileSize = 10 * 1024 * 1024;
-                    $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                    $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-                    $photoTypes = ['photo_serial' => 'serial', 'photo_power' => 'power_levels', 'photo_cables' => 'cables', 'photo_additional' => 'additional'];
-                    
-                    foreach ($photoTypes as $fieldName => $photoType) {
-                        if (!empty($_FILES[$fieldName]['name']) && $_FILES[$fieldName]['error'] === UPLOAD_ERR_OK) {
-                            $tmpFile = $_FILES[$fieldName]['tmp_name'];
-                            $fileSize = $_FILES[$fieldName]['size'];
-                            $ext = strtolower(pathinfo($_FILES[$fieldName]['name'], PATHINFO_EXTENSION));
-                            
-                            if ($fileSize > $maxFileSize) continue;
-                            if (!in_array($ext, $allowedExts)) continue;
-                            
-                            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                            $mimeType = finfo_file($finfo, $tmpFile);
-                            finfo_close($finfo);
-                            
-                            if (!in_array($mimeType, $allowedMimes)) continue;
-                            
-                            $safeExt = match($mimeType) {
-                                'image/jpeg' => 'jpg',
-                                'image/png' => 'png',
-                                'image/gif' => 'gif',
-                                'image/webp' => 'webp',
-                                default => 'jpg'
-                            };
-                            
-                            $fileName = 'ticket_' . $tokenRecord['ticket_id'] . '_' . $photoType . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $safeExt;
-                            $filePath = 'uploads/ticket_resolutions/' . $fileName;
-                            
-                            if (move_uploaded_file($tmpFile, $uploadDir . $fileName)) {
-                                $stmt = $pdo->prepare("
-                                    INSERT INTO ticket_resolution_photos 
-                                    (ticket_id, resolution_id, photo_type, file_path, file_name, uploaded_by)
-                                    VALUES (?, ?, ?, ?, ?, ?)
-                                ");
-                                $stmt->execute([$tokenRecord['ticket_id'], $resolutionId, $photoType, $filePath, $_FILES[$fieldName]['name'], $tokenRecord['employee_id']]);
-                            }
-                        }
-                    }
                 }
                 
                 $stmt = $pdo->prepare("UPDATE tickets SET status = ?, resolved_at = CASE WHEN ? = 'resolved' THEN NOW() ELSE resolved_at END, updated_at = NOW() WHERE id = ?");
@@ -164,7 +123,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                 }
                 
             } catch (Exception $e) {
-                $pdo->rollBack();
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 $message = 'Failed to update ticket: ' . $e->getMessage();
                 $messageType = 'error';
             }
@@ -245,22 +206,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
         .status-closed { background: #95a5a6; color: white; }
         .resolution-form { display: none; }
         .resolution-form.active { display: block; }
-        .photo-upload-card {
-            border: 2px dashed #dee2e6;
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .photo-upload-card:hover {
-            border-color: #667eea;
-            background: #f8f9fa;
-        }
-        .photo-preview {
-            max-height: 80px;
-            border-radius: 5px;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
@@ -349,10 +294,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     </div>
                     
                     <div class="alert alert-info small">
-                        <i class="bi bi-info-circle"></i> Please provide resolution details and photos before marking as resolved.
+                        <i class="bi bi-info-circle"></i> Please provide resolution details before marking as resolved.
                     </div>
                     
-                    <form method="POST" enctype="multipart/form-data" id="resolutionFormSubmit">
+                    <form method="POST" id="resolutionFormSubmit">
                         <input type="hidden" name="token" value="<?= htmlspecialchars($tokenParam) ?>">
                         <input type="hidden" name="new_status" value="Resolved">
                         
@@ -393,44 +338,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                             <textarea class="form-control form-control-sm" name="comment" rows="1" placeholder="Any follow-up needed..."></textarea>
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label small"><i class="bi bi-camera"></i> Resolution Photos</label>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <div class="photo-upload-card">
-                                        <i class="bi bi-upc-scan text-muted"></i>
-                                        <div class="small text-muted">Serial Photo</div>
-                                        <input type="file" class="form-control form-control-sm mt-2" name="photo_serial" accept="image/*" onchange="previewPhoto(this, 'preview_serial')">
-                                        <img id="preview_serial" class="photo-preview d-none">
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="photo-upload-card">
-                                        <i class="bi bi-graph-up text-muted"></i>
-                                        <div class="small text-muted">Power Levels</div>
-                                        <input type="file" class="form-control form-control-sm mt-2" name="photo_power" accept="image/*" onchange="previewPhoto(this, 'preview_power')">
-                                        <img id="preview_power" class="photo-preview d-none">
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="photo-upload-card">
-                                        <i class="bi bi-ethernet text-muted"></i>
-                                        <div class="small text-muted">Cables/Install</div>
-                                        <input type="file" class="form-control form-control-sm mt-2" name="photo_cables" accept="image/*" onchange="previewPhoto(this, 'preview_cables')">
-                                        <img id="preview_cables" class="photo-preview d-none">
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="photo-upload-card">
-                                        <i class="bi bi-image text-muted"></i>
-                                        <div class="small text-muted">Additional</div>
-                                        <input type="file" class="form-control form-control-sm mt-2" name="photo_additional" accept="image/*" onchange="previewPhoto(this, 'preview_additional')">
-                                        <img id="preview_additional" class="photo-preview d-none">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
                         <div class="d-grid">
                             <button type="submit" class="btn btn-success btn-lg" id="submitResolutionBtn">
                                 <i class="bi bi-check-circle"></i> Complete Resolution
@@ -459,26 +366,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
         }
         
         function submitSimpleStatus(status) {
-            document.getElementById('simpleNewStatus').value = status;
-            document.getElementById('simpleStatusForm').submit();
-        }
-        
-        function previewPhoto(input, previewId) {
-            const preview = document.getElementById(previewId);
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    preview.classList.remove('d-none');
-                };
-                reader.readAsDataURL(input.files[0]);
+            if (confirm('Change ticket status to ' + status + '?')) {
+                document.getElementById('simpleNewStatus').value = status;
+                document.getElementById('simpleStatusForm').submit();
             }
         }
         
         document.getElementById('resolutionFormSubmit')?.addEventListener('submit', function() {
             const btn = document.getElementById('submitResolutionBtn');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
         });
     </script>
 </body>
