@@ -87,6 +87,10 @@ externalPort = 80
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
 [nix]
 channel = "stable-25_05"
 packages = ["iputils", "net-snmp", "zip", "glib", "nss", "nspr", "at-spi2-atk", "cups", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXrandr", "xorg.libxcb", "alsa-lib", "pango", "libdrm", "mesa", "libxkbcommon", "gtk3", "xorg.libXext", "xorg.libXfixes", "xorg.libxshmfence", "expat", "dbus-glib", "chromium", "php83Extensions.snmp", "php83Packages.composer", "php84Extensions.snmp", "wireguard-tools", "jq"]

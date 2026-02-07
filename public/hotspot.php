@@ -69,7 +69,8 @@ $nasIP = $_GET['nas'] ?? $_GET['server'] ?? $_GET['nasip'] ?? '';
 $pathMAC = '';
 if (empty($nasIP)) {
     $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-    if (preg_match('#/hotspot/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?#', $requestUri, $matches)) {
+    if (preg_match('#/hs/[^/]+/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?#', $requestUri, $matches)
+        || preg_match('#/hotspot/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?#', $requestUri, $matches)) {
         $nasIP = $matches[1];
         if (!empty($matches[2])) {
             $pathMAC = $matches[2];

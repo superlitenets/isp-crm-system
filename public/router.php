@@ -1,14 +1,27 @@
 <?php
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-if (preg_match('#^/hotspot/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?/?$#', $uri, $matches)) {
+// Hotspot portal routing:
+// /hotspot/{nas_ip}/{mac}
+// /hotspot/{nas_ip}
+// /hs/{isp-slug}/{nas_ip}/{mac}
+// /hs/{isp-slug}/{nas_ip}
+if (preg_match('#^/hs/[^/]+/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?/?$#', $uri, $matches)
+    || preg_match('#^/hotspot/([0-9.:]+)(?:/([0-9a-fA-F:.-]+))?/?$#', $uri, $matches)) {
     $_GET['nas'] = $matches[1];
     $qs = 'nas=' . $matches[1];
     if (!empty($matches[2])) {
         $_GET['mac'] = $matches[2];
         $qs .= '&mac=' . $matches[2];
     }
-    $_SERVER['QUERY_STRING'] = $qs . (empty($_SERVER['QUERY_STRING']) ? '' : '&' . $_SERVER['QUERY_STRING']);
+    if (!empty($_SERVER['QUERY_STRING'])) {
+        parse_str($_SERVER['QUERY_STRING'], $existingParams);
+        foreach ($existingParams as $k => $v) {
+            $_GET[$k] = $v;
+        }
+        $qs .= '&' . $_SERVER['QUERY_STRING'];
+    }
+    $_SERVER['QUERY_STRING'] = $qs;
     require __DIR__ . '/hotspot.php';
     return true;
 }
