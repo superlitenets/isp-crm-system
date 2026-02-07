@@ -7,7 +7,8 @@
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     
     # Hotspot portal: /hotspot/{nas_ip}/{mac} or /hotspot/{nas_ip}
-    RewriteRule ^hotspot/([0-9.:]+)/([0-9a-fA-F:.-]+)/?$ hotspot.php?nas=$1&mac=$2 [L,QSA]
+    # MAC segment accepts actual MACs and MikroTik variables like $(mac)
+    RewriteRule ^hotspot/([0-9.:]+)/([^/?]+)/?$ hotspot.php?nas=$1&mac=$2 [L,QSA,B]
     RewriteRule ^hotspot/([0-9.:]+)/?$ hotspot.php?nas=$1 [L,QSA]
     
     # Route all requests to index.php

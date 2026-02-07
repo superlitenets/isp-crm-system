@@ -83,7 +83,10 @@ if ($nasIP) {
 $nasIP = $nasIP ?: ($_SESSION['nasIP'] ?? '');
 
 if (!empty($pathMAC) && empty($clientMAC)) {
-    $clientMAC = $pathMAC;
+    // Ignore MikroTik variable placeholders that weren't replaced
+    if (preg_match('/^[0-9a-fA-F]{2}([:\-.])[0-9a-fA-F]{2}/', $pathMAC)) {
+        $clientMAC = $pathMAC;
+    }
 }
 
 $currentNAS = null;
