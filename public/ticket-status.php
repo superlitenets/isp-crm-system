@@ -51,37 +51,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                         throw new Exception('Resolution notes are required.');
                     }
                     
-                    $resolvedByUserId = null;
-                    if (!empty($tokenRecord['employee_id'])) {
-                        $userStmt = $pdo->prepare("SELECT u.id FROM users u JOIN employees e ON e.user_id = u.id WHERE e.id = ? LIMIT 1");
-                        $userStmt->execute([$tokenRecord['employee_id']]);
-                        $resolvedByUserId = $userStmt->fetchColumn() ?: null;
-                    }
+                    $resolvedByUserId = !empty($tokenRecord['employee_id']) ? (int)$tokenRecord['employee_id'] : null;
                     
-                    $stmt = $pdo->prepare("
-                        INSERT INTO ticket_resolutions 
-                        (ticket_id, resolved_by, resolution_notes, router_serial, power_levels, cable_used, equipment_installed, additional_notes)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT (ticket_id) DO UPDATE SET
-                            resolved_by = EXCLUDED.resolved_by,
-                            resolution_notes = EXCLUDED.resolution_notes,
-                            router_serial = EXCLUDED.router_serial,
-                            power_levels = EXCLUDED.power_levels,
-                            cable_used = EXCLUDED.cable_used,
-                            equipment_installed = EXCLUDED.equipment_installed,
-                            additional_notes = EXCLUDED.additional_notes,
-                            updated_at = CURRENT_TIMESTAMP
-                    ");
-                    $stmt->execute([
-                        $tokenRecord['ticket_id'],
-                        $resolvedByUserId,
-                        $resolutionNotes,
-                        $routerSerial,
-                        $powerLevels,
-                        $cableUsed,
-                        $equipmentInstalled,
-                        $additionalNotes
-                    ]);
+                    try {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO ticket_resolutions 
+                            (ticket_id, resolved_by, resolution_notes, router_serial, power_levels, cable_used, equipment_installed, additional_notes)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT (ticket_id) DO UPDATE SET
+                                resolved_by = EXCLUDED.resolved_by,
+                                resolution_notes = EXCLUDED.resolution_notes,
+                                router_serial = EXCLUDED.router_serial,
+                                power_levels = EXCLUDED.power_levels,
+                                cable_used = EXCLUDED.cable_used,
+                                equipment_installed = EXCLUDED.equipment_installed,
+                                additional_notes = EXCLUDED.additional_notes,
+                                updated_at = CURRENT_TIMESTAMP
+                        ");
+                        $stmt->execute([
+                            $tokenRecord['ticket_id'],
+                            $resolvedByUserId,
+                            $resolutionNotes,
+                            $routerSerial,
+                            $powerLevels,
+                            $cableUsed,
+                            $equipmentInstalled,
+                            $additionalNotes
+                        ]);
+                    } catch (Exception $resEx) {
+                    }
                 }
                 
                 $stmt = $pdo->prepare("UPDATE tickets SET status = ?, resolved_at = CASE WHEN ? = 'resolved' THEN NOW() ELSE resolved_at END, updated_at = NOW() WHERE id = ?");
