@@ -92,6 +92,7 @@ require_once __DIR__ . '/../src/Mpesa.php';
 require_once __DIR__ . '/../src/Complaint.php';
 require_once __DIR__ . '/../src/ActivityLog.php';
 require_once __DIR__ . '/../src/Reports.php';
+require_once __DIR__ . '/../src/LicenseClient.php';
 
 // Skip schema initialization in production (run via deployment script instead)
 // Set SKIP_DB_INIT=1 in production environment
@@ -7240,6 +7241,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error saving mobile settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'save_license_settings':
+                try {
+                    $serverUrl = trim($_POST['license_server_url'] ?? '');
+                    $key = trim($_POST['license_key'] ?? '');
+                    
+                    $settings->set('license_server_url', $serverUrl);
+                    $settings->set('license_key', $key);
+                    \App\Settings::clearCache();
+                    
+                    if (!empty($serverUrl) && !empty($key)) {
+                        $licenseClient = new \LicenseClient();
+                        $activateResult = $licenseClient->activate();
+                        if ($activateResult['valid']) {
+                            $message = 'License settings saved and activated successfully!';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'License settings saved, but activation failed: ' . ($activateResult['message'] ?? 'Unknown error');
+                            $messageType = 'warning';
+                        }
+                    } else {
+                        $message = 'License settings saved. Licensing is disabled (no server URL or key configured).';
+                        $messageType = 'success';
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving license settings: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

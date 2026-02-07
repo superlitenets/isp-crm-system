@@ -55,7 +55,7 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Static IP Provisioning**: Provision static IPs and manage DHCP leases on MikroTik.
   - **MikroTik API Integration**: Full RouterOS API support for network configuration.
   - **Live Traffic Monitoring**: Real-time traffic graph for PPPoE, DHCP, and Static IP subscribers with on-demand Chart.js visualization polling MikroTik every 2 seconds.
-- **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers) with environment variable configuration.
+- **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers). License settings configurable via Settings > License page (server URL, key, activation, renewal) with database persistence. Config priority: DB settings > environment variables > defaults.
 - **Hotspot Captive Portal**: URL-based NAS routing (`/hotspot/{nas_ip}`) for per-NAS package selection, MAC-based auto-login, M-Pesa STK Push, voucher redemption, and MikroTik CHAP integration. PHP built-in server uses `public/router.php` for URL path routing; Apache uses `.htaccess` rewrite rules.
 
 ## External Dependencies

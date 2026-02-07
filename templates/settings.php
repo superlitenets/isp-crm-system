@@ -146,6 +146,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-receipt"></i> Invoices & Quotes
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'license' ? 'active' : '' ?>" href="?page=settings&subpage=license">
+            <i class="bi bi-shield-check"></i> License
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -7318,5 +7323,326 @@ $mpesaAccountName = $settings->get('payment_mpesa_account_name', '');
         </div>
     </div>
 </form>
+
+<?php elseif ($subpage === 'license'): ?>
+
+<?php
+$licenseClient = new \LicenseClient();
+$licenseEnabled = $licenseClient->isEnabled();
+$licenseInfo = null;
+$licenseStatus = null;
+$licenseError = null;
+
+$licenseServerUrl = $settings->get('license_server_url', getenv('LICENSE_SERVER_URL') ?: '');
+$licenseKey = $settings->get('license_key', getenv('LICENSE_KEY') ?: '');
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csrf_token'])) {
+    $licenseAction = $_POST['license_action'] ?? '';
+    
+    if ($licenseAction === 'activate_license') {
+        try {
+            $result = $licenseClient->activate();
+            if ($result['valid']) {
+                $licenseStatus = 'activated';
+            } else {
+                $licenseError = $result['message'] ?? 'Activation failed';
+            }
+        } catch (Exception $e) {
+            $licenseError = $e->getMessage();
+        }
+    }
+    
+    if ($licenseAction === 'validate_license') {
+        try {
+            $result = $licenseClient->validate();
+            if ($result['valid']) {
+                $licenseStatus = 'valid';
+            } else {
+                $licenseError = $result['message'] ?? $result['error'] ?? 'Validation failed';
+            }
+        } catch (Exception $e) {
+            $licenseError = $e->getMessage();
+        }
+    }
+    
+    if ($licenseAction === 'deactivate_license') {
+        $licenseClient->deactivate();
+        $licenseStatus = 'deactivated';
+    }
+}
+
+$licenseValidation = $licenseClient->validate();
+$isValid = $licenseValidation['valid'] ?? false;
+$licenseData = $licenseValidation['license'] ?? null;
+$graceMode = $licenseValidation['grace_mode'] ?? false;
+$mode = $licenseValidation['mode'] ?? '';
+?>
+
+<?php if ($licenseStatus === 'activated'): ?>
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle me-1"></i> License activated successfully!
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php elseif ($licenseStatus === 'valid'): ?>
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle me-1"></i> License validated successfully!
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php elseif ($licenseStatus === 'deactivated'): ?>
+<div class="alert alert-warning alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle me-1"></i> License deactivated from this installation.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php endif; ?>
+<?php if ($licenseError): ?>
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-x-circle me-1"></i> <?= htmlspecialchars($licenseError) ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php endif; ?>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>License Status</h5>
+                <?php if ($isValid && $licenseData): ?>
+                    <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i> Active</span>
+                <?php elseif ($mode === 'unlicensed'): ?>
+                    <span class="badge bg-secondary fs-6"><i class="bi bi-dash-circle me-1"></i> Unlicensed</span>
+                <?php else: ?>
+                    <span class="badge bg-danger fs-6"><i class="bi bi-x-circle me-1"></i> Invalid</span>
+                <?php endif; ?>
+            </div>
+            <div class="card-body">
+                <?php if ($isValid && $licenseData): ?>
+                    <?php if ($graceMode): ?>
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i> <strong>Grace Mode</strong> - Unable to reach the license server. Operating in grace period.
+                    </div>
+                    <?php endif; ?>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted d-block">License Key</small>
+                                <strong class="font-monospace"><?= htmlspecialchars(substr($licenseData['key'] ?? $licenseKey, 0, 8)) ?>...<?= htmlspecialchars(substr($licenseData['key'] ?? $licenseKey, -4)) ?></strong>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted d-block">Licensed To</small>
+                                <strong><?= htmlspecialchars($licenseData['customer'] ?? $licenseData['company'] ?? 'N/A') ?></strong>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted d-block">Plan / Tier</small>
+                                <strong>
+                                    <span class="badge bg-primary"><?= htmlspecialchars($licenseData['tier'] ?? 'N/A') ?></span>
+                                </strong>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted d-block">Expires</small>
+                                <?php
+                                $expiresAt = $licenseData['expires_at'] ?? null;
+                                if ($expiresAt) {
+                                    $expDate = new DateTime($expiresAt);
+                                    $now = new DateTime();
+                                    $diff = $now->diff($expDate);
+                                    $isExpired = $expDate < $now;
+                                    $isExpiringSoon = !$isExpired && $diff->days <= 30;
+                                ?>
+                                    <strong class="<?= $isExpired ? 'text-danger' : ($isExpiringSoon ? 'text-warning' : 'text-success') ?>">
+                                        <?= $expDate->format('M d, Y') ?>
+                                        <?php if ($isExpired): ?>
+                                            <span class="badge bg-danger ms-1">Expired</span>
+                                        <?php elseif ($isExpiringSoon): ?>
+                                            <span class="badge bg-warning ms-1"><?= $diff->days ?> days left</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-success ms-1"><?= $diff->days ?> days left</span>
+                                        <?php endif; ?>
+                                    </strong>
+                                <?php } else { ?>
+                                    <strong class="text-success">Lifetime</strong>
+                                <?php } ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h6 class="mb-3"><i class="bi bi-speedometer2 me-1"></i> Usage Limits</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 text-center">
+                                <i class="bi bi-people fs-4 text-primary d-block mb-1"></i>
+                                <small class="text-muted d-block">Max Users</small>
+                                <strong class="fs-5"><?= $licenseData['max_users'] > 0 ? $licenseData['max_users'] : 'Unlimited' ?></strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 text-center">
+                                <i class="bi bi-person-lines-fill fs-4 text-info d-block mb-1"></i>
+                                <small class="text-muted d-block">Max Customers</small>
+                                <strong class="fs-5"><?= $licenseData['max_customers'] > 0 ? $licenseData['max_customers'] : 'Unlimited' ?></strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 text-center">
+                                <i class="bi bi-router fs-4 text-success d-block mb-1"></i>
+                                <small class="text-muted d-block">Max ONUs</small>
+                                <strong class="fs-5"><?= $licenseData['max_onus'] > 0 ? $licenseData['max_onus'] : 'Unlimited' ?></strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <?php
+                    $features = $licenseData['features'] ?? [];
+                    if (!empty($features)):
+                    ?>
+                    <hr>
+                    <h6 class="mb-3"><i class="bi bi-toggles me-1"></i> Licensed Features</h6>
+                    <div class="row g-2">
+                        <?php
+                        $featureLabels = [
+                            'crm' => ['CRM & Customers', 'bi-people'],
+                            'tickets' => ['Ticketing System', 'bi-ticket-perforated'],
+                            'oms' => ['OMS / SmartOLT', 'bi-hdd-network'],
+                            'hr' => ['HR & Payroll', 'bi-person-badge'],
+                            'inventory' => ['Inventory', 'bi-box-seam'],
+                            'accounting' => ['Accounting', 'bi-calculator'],
+                            'whitelabel' => ['White Label', 'bi-brush'],
+                            'radius' => ['RADIUS Billing', 'bi-broadcast'],
+                            'vpn' => ['VPN Management', 'bi-shield-lock'],
+                            'huawei_olt' => ['Huawei OLT', 'bi-hdd-rack'],
+                        ];
+                        foreach ($features as $feature => $enabled):
+                            $label = $featureLabels[$feature] ?? [ucfirst(str_replace('_', ' ', $feature)), 'bi-puzzle'];
+                        ?>
+                        <div class="col-md-4 col-6">
+                            <div class="d-flex align-items-center p-2 border rounded <?= $enabled ? 'border-success bg-success bg-opacity-10' : 'border-secondary bg-light' ?>">
+                                <i class="bi <?= $label[1] ?> me-2 <?= $enabled ? 'text-success' : 'text-secondary' ?>"></i>
+                                <span class="small <?= $enabled ? '' : 'text-muted' ?>"><?= $label[0] ?></span>
+                                <i class="bi <?= $enabled ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-secondary' ?> ms-auto"></i>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+
+                <?php elseif ($mode === 'unlicensed'): ?>
+                    <div class="text-center py-4">
+                        <i class="bi bi-shield-slash display-3 text-muted"></i>
+                        <h5 class="mt-3">No License Configured</h5>
+                        <p class="text-muted">This CRM is running without license restrictions.<br>Configure a license server URL and license key below to enable licensing.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="text-center py-4">
+                        <i class="bi bi-shield-x display-3 text-danger"></i>
+                        <h5 class="mt-3 text-danger">License Invalid</h5>
+                        <p class="text-muted"><?= htmlspecialchars($licenseValidation['message'] ?? $licenseValidation['error'] ?? 'Unknown error') ?></p>
+                        <form method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="license_action" value="activate_license">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-arrow-repeat me-1"></i> Try Activation
+                            </button>
+                        </form>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <?php if ($isValid && $licenseData): ?>
+            <div class="card-footer bg-white d-flex gap-2">
+                <form method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="license_action" value="validate_license">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-repeat me-1"></i> Re-validate
+                    </button>
+                </form>
+                <form method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to deactivate this license from this installation?')">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="license_action" value="deactivate_license">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-x-circle me-1"></i> Deactivate
+                    </button>
+                </form>
+                <?php if (!empty($licenseServerUrl)): ?>
+                <a href="<?= htmlspecialchars(rtrim($licenseServerUrl, '/')) ?>/subscribe.php?key=<?= urlencode($licenseData['key'] ?? $licenseKey) ?>" target="_blank" class="btn btn-success btn-sm ms-auto">
+                    <i class="bi bi-credit-card me-1"></i> Renew / Upgrade License
+                </a>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-gear me-2"></i>License Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_license_settings">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">License Server URL</label>
+                        <input type="url" class="form-control" name="license_server_url" value="<?= htmlspecialchars($licenseServerUrl) ?>" placeholder="https://license.example.com">
+                        <small class="text-muted">The URL of your license validation server</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">License Key</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control font-monospace" name="license_key" value="<?= htmlspecialchars($licenseKey) ?>" placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" id="licenseKeyInput">
+                            <button type="button" class="btn btn-outline-secondary" onclick="let i=document.getElementById('licenseKeyInput'); i.type=i.type==='password'?'text':'password';">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Your unique license key</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-save me-1"></i> Save & Activate
+                    </button>
+                </form>
+                
+                <?php if ($licenseEnabled): ?>
+                <hr>
+                <div class="small text-muted">
+                    <p class="mb-1"><strong>Cache Info:</strong></p>
+                    <?php
+                    $cacheFile = __DIR__ . '/../storage/license_cache.json';
+                    if (file_exists($cacheFile)) {
+                        $cacheData = json_decode(file_get_contents($cacheFile), true);
+                        $lastValidated = $cacheData['last_validated'] ?? null;
+                    ?>
+                    <p class="mb-1">Last validated: <?= $lastValidated ? date('M d, Y H:i', $lastValidated) : 'Never' ?></p>
+                    <p class="mb-0">Cache file: <code>storage/license_cache.json</code></p>
+                    <?php } else { ?>
+                    <p class="mb-0">No cached license data</p>
+                    <?php } ?>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="card border-info">
+            <div class="card-body">
+                <h6><i class="bi bi-info-circle text-info me-1"></i> About Licensing</h6>
+                <ul class="mb-0 small text-muted">
+                    <li>License validates every 24 hours automatically</li>
+                    <li>7-day grace period if the server is unreachable</li>
+                    <li>Features are enabled/disabled based on your plan tier</li>
+                    <li>Leave both fields empty to run without license restrictions</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php endif; ?>
