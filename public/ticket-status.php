@@ -39,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
             try {
                 $pdo->beginTransaction();
                 
+                $resolvedByUserId = !empty($tokenRecord['employee_id']) ? (int)$tokenRecord['employee_id'] : null;
+                
                 if ($newStatus === 'Resolved') {
                     $resolutionNotes = trim($_POST['resolution_notes'] ?? '');
                     $routerSerial = trim($_POST['router_serial'] ?? '');
@@ -50,9 +52,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     if (empty($resolutionNotes)) {
                         throw new Exception('Resolution notes are required.');
                     }
-                    
-                    $resolvedByUserId = !empty($tokenRecord['employee_id']) ? (int)$tokenRecord['employee_id'] : null;
-                    
+                }
+                
+                $dbStatus = strtolower(str_replace(' ', '_', $newStatus));
+                $stmt = $pdo->prepare("UPDATE tickets SET status = ?, resolved_at = CASE WHEN ? = 'resolved' THEN NOW() ELSE resolved_at END, updated_at = NOW() WHERE id = ?");
+                $stmt->execute([$dbStatus, $dbStatus, $tokenRecord['ticket_id']]);
+                
+                $statusLink->useToken($tokenRecord['id']);
+                
+                if (in_array($newStatus, ['Resolved', 'Closed'])) {
+                    $statusLink->invalidateToken($tokenRecord['id']);
+                }
+                
+                if (!empty($comment)) {
+                    try {
+                        $pdo->exec("SAVEPOINT comment_save");
+                        $stmt = $pdo->prepare("
+                            INSERT INTO ticket_comments (ticket_id, user_id, comment, created_at)
+                            VALUES (?, ?, ?, NOW())
+                        ");
+                        $stmt->execute([$tokenRecord['ticket_id'], $resolvedByUserId, $comment]);
+                    } catch (Exception $commentEx) {
+                        $pdo->exec("ROLLBACK TO SAVEPOINT comment_save");
+                    }
+                }
+                
+                $techName = $tokenRecord['assigned_to_name'] ?? 'Technician';
+                $logDescription = "Status changed to '{$newStatus}' via quick link by {$techName}" . ($comment ? ". Note: {$comment}" : "");
+                try {
+                    $pdo->exec("SAVEPOINT log_save");
+                    $logStmt = $pdo->prepare("
+                        INSERT INTO activity_logs (user_id, action_type, entity_type, entity_id, details, created_at)
+                        VALUES (?, 'status_updated_via_link', 'ticket', ?, ?, NOW())
+                    ");
+                    $logStmt->execute([$resolvedByUserId, $tokenRecord['ticket_id'], $logDescription]);
+                } catch (Exception $logEx) {
+                    $pdo->exec("ROLLBACK TO SAVEPOINT log_save");
+                }
+                
+                $pdo->commit();
+                
+                if ($newStatus === 'Resolved' && !empty($resolutionNotes)) {
                     try {
                         $stmt = $pdo->prepare("
                             INSERT INTO ticket_resolutions 
@@ -81,36 +121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     } catch (Exception $resEx) {
                     }
                 }
-                
-                $stmt = $pdo->prepare("UPDATE tickets SET status = ?, resolved_at = CASE WHEN ? = 'resolved' THEN NOW() ELSE resolved_at END, updated_at = NOW() WHERE id = ?");
-                $stmt->execute([strtolower(str_replace(' ', '_', $newStatus)), strtolower(str_replace(' ', '_', $newStatus)), $tokenRecord['ticket_id']]);
-                
-                $statusLink->useToken($tokenRecord['id']);
-                
-                if (in_array($newStatus, ['Resolved', 'Closed'])) {
-                    $statusLink->invalidateToken($tokenRecord['id']);
-                }
-                
-                $techName = $tokenRecord['assigned_to_name'] ?? 'Technician';
-                $logDescription = "Status changed to '{$newStatus}' via quick link by {$techName}" . ($comment ? ". Note: {$comment}" : "");
-                try {
-                    $logStmt = $pdo->prepare("
-                        INSERT INTO activity_logs (user_id, action_type, entity_type, entity_id, details, created_at)
-                        VALUES (?, 'status_updated_via_link', 'ticket', ?, ?, NOW())
-                    ");
-                    $logStmt->execute([$tokenRecord['employee_id'], $tokenRecord['ticket_id'], $logDescription]);
-                } catch (Exception $logEx) {
-                }
-                
-                if (!empty($comment)) {
-                    $stmt = $pdo->prepare("
-                        INSERT INTO ticket_comments (ticket_id, user_id, comment, created_at)
-                        VALUES (?, ?, ?, NOW())
-                    ");
-                    $stmt->execute([$tokenRecord['ticket_id'], $tokenRecord['employee_id'], $comment]);
-                }
-                
-                $pdo->commit();
                 
                 $message = "Ticket status updated to '{$newStatus}' successfully!";
                 $messageType = 'success';
