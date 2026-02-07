@@ -3675,14 +3675,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$ticketId, $currentUser['id'], 'Quick resolved by admin/support']);
                         
                         $stmt = $db->prepare("
-                            INSERT INTO ticket_activity 
-                            (ticket_id, user_id, action, details, created_at) 
-                            VALUES (?, ?, 'status_change', ?, CURRENT_TIMESTAMP)
+                            INSERT INTO ticket_comments 
+                            (ticket_id, user_id, comment, is_internal, created_at) 
+                            VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP)
                         ");
                         $stmt->execute([
                             $ticketId, 
                             $currentUser['id'], 
-                            json_encode(['from' => 'open', 'to' => 'resolved', 'type' => 'admin_quick_resolve'])
+                            'Status changed to resolved (admin quick resolve)'
                         ]);
                         
                         $db->commit();
