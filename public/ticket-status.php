@@ -52,6 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     if (empty($resolutionNotes)) {
                         throw new Exception('Resolution notes are required.');
                     }
+                    if (empty($routerSerial)) {
+                        throw new Exception('Router serial number is required.');
+                    }
+                    if (empty($cableUsed)) {
+                        throw new Exception('Cable used is required.');
+                    }
                 }
                 
                 $dbStatus = strtolower(str_replace(' ', '_', $newStatus));
@@ -311,8 +317,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                         
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label small">Router Serial</label>
-                                <input type="text" class="form-control form-control-sm" name="router_serial" placeholder="SN123456">
+                                <label class="form-label small">Router Serial <span style="color:red">*</span></label>
+                                <input type="text" class="form-control form-control-sm" name="router_serial" placeholder="SN123456" required>
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">Power Levels</label>
@@ -322,8 +328,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                         
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label small">Cable Used</label>
-                                <input type="text" class="form-control form-control-sm" name="cable_used" placeholder="50m CAT6">
+                                <label class="form-label small">Cable Used <span style="color:red">*</span></label>
+                                <input type="text" class="form-control form-control-sm" name="cable_used" placeholder="50m CAT6" required>
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">Equipment</label>
