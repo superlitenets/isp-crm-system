@@ -16513,10 +16513,11 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <tr>
                                 <td class="text-muted">Encryption</td>
                                 <td>
-                                    <select class="form-select form-select-sm" id="wifiPortEncryption">
+                                    <select class="form-select form-select-sm" id="wifiPortEncryption" onchange="toggleWifiPasswordField(this.value)">
                                         <option value="AES" selected>AES</option>
                                         <option value="TKIP">TKIP</option>
                                         <option value="TKIP+AES">TKIP+AES</option>
+                                        <option value="Open">Open (No Encryption)</option>
                                     </select>
                                 </td>
                             </tr>
@@ -22129,8 +22130,21 @@ function saveDeviceStatus() {
                     document.getElementById('wifiPortEnabled').checked = iface.enabled;
                     document.getElementById('wifiPortDisabled').checked = !iface.enabled;
                     document.getElementById('wifiPortSsid').value = iface.ssid || '';
+                    
+                    // Set encryption from TR-069 BeaconType/security
+                    const sec = (iface.security || iface.beacon_type || '').toLowerCase();
+                    const encSelect = document.getElementById('wifiPortEncryption');
+                    if (sec === 'basic' || sec === 'none' || sec === 'open') {
+                        encSelect.value = 'Open';
+                    } else {
+                        const enc = (iface.encryption || '').toUpperCase();
+                        if (enc.includes('TKIP') && enc.includes('AES')) encSelect.value = 'TKIP+AES';
+                        else if (enc.includes('TKIP')) encSelect.value = 'TKIP';
+                        else encSelect.value = 'AES';
+                    }
+                    toggleWifiPasswordField(encSelect.value);
+                    
                     if (iface.vlan_id) {
-                        // Delay to ensure dropdown is populated first
                         setTimeout(() => {
                             document.getElementById('wifiPortVlan').value = iface.vlan_id;
                         }, 100);
@@ -22158,6 +22172,14 @@ function saveDeviceStatus() {
             vlans.forEach(vlan => {
                 select.innerHTML += `<option value="${vlan}">${vlan}</option>`;
             });
+        }
+    }
+    
+    // Hide/show password field based on encryption selection
+    function toggleWifiPasswordField(encryption) {
+        const passRow = document.getElementById('wifiPortPassword')?.closest('tr');
+        if (passRow) {
+            passRow.style.display = (encryption === 'Open') ? 'none' : '';
         }
     }
     
@@ -22195,8 +22217,23 @@ function saveDeviceStatus() {
         // Core WiFi parameters (universally supported)
         params[basePath + 'Enable'] = enabled;
         if (ssid) params[basePath + 'SSID'] = ssid;
-        if (password && password.length >= 8) {
-            params[basePath + 'PreSharedKey.1.KeyPassphrase'] = password;
+        
+        // Encryption / security settings
+        if (encryption === 'Open') {
+            params[basePath + 'BeaconType'] = 'Basic';
+            params[basePath + 'BasicAuthenticationMode'] = 'None';
+            params[basePath + 'WPAAuthenticationMode'] = '';
+            params[basePath + 'IEEE11iAuthenticationMode'] = '';
+            params[basePath + 'WPAEncryptionModes'] = '';
+        } else {
+            params[basePath + 'BeaconType'] = '11i';
+            params[basePath + 'IEEE11iAuthenticationMode'] = 'PSKAuthentication';
+            params[basePath + 'WPAAuthenticationMode'] = 'PSKAuthentication';
+            const encMap = { 'AES': 'AESEncryption', 'TKIP': 'TKIPEncryption', 'TKIP+AES': 'TKIPandAESEncryption' };
+            params[basePath + 'WPAEncryptionModes'] = encMap[encryption] || 'AESEncryption';
+            if (password && password.length >= 8) {
+                params[basePath + 'PreSharedKey.1.KeyPassphrase'] = password;
+            }
         }
         
         // VLAN configuration (if specified)
