@@ -12433,6 +12433,15 @@ class HuaweiOLT {
     }
     
     public function matchONUToCustomer(int $onuId, int $customerId): bool {
+        $custStmt = $this->db->prepare("SELECT name, phone, address FROM customers WHERE id = ?");
+        $custStmt->execute([$customerId]);
+        $custData = $custStmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($custData) {
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET customer_id = ?, customer_name = ?, phone = ? WHERE id = ?");
+            return $stmt->execute([$customerId, $custData['name'], $custData['phone'] ?? null, $onuId]);
+        }
+        
         $stmt = $this->db->prepare("UPDATE huawei_onus SET customer_id = ? WHERE id = ?");
         return $stmt->execute([$customerId, $onuId]);
     }

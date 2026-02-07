@@ -151,7 +151,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_unconfigured_count') {
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_customers_for_auth') {
     header('Content-Type: application/json');
     try {
-        $stmt = $db->query("SELECT id, name, phone, account_number FROM customers ORDER BY name LIMIT 5000");
+        $stmt = $db->query("SELECT id, name, phone, account_number, address FROM customers ORDER BY name LIMIT 5000");
         $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode(['success' => true, 'customers' => $customers]);
     } catch (Exception $e) {
@@ -9088,6 +9088,9 @@ try {
                             const opt = document.createElement('option');
                             opt.value = c.id;
                             opt.textContent = c.name + ' - ' + (c.phone || 'No phone') + ' (' + (c.account_number || 'N/A') + ')';
+                            opt.dataset.name = c.name;
+                            opt.dataset.phone = c.phone || '';
+                            opt.dataset.address = c.address || '';
                             sel.appendChild(opt);
                         });
                         if (currentVal) sel.value = currentVal;
@@ -9095,7 +9098,8 @@ try {
                     .catch(e => console.log('Customer load failed:', e));
                 sel.addEventListener('change', function(){
                     const viewBtn = sel.parentElement.querySelector('a.btn');
-                    if (this.value) {
+                    const selected = this.options[this.selectedIndex];
+                    if (this.value && selected) {
                         if (viewBtn) {
                             viewBtn.href = '?page=customers&action=view&id=' + this.value;
                             viewBtn.style.display = '';
@@ -9106,6 +9110,14 @@ try {
                             a.title = 'View customer';
                             a.innerHTML = '<i class="bi bi-eye"></i>';
                             sel.parentElement.appendChild(a);
+                        }
+                        const nameField = sel.closest('form').querySelector('input[name="name"]');
+                        const descField = sel.closest('form').querySelector('input[name="description"]');
+                        if (nameField && selected.dataset.name) {
+                            nameField.value = selected.dataset.name;
+                        }
+                        if (descField && selected.dataset.address) {
+                            descField.value = selected.dataset.address;
                         }
                     } else if (viewBtn) {
                         viewBtn.style.display = 'none';
