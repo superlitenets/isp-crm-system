@@ -645,9 +645,9 @@ class DiscoveryWorker {
 
         const discoveriesByGroup = {};
         for (const d of result.rows) {
-            const groupId = d.whatsapp_group || provisioningGroup;
+            const groupId = provisioningGroup || d.whatsapp_group;
             if (!groupId) {
-                console.log(`[Discovery] No group for ONU ${d.serial_number} (no branch group or global provisioning group)`);
+                console.log(`[Discovery] No group for ONU ${d.serial_number} (no provisioning group configured)`);
                 continue;
             }
             

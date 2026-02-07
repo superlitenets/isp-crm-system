@@ -3059,10 +3059,8 @@ class HuaweiOLT {
             $oltId = $onu['olt_id'] ?? null;
             if ($oltId) {
                 $olt = $this->getOLT($oltId);
-                if ($olt && !empty($olt['branch_whatsapp_group'])) {
+                if ($olt) {
                     $this->sendLosNotification($onu, $olt, $previousStatus);
-                } else {
-                    error_log("OMS LOS Alert: ONU {$onu['sn']} went LOS but OLT has no branch/WhatsApp group configured");
                 }
             }
         }
@@ -11414,15 +11412,17 @@ class HuaweiOLT {
     }
     
     public function sendLosNotification(array $onu, array $olt, string $previousStatus = 'online'): bool {
-        if (empty($olt['branch_whatsapp_group'])) {
-            return false;
-        }
-        
         try {
             require_once __DIR__ . '/WhatsApp.php';
             require_once __DIR__ . '/Settings.php';
             $whatsapp = new \App\WhatsApp($this->db);
             $settings = new \App\Settings();
+            
+            $provisioningGroup = $settings->get('wa_provisioning_group', '');
+            if (empty($provisioningGroup)) {
+                error_log("OMS Notification: No provisioning group configured (wa_provisioning_group)");
+                return false;
+            }
             
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
             $branchCode = $olt['branch_code'] ?? '';
@@ -11449,7 +11449,7 @@ class HuaweiOLT {
             
             $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
             
-            $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
+            $result = $whatsapp->sendToGroup($provisioningGroup, $message);
             return $result['success'] ?? false;
         } catch (\Exception $e) {
             error_log("OMS Notification Error (LOS): " . $e->getMessage());
@@ -11458,15 +11458,17 @@ class HuaweiOLT {
     }
     
     public function sendOnuAuthorizedNotification(array $onu, array $olt, string $authorizedBy = ''): bool {
-        if (empty($olt['branch_whatsapp_group'])) {
-            return false;
-        }
-        
         try {
             require_once __DIR__ . '/WhatsApp.php';
             require_once __DIR__ . '/Settings.php';
             $whatsapp = new \App\WhatsApp($this->db);
             $settings = new \App\Settings();
+            
+            $provisioningGroup = $settings->get('wa_provisioning_group', '');
+            if (empty($provisioningGroup)) {
+                error_log("OMS Notification: No provisioning group configured (wa_provisioning_group)");
+                return false;
+            }
             
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
             $branchCode = $olt['branch_code'] ?? '';
@@ -11494,7 +11496,7 @@ class HuaweiOLT {
             
             $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
             
-            $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
+            $result = $whatsapp->sendToGroup($provisioningGroup, $message);
             return $result['success'] ?? false;
         } catch (\Exception $e) {
             error_log("OMS Notification Error (Authorized): " . $e->getMessage());
