@@ -3652,18 +3652,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ticketId = (int)($_POST['ticket_id'] ?? 0);
                 if ($ticketId) {
                     try {
-                        // Update ticket status to resolved
+                        $db->beginTransaction();
+                        
                         $stmt = $db->prepare("
                             UPDATE tickets 
                             SET status = 'resolved', 
-                                resolved_by = ?, 
                                 resolved_at = CURRENT_TIMESTAMP,
                                 updated_at = CURRENT_TIMESTAMP 
                             WHERE id = ?
                         ");
-                        $stmt->execute([$currentUser['id'], $ticketId]);
+                        $stmt->execute([$ticketId]);
                         
-                        // Log the activity
+                        $stmt = $db->prepare("
+                            INSERT INTO ticket_resolutions 
+                            (ticket_id, resolved_by, resolution_notes)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT (ticket_id) DO UPDATE SET
+                                resolved_by = EXCLUDED.resolved_by,
+                                resolution_notes = EXCLUDED.resolution_notes,
+                                updated_at = CURRENT_TIMESTAMP
+                        ");
+                        $stmt->execute([$ticketId, $currentUser['id'], 'Quick resolved by admin/support']);
+                        
                         $stmt = $db->prepare("
                             INSERT INTO ticket_activity 
                             (ticket_id, user_id, action, details, created_at) 
@@ -3675,9 +3685,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             json_encode(['from' => 'open', 'to' => 'resolved', 'type' => 'admin_quick_resolve'])
                         ]);
                         
+                        $db->commit();
+                        
                         $_SESSION['flash_message'] = 'Ticket resolved successfully.';
                         $_SESSION['flash_type'] = 'success';
                     } catch (Exception $e) {
+                        if ($db->inTransaction()) {
+                            $db->rollBack();
+                        }
                         $_SESSION['flash_message'] = 'Error resolving ticket: ' . $e->getMessage();
                         $_SESSION['flash_type'] = 'danger';
                     }
