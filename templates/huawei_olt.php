@@ -2752,7 +2752,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $templates = [
                     'wa_template_oms_new_onu' => trim($_POST['wa_template_oms_new_onu'] ?? ''),
                     'wa_template_oms_los_alert' => trim($_POST['wa_template_oms_los_alert'] ?? ''),
-                    'wa_template_oms_onu_authorized' => trim($_POST['wa_template_oms_onu_authorized'] ?? '')
+                    'wa_template_oms_onu_authorized' => trim($_POST['wa_template_oms_onu_authorized'] ?? ''),
+                    'wa_template_oms_wifi_changed' => trim($_POST['wa_template_oms_wifi_changed'] ?? '')
                 ];
                 foreach ($templates as $key => $value) {
                     if (empty($value)) continue;
@@ -14040,7 +14041,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             
             $templateSettings = [];
             try {
-                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_los_alert', 'wa_template_oms_onu_authorized')");
+                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_los_alert', 'wa_template_oms_onu_authorized', 'wa_template_oms_wifi_changed')");
                 while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
                     $templateSettings[$row['setting_key']] = $row['setting_value'];
                 }
@@ -14049,6 +14050,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             $defaultDiscoveryTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel.";
             $defaultLosTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
             $defaultAuthorizedTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
+            $defaultWifiChangedTemplate = "📶 *WiFi Credentials Updated*\n\nHello {customer_name},\n\nYour WiFi settings have been updated:\n\n📡 *Network Name (SSID):* {ssid}\n🔑 *Password:* {password}\n📻 *Band:* {band}\n\n🔌 *ONU:* {onu_name}\n⏰ *Time:* {change_time}\n\nPlease reconnect your devices using the new credentials.\n\nThank you!";
             
             $waGroups = [];
             try {
@@ -14277,6 +14279,21 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
                                         </button>
                                     </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="mb-2">
+                                        <label class="form-label fw-bold">
+                                            <i class="bi bi-wifi text-info me-1"></i>
+                                            WiFi Credentials Changed (Sent to Customer)
+                                        </label>
+                                        <small class="d-block text-muted mb-1">Sent directly to customer's WhatsApp when WiFi SSID/password is changed via TR-069</small>
+                                        <textarea name="wa_template_oms_wifi_changed" class="form-control font-monospace" rows="8" placeholder="Enter WiFi change notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_wifi_changed'] ?? $defaultWifiChangedTemplate) ?></textarea>
+                                        <small class="text-muted">Placeholders: {customer_name}, {customer_phone}, {onu_name}, {onu_sn}, {ssid}, {password}, {band}, {wlan_index}, {olt_name}, {branch_name}, {change_time}, {changed_by}</small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_wifi_changed]').value = <?= htmlspecialchars(json_encode($defaultWifiChangedTemplate)) ?>">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+                                    </button>
                                 </div>
                                 
                                 <hr class="my-3">

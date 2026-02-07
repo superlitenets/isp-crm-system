@@ -8387,6 +8387,14 @@ class HuaweiOLT {
         ]);
         
         if ($success) {
+            if (!empty($password)) {
+                try {
+                    $this->sendWiFiChangeNotification($onu, $ssid, $password, $wlanIndex);
+                } catch (\Exception $e) {
+                    error_log("WiFi notification failed (non-critical): " . $e->getMessage());
+                }
+            }
+
             return [
                 'success' => true,
                 'message' => "WiFi configuration sent via TR-069. SSID: {$ssid}",
@@ -11504,6 +11512,80 @@ class HuaweiOLT {
         }
     }
     
+    public function sendWiFiChangeNotification(array $onu, string $ssid, string $password, int $wlanIndex = 1): bool {
+        try {
+            require_once __DIR__ . '/WhatsApp.php';
+            require_once __DIR__ . '/Settings.php';
+            $whatsapp = new \App\WhatsApp($this->db);
+            $settings = new \App\Settings();
+
+            $customerPhone = $onu['phone'] ?? $onu['customer_phone'] ?? '';
+            if (empty($customerPhone)) {
+                error_log("OMS WiFi Notification: No customer phone for ONU {$onu['sn']}");
+                return false;
+            }
+
+            $customerName = $onu['customer_name'] ?? 'Customer';
+            $onuName = $onu['name'] ?? 'N/A';
+            $onuSn = $onu['sn'] ?? '';
+
+            $oltName = '';
+            $branchName = '';
+            if (!empty($onu['olt_id'])) {
+                $olt = $this->getOLT($onu['olt_id']);
+                if ($olt) {
+                    $oltName = $olt['name'] ?? '';
+                    $branchName = $olt['branch_name'] ?? '';
+                }
+            }
+
+            $band = '2.4GHz';
+            if ($wlanIndex >= 5) {
+                $band = '5GHz';
+            }
+
+            $defaultTemplate = "📶 *WiFi Credentials Updated*\n\nHello {customer_name},\n\nYour WiFi settings have been updated:\n\n📡 *Network Name (SSID):* {ssid}\n🔑 *Password:* {password}\n📻 *Band:* {band}\n\n🔌 *ONU:* {onu_name}\n⏰ *Time:* {change_time}\n\nPlease reconnect your devices using the new credentials.\n\nThank you!";
+            $template = $settings->get('wa_template_oms_wifi_changed', $defaultTemplate);
+
+            $changedBy = '';
+            if (!empty($_SESSION['user_name'])) {
+                $changedBy = $_SESSION['user_name'];
+            } elseif (!empty($_SESSION['user_id'])) {
+                $stmt = $this->db->prepare("SELECT name FROM users WHERE id = ?");
+                $stmt->execute([$_SESSION['user_id']]);
+                $changedBy = $stmt->fetchColumn() ?: '';
+            }
+
+            $placeholders = [
+                '{customer_name}' => $customerName,
+                '{customer_phone}' => $customerPhone,
+                '{onu_name}' => $onuName,
+                '{onu_sn}' => $onuSn,
+                '{ssid}' => $ssid,
+                '{password}' => $password,
+                '{band}' => $band,
+                '{wlan_index}' => (string)$wlanIndex,
+                '{olt_name}' => $oltName,
+                '{branch_name}' => $branchName,
+                '{change_time}' => date('Y-m-d H:i:s'),
+                '{changed_by}' => $changedBy
+            ];
+
+            $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
+
+            $result = $whatsapp->send($customerPhone, $message);
+            if ($result['success'] ?? false) {
+                error_log("OMS WiFi Notification: Sent to {$customerPhone} for ONU {$onuSn}");
+            } else {
+                error_log("OMS WiFi Notification: Failed to send to {$customerPhone} - " . ($result['error'] ?? 'Unknown error'));
+            }
+            return $result['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("OMS Notification Error (WiFi Change): " . $e->getMessage());
+            return false;
+        }
+    }
+
     private function getTR069AcsUrl(): ?string {
         try {
             // First check for explicit TR-069 ACS URL setting
