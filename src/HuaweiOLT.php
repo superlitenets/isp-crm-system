@@ -3674,8 +3674,8 @@ class HuaweiOLT {
     
     public function getONU(int $id): ?array {
         $stmt = $this->db->prepare("
-            SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name,
-                   ot.model as onu_type_model, dl.equipment_id as discovered_eqid
+            SELECT o.*, olt.name as olt_name, c.name as customer_name, c.phone as customer_phone,
+                   sp.name as profile_name, ot.model as onu_type_model, dl.equipment_id as discovered_eqid
             FROM huawei_onus o
             LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
             LEFT JOIN customers c ON o.customer_id = c.id
@@ -8387,12 +8387,10 @@ class HuaweiOLT {
         ]);
         
         if ($success) {
-            if (!empty($password)) {
-                try {
-                    $this->sendWiFiChangeNotification($onu, $ssid, $password, $wlanIndex);
-                } catch (\Exception $e) {
-                    error_log("WiFi notification failed (non-critical): " . $e->getMessage());
-                }
+            try {
+                $this->sendWiFiChangeNotification($onu, $ssid, $password ?: '(unchanged)', $wlanIndex);
+            } catch (\Exception $e) {
+                error_log("WiFi notification failed (non-critical): " . $e->getMessage());
             }
 
             return [
