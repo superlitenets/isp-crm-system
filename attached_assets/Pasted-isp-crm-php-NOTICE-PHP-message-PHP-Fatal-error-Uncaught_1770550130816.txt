@@ -1,0 +1,38 @@
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to undefined function getDbConnection() in /var/www/html/public/isp-cron.php:14
+isp_crm_php  | Stack trace:
+isp_crm_php  | #0 {main}
+isp_crm_php  |   thrown in /var/www/html/public/isp-cron.php on line 14
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:06:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:10:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:10:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:10:16 +0300 "GET /isp-cron.php" 500
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to undefined function getDbConnection() in /var/www/html/public/isp-cron.php:14
+isp_crm_php  | Stack trace:
+isp_crm_php  | #0 {main}
+isp_crm_php  |   thrown in /var/www/html/public/isp-cron.php on line 14
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:11:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:13:01 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:14:59 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:15:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:15:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:15:16 +0300 "GET /isp-cron.php" 500
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to undefined function getDbConnection() in /var/www/html/public/isp-cron.php:14
+isp_crm_php  | Stack trace:
+isp_crm_php  | #0 {main}
+isp_crm_php  |   thrown in /var/www/html/public/isp-cron.php on line 14
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:16:30 +0300 "GET /vtigercrm/graph.php" 404
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:16:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:18:04 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:19:26 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:20:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:20:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:20:16 +0300 "GET /isp-cron.php" 500
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to undefined function getDbConnection() in /var/www/html/public/isp-cron.php:14
+isp_crm_php  | Stack trace:
+isp_crm_php  | #0 {main}
+isp_crm_php  |   thrown in /var/www/html/public/isp-cron.php on line 14
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:22:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:25:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  08/Feb/2026:14:25:01 +0300 "GET /cron.php" 200
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to undefined function getDbConnection() in /var/www/html/public/isp-cron.php:14
+isp_crm_php  | Stack trace:

@@ -12,7 +12,7 @@ $isCli = php_sapi_name() === 'cli';
 $action = $isCli ? ($argv[1] ?? '') : ($_GET['action'] ?? '');
 $secret = $isCli ? 'cli-bypass' : ($_GET['secret'] ?? '');
 
-$db = getDbConnection();
+$db = Database::getConnection();
 $settings = new \App\Settings();
 $cronSecret = $settings->get('cron_secret', 'isp-crm-cron-2024');
 
