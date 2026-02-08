@@ -772,16 +772,24 @@ function formatValidity($days, $pkg = null) {
         <!-- SUCCESS STATE -->
         <?php 
         $mikrotikLoginUrl = '';
-        if (!empty($linkLoginOnly) && !empty($clientMAC)) {
-            $loginParams = [
-                'username' => $clientMAC,
-                'password' => $clientMAC
-            ];
+        $mikrotikLoginUser = '';
+        $mikrotikLoginPass = '';
+        $mikrotikDst = $linkOrig ?: '';
+        $useChap = false;
+        if (!empty($linkLoginOnly) && $subscription) {
+            $mikrotikLoginUser = $subscription['username'] ?? $clientMAC;
+            $plainPass = $subscription['password'] ?? $clientMAC;
+            $mikrotikLoginUrl = $linkLoginOnly;
+            
             if (!empty($chapId) && !empty($chapChallenge)) {
-                $loginParams['chap-id'] = $chapId;
-                $loginParams['chap-challenge'] = $chapChallenge;
+                $chapIdBin = stripcslashes($chapId);
+                $chapChallengeBin = stripcslashes($chapChallenge);
+                $chapHash = md5($chapIdBin . $plainPass . $chapChallengeBin);
+                $mikrotikLoginPass = $chapHash;
+                $useChap = true;
+            } else {
+                $mikrotikLoginPass = $plainPass;
             }
-            $mikrotikLoginUrl = $linkLoginOnly . (strpos($linkLoginOnly, '?') !== false ? '&' : '?') . http_build_query($loginParams);
         }
         ?>
         <?php
@@ -795,9 +803,16 @@ function formatValidity($days, $pkg = null) {
         $canAddMore = $subMaxDevices > 1 && $subDeviceCount < $subMaxDevices;
         ?>
         <?php if (!empty($mikrotikLoginUrl)): ?>
+        <form id="mikrotikLoginForm" method="POST" action="<?= htmlspecialchars($mikrotikLoginUrl) ?>" style="display:none;">
+            <input type="hidden" name="username" value="<?= htmlspecialchars($mikrotikLoginUser) ?>">
+            <input type="hidden" name="password" value="<?= htmlspecialchars($mikrotikLoginPass) ?>">
+            <?php if (!empty($mikrotikDst)): ?>
+            <input type="hidden" name="dst" value="<?= htmlspecialchars($mikrotikDst) ?>">
+            <?php endif; ?>
+        </form>
         <script>
             setTimeout(function() {
-                window.location.href = '<?= htmlspecialchars($mikrotikLoginUrl) ?>';
+                document.getElementById('mikrotikLoginForm').submit();
             }, <?= $canAddMore ? '4000' : '2000' ?>);
         </script>
         <?php endif; ?>
@@ -829,9 +844,9 @@ function formatValidity($days, $pkg = null) {
                     
                     <?php if (!empty($mikrotikLoginUrl)): ?>
                     <p style="color: #94a3b8; font-size: 13px; margin-bottom: 12px;">Redirecting to network...</p>
-                    <a href="<?= htmlspecialchars($mikrotikLoginUrl) ?>" class="btn-main btn-primary" style="text-decoration: none;">
+                    <button type="button" onclick="document.getElementById('mikrotikLoginForm').submit();" class="btn-main btn-primary">
                         <i class="bi bi-arrow-right-circle"></i> Click Here if Not Redirected
-                    </a>
+                    </button>
                     <?php elseif (!empty($linkOrig)): ?>
                     <a href="<?= htmlspecialchars($linkOrig) ?>" class="btn-main btn-primary" style="text-decoration: none;">
                         <i class="bi bi-globe"></i> Continue Browsing
