@@ -2407,9 +2407,9 @@ class RadiusBilling {
         } else {
             $accountNumber = 'HS-' . strtoupper(substr(md5($phone . microtime(true)), 0, 8));
             $stmt = $this->db->prepare("
-                INSERT INTO customers (account_number, name, phone, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO customers (account_number, name, phone, address, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ");
-            $stmt->execute([$accountNumber, 'Hotspot User ' . substr($phone, -4), '+' . $phone]);
+            $stmt->execute([$accountNumber, 'Hotspot User ' . substr($phone, -4), '+' . $phone, 'Hotspot']);
             $customerId = $this->db->lastInsertId();
         }
         
