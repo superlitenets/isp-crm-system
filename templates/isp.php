@@ -2495,6 +2495,7 @@ try {
         /* Enhanced ISP Mobile Responsiveness */
         @media (max-width: 991.98px) {
             .isp-sidebar { display: none !important; }
+            .isp-sidebar.show { display: flex !important; position: fixed; top: 0; left: 0; bottom: 0; z-index: 1050; width: 280px; overflow-y: auto; box-shadow: 4px 0 20px rgba(0,0,0,0.3); }
             .isp-main { margin-left: 0 !important; }
             /* Make subscriber table scrollable */
             .card-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -2562,6 +2563,20 @@ try {
     <button class="isp-mobile-toggle" id="ispMobileMenuBtn" onclick="toggleIspMobileMenu()">
         <i class="bi bi-list" id="ispMobileMenuIcon"></i>
     </button>
+    <script>
+    function toggleIspMobileMenu() {
+        var sidebar = document.querySelector('.isp-sidebar');
+        var overlay = document.getElementById('ispSidebarOverlay');
+        var icon = document.getElementById('ispMobileMenuIcon');
+        if (sidebar && overlay) {
+            sidebar.classList.toggle('show');
+            overlay.classList.toggle('show');
+            if (icon) {
+                icon.className = sidebar.classList.contains('show') ? 'bi bi-x-lg' : 'bi bi-list';
+            }
+        }
+    }
+    </script>
     
     <div class="isp-mobile-header" style="top: 40px;">
         <div class="brand-mobile">
