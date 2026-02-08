@@ -2313,17 +2313,18 @@ class RadiusBilling {
                 $subscriptionId = $existing['id'];
             } else {
                 // Create new subscription for this MAC
-                $stmt = $this->db->prepare("
-                    INSERT INTO radius_subscriptions 
-                    (username, password, mac_address, package_id, status, expiry_date, access_type, created_at)
-                    VALUES (?, ?, ?, ?, 'active', ?, 'hotspot', CURRENT_TIMESTAMP)
-                ");
                 $username = 'HS-' . strtoupper(substr(md5($macFormatted . time()), 0, 8));
                 $password = strtoupper(substr(md5(uniqid()), 0, 8));
+                $passwordEncrypted = password_hash($password, PASSWORD_DEFAULT);
                 $validityMinutes = $voucher['validity_minutes'] ?? ($voucher['validity_days'] * 1440);
                 $expiry = date('Y-m-d H:i:s', strtotime("+{$validityMinutes} minutes"));
                 
-                $stmt->execute([$username, $password, $macFormatted, $voucher['package_id'], $expiry]);
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_subscriptions 
+                    (username, password, password_encrypted, mac_address, package_id, status, expiry_date, access_type, created_at)
+                    VALUES (?, ?, ?, ?, ?, 'active', ?, 'hotspot', CURRENT_TIMESTAMP)
+                ");
+                $stmt->execute([$username, $password, $passwordEncrypted, $macFormatted, $voucher['package_id'], $expiry]);
                 $subscriptionId = $this->db->lastInsertId();
             }
             
@@ -2413,13 +2414,14 @@ class RadiusBilling {
             // Create new subscription
             $username = 'HS-' . strtoupper(substr(md5($macFormatted . time()), 0, 8));
             $password = strtoupper(substr(md5(uniqid()), 0, 8));
+            $passwordEncrypted = password_hash($password, PASSWORD_DEFAULT);
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_subscriptions 
-                (customer_id, username, password, mac_address, package_id, status, access_type, created_at)
-                VALUES (?, ?, ?, ?, ?, 'pending_payment', 'hotspot', CURRENT_TIMESTAMP)
+                (customer_id, username, password, password_encrypted, mac_address, package_id, status, access_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending_payment', 'hotspot', CURRENT_TIMESTAMP)
             ");
-            $stmt->execute([$customerId, $username, $password, $macFormatted, $packageId]);
+            $stmt->execute([$customerId, $username, $password, $passwordEncrypted, $macFormatted, $packageId]);
             $subscriptionId = $this->db->lastInsertId();
         }
         
