@@ -2405,11 +2405,11 @@ class RadiusBilling {
         if ($customer) {
             $customerId = $customer['id'];
         } else {
-            // Create new customer
+            $accountNumber = 'HS-' . strtoupper(substr(md5($phone . microtime(true)), 0, 8));
             $stmt = $this->db->prepare("
-                INSERT INTO customers (name, phone, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO customers (account_number, name, phone, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
             ");
-            $stmt->execute(['Hotspot User ' . substr($phone, -4), '+' . $phone]);
+            $stmt->execute([$accountNumber, 'Hotspot User ' . substr($phone, -4), '+' . $phone]);
             $customerId = $this->db->lastInsertId();
         }
         
