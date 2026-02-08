@@ -1488,11 +1488,23 @@ class RadiusBilling {
     private function createBillingRecord(int $subscriptionId, int $packageId, float $amount, string $type, string $start, string $end, string $description = ''): void {
         $invoiceNumber = 'RAD-' . date('Ymd') . '-' . str_pad($subscriptionId, 5, '0', STR_PAD_LEFT);
         
-        $stmt = $this->db->prepare("
-            INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, period_start, period_end, invoice_number, status, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-        ");
-        $stmt->execute([$subscriptionId, $packageId, $amount, $type, $start, $end, $invoiceNumber, $description]);
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, period_start, period_end, invoice_number, status, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            ");
+            $stmt->execute([$subscriptionId, $packageId, $amount, $type, $start, $end, $invoiceNumber, $description]);
+        } catch (\PDOException $e) {
+            if (strpos($e->getMessage(), 'description') !== false) {
+                $stmt = $this->db->prepare("
+                    INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, period_start, period_end, invoice_number, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+                ");
+                $stmt->execute([$subscriptionId, $packageId, $amount, $type, $start, $end, $invoiceNumber]);
+            } else {
+                throw $e;
+            }
+        }
     }
     
     public function getBillingHistory(?int $subscriptionId = null, int $limit = 50): array {
