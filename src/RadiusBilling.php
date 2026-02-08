@@ -597,23 +597,27 @@ class RadiusBilling {
             $mac = implode(':', str_split($mac, 2));
         }
         
-        // First check devices table
-        $stmt = $this->db->prepare("
-            SELECT s.*, d.mac_address as device_mac, d.device_name,
-                   p.name as package_name, p.price as package_price, p.download_speed, p.upload_speed, p.max_devices,
-                   c.name as customer_name, c.phone as customer_phone
-            FROM radius_subscription_devices d
-            JOIN radius_subscriptions s ON d.subscription_id = s.id
-            LEFT JOIN radius_packages p ON s.package_id = p.id
-            LEFT JOIN customers c ON s.customer_id = c.id
-            WHERE d.mac_address = ? AND d.is_active = true
-        ");
-        $stmt->execute([$mac]);
-        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        if ($sub) {
-            $sub['is_expired'] = !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time();
-            return $sub;
+        // First check devices table (may not exist on older installations)
+        try {
+            $stmt = $this->db->prepare("
+                SELECT s.*, d.mac_address as device_mac, d.device_name,
+                       p.name as package_name, p.price as package_price, p.download_speed, p.upload_speed, p.max_devices,
+                       c.name as customer_name, c.phone as customer_phone
+                FROM radius_subscription_devices d
+                JOIN radius_subscriptions s ON d.subscription_id = s.id
+                LEFT JOIN radius_packages p ON s.package_id = p.id
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE d.mac_address = ? AND d.is_active = true
+            ");
+            $stmt->execute([$mac]);
+            $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($sub) {
+                $sub['is_expired'] = !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time();
+                return $sub;
+            }
+        } catch (\Exception $e) {
+            // Table doesn't exist yet, fall through to legacy lookup
         }
         
         // Fallback to legacy single mac_address field
