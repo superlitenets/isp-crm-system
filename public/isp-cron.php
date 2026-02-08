@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/RadiusBilling.php';
+require_once __DIR__ . '/../src/MikroTikAPI.php';
 require_once __DIR__ . '/../src/SMSGateway.php';
 require_once __DIR__ . '/../src/Settings.php';
 

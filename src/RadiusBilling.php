@@ -4917,6 +4917,10 @@ class RadiusBilling {
             return null;
         }
     }
+
+    public function getDecryptedApiPassword(?string $encrypted): ?string {
+        return $this->decryptApiPassword($encrypted);
+    }
     
     // ==================== VLAN Management ====================
     

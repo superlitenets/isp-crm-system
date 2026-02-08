@@ -899,13 +899,19 @@ if ($action === 'reboot_nas') {
     if ($id) {
         $nas = $radiusBilling->getNAS($id);
         if ($nas && $nas['api_enabled']) {
-            $api = new MikroTikAPI();
-            if ($api->connect($nas['ip_address'], $nas['api_username'], $nas['api_password'], $nas['api_port'] ?: 8728)) {
-                $result = $api->command('/system/reboot');
+            try {
+                $apiPassword = $radiusBilling->getDecryptedApiPassword($nas['api_password_encrypted'] ?? '');
+                if (!$apiPassword) {
+                    echo json_encode(['success' => false, 'error' => 'Failed to decrypt API password']);
+                    exit;
+                }
+                $api = new MikroTikAPI($nas['ip_address'], (int)($nas['api_port'] ?: 8728), $nas['api_username'], $apiPassword);
+                $api->connect();
+                $api->command('/system/reboot');
                 $api->disconnect();
                 echo json_encode(['success' => true, 'message' => 'Reboot command sent']);
-            } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to connect to MikroTik API']);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => 'Failed to connect: ' . $e->getMessage()]);
             }
         } else {
             echo json_encode(['success' => false, 'error' => 'NAS not found or API not enabled']);
