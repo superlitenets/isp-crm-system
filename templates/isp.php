@@ -3107,7 +3107,7 @@ try {
             if ($filter === 'expired') $filters['expired'] = true;
             if (!empty($_GET['status'])) $filters['status'] = $_GET['status'];
             if (!empty($_GET['package_id'])) $filters['package_id'] = (int)$_GET['package_id'];
-            if (!empty($_GET['access_type'])) $filters['access_type'] = $_GET['access_type'];
+            $filters['access_type'] = !empty($_GET['access_type']) ? $_GET['access_type'] : 'pppoe';
             
             $packages = $radiusBilling->getPackages();
             $nasDevices = $radiusBilling->getNASDevices();
@@ -3211,7 +3211,7 @@ try {
             $pppoeCount = $radiusBilling->countSubscribersByAccessType('pppoe');
             $staticCount = $radiusBilling->countSubscribersByAccessType('static');
             $hotspotCount = $radiusBilling->countSubscribersByAccessType('hotspot');
-            $currentAccessType = $_GET['access_type'] ?? '';
+            $currentAccessType = $_GET['access_type'] ?? 'pppoe';
             ?>
             
             <ul class="nav nav-tabs mb-3">
