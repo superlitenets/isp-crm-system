@@ -143,10 +143,29 @@ class RadiusBilling {
     
     public function getNASByIP(string $ipAddress): ?array {
         $cleanIP = preg_replace('/:\d+$/', '', $ipAddress);
-        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE (ip_address = ? OR local_ip = ?) AND is_active = true LIMIT 1");
-        $stmt->execute([$cleanIP, $cleanIP]);
-        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if ($result) return $result;
+        
+        try {
+            $hasLocalIP = false;
+            $colCheck = $this->db->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'radius_nas' AND column_name = 'local_ip'");
+            if ($colCheck->fetch()) {
+                $hasLocalIP = true;
+            }
+            
+            if ($hasLocalIP) {
+                $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE (ip_address = ? OR local_ip = ?) AND is_active = true LIMIT 1");
+                $stmt->execute([$cleanIP, $cleanIP]);
+            } else {
+                $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE ip_address = ? AND is_active = true LIMIT 1");
+                $stmt->execute([$cleanIP]);
+            }
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($result) return $result;
+        } catch (\Exception $e) {
+            $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE ip_address = ? AND is_active = true LIMIT 1");
+            $stmt->execute([$cleanIP]);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($result) return $result;
+        }
 
         $stmt2 = $this->db->prepare("
             SELECT n.* FROM radius_nas n
