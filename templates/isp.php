@@ -3399,8 +3399,11 @@ try {
                                         <div class="mt-1">
                                             <span class="badge bg-light text-dark border"><?= strtoupper($sub['access_type']) ?></span>
                                         </div>
-                                        <?php if ($sub['mac_address']): ?>
-                                        <div class="small text-success mt-1" title="MAC Bound"><i class="bi bi-lock-fill"></i> MAC</div>
+                                        <?php if ($sub['mac_address']): 
+                                            $subMacVendor = \App\MacVendorLookup::getShortName($sub['mac_address']);
+                                            $subMacIcon = $subMacVendor ? \App\MacVendorLookup::getDeviceIcon($subMacVendor) : 'bi-lock-fill';
+                                        ?>
+                                        <div class="small text-success mt-1" title="<?= htmlspecialchars($sub['mac_address']) ?>"><i class="bi <?= $subMacIcon ?>"></i> <?= $subMacVendor ? htmlspecialchars($subMacVendor) : 'MAC' ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -3852,8 +3855,16 @@ try {
                                     <span class="badge bg-<?= $statusClass === 'success' ? 'white text-success' : ($statusClass === 'danger' ? 'danger' : 'warning text-dark') ?>"><?= $statusLabel ?></span>
                                     <span class="badge bg-white bg-opacity-25"><?= strtoupper($subscriber['access_type']) ?></span>
                                 </div>
-                                <?php if ($subscriber['mac_address']): ?>
-                                <div class="mt-2"><span class="badge bg-white bg-opacity-10"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span></div>
+                                <?php if ($subscriber['mac_address']): 
+                                    $macVendor = \App\MacVendorLookup::getShortName($subscriber['mac_address']);
+                                    $macIcon = $macVendor ? \App\MacVendorLookup::getDeviceIcon($macVendor) : 'bi-lock-fill';
+                                ?>
+                                <div class="mt-2">
+                                    <span class="badge bg-white bg-opacity-10"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span>
+                                    <?php if ($macVendor): ?>
+                                    <span class="badge bg-white bg-opacity-10"><i class="bi <?= $macIcon ?> me-1"></i><?= htmlspecialchars($macVendor) ?></span>
+                                    <?php endif; ?>
+                                </div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -4225,9 +4236,15 @@ try {
                                             <tr>
                                                 <td class="text-muted">MAC Address</td>
                                                 <td>
-                                                    <?php if ($subscriber['mac_address']): ?>
+                                                    <?php if ($subscriber['mac_address']): 
+                                                        $detailMacVendor = \App\MacVendorLookup::getShortName($subscriber['mac_address']);
+                                                        $detailMacIcon = $detailMacVendor ? \App\MacVendorLookup::getDeviceIcon($detailMacVendor) : 'bi-lock-fill';
+                                                    ?>
                                                     <code><?= htmlspecialchars($subscriber['mac_address']) ?></code>
                                                     <span class="badge bg-success ms-1"><i class="bi bi-lock-fill"></i></span>
+                                                    <?php if ($detailMacVendor): ?>
+                                                    <span class="badge bg-info ms-1"><i class="bi <?= $detailMacIcon ?> me-1"></i><?= htmlspecialchars($detailMacVendor) ?></span>
+                                                    <?php endif; ?>
                                                     <form method="post" class="d-inline">
                                                         <input type="hidden" name="action" value="clear_mac">
                                                         <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
@@ -5180,8 +5197,9 @@ try {
                                     <tbody>
                                         <?php foreach ($devices as $device): ?>
                                         <tr>
-                                            <td><code><?= htmlspecialchars($device['mac_address']) ?></code></td>
-                                            <td><?= htmlspecialchars($device['device_name'] ?: '-') ?></td>
+                                            <?php $devVendor = \App\MacVendorLookup::getShortName($device['mac_address']); $devIcon = $devVendor ? \App\MacVendorLookup::getDeviceIcon($devVendor) : ''; ?>
+                                            <td><code><?= htmlspecialchars($device['mac_address']) ?></code><?php if ($devVendor): ?> <span class="badge bg-info"><i class="bi <?= $devIcon ?> me-1"></i><?= htmlspecialchars($devVendor) ?></span><?php endif; ?></td>
+                                            <td><?= htmlspecialchars($device['device_name'] ?: ($devVendor ?: '-')) ?></td>
                                             <td><?= $device['last_seen'] ? date('M j, g:i A', strtotime($device['last_seen'])) : 'Never' ?></td>
                                             <td>
                                                 <?php if ($device['is_active']): ?>
