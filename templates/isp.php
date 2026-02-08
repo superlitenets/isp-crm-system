@@ -901,7 +901,7 @@ if ($action === 'reboot_nas') {
         if ($nas && $nas['api_enabled']) {
             $api = new MikroTikAPI();
             if ($api->connect($nas['ip_address'], $nas['api_username'], $nas['api_password'], $nas['api_port'] ?: 8728)) {
-                $result = $api->sendCommand('/system/reboot');
+                $result = $api->command('/system/reboot');
                 $api->disconnect();
                 echo json_encode(['success' => true, 'message' => 'Reboot command sent']);
             } else {
