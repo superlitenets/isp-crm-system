@@ -2571,15 +2571,10 @@ try {
     </button>
     <script>
     function toggleIspMobileMenu() {
-        var sidebar = document.querySelector('.isp-sidebar');
-        var overlay = document.getElementById('ispSidebarOverlay');
-        var icon = document.getElementById('ispMobileMenuIcon');
-        if (sidebar && overlay) {
-            sidebar.classList.toggle('show');
-            overlay.classList.toggle('show');
-            if (icon) {
-                icon.className = sidebar.classList.contains('show') ? 'bi bi-x-lg' : 'bi bi-list';
-            }
+        var offcanvasEl = document.getElementById('ispMobileSidebar');
+        if (offcanvasEl) {
+            var bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+            bsOffcanvas.toggle();
         }
     }
     </script>
