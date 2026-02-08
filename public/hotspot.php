@@ -995,7 +995,15 @@ function formatValidity($days, $pkg = null) {
                 document.getElementById('stkSuccessInfo').innerHTML = infoHtml;
                 
                 setTimeout(function() {
-                    window.location.href = '<?= $_SERVER['REQUEST_URI'] ?>';
+                    // Redirect to HTTP URL so MikroTik intercepts and generates fresh CHAP params
+                    // MikroTik will redirect back to captive portal with new chapId/chapChallenge
+                    var dst = '<?= htmlspecialchars($linkOrig ?: "http://detectportal.firefox.com/") ?>';
+                    if (dst.indexOf('http://') === 0) {
+                        window.location.href = dst;
+                    } else {
+                        // Fallback: reload page (CHAP may be stale but will still show success)
+                        window.location.href = '<?= $_SERVER['REQUEST_URI'] ?>';
+                    }
                 }, 3000);
             }
             
