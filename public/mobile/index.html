@@ -43,7 +43,7 @@
         <div id="salesperson-screen" class="screen">
             <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
-                    <span class="navbar-brand"><i class="bi bi-person-badge"></i> Sales</span>
+                    <span class="navbar-brand"><i class="bi bi-wifi"></i> ISP CRM</span>
                     <div class="d-flex align-items-center">
                         <span id="sp-user-name" class="text-white me-2 small"></span>
                         <button class="btn btn-outline-light btn-sm" onclick="app.logout()">
@@ -54,7 +54,6 @@
             </nav>
 
             <div class="main-content">
-                <!-- Attendance Section for Salesperson -->
                 <div id="sp-attendance-card" class="attendance-section">
                     <div class="attendance-time" id="sp-current-time"></div>
                     <div class="attendance-date" id="sp-current-date"></div>
@@ -79,8 +78,8 @@
                         <div class="stat-label">Sales (KES)</div>
                     </div>
                     <div class="stat-card warning">
-                        <div class="stat-value" id="sp-pending">0</div>
-                        <div class="stat-label">Pending</div>
+                        <div class="stat-value" id="tech-open">0</div>
+                        <div class="stat-label">Open Tickets</div>
                     </div>
                     <div class="stat-card info">
                         <div class="stat-value" id="sp-commission">0</div>
@@ -88,9 +87,27 @@
                     </div>
                 </div>
 
-                <div class="quick-action-card" onclick="app.showNewOrder()">
-                    <i class="bi bi-plus-circle-fill"></i>
-                    <span>Add New Order</span>
+                <div class="d-flex gap-2 mb-3">
+                    <div class="quick-action-card flex-fill" onclick="app.showNewOrder()">
+                        <i class="bi bi-cart-plus-fill text-primary"></i>
+                        <span>New Order</span>
+                    </div>
+                    <div class="quick-action-card flex-fill" onclick="app.showNewTicket()">
+                        <i class="bi bi-ticket-perforated-fill text-success"></i>
+                        <span>New Ticket</span>
+                    </div>
+                </div>
+
+                <div id="dash-tickets-section">
+                    <div class="section-header">
+                        <h5><i class="bi bi-ticket"></i> My Tickets</h5>
+                        <select class="form-select form-select-sm" style="width: auto;" onchange="app.filterTickets(this.value)">
+                            <option value="">All</option>
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                        </select>
+                    </div>
+                    <div id="tech-tickets-list" class="list-container"></div>
                 </div>
 
                 <div class="section-header mt-4">
@@ -100,91 +117,13 @@
             </div>
 
             <nav class="bottom-nav">
-                <a href="#" class="nav-item active" onclick="app.loadSalespersonDashboard(); app.setActiveNav(this);">
-                    <i class="bi bi-house"></i>
-                    <span>Home</span>
-                </a>
-                <a href="#" class="nav-item" onclick="app.showNewOrder(); app.setActiveNav(this);">
-                    <i class="bi bi-plus-circle"></i>
-                    <span>Add Order</span>
-                </a>
-                <a href="#" class="nav-item" onclick="app.showPerformance(); app.setActiveNav(this);">
-                    <i class="bi bi-bar-chart"></i>
-                    <span>Stats</span>
-                </a>
-                <a href="javascript:void(0)" class="nav-item" onclick="event.preventDefault(); app.showProfile(); app.setActiveNav(this);" style="position: relative;">
-                    <i class="bi bi-person-circle"></i>
-                    <span>Profile</span>
-                </a>
-            </nav>
-        </div>
-
-        <div id="technician-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
-                <div class="container-fluid">
-                    <span class="navbar-brand"><i class="bi bi-tools"></i> Technician</span>
-                    <div class="d-flex align-items-center">
-                        <span id="tech-user-name" class="text-white me-2 small"></span>
-                        <button class="btn btn-outline-light btn-sm" onclick="app.logout()">
-                            <i class="bi bi-box-arrow-right"></i>
-                        </button>
-                    </div>
-                </div>
-            </nav>
-
-            <div class="main-content">
-                <div id="attendance-card" class="attendance-section">
-                    <div class="attendance-time" id="current-time"></div>
-                    <div class="attendance-date" id="current-date"></div>
-                    <div class="attendance-buttons">
-                        <button class="btn btn-success btn-lg" id="btn-clock-in" onclick="app.clockIn()">
-                            <i class="bi bi-box-arrow-in-right"></i> Clock In
-                        </button>
-                        <button class="btn btn-danger btn-lg" id="btn-clock-out" onclick="app.clockOut()" disabled>
-                            <i class="bi bi-box-arrow-right"></i> Clock Out
-                        </button>
-                    </div>
-                    <div id="attendance-status" class="attendance-status"></div>
-                </div>
-
-                <div id="tech-stats" class="stats-cards">
-                    <div class="stat-card">
-                        <div class="stat-value" id="tech-total">0</div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                    <div class="stat-card warning">
-                        <div class="stat-value" id="tech-open">0</div>
-                        <div class="stat-label">Open</div>
-                    </div>
-                    <div class="stat-card info">
-                        <div class="stat-value" id="tech-progress">0</div>
-                        <div class="stat-label">In Progress</div>
-                    </div>
-                    <div class="stat-card success">
-                        <div class="stat-value" id="tech-resolved">0</div>
-                        <div class="stat-label">Resolved</div>
-                    </div>
-                </div>
-
-                <div class="section-header">
-                    <h5><i class="bi bi-ticket"></i> My Tickets</h5>
-                    <select class="form-select form-select-sm" style="width: auto;" onchange="app.filterTickets(this.value)">
-                        <option value="">All</option>
-                        <option value="open">Open</option>
-                        <option value="in_progress">In Progress</option>
-                    </select>
-                </div>
-                <div id="tech-tickets-list" class="list-container"></div>
-            </div>
-
-            <nav class="bottom-nav bg-success">
-                <a href="javascript:void(0)" class="nav-item active" onclick="app.loadTechnicianDashboard(); app.setActiveNav(this); return false;">
+                <a href="javascript:void(0)" class="nav-item active" onclick="app.showDashboard(); app.setActiveNav(this); return false;">
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="app.showMyTickets(); app.setActiveNav(this); return false;">
                     <i class="bi bi-ticket-perforated"></i>
-                    <span>My Tickets</span>
+                    <span>Tickets</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="app.showAvailableTickets(); app.setActiveNav(this); return false;">
                     <i class="bi bi-inbox"></i>
@@ -201,8 +140,11 @@
             </nav>
         </div>
 
+        <div id="technician-screen" class="screen" style="display:none;">
+        </div>
+
         <div id="my-tickets-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -227,7 +169,7 @@
         </div>
 
         <div id="my-teams-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -244,7 +186,7 @@
         </div>
 
         <div id="team-tickets-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -261,7 +203,7 @@
         </div>
 
         <div id="available-tickets-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -279,7 +221,7 @@
         </div>
 
         <div id="tech-equipment-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -336,7 +278,7 @@
         </div>
 
         <div id="ticket-detail-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -366,7 +308,7 @@
         </div>
 
         <div id="tech-performance-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -381,7 +323,7 @@
         </div>
 
         <div id="new-ticket-screen" class="screen">
-            <nav class="navbar navbar-dark bg-success fixed-top">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>
@@ -439,7 +381,7 @@
         </div>
 
         <div id="profile-screen" class="screen">
-            <nav id="profile-navbar" class="navbar navbar-dark bg-success fixed-top">
+            <nav id="profile-navbar" class="navbar navbar-dark bg-primary fixed-top">
                 <div class="container-fluid">
                     <button class="btn btn-link text-white p-0" onclick="app.goBack()">
                         <i class="bi bi-arrow-left fs-5"></i>

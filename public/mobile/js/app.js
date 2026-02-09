@@ -84,8 +84,7 @@ const app = {
         if (this.currentScreen === 'salesperson-screen') {
             await this.loadSalespersonDashboard();
             await this.loadSalespersonAttendance();
-        } else if (this.currentScreen === 'technician-screen') {
-            await this.loadTechnicianDashboard();
+            await this.loadDashboardTickets();
         }
         this.showToast('Refreshed', 'success');
     },
@@ -164,16 +163,11 @@ const app = {
     },
     
     showDashboard() {
-        if (this.salesperson) {
-            this.showScreen('salesperson-screen');
-            document.getElementById('sp-user-name').textContent = this.user.name;
-            this.loadSalespersonDashboard();
-            this.loadSalespersonAttendance();
-        } else {
-            this.showScreen('technician-screen');
-            document.getElementById('tech-user-name').textContent = this.user.name;
-            this.loadTechnicianDashboard();
-        }
+        this.showScreen('salesperson-screen');
+        document.getElementById('sp-user-name').textContent = this.user.name;
+        this.loadSalespersonDashboard();
+        this.loadSalespersonAttendance();
+        this.loadDashboardTickets();
     },
     
     async loadSalespersonDashboard() {
@@ -182,7 +176,6 @@ const app = {
             const { stats, orders } = result.data;
             document.getElementById('sp-total-orders').textContent = stats.total_orders || 0;
             document.getElementById('sp-total-sales').textContent = this.formatNumber(stats.total_sales || 0);
-            document.getElementById('sp-pending').textContent = stats.pending_orders || 0;
             document.getElementById('sp-commission').textContent = this.formatNumber(stats.total_commission || 0);
             this.renderOrders(orders);
         }
@@ -297,14 +290,22 @@ const app = {
         this.showNewOrder();
     },
     
+    async loadDashboardTickets() {
+        const result = await this.api('technician-dashboard');
+        if (result.success) {
+            const { stats, tickets } = result.data;
+            const openEl = document.getElementById('tech-open');
+            if (openEl) openEl.textContent = stats.open_tickets || 0;
+            this.renderTickets(tickets);
+        }
+    },
+
     async loadTechnicianDashboard() {
         const result = await this.api('technician-dashboard');
         if (result.success) {
             const { stats, tickets, attendance } = result.data;
-            document.getElementById('tech-total').textContent = stats.total_tickets || 0;
-            document.getElementById('tech-open').textContent = stats.open_tickets || 0;
-            document.getElementById('tech-progress').textContent = stats.in_progress_tickets || 0;
-            document.getElementById('tech-resolved').textContent = stats.resolved_tickets || 0;
+            const openEl = document.getElementById('tech-open');
+            if (openEl) openEl.textContent = stats.open_tickets || 0;
             this.renderTickets(tickets);
             this.renderAttendanceStatus(attendance);
         }
@@ -650,7 +651,7 @@ const app = {
         if (result.success) {
             this.hideCloseTicketModal();
             this.showToast('Ticket closed successfully!', 'success');
-            this.loadTechnicianDashboard();
+            this.loadDashboardTickets();
             this.goBack();
         } else {
             this.hideCloseTicketModal();
@@ -1143,7 +1144,7 @@ const app = {
             document.getElementById('new-ticket-form').reset();
             document.getElementById('ticket-customer-id').value = '';
             this.goBack();
-            this.loadTechnicianDashboard();
+            this.loadDashboardTickets();
         } else {
             this.showToast(result.error || 'Failed to create ticket', 'danger');
         }
@@ -1270,7 +1271,7 @@ const app = {
         if (result.success) {
             this.showToast('Ticket claimed successfully!', 'success');
             this.loadAvailableTickets();
-            this.loadTechnicianDashboard();
+            this.loadDashboardTickets();
         } else {
             if (this.isClockInError(result.error)) {
                 this.showClockInPrompt();
