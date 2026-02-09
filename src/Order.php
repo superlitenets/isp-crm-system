@@ -341,18 +341,27 @@ class Order {
         }
         
         $assignedTo = null;
+        $teamId = null;
         if (!empty($order['salesperson_id'])) {
-            $spStmt = $this->db->prepare("SELECT user_id FROM salespersons WHERE id = ? AND user_id IS NOT NULL");
+            $spStmt = $this->db->prepare("SELECT s.user_id, s.employee_id FROM salespersons s WHERE s.id = ?");
             $spStmt->execute([$order['salesperson_id']]);
-            $spUserId = $spStmt->fetchColumn();
-            if ($spUserId) {
-                $assignedTo = (int) $spUserId;
+            $spRow = $spStmt->fetch(\PDO::FETCH_ASSOC);
+            if ($spRow && !empty($spRow['user_id'])) {
+                $assignedTo = (int) $spRow['user_id'];
+            }
+            if ($spRow && !empty($spRow['employee_id'])) {
+                $tmStmt = $this->db->prepare("SELECT team_id FROM team_members WHERE employee_id = ? LIMIT 1");
+                $tmStmt->execute([$spRow['employee_id']]);
+                $tmTeamId = $tmStmt->fetchColumn();
+                if ($tmTeamId) {
+                    $teamId = (int) $tmTeamId;
+                }
             }
         }
 
         $stmt = $this->db->prepare("
-            INSERT INTO tickets (ticket_number, customer_id, subject, description, category, priority, status, assigned_to, created_by)
-            VALUES (?, ?, ?, ?, 'installation', 'high', 'open', ?, ?)
+            INSERT INTO tickets (ticket_number, customer_id, subject, description, category, priority, status, assigned_to, team_id, created_by)
+            VALUES (?, ?, ?, ?, 'installation', 'high', 'open', ?, ?, ?)
             RETURNING id
         ");
         $stmt->execute([
@@ -361,6 +370,7 @@ class Order {
             $subject,
             $description,
             $assignedTo,
+            $teamId,
             $createdBy
         ]);
         $ticketId = (int) $stmt->fetchColumn();
