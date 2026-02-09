@@ -1591,6 +1591,12 @@ function syncAllEmployeesToDevice(deviceId) {
                                 </label>
                             </div>
                             <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_sales_commissions" id="includeSalesCommissions" value="1" checked>
+                                <label class="form-check-label" for="includeSalesCommissions">
+                                    <i class="bi bi-cart-check text-success"></i> Include sales order commissions automatically
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
                                 <input class="form-check-input" type="checkbox" name="include_advance_deductions" id="includeAdvanceDeductions" value="1" checked>
                                 <label class="form-check-label" for="includeAdvanceDeductions">
                                     <i class="bi bi-cash-coin text-danger"></i> Include salary advance deductions automatically
@@ -1671,6 +1677,12 @@ function syncAllEmployeesToDevice(deviceId) {
                                 <input class="form-check-input" type="checkbox" name="include_ticket_commissions" id="bulkIncludeTicketCommissions" value="1" checked>
                                 <label class="form-check-label" for="bulkIncludeTicketCommissions">
                                     <i class="bi bi-ticket-perforated text-success"></i> Include ticket commissions
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_sales_commissions" id="bulkIncludeSalesCommissions" value="1" checked>
+                                <label class="form-check-label" for="bulkIncludeSalesCommissions">
+                                    <i class="bi bi-cart-check text-success"></i> Include sales order commissions
                                 </label>
                             </div>
                             <div class="form-check mt-2">

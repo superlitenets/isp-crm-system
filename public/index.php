@@ -4108,6 +4108,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $additions[] = 'ticket commissions';
                         }
                         
+                        if (!empty($_POST['include_sales_commissions'])) {
+                            $salespersonModel = new \App\Salesperson($payrollDb);
+                            $salespersonModel->applySalesCommissionsToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
+                            $additions[] = 'sales commissions';
+                        }
+                        
                         if (!empty($_POST['include_advance_deductions'])) {
                             $salaryAdvance = new \App\SalaryAdvance($payrollDb);
                             $activeAdvances = $salaryAdvance->getEmployeeActiveAdvances((int)$_POST['employee_id']);
@@ -4200,6 +4206,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $ticketCommission->applyToPayroll($payrollId, $empId, $payPeriodMonth);
                             }
                             
+                            if (!empty($_POST['include_sales_commissions'])) {
+                                $salespersonModel = new \App\Salesperson($payrollDb);
+                                $salespersonModel->applySalesCommissionsToPayroll($payrollId, $empId, $payPeriodMonth);
+                            }
+                            
                             if (!empty($_POST['include_advance_deductions'])) {
                                 $salaryAdvance = new \App\SalaryAdvance($payrollDb);
                                 $activeAdvances = $salaryAdvance->getEmployeeActiveAdvances($empId);
@@ -4220,6 +4231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         if (!empty($_POST['include_late_deductions'])) $additionsApplied[] = 'late deductions';
                         if (!empty($_POST['include_ticket_commissions'])) $additionsApplied[] = 'ticket commissions';
+                        if (!empty($_POST['include_sales_commissions'])) $additionsApplied[] = 'sales commissions';
                         if (!empty($_POST['include_advance_deductions'])) $additionsApplied[] = 'advance deductions';
                         
                         $message = "Bulk payroll generated: {$results['success']} created, {$results['skipped']} skipped (already exist).";

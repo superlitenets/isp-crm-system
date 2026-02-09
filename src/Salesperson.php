@@ -455,4 +455,78 @@ class Salesperson {
             'period_commission' => (float) ($periodStats['period_commission'] ?? 0)
         ];
     }
+
+    public function applySalesCommissionsToPayroll(int $payrollId, int $employeeId, string $month): bool {
+        $salesperson = $this->getByEmployeeId($employeeId);
+        if (!$salesperson) {
+            return true;
+        }
+
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+
+        $stmt = $this->db->prepare("
+            SELECT id, commission_amount 
+            FROM sales_commissions 
+            WHERE salesperson_id = ? 
+              AND status = 'pending' 
+              AND created_at BETWEEN ? AND ?
+        ");
+        $stmt->execute([$salesperson['id'], $startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+        $pendingCommissions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($pendingCommissions)) {
+            return true;
+        }
+
+        $commissionIds = array_column($pendingCommissions, 'id');
+        $totalAmount = array_sum(array_column($pendingCommissions, 'commission_amount'));
+        $orderCount = count($pendingCommissions);
+
+        try {
+            $this->db->beginTransaction();
+
+            $this->db->prepare("DELETE FROM payroll_commissions WHERE payroll_id = ? AND employee_id = ? AND commission_type = 'sales'")->execute([$payrollId, $employeeId]);
+
+            $stmt = $this->db->prepare("
+                INSERT INTO payroll_commissions (payroll_id, employee_id, commission_type, description, amount, details)
+                VALUES (?, ?, 'sales', ?, ?, ?)
+            ");
+
+            $description = "Sales commission ({$orderCount} orders)";
+
+            $stmt->execute([
+                $payrollId,
+                $employeeId,
+                $description,
+                $totalAmount,
+                json_encode(['commission_ids' => $commissionIds, 'month' => $month])
+            ]);
+
+            $placeholders = implode(',', array_fill(0, count($commissionIds), '?'));
+            $updateStmt = $this->db->prepare("
+                UPDATE sales_commissions 
+                SET status = 'paid', paid_at = CURRENT_TIMESTAMP
+                WHERE id IN ($placeholders) AND status = 'pending'
+            ");
+            $updateStmt->execute($commissionIds);
+
+            $updatePayroll = $this->db->prepare("
+                UPDATE payroll 
+                SET allowances = COALESCE(allowances, 0) + ?,
+                    net_pay = COALESCE(net_pay, 0) + ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $updatePayroll->execute([$totalAmount, $totalAmount, $payrollId]);
+
+            $this->updateTotals($salesperson['id']);
+
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
 }
