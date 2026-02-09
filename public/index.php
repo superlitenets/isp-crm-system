@@ -6966,6 +6966,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'sync_employees':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can sync employees.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $salesperson = new \App\Salesperson($db);
+                        $result = $salesperson->syncAllEmployees();
+                        if ($result['synced'] > 0) {
+                            $message = "Successfully synced {$result['synced']} employee(s) as salespersons with default commission settings.";
+                            $messageType = 'success';
+                        } else {
+                            $message = 'All employees are already registered as salespersons.';
+                            $messageType = 'info';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error syncing employees: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
             case 'delete_salesperson':
                 if (!\App\Auth::isAdmin()) {
                     $message = 'Only administrators can delete salespersons.';

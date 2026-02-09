@@ -19,6 +19,13 @@ $mySalesperson = $currentUserId ? $salespersonModel->getByUserId($currentUserId)
                 <a href="?page=sales&action=commissions" class="btn btn-outline-success me-2">
                     <i class="bi bi-cash-stack me-1"></i>All Commissions
                 </a>
+                <form method="POST" action="?page=sales" class="d-inline me-2">
+                    <input type="hidden" name="csrf_token" value="<?= \App\Auth::generateToken() ?>">
+                    <input type="hidden" name="action" value="sync_employees">
+                    <button type="submit" class="btn btn-outline-warning" onclick="return confirm('This will register all HR employees as salespersons with default commission settings. Continue?')">
+                        <i class="bi bi-arrow-repeat me-1"></i>Sync Employees
+                    </button>
+                </form>
                 <a href="?page=sales&action=add" class="btn btn-primary">
                     <i class="bi bi-plus-lg me-1"></i>Add Salesperson
                 </a>

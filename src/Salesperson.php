@@ -316,6 +316,75 @@ class Salesperson {
         return $result ?: null;
     }
 
+    public function syncAllEmployees(?string $commissionType = null, ?float $commissionValue = null): array {
+        $defaults = $this->getDefaultCommission();
+        $commissionType = $commissionType ?? $defaults['type'];
+        $commissionValue = $commissionValue ?? $defaults['value'];
+
+        $stmt = $this->db->query("
+            SELECT e.id, e.name, e.email, e.phone, e.user_id
+            FROM employees e
+            WHERE e.employment_status != 'terminated'
+              AND NOT EXISTS (SELECT 1 FROM salespersons s WHERE s.employee_id = e.id)
+            ORDER BY e.name
+        ");
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $synced = 0;
+        foreach ($employees as $emp) {
+            $this->create([
+                'employee_id' => $emp['id'],
+                'user_id' => $emp['user_id'] ?? null,
+                'name' => $emp['name'],
+                'email' => $emp['email'] ?? null,
+                'phone' => $emp['phone'] ?? '',
+                'commission_type' => $commissionType,
+                'commission_value' => $commissionValue,
+                'is_active' => true,
+                'notes' => 'Auto-synced from HR employee records'
+            ]);
+            $synced++;
+        }
+
+        return ['synced' => $synced, 'total_employees' => count($employees)];
+    }
+
+    public function getByUserIdOrCreate(int $userId): ?array {
+        $existing = $this->getByUserId($userId);
+        if ($existing) {
+            return $existing;
+        }
+
+        $stmt = $this->db->prepare("SELECT id, name, email, phone FROM employees WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $emp = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$emp) {
+            return null;
+        }
+
+        $existingByEmp = $this->getByEmployeeId($emp['id']);
+        if ($existingByEmp) {
+            if (empty($existingByEmp['user_id'])) {
+                $this->db->prepare("UPDATE salespersons SET user_id = ? WHERE id = ?")->execute([$userId, $existingByEmp['id']]);
+            }
+            return $this->getById($existingByEmp['id']);
+        }
+
+        $defaults = $this->getDefaultCommission();
+        $id = $this->create([
+            'employee_id' => $emp['id'],
+            'user_id' => $userId,
+            'name' => $emp['name'],
+            'email' => $emp['email'] ?? null,
+            'phone' => $emp['phone'] ?? '',
+            'commission_type' => $defaults['type'],
+            'commission_value' => $defaults['value'],
+            'is_active' => true,
+            'notes' => 'Auto-created when creating order'
+        ]);
+        return $this->getById($id);
+    }
+
     public function getEmployeeSalesMetrics(int $employeeId, ?string $periodStart = null, ?string $periodEnd = null): array {
         $salesperson = $this->getByEmployeeId($employeeId);
         

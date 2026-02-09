@@ -15,6 +15,28 @@ $currentUserId = $_SESSION['user_id'] ?? null;
 $canViewAllOrders = \App\Auth::can('orders.view_all') || \App\Auth::isAdmin();
 $orderUserFilter = $canViewAllOrders ? null : $currentUserId;
 $stats = $orderModel->getStats($orderUserFilter);
+
+$mySalespersonId = null;
+if ($currentUserId && isset($salespersonModel)) {
+    try {
+        $mySp = $salespersonModel->getByUserIdOrCreate($currentUserId);
+        if ($mySp) {
+            $mySalespersonId = $mySp['id'];
+            $alreadyInList = false;
+            foreach ($activeSalespersons as $asp) {
+                if ($asp['id'] == $mySalespersonId) {
+                    $alreadyInList = true;
+                    break;
+                }
+            }
+            if (!$alreadyInList) {
+                $activeSalespersons[] = $mySp;
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log("Auto-create salesperson error: " . $e->getMessage());
+    }
+}
 ?>
 
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
@@ -172,9 +194,12 @@ $customers = $db->query("SELECT id, name, phone, email, account_number FROM cust
                             <select name="salesperson_id" class="form-select">
                                 <option value="">-- No Salesperson --</option>
                                 <?php foreach ($activeSalespersons as $sp): ?>
-                                <option value="<?= $sp['id'] ?>"><?= htmlspecialchars($sp['name']) ?></option>
+                                <option value="<?= $sp['id'] ?>" <?= ($mySalespersonId && $sp['id'] == $mySalespersonId) ? 'selected' : '' ?>><?= htmlspecialchars($sp['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php if ($mySalespersonId): ?>
+                            <small class="text-muted">Auto-assigned to you. Change if needed.</small>
+                            <?php endif; ?>
                         </div>
                     </div>
 
