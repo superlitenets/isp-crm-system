@@ -692,7 +692,7 @@ class RadiusBilling {
                 $data['simultaneous_sessions'] ?? 1,
                 $data['max_devices'] ?? 1,
                 $this->castBoolean($data['fup_enabled'] ?? false),
-                $data['fup_quota_mb'] ?: null,
+                ($data['fup_quota_mb'] ?? null) ?: null,
                 $data['fup_download_speed'] ?? '',
                 $data['fup_upload_speed'] ?? '',
                 $this->castBoolean($data['is_active'] ?? true, true)
@@ -741,7 +741,7 @@ class RadiusBilling {
                 $data['simultaneous_sessions'] ?? 1,
                 $data['max_devices'] ?? 1,
                 $this->castBoolean($data['fup_enabled'] ?? false),
-                $data['fup_quota_mb'] ?: null,
+                ($data['fup_quota_mb'] ?? null) ?: null,
                 $data['fup_download_speed'] ?? '',
                 $data['fup_upload_speed'] ?? '',
                 $this->castBoolean($data['is_active'] ?? true, true),
