@@ -1,0 +1,350 @@
+Welcome to Ubuntu 24.04.3 LTS (GNU/Linux 6.8.0-90-generic x86_64)
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+ System information as of Mon Feb  9 06:40:24 PM UTC 2026
+  System load:  0.67               Processes:              618
+  Usage of /:   80.3% of 66.75GB   Users logged in:        1
+  Memory usage: 22%                IPv4 address for ens18: 102.205.236.243
+  Swap usage:   0%
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+Expanded Security Maintenance for Applications is not enabled.
+7 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+*** System restart required ***
+Last login: Mon Feb  9 16:04:40 2026 from 102.205.239.250
+superlite@superlitecrm:~$ sudo su
+[sudo] password for superlite:
+Sorry, try again.
+[sudo] password for superlite:
+root@superlitecrm:/home/superlite# cd /root/isp
+root@superlitecrm:~/isp# docker compose logs -f php
+isp_crm_php  | [09-Feb-2026 19:24:02] NOTICE: fpm is running, pid 1
+isp_crm_php  | [09-Feb-2026 19:24:02] NOTICE: ready to handle connections
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:24:08 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:24:19 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:25:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:25:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:25:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:25:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:26:25 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:26:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:27:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:27:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:28:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:29:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:29:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:30:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:30:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:30:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:30:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:31:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:32:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:32:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:33:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:34:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:34:53 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:34:55 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:34:55 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:34:59 +0300 "POST /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:34:59 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:02 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:09 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:36 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:35:43 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:36:34 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:37:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:37:55 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:37:57 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:38:25 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:38:30 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:38:54 +0300 "GET /hotspot.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:00 +0300 "POST /hotspot.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:03 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:07 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=12 (username: HS-A0C9CE1A)
+isp_crm_php  | NOTICE: PHP message: RADIUS: Activated hotspot subscription ID=12, expires: 2026-02-09 20:39:09
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing failed: Subscription not found for phone: 254718664444
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:09 +0300 "POST /index.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=12 (username: HS-A0C9CE1A)
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing failed: Subscription not found for phone: 254718664444
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:09 +0300 "POST /index.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=12 (username: HS-A0C9CE1A)
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing failed: Subscription not found for phone: 254718664444
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:09 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:10 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:13 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:16 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:19 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:23 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:26 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:29 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:32 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:35 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:38 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:42 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:45 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:48 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:51 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:54 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:39:57 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:00 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:04 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:07 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:10 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:13 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:16 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:19 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:23 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:26 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:29 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:32 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:35 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:38 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:42 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:45 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:48 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:52 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:55 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:40:58 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:41:01 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:41:04 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:41:07 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:41:36 +0300 "GET /hotspot.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:42:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:44:48 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:44:48 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:44:51 +0300 "POST /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:44:51 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:45:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:45:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:45:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:45:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:47:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:50:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:50:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:50:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:50:35 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:50:36 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:50:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:52:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:55:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:55:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:55:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:55:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:19:57:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:00:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:00:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:00:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:01:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:02:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:05:00 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:05:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:05:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:05:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:06:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:06:20 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:07:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:10:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:10:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:10:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:11:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:12:11 +0300 "GET /admin/config.php"
+404
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:12:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:14:18 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:15:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:15:09 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:15:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:15:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:16:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:17:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:20:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:20:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:20:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:21:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:22:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:25:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:25:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:25:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:27:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:27:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:30:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:30:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:30:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:32:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:32:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:35:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:35:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:35:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:37:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:37:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:40:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:40:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:40:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:42:04 +0300 "GET /admin/config.php"
+404
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:42:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:42:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:45:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:45:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:45:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:46:38 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:47:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:47:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:49:54 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:50:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:50:06 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:50:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:50:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:52:02 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:52:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:52:44 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:53:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:55:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:55:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:55:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:55:28 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:57:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:58:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:20:58:21 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:00:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:00:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:00:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:00:19 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:02:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:03:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:05:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:05:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:05:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:07:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:08:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:09:31 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:09:51 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:10:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:10:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:10:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:10:17 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:10:59 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:12:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:13:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:14:21 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:15:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:15:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:15:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:16:55 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:17:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:18:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:20:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:20:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:20:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:20:29 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:22:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:23:54 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:24:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:25:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:25:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:25:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:25:39 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:08 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:10 +0300 "POST /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:11 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:13 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:13 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:13 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:14 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:14 +0300 "GET /index.php" 200
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0743466323
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0743466323
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+isp_crm_php  | NOTICE: PHP message: notifyBranchWhatsAppGroup called - ticketId: 404, branchId: 2
+isp_crm_php  | NOTICE: PHP message: notifyBranchWhatsAppGroup - Sending to group: 120363151338798184@g.us for branch: GITHURAI
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup called - Group: 120363151338798184@g.us, Provider: session, URL: http://127.0.0.1:3001
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup - Calling URL: http://127.0.0.1:3001/send-group
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup response - HTTP: 200, Error: , Response: {"success":true,"messageId":"3EB02454225AE6DA859AA5","timestamp":1770661615}
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup SUCCESS - MessageId: 3EB02454225AE6DA859AA5
+isp_crm_php  | NOTICE: PHP message: WhatsApp branch group notification sent for
+ticket TKT-20260209-9998 to branch GITHURAI
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:26:49 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:27:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:27:30 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:27:36 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:27:41 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:27:48 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:29:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:30:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:30:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:30:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:31:58 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:32:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:33:22 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:34:20 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:34:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:35:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:35:01 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:35:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:35:51 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:35:53 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:35:54 +0300 "GET /index.php" 200
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0721236370
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0721236370
+isp_crm_php  | NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+isp_crm_php  | NOTICE: PHP message: notifyBranchWhatsAppGroup called - ticketId: 405, branchId: 1
+isp_crm_php  | NOTICE: PHP message: notifyBranchWhatsAppGroup - Sending to group: 120363395097732236@g.us for branch: HURUMA
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup called - Group: 120363395097732236@g.us, Provider: session, URL: http://127.0.0.1:3001
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup - Calling URL: http://127.0.0.1:3001/send-group
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup response - HTTP: 200, Error: , Response: {"success":true,"messageId":"3EB0319C53D60C16574250","timestamp":1770662209}
+isp_crm_php  | NOTICE: PHP message: WhatsApp sendToGroup SUCCESS - MessageId: 3EB0319C53D60C16574250
+isp_crm_php  | NOTICE: PHP message: WhatsApp branch group notification sent for
+ticket TKT-20260209-2303 to branch HURUMA
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:36:45 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:36:56 +0300 "GET /ticket-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:37:11 +0300 "GET /ticket-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:37:13 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:37:30 +0300 "GET /ticket-view.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:36 +0300 "GET /hotspot.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:46 +0300 "POST /hotspot.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:50 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:53 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=12 (username: HS-A0C9CE1A)
+isp_crm_php  | NOTICE: PHP message: RADIUS: Activated hotspot subscription ID=12, expires: 2026-02-09 22:39:55
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing failed: Subscription not found for phone: 254718664444
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:55 +0300 "POST /index.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=12 (username: HS-A0C9CE1A)
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing failed: Subscription not found for phone: 254718664444
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:55 +0300 "POST /index.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=12 (username: HS-A0C9CE1A)
+isp_crm_php  | NOTICE: PHP message: RADIUS payment processing failed: Subscription not found for phone: 254718664444
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:55 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:56 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:39:59 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:02 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:02 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:05 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:08 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:11 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:15 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:15 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:02 +0300 "GET /cron.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:18 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:27 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:30 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:30 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:31 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.9 -  09/Feb/2026:21:40:31 +0300 "GET /index.php" 200
+^[[D^[[A^[[B^[[B^[[B^[[B^[[A^[[D

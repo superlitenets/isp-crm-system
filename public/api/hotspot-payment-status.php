@@ -44,8 +44,9 @@ try {
     
     if ($lookupId) {
         $stmt = $db->prepare("
-            SELECT s.id, s.status, s.expiry_date,
-                   p.name as package_name, p.download_speed, p.max_devices
+            SELECT s.id, s.status, s.expiry_date, s.package_id,
+                   p.name as package_name, p.download_speed, p.max_devices,
+                   p.session_duration_hours, p.validity_days
             FROM radius_subscriptions s
             LEFT JOIN radius_packages p ON s.package_id = p.id
             WHERE s.id = ?
@@ -63,8 +64,9 @@ try {
         }
         
         $stmt = $db->prepare("
-            SELECT s.id, s.status, s.expiry_date,
-                   p.name as package_name, p.download_speed, p.max_devices
+            SELECT s.id, s.status, s.expiry_date, s.package_id,
+                   p.name as package_name, p.download_speed, p.max_devices,
+                   p.session_duration_hours, p.validity_days
             FROM radius_subscriptions s
             LEFT JOIN radius_packages p ON s.package_id = p.id
             WHERE s.mac_address = ?
@@ -75,8 +77,9 @@ try {
         
         if (!$subscription) {
             $stmt = $db->prepare("
-                SELECT s.id, s.status, s.expiry_date,
-                       p.name as package_name, p.download_speed, p.max_devices
+                SELECT s.id, s.status, s.expiry_date, s.package_id,
+                       p.name as package_name, p.download_speed, p.max_devices,
+                       p.session_duration_hours, p.validity_days
                 FROM radius_subscription_devices d
                 JOIN radius_subscriptions s ON d.subscription_id = s.id
                 LEFT JOIN radius_packages p ON s.package_id = p.id
@@ -95,6 +98,45 @@ try {
     
     $isActive = $subscription['status'] === 'active';
     $isExpiredByDate = !empty($subscription['expiry_date']) && strtotime($subscription['expiry_date']) < time();
+    
+    if ($subscription['status'] === 'pending_payment') {
+        $accountRefs = ['HS-' . $subscription['id'], 'radius_' . $subscription['id']];
+        $placeholders = implode(',', array_fill(0, count($accountRefs), '?'));
+        $txStmt = $db->prepare("
+            SELECT id, amount, mpesa_receipt_number FROM mpesa_transactions 
+            WHERE account_reference IN ({$placeholders})
+            AND status = 'completed'
+            AND created_at > NOW() - INTERVAL '10 minutes'
+            ORDER BY id DESC LIMIT 1
+        ");
+        $txStmt->execute($accountRefs);
+        $completedTx = $txStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($completedTx) {
+            $sessionHours = !empty($subscription['session_duration_hours']) ? (float)$subscription['session_duration_hours'] : 0;
+            if ($sessionHours > 0) {
+                $durationSeconds = (int)($sessionHours * 3600);
+                $expiryDate = date('Y-m-d H:i:s', time() + $durationSeconds);
+            } else {
+                $validityDays = $subscription['validity_days'] ?? 30;
+                $expiryDate = date('Y-m-d H:i:s', strtotime("+{$validityDays} days"));
+            }
+            
+            $activateStmt = $db->prepare("
+                UPDATE radius_subscriptions 
+                SET status = 'active', expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ? AND status = 'pending_payment'
+            ");
+            $activateStmt->execute([$expiryDate, $subscription['id']]);
+            
+            error_log("HOTSPOT-STATUS: Self-healed subscription ID={$subscription['id']}, activated via completed M-Pesa tx={$completedTx['mpesa_receipt_number']}");
+            
+            $subscription['status'] = 'active';
+            $subscription['expiry_date'] = $expiryDate;
+            $isActive = true;
+            $isExpiredByDate = false;
+        }
+    }
     
     if ($isActive && !$isExpiredByDate) {
         echo json_encode([

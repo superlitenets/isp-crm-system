@@ -3006,8 +3006,8 @@ class RadiusBilling {
             $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
         }
         
-        // Second: Try to extract subscription ID from account reference (format: radius_X)
-        if (!$sub && preg_match('/^radius_(\d+)$/i', $accountRef, $matches)) {
+        // Second: Try to extract subscription ID from account reference (format: radius_X or HS-X)
+        if (!$sub && preg_match('/^(?:radius_|HS-)(\d+)$/i', $accountRef, $matches)) {
             $extractedId = (int)$matches[1];
             $stmt = $this->db->prepare("SELECT * FROM radius_subscriptions WHERE id = ?");
             $stmt->execute([$extractedId]);
