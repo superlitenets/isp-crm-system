@@ -340,16 +340,28 @@ class Order {
             $description .= "\nNotes: {$order['notes']}\n";
         }
         
+        $assignedTo = null;
+        if (!empty($order['salesperson_id'])) {
+            $spStmt = $this->db->prepare("SELECT user_id FROM salespersons WHERE id = ? AND user_id IS NOT NULL");
+            $spStmt->execute([$order['salesperson_id']]);
+            $spUserId = $spStmt->fetchColumn();
+            if ($spUserId) {
+                $assignedTo = (int) $spUserId;
+            }
+        }
+
         $stmt = $this->db->prepare("
-            INSERT INTO tickets (ticket_number, customer_id, subject, description, category, priority, status)
-            VALUES (?, ?, ?, ?, 'installation', 'high', 'open')
+            INSERT INTO tickets (ticket_number, customer_id, subject, description, category, priority, status, assigned_to, created_by)
+            VALUES (?, ?, ?, ?, 'installation', 'high', 'open', ?, ?)
             RETURNING id
         ");
         $stmt->execute([
             $ticketNumber,
             $customerId,
             $subject,
-            $description
+            $description,
+            $assignedTo,
+            $createdBy
         ]);
         $ticketId = (int) $stmt->fetchColumn();
         

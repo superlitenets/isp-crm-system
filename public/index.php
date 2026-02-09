@@ -8428,7 +8428,11 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     case 'convert':
                         $ticketId = $orderModel->convertToTicket($orderId, $currentUser['id']);
                         if ($ticketId) {
-                            $_SESSION['success_message'] = 'Order converted to ticket! Please assign a technician.';
+                            $convertedOrder = $orderModel->getById($orderId);
+                            $autoAssigned = !empty($convertedOrder['salesperson_id']);
+                            $_SESSION['success_message'] = $autoAssigned 
+                                ? 'Order converted to installation ticket and automatically assigned to the salesperson!'
+                                : 'Order converted to ticket! Please assign a technician.';
                             header('Location: ?page=tickets&action=edit&id=' . $ticketId);
                             exit;
                         } else {
