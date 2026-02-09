@@ -6518,7 +6518,7 @@ try {
                                             <option value="dhcp">DHCP</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-3 mb-3 pppoe-only-field">
                                         <label class="form-label">Billing Cycle</label>
                                         <select name="billing_type" class="form-select">
                                             <option value="daily">Daily</option>
@@ -6534,9 +6534,25 @@ try {
                                         <label class="form-label">Price (KES)</label>
                                         <input type="number" name="price" class="form-control" step="0.01" required>
                                     </div>
-                                    <div class="col-md-4 mb-3">
+                                    <div class="col-md-4 mb-3 pppoe-only-field">
                                         <label class="form-label">Validity (Days)</label>
                                         <input type="number" name="validity_days" class="form-control" value="30">
+                                    </div>
+                                    <div class="col-md-4 mb-3 hotspot-only-field" style="display:none;">
+                                        <label class="form-label">Session Duration</label>
+                                        <select name="session_duration_hours" class="form-select">
+                                            <option value="1">1 Hour</option>
+                                            <option value="2">2 Hours</option>
+                                            <option value="3">3 Hours</option>
+                                            <option value="5">5 Hours</option>
+                                            <option value="8">8 Hours</option>
+                                            <option value="12">12 Hours</option>
+                                            <option value="24" selected>24 Hours (Daily)</option>
+                                            <option value="48">2 Days</option>
+                                            <option value="72">3 Days</option>
+                                            <option value="168">7 Days (Weekly)</option>
+                                            <option value="720">30 Days (Monthly)</option>
+                                        </select>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label">Data Quota (MB)</label>
@@ -6618,11 +6634,13 @@ try {
             </div>
             
             <script>
-            // Toggle hotspot-only fields based on package type
             document.querySelector('#addPackageModal select[name="package_type"]').addEventListener('change', function() {
                 const isHotspot = this.value === 'hotspot';
                 document.querySelectorAll('#addPackageModal .hotspot-only-field').forEach(el => {
                     el.style.display = isHotspot ? 'block' : 'none';
+                });
+                document.querySelectorAll('#addPackageModal .pppoe-only-field').forEach(el => {
+                    el.style.display = isHotspot ? 'none' : 'block';
                 });
             });
             </script>
@@ -6653,7 +6671,7 @@ try {
                                             <option value="dhcp">DHCP</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-3 mb-3 edit-pppoe-only-field">
                                         <label class="form-label">Billing Cycle</label>
                                         <select name="billing_type" id="editPkgBilling" class="form-select">
                                             <option value="daily">Daily</option>
@@ -6669,9 +6687,25 @@ try {
                                         <label class="form-label">Price (KES)</label>
                                         <input type="number" name="price" id="editPkgPrice" class="form-control" step="0.01" required>
                                     </div>
-                                    <div class="col-md-4 mb-3">
+                                    <div class="col-md-4 mb-3 edit-pppoe-only-field">
                                         <label class="form-label">Validity (Days)</label>
                                         <input type="number" name="validity_days" id="editPkgValidity" class="form-control">
+                                    </div>
+                                    <div class="col-md-4 mb-3 edit-hotspot-only-field" style="display:none;">
+                                        <label class="form-label">Session Duration</label>
+                                        <select name="session_duration_hours" id="editPkgSessionDuration" class="form-select">
+                                            <option value="1">1 Hour</option>
+                                            <option value="2">2 Hours</option>
+                                            <option value="3">3 Hours</option>
+                                            <option value="5">5 Hours</option>
+                                            <option value="8">8 Hours</option>
+                                            <option value="12">12 Hours</option>
+                                            <option value="24">24 Hours (Daily)</option>
+                                            <option value="48">2 Days</option>
+                                            <option value="72">3 Days</option>
+                                            <option value="168">7 Days (Weekly)</option>
+                                            <option value="720">30 Days (Monthly)</option>
+                                        </select>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label">Data Quota (MB)</label>
@@ -6774,21 +6808,28 @@ try {
                 document.getElementById('editPkgIpBinding').checked = pkg.ip_binding == true || pkg.ip_binding == 't';
                 document.getElementById('editPkgActive').checked = pkg.is_active == true || pkg.is_active == 't';
                 document.getElementById('editPkgDesc').value = pkg.description || '';
+                document.getElementById('editPkgSessionDuration').value = pkg.session_duration_hours || 24;
                 
-                // Toggle hotspot-only fields
+                // Toggle hotspot/pppoe fields
                 const isHotspot = pkg.package_type === 'hotspot';
                 document.querySelectorAll('.edit-hotspot-only-field').forEach(el => {
                     el.style.display = isHotspot ? 'block' : 'none';
+                });
+                document.querySelectorAll('.edit-pppoe-only-field').forEach(el => {
+                    el.style.display = isHotspot ? 'none' : 'block';
                 });
                 
                 new bootstrap.Modal(document.getElementById('editPackageModal')).show();
             }
             
-            // Toggle hotspot-only fields on type change in edit modal
+            // Toggle hotspot/pppoe fields on type change in edit modal
             document.getElementById('editPkgType').addEventListener('change', function() {
                 const isHotspot = this.value === 'hotspot';
                 document.querySelectorAll('.edit-hotspot-only-field').forEach(el => {
                     el.style.display = isHotspot ? 'block' : 'none';
+                });
+                document.querySelectorAll('.edit-pppoe-only-field').forEach(el => {
+                    el.style.display = isHotspot ? 'none' : 'block';
                 });
             });
             </script>

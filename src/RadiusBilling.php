@@ -666,10 +666,10 @@ class RadiusBilling {
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO radius_packages (name, description, package_type, billing_type, price, validity_days,
-                    data_quota_mb, download_speed, upload_speed, burst_download, burst_upload,
+                    session_duration_hours, data_quota_mb, download_speed, upload_speed, burst_download, burst_upload,
                     burst_threshold, burst_time, priority, address_pool, ip_binding,
                     simultaneous_sessions, max_devices, fup_enabled, fup_quota_mb, fup_download_speed, fup_upload_speed, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?::boolean, ?, ?, ?, ?::boolean)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?::boolean, ?, ?, ?, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -678,6 +678,7 @@ class RadiusBilling {
                 $data['billing_type'] ?? 'monthly',
                 $data['price'] ?? 0,
                 $data['validity_days'] ?? 30,
+                !empty($data['session_duration_hours']) ? $data['session_duration_hours'] : null,
                 $data['data_quota_mb'] ?: null,
                 $data['download_speed'] ?? '',
                 $data['upload_speed'] ?? '',
@@ -712,7 +713,7 @@ class RadiusBilling {
             $stmt = $this->db->prepare("
                 UPDATE radius_packages SET
                     name = ?, description = ?, package_type = ?, billing_type = ?, price = ?,
-                    validity_days = ?, data_quota_mb = ?, download_speed = ?, upload_speed = ?,
+                    validity_days = ?, session_duration_hours = ?, data_quota_mb = ?, download_speed = ?, upload_speed = ?,
                     burst_download = ?, burst_upload = ?, burst_threshold = ?, burst_time = ?,
                     priority = ?, address_pool = ?, ip_binding = ?::boolean, simultaneous_sessions = ?,
                     max_devices = ?, fup_enabled = ?::boolean, fup_quota_mb = ?, fup_download_speed = ?, fup_upload_speed = ?,
@@ -726,6 +727,7 @@ class RadiusBilling {
                 $data['billing_type'] ?? 'monthly',
                 $data['price'] ?? 0,
                 $data['validity_days'] ?? 30,
+                !empty($data['session_duration_hours']) ? $data['session_duration_hours'] : null,
                 $data['data_quota_mb'] ?: null,
                 $data['download_speed'] ?? '',
                 $data['upload_speed'] ?? '',
@@ -2106,7 +2108,8 @@ class RadiusBilling {
         $stmt = $this->db->prepare("
             SELECT s.*, c.name as customer_name, c.phone as customer_phone,
                    p.name as package_name, p.download_speed, p.upload_speed, p.address_pool,
-                   p.data_quota_mb, p.fup_enabled, p.fup_quota_mb, p.fup_download_speed, p.fup_upload_speed
+                   p.data_quota_mb, p.fup_enabled, p.fup_quota_mb, p.fup_download_speed, p.fup_upload_speed,
+                   p.session_duration_hours
             FROM radius_subscriptions s
             LEFT JOIN customers c ON s.customer_id = c.id
             LEFT JOIN radius_packages p ON s.package_id = p.id
@@ -2153,6 +2156,14 @@ class RadiusBilling {
             $attributes['Framed-IP-Address'] = $sub['static_ip'];
         }
         
+        // Set Session-Timeout based on remaining time until expiry
+        if (!empty($sub['expiry_date'])) {
+            $remainingSeconds = max(0, strtotime($sub['expiry_date']) - time());
+            if ($remainingSeconds > 0) {
+                $attributes['Session-Timeout'] = $remainingSeconds;
+            }
+        }
+        
         // Auto-assign NAS ID based on the NAS IP the user connected through
         if (!empty($nasIp)) {
             $nasStmt = $this->db->prepare("SELECT id FROM radius_nas WHERE ip_address = ? LIMIT 1");
@@ -2178,7 +2189,7 @@ class RadiusBilling {
         
         $stmt = $this->db->prepare("
             SELECT v.*, p.name as package_name, p.download_speed, p.upload_speed, 
-                   p.validity_days, p.data_quota_mb, p.address_pool
+                   p.validity_days, p.data_quota_mb, p.address_pool, p.session_duration_hours
             FROM radius_vouchers v
             LEFT JOIN radius_packages p ON v.package_id = p.id
             WHERE v.code = ? AND v.status = 'unused'
@@ -2196,13 +2207,20 @@ class RadiusBilling {
             UPDATE radius_vouchers SET status = 'used', used_at = CURRENT_TIMESTAMP WHERE id = ?
         ")->execute([$voucher['id']]);
         
-        // Calculate expiry
-        $expiryDate = date('Y-m-d H:i:s', strtotime("+{$voucher['validity_days']} days"));
+        // Calculate expiry and session timeout
+        if (!empty($voucher['session_duration_hours'])) {
+            $durationSeconds = (int)($voucher['session_duration_hours'] * 3600);
+            $expiryDate = date('Y-m-d H:i:s', time() + $durationSeconds);
+            $sessionTimeout = $durationSeconds;
+        } else {
+            $expiryDate = date('Y-m-d H:i:s', strtotime("+{$voucher['validity_days']} days"));
+            $sessionTimeout = $voucher['validity_days'] * 86400;
+        }
         
         // Build attributes
         $attributes = [
             'Mikrotik-Rate-Limit' => "{$voucher['upload_speed']}/{$voucher['download_speed']}",
-            'Session-Timeout' => $voucher['validity_days'] * 86400,
+            'Session-Timeout' => $sessionTimeout,
         ];
         
         if (!empty($voucher['address_pool'])) {
@@ -2254,7 +2272,7 @@ class RadiusBilling {
         $stmt = $this->db->prepare("
             SELECT s.*, c.name as customer_name, c.phone as customer_phone,
                    p.name as package_name, p.download_speed, p.upload_speed, p.address_pool,
-                   p.data_quota_mb, p.price as package_price, p.validity_days
+                   p.data_quota_mb, p.price as package_price, p.validity_days, p.session_duration_hours
             FROM radius_subscriptions s
             LEFT JOIN customers c ON s.customer_id = c.id
             LEFT JOIN radius_packages p ON s.package_id = p.id
@@ -2285,7 +2303,7 @@ class RadiusBilling {
         // Get voucher
         $stmt = $this->db->prepare("
             SELECT v.*, p.name as package_name, p.download_speed, p.upload_speed, 
-                   p.validity_days, p.data_quota_mb, p.address_pool
+                   p.validity_days, p.data_quota_mb, p.address_pool, p.session_duration_hours
             FROM radius_vouchers v
             LEFT JOIN radius_packages p ON v.package_id = p.id
             WHERE v.code = ? AND v.status = 'unused'
@@ -2303,9 +2321,15 @@ class RadiusBilling {
             // Check if MAC already has a subscription
             $existing = $this->getSubscriptionByMAC($mac);
             
+            // Calculate validity in minutes from session_duration_hours or validity_days
+            if (!empty($voucher['session_duration_hours'])) {
+                $validityMinutes = (int)($voucher['session_duration_hours'] * 60);
+            } else {
+                $validityMinutes = $voucher['validity_minutes'] ?? ($voucher['validity_days'] * 1440);
+            }
+            
             if ($existing) {
                 // Extend existing subscription
-                $validityMinutes = $voucher['validity_minutes'] ?? ($voucher['validity_days'] * 1440);
                 $newExpiry = date('Y-m-d H:i:s', strtotime("+{$validityMinutes} minutes"));
                 
                 // If subscription is expired, extend from now; otherwise extend from current expiry
@@ -2328,7 +2352,6 @@ class RadiusBilling {
                 $username = 'HS-' . strtoupper(substr(md5($macFormatted . time()), 0, 8));
                 $password = strtoupper(substr(md5(uniqid()), 0, 8));
                 $passwordEncrypted = password_hash($password, PASSWORD_DEFAULT);
-                $validityMinutes = $voucher['validity_minutes'] ?? ($voucher['validity_days'] * 1440);
                 $expiry = date('Y-m-d H:i:s', strtotime("+{$validityMinutes} minutes"));
                 
                 $stmt = $this->db->prepare("
@@ -2449,7 +2472,7 @@ class RadiusBilling {
     
     public function activateHotspotByPayment(int $subscriptionId): array {
         $stmt = $this->db->prepare("
-            SELECT s.*, p.validity_days 
+            SELECT s.*, p.validity_days, p.session_duration_hours 
             FROM radius_subscriptions s 
             LEFT JOIN radius_packages p ON s.package_id = p.id 
             WHERE s.id = ?
@@ -2461,7 +2484,12 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        $expiry = date('Y-m-d H:i:s', strtotime("+{$sub['validity_days']} days"));
+        if (!empty($sub['session_duration_hours'])) {
+            $durationSeconds = (int)($sub['session_duration_hours'] * 3600);
+            $expiry = date('Y-m-d H:i:s', time() + $durationSeconds);
+        } else {
+            $expiry = date('Y-m-d H:i:s', strtotime("+{$sub['validity_days']} days"));
+        }
         
         $stmt = $this->db->prepare("
             UPDATE radius_subscriptions 

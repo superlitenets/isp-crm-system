@@ -291,7 +291,22 @@ if ($errorMsg && empty($message)) {
 }
 
 // Helper: format validity
+function formatDuration($hours) {
+    $hours = (float)$hours;
+    if ($hours < 1) return round($hours * 60) . ' min';
+    if ($hours == 1) return '1 Hour';
+    if ($hours < 24) return (int)$hours . ' Hours';
+    if ($hours == 24) return '24 Hours';
+    $days = $hours / 24;
+    if ($days == 7) return '7 Days';
+    if ($days == 30) return '30 Days';
+    return (int)$days . ' Day' . ($days > 1 ? 's' : '');
+}
+
 function formatValidity($days, $pkg = null) {
+    if (!empty($pkg['session_duration_hours'])) {
+        return formatDuration($pkg['session_duration_hours']);
+    }
     if (isset($pkg['validity_hours']) && $pkg['validity_hours'] > 0 && $pkg['validity_hours'] < 24) {
         return $pkg['validity_hours'] . ' hour' . ($pkg['validity_hours'] > 1 ? 's' : '');
     }
@@ -1087,7 +1102,7 @@ function formatValidity($days, $pkg = null) {
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
                                 <div style="font-weight: 600; color: #0f172a;"><?= htmlspecialchars($subscription['package_name']) ?></div>
-                                <div style="font-size: 12px; color: #64748b;"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= $subscription['validity_days'] ?> days</div>
+                                <div style="font-size: 12px; color: #64748b;"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : $subscription['validity_days'] . ' days' ?></div>
                             </div>
                             <div class="pkg-price">KES <?= number_format($subscription['package_price'] ?? 0) ?></div>
                         </div>
