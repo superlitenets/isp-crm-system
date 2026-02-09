@@ -561,7 +561,7 @@ try {
             
         case 'available-tickets':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             if (!in_array($user['role'] ?? '', $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to view available tickets']);
                 break;
@@ -572,7 +572,7 @@ try {
             
         case 'claim-ticket':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             if (!in_array($user['role'] ?? '', $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to claim tickets']);
                 break;
@@ -594,7 +594,7 @@ try {
             
         case 'technician-equipment':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             if (!in_array($user['role'] ?? '', $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to view equipment']);
                 break;
@@ -605,7 +605,7 @@ try {
             
         case 'ticket-detail-any':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             $userRole = $user['role'] ?? '';
             if (!in_array($userRole, $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to view this ticket']);
@@ -628,7 +628,7 @@ try {
             
         case 'update-ticket-any':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             $userRole = $user['role'] ?? '';
             if (!in_array($userRole, $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to update tickets']);
@@ -654,7 +654,7 @@ try {
             
         case 'resolve-ticket':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             $userRole = $user['role'] ?? '';
             if (!in_array($userRole, $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to resolve tickets']);
@@ -782,7 +782,7 @@ try {
             
         case 'add-comment-any':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             $userRole = $user['role'] ?? '';
             if (!in_array($userRole, $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to add comments']);
@@ -807,7 +807,7 @@ try {
             
         case 'close-ticket':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             $userRole = $user['role'] ?? '';
             if (!in_array($userRole, $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized']);
@@ -838,7 +838,7 @@ try {
             
         case 'available-equipment':
             requireAuth();
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff', 'salesperson'];
             if (!in_array($user['role'] ?? '', $allowedRoles)) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized']);
                 break;
