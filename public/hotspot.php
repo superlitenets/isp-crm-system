@@ -212,6 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $renewPkgName = $subscription['package_name'];
                     $amount = (int)($subscription['package_price'] ?? 0);
                     $subId = $subscription['id'];
+                    $priorStatus = $subscription['status'] ?? 'active';
 
                     if ($newPackageId > 0 && $newPackageId != ($subscription['package_id'] ?? 0)) {
                         $pkgStmt = $db->prepare("SELECT id, name, price FROM radius_packages WHERE id = ? AND is_active = true");
@@ -224,7 +225,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         }
                     }
 
+                    $db->prepare("UPDATE radius_subscriptions SET status = 'pending_payment', updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$subId]);
+
                     if ($amount <= 0) {
+                        $db->prepare("UPDATE radius_subscriptions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$priorStatus, $subId]);
                         $message = 'Package price not configured. Please use a voucher.';
                         $messageType = 'warning';
                     } else {
@@ -237,11 +241,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             $stkPushSent = true;
                             $_SESSION['pending_subscription_id'] = $subId;
                         } else {
+                            $db->prepare("UPDATE radius_subscriptions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$priorStatus, $subId]);
                             $message = $stkResult['message'] ?? 'Failed to send payment request. Use voucher instead.';
                             $messageType = 'warning';
                         }
                     }
                 } catch (Exception $e) {
+                    $db->prepare("UPDATE radius_subscriptions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$priorStatus ?? 'active', $subId ?? 0]);
                     $message = 'Payment service error. Please use a voucher instead.';
                     $messageType = 'warning';
                 }

@@ -93,7 +93,10 @@ try {
         exit;
     }
     
-    if ($subscription['status'] === 'active') {
+    $isActive = $subscription['status'] === 'active';
+    $isExpiredByDate = !empty($subscription['expiry_date']) && strtotime($subscription['expiry_date']) < time();
+    
+    if ($isActive && !$isExpiredByDate) {
         echo json_encode([
             'status' => 'active',
             'activated' => true,
@@ -105,6 +108,12 @@ try {
     } elseif ($subscription['status'] === 'pending_payment') {
         echo json_encode([
             'status' => 'pending_payment',
+            'activated' => false,
+            'waiting' => true,
+        ]);
+    } elseif ($isActive && $isExpiredByDate) {
+        echo json_encode([
+            'status' => 'expired',
             'activated' => false,
             'waiting' => true,
         ]);

@@ -487,8 +487,21 @@ class Mpesa {
                     
                     // For pending_payment hotspot subscriptions, activate them
                     if ($subscription['status'] === 'pending_payment') {
-                        $validityDays = $subscription['validity_days'] ?? 30;
-                        $expiryDate = date('Y-m-d H:i:s', strtotime("+{$validityDays} days"));
+                        $sessionHours = null;
+                        $phStmt = $this->db->prepare("SELECT session_duration_hours FROM radius_packages WHERE id = ?");
+                        $phStmt->execute([$subscription['package_id'] ?? 0]);
+                        $pkgRow = $phStmt->fetch(\PDO::FETCH_ASSOC);
+                        if ($pkgRow && !empty($pkgRow['session_duration_hours'])) {
+                            $sessionHours = (float)$pkgRow['session_duration_hours'];
+                        }
+
+                        if ($sessionHours && $sessionHours > 0) {
+                            $durationSeconds = (int)($sessionHours * 3600);
+                            $expiryDate = date('Y-m-d H:i:s', time() + $durationSeconds);
+                        } else {
+                            $validityDays = $subscription['validity_days'] ?? 30;
+                            $expiryDate = date('Y-m-d H:i:s', strtotime("+{$validityDays} days"));
+                        }
                         $activateStmt = $this->db->prepare("
                             UPDATE radius_subscriptions 
                             SET status = 'active', expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
