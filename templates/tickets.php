@@ -271,8 +271,8 @@ if (isset($_GET['customer_id'])) {
                 <div class="col-md-4">
                     <label class="form-label">Status *</label>
                     <select class="form-select" name="status" required>
-                        <?php foreach ($ticketStatuses as $key => $label): ?>
-                        <option value="<?= $key ?>" <?= ($ticketData['status'] ?? 'open') === $key ? 'selected' : '' ?>>
+                        <?php foreach ($ticketEditableStatuses as $key => $label): ?>
+                        <option value="<?= $key ?>" <?= ($ticketData['status'] ?? 'in_progress') === $key ? 'selected' : '' ?>>
                             <?= $label ?>
                         </option>
                         <?php endforeach; ?>

@@ -8466,6 +8466,7 @@ $connectionStatuses = $customer->getConnectionStatuses();
 $categories = $ticket->getCategories();
 $priorities = $ticket->getPriorities();
 $ticketStatuses = $ticket->getStatuses();
+$ticketEditableStatuses = $ticket->getEditableStatuses();
 $csrfToken = \App\Auth::generateToken();
 
 ?>

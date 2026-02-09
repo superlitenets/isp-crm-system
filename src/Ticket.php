@@ -947,7 +947,19 @@ class Ticket {
             'open' => 'Open',
             'in_progress' => 'In Progress',
             'pending' => 'Pending',
-            'resolved' => 'Completed'
+            'on_hold' => 'On Hold',
+            'resolved' => 'Resolved',
+            'closed' => 'Closed'
+        ];
+    }
+    
+    public function getEditableStatuses(): array {
+        return [
+            'in_progress' => 'In Progress',
+            'pending' => 'Pending',
+            'on_hold' => 'On Hold',
+            'resolved' => 'Resolved',
+            'closed' => 'Closed'
         ];
     }
 
