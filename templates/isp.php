@@ -1646,6 +1646,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt = $db->prepare("UPDATE radius_subscriptions SET mac_address = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                 $stmt->execute([$id]);
+                $db->prepare("DELETE FROM radius_subscription_macs WHERE subscription_id = ?")->execute([$id]);
                 $message = 'MAC binding cleared. MAC will be auto-captured on next connection.';
                 $messageType = 'success';
             } catch (Exception $e) {

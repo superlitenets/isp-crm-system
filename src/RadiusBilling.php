@@ -1237,6 +1237,16 @@ class RadiusBilling {
             }
             
             $sessionMac = $data['mac_address'] ?? '';
+            $nasIp = $data['nas_ip_address'] ?? '';
+            
+            // Close any stale "active" sessions from a different NAS (e.g. after NAS swap)
+            if (!empty($nasIp)) {
+                $this->db->prepare("
+                    UPDATE radius_sessions 
+                    SET status = 'closed', session_end = CURRENT_TIMESTAMP, terminate_cause = 'NAS-Swap'
+                    WHERE subscription_id = ? AND status = 'active' AND nas_ip_address != ?
+                ")->execute([$sub['id'], $nasIp]);
+            }
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_sessions (subscription_id, acct_session_id, nas_id, nas_ip_address,
@@ -1247,7 +1257,7 @@ class RadiusBilling {
                 $sub['id'],
                 $data['acct_session_id'],
                 $data['nas_id'] ?? null,
-                $data['nas_ip_address'] ?? '',
+                $nasIp,
                 $data['nas_port_id'] ?? '',
                 $data['framed_ip_address'] ?? '',
                 $sessionMac
@@ -1778,12 +1788,33 @@ class RadiusBilling {
             }
         }
         
-        // Auto-save MAC address for hotspot users (no pre-registration needed)
+        // MAC address locking on first authentication
         if (!empty($callingStationId)) {
             $normalizedMac = strtoupper(str_replace(['-', '.'], ':', $callingStationId));
-            if (empty($sub['mac_address']) || $sub['mac_address'] !== $normalizedMac) {
-                $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ? WHERE id = ?");
-                $updateStmt->execute([$normalizedMac, $sub['id']]);
+            
+            if ($isHotspot) {
+                // Hotspot: always update MAC (devices change frequently)
+                if (empty($sub['mac_address']) || $sub['mac_address'] !== $normalizedMac) {
+                    $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ? WHERE id = ?");
+                    $updateStmt->execute([$normalizedMac, $sub['id']]);
+                }
+            } else {
+                // PPPoE/Static/DHCP: lock MAC on first auth, reject different MACs after that
+                if (empty($sub['mac_address'])) {
+                    // First auth - capture and lock MAC
+                    $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ? WHERE id = ?");
+                    $updateStmt->execute([$normalizedMac, $sub['id']]);
+                } elseif ($sub['mac_address'] !== $normalizedMac) {
+                    // Different MAC trying to connect - reject unless MAC binding enforcement is off
+                    if ($enforceMacBinding) {
+                        $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 
+                            "MAC locked. Registered: {$sub['mac_address']}, Attempted: {$normalizedMac}. Use Reset MAC to unlock.");
+                        return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Device not authorized. Contact support to reset MAC binding.'];
+                    }
+                    // If binding not enforced, update to new MAC
+                    $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ? WHERE id = ?");
+                    $updateStmt->execute([$normalizedMac, $sub['id']]);
+                }
             }
         }
         
