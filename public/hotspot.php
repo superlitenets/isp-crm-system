@@ -199,6 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
         case 'renew':
             $phone = $_POST['phone'] ?? '';
+            $newPackageId = (int)($_POST['package_id'] ?? 0);
             
             if (empty($phone)) {
                 $message = 'Please enter your phone number';
@@ -208,19 +209,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $messageType = 'danger';
             } else {
                 try {
+                    $renewPkgName = $subscription['package_name'];
                     $amount = (int)($subscription['package_price'] ?? 0);
+                    $subId = $subscription['id'];
+
+                    if ($newPackageId > 0 && $newPackageId != ($subscription['package_id'] ?? 0)) {
+                        $pkgStmt = $db->prepare("SELECT id, name, price FROM radius_packages WHERE id = ? AND is_active = true");
+                        $pkgStmt->execute([$newPackageId]);
+                        $newPkg = $pkgStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($newPkg) {
+                            $amount = (int)$newPkg['price'];
+                            $renewPkgName = $newPkg['name'];
+                            $db->prepare("UPDATE radius_subscriptions SET package_id = ? WHERE id = ?")->execute([$newPackageId, $subId]);
+                        }
+                    }
+
                     if ($amount <= 0) {
                         $message = 'Package price not configured. Please use a voucher.';
                         $messageType = 'warning';
                     } else {
                         $stkResult = $mpesa->stkPush($phone, $amount, 
-                            'HS-' . $subscription['id'], 
-                            "Renew - {$subscription['package_name']}");
+                            'HS-' . $subId, 
+                            "Renew - {$renewPkgName}");
                         if ($stkResult && !empty($stkResult['success'])) {
                             $message = "Payment request sent! Enter your M-Pesa PIN on your phone.";
                             $messageType = 'success';
                             $stkPushSent = true;
-                            $_SESSION['pending_subscription_id'] = $subscription['id'];
+                            $_SESSION['pending_subscription_id'] = $subId;
                         } else {
                             $message = $stkResult['message'] ?? 'Failed to send payment request. Use voucher instead.';
                             $messageType = 'warning';
@@ -1101,24 +1116,72 @@ function formatValidity($days, $pkg = null) {
                     <div style="background: #f8fafc; border-radius: 14px; padding: 14px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <div style="font-weight: 600; color: #0f172a;"><?= htmlspecialchars($subscription['package_name']) ?></div>
+                                <div style="font-weight: 600; color: #0f172a;">Previous: <?= htmlspecialchars($subscription['package_name']) ?></div>
                                 <div style="font-size: 12px; color: #64748b;"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : ($subscription['validity_days'] ?? '0') . ' days' ?></div>
                             </div>
                             <div class="pkg-price">KES <?= number_format($subscription['package_price'] ?? 0) ?></div>
                         </div>
                     </div>
                     <?php endif; ?>
-                    
-                    <?php if ($mpesaEnabled): ?>
-                    <form method="POST" style="margin-bottom: 16px;">
-                        <input type="hidden" name="action" value="renew">
-                        <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
-                        <input type="tel" name="phone" class="form-input" placeholder="M-Pesa Phone (e.g., 0712345678)" value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" required style="margin-bottom: 12px;">
-                        <button type="submit" class="btn-main btn-mpesa">
-                            <i class="bi bi-phone"></i> Renew with M-Pesa
+
+                    <?php if (!empty($packages)): ?>
+                    <div class="section-title" style="margin-bottom: 12px;">
+                        <i class="bi bi-box-seam"></i> Choose a Plan
+                    </div>
+                    <?php foreach ($packages as $i => $pkg): ?>
+                    <?php
+                        $validityText = formatValidity($pkg['validity_days'] ?? 0, $pkg);
+                        $hasData = !empty($pkg['data_quota_mb']);
+                        $dataText = $hasData ? number_format($pkg['data_quota_mb'] / 1024, 1) . ' GB' : 'Unlimited';
+                        $maxDevices = (int)($pkg['max_devices'] ?? 1);
+                        $isCurrentPkg = $subscription && ($pkg['id'] == ($subscription['package_id'] ?? 0));
+                    ?>
+                    <div class="pkg-card" onclick="openExpiredPayment(<?= $pkg['id'] ?>, '<?= htmlspecialchars(addslashes($pkg['name'])) ?>', <?= $pkg['price'] ?>, '<?= htmlspecialchars(addslashes($pkg['download_speed'] ?? '')) ?>', '<?= htmlspecialchars($validityText) ?>', '<?= htmlspecialchars($dataText) ?>', <?= $maxDevices ?>)" style="cursor: pointer;">
+                        <?php if ($isCurrentPkg): ?>
+                        <div style="position: absolute; top: 8px; right: 8px;"><span class="pkg-tag" style="background: #dbeafe; color: #2563eb; font-size: 10px;">Previous Plan</span></div>
+                        <?php endif; ?>
+                        <?php if ($maxDevices > 1): ?>
+                        <div class="pkg-multi-badge"><i class="bi bi-people-fill"></i> <?= $maxDevices ?> Devices</div>
+                        <?php endif; ?>
+                        <div class="pkg-top">
+                            <div class="pkg-name"><?= htmlspecialchars($pkg['name']) ?></div>
+                            <div class="pkg-price">KES <?= number_format($pkg['price']) ?></div>
+                        </div>
+                        <div class="pkg-details">
+                            <span class="pkg-tag"><i class="bi bi-speedometer2"></i> <?= htmlspecialchars($pkg['download_speed'] ?? 'N/A') ?></span>
+                            <span class="pkg-tag"><i class="bi bi-clock"></i> <?= $validityText ?></span>
+                            <?php if ($hasData): ?>
+                            <span class="pkg-tag"><i class="bi bi-database"></i> <?= $dataText ?></span>
+                            <?php endif; ?>
+                            <?php if ($maxDevices > 1): ?>
+                            <span class="pkg-tag"><i class="bi bi-phone"></i> <?= $maxDevices ?> devices</span>
+                            <?php endif; ?>
+                        </div>
+                        <button type="button" class="pkg-buy-btn">
+                            <i class="bi bi-cart-check"></i> <?= $isCurrentPkg ? 'Renew' : 'Buy Now' ?> - KES <?= number_format($pkg['price']) ?>
                         </button>
-                    </form>
+                    </div>
+                    <?php endforeach; ?>
                     <?php endif; ?>
+
+                    <div id="expired-payment-modal" style="display:none; background: #f8fafc; border-radius: 14px; padding: 16px; margin-bottom: 16px; border: 2px solid #6366f1;">
+                        <h5 style="margin-bottom: 12px; color: #0f172a;"><i class="bi bi-bag-check"></i> <span id="exp-pkg-name"></span></h5>
+                        <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
+                            <span id="exp-pkg-speed"></span> | <span id="exp-pkg-validity"></span> | <span id="exp-pkg-data"></span>
+                        </div>
+                        <?php if ($mpesaEnabled): ?>
+                        <form method="POST" style="margin-bottom: 12px;">
+                            <input type="hidden" name="action" value="renew">
+                            <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
+                            <input type="hidden" name="package_id" id="exp-package-id" value="">
+                            <input type="tel" name="phone" class="form-input" placeholder="M-Pesa Phone (e.g., 0712345678)" value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" required style="margin-bottom: 12px;">
+                            <button type="submit" class="btn-main btn-mpesa">
+                                <i class="bi bi-phone"></i> Pay KES <span id="exp-pkg-price"></span> via M-Pesa
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                        <button type="button" onclick="document.getElementById('expired-payment-modal').style.display='none'" class="btn-main" style="background: #e2e8f0; color: #475569; font-size: 13px; padding: 10px;">Cancel</button>
+                    </div>
                     
                     <div class="divider">or use voucher</div>
                     
@@ -1318,6 +1381,18 @@ function formatValidity($days, $pkg = null) {
     <?php endif; ?>
 
     <script>
+    function openExpiredPayment(pkgId, name, price, speed, validity, data, maxDevices) {
+        document.getElementById('exp-package-id').value = pkgId;
+        document.getElementById('exp-pkg-name').textContent = name;
+        document.getElementById('exp-pkg-price').textContent = price.toLocaleString();
+        document.getElementById('exp-pkg-speed').textContent = speed;
+        document.getElementById('exp-pkg-validity').textContent = validity;
+        document.getElementById('exp-pkg-data').textContent = data;
+        var modal = document.getElementById('expired-payment-modal');
+        modal.style.display = 'block';
+        modal.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+
     function openPayment(pkgId, name, price, speed, validity, data, maxDevices) {
         document.getElementById('modalPackageId').value = pkgId;
         document.getElementById('modalPkgName').textContent = name;
