@@ -1182,7 +1182,7 @@ function syncAllEmployeesToDevice(deviceId) {
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'commissions' ? 'active' : '' ?>" href="?page=hr&subpage=commissions">
-            <i class="bi bi-ticket-perforated"></i> Commissions
+            <i class="bi bi-ticket-perforated"></i> Ticket Commissions
         </a>
     </li>
     <li class="nav-item">
