@@ -555,7 +555,7 @@ class Mpesa {
             $radiusBilling = new RadiusBilling($this->db);
             
             // Use the proper processPayment method which handles wallet credits
-            $result = $radiusBilling->processPayment($receiptNumber ?? $checkoutRequestId, $phoneNumber ?? '', $amount, $accountRef);
+            $result = $radiusBilling->processPayment($receiptNumber ?? $checkoutRequestId, $phoneNumber ?? '', $amount, $accountRef, $subscription['id']);
             
             if ($result['success']) {
                 if (!empty($result['wallet_topup'])) {
