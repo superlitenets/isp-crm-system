@@ -2533,10 +2533,11 @@ class RadiusBilling {
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '64k/64k';
         
         // Get expired subscriptions past grace period
+        // Uses CURRENT_TIMESTAMP for precise hour-based hotspot session expiry
         $stmt = $this->db->query("
-            SELECT id, grace_period_days, expiry_date, static_ip FROM radius_subscriptions 
+            SELECT id, grace_period_days, expiry_date, static_ip, access_type FROM radius_subscriptions 
             WHERE status = 'active' 
-            AND expiry_date < CURRENT_DATE - INTERVAL '1 day' * grace_period_days
+            AND expiry_date < CURRENT_TIMESTAMP - INTERVAL '1 day' * COALESCE(grace_period_days, 0)
         ");
         
         while ($sub = $stmt->fetch(\PDO::FETCH_ASSOC)) {
