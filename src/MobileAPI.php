@@ -372,7 +372,7 @@ class MobileAPI {
         return ['success' => $result];
     }
     
-    private function sendStatusNotification(array $ticket, string $status): void {
+    public function sendStatusNotification(array $ticket, string $status): void {
         try {
             $settings = new Settings();
             $smsEnabled = $settings->get('sms_enabled', false);
@@ -1250,7 +1250,7 @@ class MobileAPI {
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
-            WHERE t.assigned_to IS NULL AND t.status NOT IN ('resolved', 'closed')";
+            WHERE t.assigned_to IS NULL AND t.team_id IS NULL AND t.status NOT IN ('resolved', 'closed')";
         $params = [];
         
         if (!empty($branchIds)) {
@@ -1280,7 +1280,7 @@ class MobileAPI {
         }
         
         $stmt = $this->db->prepare("
-            UPDATE tickets SET assigned_to = ?, updated_at = NOW() 
+            UPDATE tickets SET assigned_to = ?, status = 'in_progress', updated_at = NOW() 
             WHERE id = ? AND assigned_to IS NULL AND status NOT IN ('resolved', 'closed')
         ");
         $stmt->execute([$userId, $ticketId]);

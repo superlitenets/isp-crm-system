@@ -35,7 +35,12 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 $input = [];
 if ($method === 'POST') {
-    $input = json_decode(file_get_contents('php://input'), true) ?? [];
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    if (strpos($contentType, 'multipart/form-data') !== false) {
+        $input = $_POST;
+    } else {
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+    }
 }
 
 $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -644,6 +649,134 @@ try {
                 echo json_encode(['success' => true]);
             } else {
                 echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to update ticket']);
+            }
+            break;
+            
+        case 'resolve-ticket':
+            requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            $userRole = $user['role'] ?? '';
+            if (!in_array($userRole, $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to resolve tickets']);
+                break;
+            }
+            
+            $ticketId = (int) ($input['ticket_id'] ?? 0);
+            $resolutionNotes = trim($input['resolution_notes'] ?? '');
+            
+            if (!$ticketId || !$resolutionNotes) {
+                echo json_encode(['success' => false, 'error' => 'Ticket ID and resolution notes are required']);
+                break;
+            }
+            
+            if (!$api->isClockedIn($user['id'])) {
+                echo json_encode(['success' => false, 'error' => 'You must clock in before resolving tickets']);
+                break;
+            }
+            
+            if (!$api->canModifyTicket($ticketId, $user['id'], $userRole)) {
+                echo json_encode(['success' => false, 'error' => 'You do not have permission to resolve this ticket']);
+                break;
+            }
+            
+            try {
+                $pdo = $db;
+                $pdo->beginTransaction();
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO ticket_resolutions 
+                    (ticket_id, resolved_by, resolution_notes, router_serial, power_levels, cable_used, equipment_installed, additional_notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (ticket_id) DO UPDATE SET
+                        resolution_notes = EXCLUDED.resolution_notes,
+                        router_serial = EXCLUDED.router_serial,
+                        power_levels = EXCLUDED.power_levels,
+                        cable_used = EXCLUDED.cable_used,
+                        equipment_installed = EXCLUDED.equipment_installed,
+                        additional_notes = EXCLUDED.additional_notes,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING id
+                ");
+                $stmt->execute([
+                    $ticketId,
+                    $user['id'],
+                    $resolutionNotes,
+                    trim($input['router_serial'] ?? ''),
+                    trim($input['power_levels'] ?? ''),
+                    trim($input['cable_used'] ?? ''),
+                    trim($input['equipment_installed'] ?? ''),
+                    trim($input['additional_notes'] ?? '')
+                ]);
+                $resolutionId = $stmt->fetchColumn();
+                
+                $uploadDir = __DIR__ . '/uploads/ticket_resolutions/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+                
+                $photoTypes = ['photo_serial' => 'serial', 'photo_power' => 'power_levels', 'photo_cables' => 'cables', 'photo_additional' => 'additional'];
+                $maxFileSize = 10 * 1024 * 1024;
+                $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                
+                foreach ($photoTypes as $fieldName => $photoType) {
+                    if (!empty($_FILES[$fieldName]['name']) && $_FILES[$fieldName]['error'] === UPLOAD_ERR_OK) {
+                        $tmpFile = $_FILES[$fieldName]['tmp_name'];
+                        $fileSize = $_FILES[$fieldName]['size'];
+                        $ext = strtolower(pathinfo($_FILES[$fieldName]['name'], PATHINFO_EXTENSION));
+                        
+                        if ($fileSize > $maxFileSize || !in_array($ext, $allowedExts)) {
+                            continue;
+                        }
+                        
+                        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                        $mimeType = finfo_file($finfo, $tmpFile);
+                        finfo_close($finfo);
+                        
+                        if (!in_array($mimeType, $allowedMimes)) {
+                            continue;
+                        }
+                        
+                        $safeExt = match($mimeType) {
+                            'image/jpeg' => 'jpg',
+                            'image/png' => 'png',
+                            'image/gif' => 'gif',
+                            'image/webp' => 'webp',
+                            default => 'jpg'
+                        };
+                        
+                        $fileName = 'ticket_' . $ticketId . '_' . $photoType . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $safeExt;
+                        $filePath = 'uploads/ticket_resolutions/' . $fileName;
+                        
+                        if (move_uploaded_file($tmpFile, $uploadDir . $fileName)) {
+                            $stmt = $pdo->prepare("
+                                INSERT INTO ticket_resolution_photos 
+                                (ticket_id, resolution_id, photo_type, file_path, file_name, uploaded_by)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            ");
+                            $stmt->execute([$ticketId, $resolutionId, $photoType, $filePath, $_FILES[$fieldName]['name'], $user['id']]);
+                        }
+                    }
+                }
+                
+                $ticketModel = new \App\Ticket();
+                $ticketModel->quickStatusChange($ticketId, 'resolved', $user['id']);
+                
+                $pdo->commit();
+                
+                $ticketData = $ticketModel->find($ticketId);
+                if ($ticketData && !empty($ticketData['customer_id'])) {
+                    try {
+                        $api->sendStatusNotification($ticketData, 'resolved');
+                    } catch (\Exception $e) {}
+                }
+                
+                echo json_encode(['success' => true, 'message' => 'Ticket resolved successfully']);
+            } catch (Exception $e) {
+                if (isset($pdo) && $pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                echo json_encode(['success' => false, 'error' => 'Error resolving ticket: ' . $e->getMessage()]);
             }
             break;
             

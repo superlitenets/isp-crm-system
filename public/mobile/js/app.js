@@ -1457,9 +1457,66 @@ const app = {
                     <h6><i class="bi bi-arrow-repeat"></i> Update Status</h6>
                     <div class="status-actions">
                         ${!ticket.assigned_to ? `<button class="btn btn-primary btn-sm" onclick="app.claimAndUpdate(${ticket.id})">Claim & Start</button>` : ''}
-                        ${ticket.status !== 'in_progress' ? `<button class="btn btn-warning btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'in_progress')">Start Working</button>` : ''}
-                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'resolved')">Mark Resolved</button>` : ''}
-                        ${ticket.status !== 'on_hold' ? `<button class="btn btn-secondary btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'on_hold')">On Hold</button>` : ''}
+                        ${ticket.status !== 'in_progress' && ticket.status !== 'resolved' ? `<button class="btn btn-warning btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'in_progress')">Start Working</button>` : ''}
+                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.showResolveForm(${ticket.id})"><i class="bi bi-check-circle"></i> Resolve Ticket</button>` : ''}
+                        ${ticket.status !== 'on_hold' && ticket.status !== 'resolved' ? `<button class="btn btn-secondary btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'on_hold')">On Hold</button>` : ''}
+                    </div>
+                </div>
+                
+                <div id="resolve-form-${ticket.id}" style="display:none;">
+                    <div class="ticket-detail-card">
+                        <h6 class="text-success"><i class="bi bi-check-circle"></i> Resolution Details</h6>
+                        <div class="alert alert-info small p-2">
+                            <i class="bi bi-info-circle"></i> Please provide details about the completed work.
+                        </div>
+                        <form id="resolve-ticket-form-${ticket.id}" onsubmit="app.submitResolveForm(event, ${ticket.id}); return false;">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Router Serial Number</label>
+                                <input type="text" class="form-control form-control-sm" name="router_serial" placeholder="e.g., SN123456789">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Power Levels (dBm)</label>
+                                <input type="text" class="form-control form-control-sm" name="power_levels" placeholder="e.g., TX: -3.2 / RX: -18.5">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Cable Used</label>
+                                <input type="text" class="form-control form-control-sm" name="cable_used" placeholder="e.g., 50m CAT6, Fiber patch">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Equipment Installed</label>
+                                <input type="text" class="form-control form-control-sm" name="equipment_installed" placeholder="e.g., ONU, Router, Switch">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Resolution Notes *</label>
+                                <textarea class="form-control form-control-sm" name="resolution_notes" rows="3" required placeholder="Describe what was done to resolve this ticket..."></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-upc-scan"></i> Router Serial Photo</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_serial" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-graph-up"></i> Power Levels Photo</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_power" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-ethernet"></i> Cables/Installation Photo</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_cables" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-image"></i> Additional Photo (Optional)</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_additional" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Additional Notes</label>
+                                <textarea class="form-control form-control-sm" name="additional_notes" rows="2" placeholder="Any additional comments..."></textarea>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-secondary btn-sm flex-fill" onclick="document.getElementById('resolve-form-${ticket.id}').style.display='none'">Cancel</button>
+                                <button type="submit" class="btn btn-success btn-sm flex-fill" id="resolve-submit-btn-${ticket.id}">
+                                    <i class="bi bi-check-circle"></i> Complete Resolution
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
                 
@@ -1516,6 +1573,75 @@ const app = {
             } else {
                 this.showToast(result.error || 'Failed to update', 'danger');
             }
+        }
+    },
+    
+    showResolveForm(ticketId) {
+        const form = document.getElementById('resolve-form-' + ticketId);
+        if (form) {
+            form.style.display = 'block';
+            form.scrollIntoView({ behavior: 'smooth' });
+        }
+    },
+    
+    async submitResolveForm(event, ticketId) {
+        event.preventDefault();
+        const form = document.getElementById('resolve-ticket-form-' + ticketId);
+        const submitBtn = document.getElementById('resolve-submit-btn-' + ticketId);
+        
+        const resolutionNotes = form.querySelector('[name="resolution_notes"]').value.trim();
+        if (!resolutionNotes) {
+            this.showToast('Resolution notes are required', 'warning');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Submitting...';
+        
+        const formData = new FormData();
+        formData.append('ticket_id', ticketId);
+        formData.append('resolution_notes', resolutionNotes);
+        formData.append('router_serial', form.querySelector('[name="router_serial"]').value);
+        formData.append('power_levels', form.querySelector('[name="power_levels"]').value);
+        formData.append('cable_used', form.querySelector('[name="cable_used"]').value);
+        formData.append('equipment_installed', form.querySelector('[name="equipment_installed"]').value);
+        formData.append('additional_notes', form.querySelector('[name="additional_notes"]').value);
+        
+        const photoFields = ['photo_serial', 'photo_power', 'photo_cables', 'photo_additional'];
+        photoFields.forEach(field => {
+            const fileInput = form.querySelector(`[name="${field}"]`);
+            if (fileInput && fileInput.files.length > 0) {
+                formData.append(field, fileInput.files[0]);
+            }
+        });
+        
+        try {
+            const token = localStorage.getItem('mobile_token');
+            const response = await fetch('/mobile-api.php?action=resolve-ticket', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                },
+                body: formData
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showToast('Ticket resolved successfully!', 'success');
+                this.showTicketDetailAny(ticketId);
+                this.loadDashboardTickets();
+            } else {
+                if (this.isClockInError(result.error)) {
+                    this.showClockInPrompt();
+                } else {
+                    this.showToast(result.error || 'Failed to resolve ticket', 'danger');
+                }
+            }
+        } catch (e) {
+            this.showToast('Network error. Please try again.', 'danger');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Complete Resolution';
         }
     },
     
