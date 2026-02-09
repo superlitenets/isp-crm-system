@@ -9060,6 +9060,11 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'sales' ? 'active' : '' ?>" href="?page=sales">
+                        <i class="bi bi-people-fill"></i> Sales
+                    </a>
+                </li>
                 <?php if (\App\Auth::can('tickets.view')): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'complaints' ? 'active' : '' ?>" href="?page=complaints">
@@ -9190,6 +9195,11 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'sales' ? 'active' : '' ?>" href="?page=sales">
+                    <i class="bi bi-graph-up-arrow"></i> Sales
+                </a>
+            </li>
             <?php if (\App\Auth::can('tickets.view')): ?>
             <li class="nav-item">
                 <?php 
@@ -9424,6 +9434,9 @@ $csrfToken = \App\Auth::generateToken();
                 } else {
                     include __DIR__ . '/../templates/orders.php';
                 }
+                break;
+            case 'sales':
+                include __DIR__ . '/../templates/sales.php';
                 break;
             case 'complaints':
                 if (!\App\Auth::can('tickets.view')) {
