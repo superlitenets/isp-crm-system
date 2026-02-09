@@ -2781,7 +2781,7 @@ $ticketCommission = new \App\TicketCommission($db);
 $selectedMonth = $_GET['month'] ?? date('Y-m');
 $selectedEmployeeId = isset($_GET['employee_id']) && $_GET['employee_id'] !== '' ? (int)$_GET['employee_id'] : null;
 
-$currentUser = \App\Auth::getUser();
+$currentUser = \App\Auth::user();
 $currentEmployee = $employee->getByUserId($currentUser['id']);
 $isAdminOrManager = in_array($currentUser['role'], ['admin', 'manager']);
 
