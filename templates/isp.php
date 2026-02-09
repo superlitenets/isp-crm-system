@@ -486,6 +486,8 @@ if ($action === 'get_live_traffic') {
         
         if ($accessType === 'pppoe') {
             $trafficData = $api->getPPPoESessionTraffic($sub['username']);
+        } elseif ($accessType === 'hotspot') {
+            $trafficData = $api->getHotspotSessionTraffic($sub['username']);
         } elseif ($accessType === 'dhcp' && !empty($sub['mac_address'])) {
             $trafficData = $api->getDHCPLeaseTraffic($sub['mac_address']);
         } elseif (!empty($sub['static_ip'])) {

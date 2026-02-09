@@ -354,6 +354,26 @@ class MikroTikAPI {
         ];
     }
     
+    public function getHotspotSessionTraffic(string $username): array {
+        $sessions = $this->command('/ip/hotspot/active/print', ['?user' => $username]);
+        
+        if (empty($sessions)) {
+            return ['error' => 'Hotspot session not found', 'online' => false];
+        }
+        
+        $session = $sessions[0];
+        return [
+            'online' => true,
+            'username' => $username,
+            'uptime' => $session['uptime'] ?? '0s',
+            'address' => $session['address'] ?? '',
+            'mac' => $session['mac-address'] ?? '',
+            'rx_bytes' => (int)($session['bytes-in'] ?? 0),
+            'tx_bytes' => (int)($session['bytes-out'] ?? 0),
+            'timestamp' => time() * 1000
+        ];
+    }
+    
     public function getDHCPLeaseTraffic(string $macAddress): array {
         $leases = $this->command('/ip/dhcp-server/lease/print', ['?mac-address' => strtoupper($macAddress)]);
         
