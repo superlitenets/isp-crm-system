@@ -537,9 +537,66 @@ const app = {
                 <div class="ticket-detail-card">
                     <h6><i class="bi bi-arrow-repeat"></i> Update Status</h6>
                     <div class="status-actions">
-                        ${ticket.status !== 'in_progress' ? `<button class="btn btn-warning btn-sm" onclick="app.updateTicketStatus(${ticket.id}, 'in_progress')">Start Working</button>` : ''}
-                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.showCloseTicketModal(${ticket.id})">Close Ticket</button>` : ''}
-                        ${ticket.status !== 'on_hold' ? `<button class="btn btn-secondary btn-sm" onclick="app.updateTicketStatus(${ticket.id}, 'on_hold')">On Hold</button>` : ''}
+                        ${ticket.status !== 'in_progress' && ticket.status !== 'resolved' ? `<button class="btn btn-warning btn-sm" onclick="app.updateTicketStatus(${ticket.id}, 'in_progress')">Start Working</button>` : ''}
+                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.showResolveForm(${ticket.id})"><i class="bi bi-check-circle"></i> Resolve Ticket</button>` : ''}
+                        ${ticket.status !== 'on_hold' && ticket.status !== 'resolved' ? `<button class="btn btn-secondary btn-sm" onclick="app.updateTicketStatus(${ticket.id}, 'on_hold')">On Hold</button>` : ''}
+                    </div>
+                </div>
+                
+                <div id="resolve-form-${ticket.id}" style="display:none;">
+                    <div class="ticket-detail-card">
+                        <h6 class="text-success"><i class="bi bi-check-circle"></i> Resolution Details</h6>
+                        <div class="alert alert-info small p-2">
+                            <i class="bi bi-info-circle"></i> Please provide details about the completed work.
+                        </div>
+                        <form id="resolve-ticket-form-${ticket.id}" onsubmit="app.submitResolveForm(event, ${ticket.id}); return false;">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Router Serial Number</label>
+                                <input type="text" class="form-control form-control-sm" name="router_serial" placeholder="e.g., SN123456789">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Power Levels (dBm)</label>
+                                <input type="text" class="form-control form-control-sm" name="power_levels" placeholder="e.g., TX: -3.2 / RX: -18.5">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Cable Used</label>
+                                <input type="text" class="form-control form-control-sm" name="cable_used" placeholder="e.g., 50m CAT6, Fiber patch">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Equipment Installed</label>
+                                <input type="text" class="form-control form-control-sm" name="equipment_installed" placeholder="e.g., ONU, Router, Switch">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Resolution Notes *</label>
+                                <textarea class="form-control form-control-sm" name="resolution_notes" rows="3" required placeholder="Describe what was done to resolve this ticket..."></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-upc-scan"></i> Router Serial Photo</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_serial" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-graph-up"></i> Power Levels Photo</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_power" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-ethernet"></i> Cables/Installation Photo</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_cables" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold"><i class="bi bi-image"></i> Additional Photo (Optional)</label>
+                                <input type="file" class="form-control form-control-sm" name="photo_additional" accept="image/*" capture="environment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Additional Notes</label>
+                                <textarea class="form-control form-control-sm" name="additional_notes" rows="2" placeholder="Any additional comments..."></textarea>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-secondary btn-sm flex-fill" onclick="document.getElementById('resolve-form-${ticket.id}').style.display='none'">Cancel</button>
+                                <button type="submit" class="btn btn-success btn-sm flex-fill" id="resolve-submit-btn-${ticket.id}">
+                                    <i class="bi bi-check-circle"></i> Complete Resolution
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
                 
@@ -600,68 +657,6 @@ const app = {
         }
     },
     
-    async showCloseTicketModal(ticketId) {
-        const modalHtml = `
-            <div class="modal-overlay" id="close-ticket-modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5><i class="bi bi-check-circle"></i> Close Ticket</h5>
-                        <button class="btn-close" onclick="app.hideCloseTicketModal()"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Resolution Notes <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="close-comment" rows="3" placeholder="What was done to resolve this ticket?" required></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-outline-secondary" onclick="app.hideCloseTicketModal()">Cancel</button>
-                        <button class="btn btn-success" onclick="app.submitCloseTicket(${ticketId})">
-                            <i class="bi bi-check-lg"></i> Close Ticket
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    },
-    
-    hideCloseTicketModal() {
-        const modal = document.getElementById('close-ticket-modal');
-        if (modal) modal.remove();
-    },
-    
-    async submitCloseTicket(ticketId) {
-        const comment = document.getElementById('close-comment').value.trim();
-        
-        if (!comment) {
-            this.showToast('Resolution notes are required', 'warning');
-            document.getElementById('close-comment').focus();
-            return;
-        }
-        
-        const data = {
-            ticket_id: ticketId,
-            comment: comment
-        };
-        
-        const result = await this.api('close-ticket', 'POST', data);
-        
-        if (result.success) {
-            this.hideCloseTicketModal();
-            this.showToast('Ticket closed successfully!', 'success');
-            this.loadDashboardTickets();
-            this.goBack();
-        } else {
-            this.hideCloseTicketModal();
-            if (this.isClockInError(result.error)) {
-                this.showClockInPrompt();
-            } else {
-                this.showToast(result.error || 'Failed to close ticket', 'danger');
-            }
-        }
-    },
     
     async addComment(ticketId) {
         const input = document.getElementById('new-comment');
@@ -1458,7 +1453,7 @@ const app = {
                     <div class="status-actions">
                         ${!ticket.assigned_to ? `<button class="btn btn-primary btn-sm" onclick="app.claimAndUpdate(${ticket.id})">Claim & Start</button>` : ''}
                         ${ticket.status !== 'in_progress' && ticket.status !== 'resolved' ? `<button class="btn btn-warning btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'in_progress')">Start Working</button>` : ''}
-                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.showResolveForm(${ticket.id})"><i class="bi bi-check-circle"></i> Resolve Ticket</button>` : ''}
+                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.showResolveForm(${ticket.id}, 'all-tickets')"><i class="bi bi-check-circle"></i> Resolve Ticket</button>` : ''}
                         ${ticket.status !== 'on_hold' && ticket.status !== 'resolved' ? `<button class="btn btn-secondary btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'on_hold')">On Hold</button>` : ''}
                     </div>
                 </div>
@@ -1576,7 +1571,8 @@ const app = {
         }
     },
     
-    showResolveForm(ticketId) {
+    showResolveForm(ticketId, context) {
+        this._resolveContext = context || 'my-tickets';
         const form = document.getElementById('resolve-form-' + ticketId);
         if (form) {
             form.style.display = 'block';
@@ -1628,8 +1624,12 @@ const app = {
             
             if (result.success) {
                 this.showToast('Ticket resolved successfully!', 'success');
-                this.showTicketDetailAny(ticketId);
                 this.loadDashboardTickets();
+                if (this._resolveContext === 'all-tickets') {
+                    this.showTicketDetailAny(ticketId);
+                } else {
+                    this.showTicketDetail(ticketId);
+                }
             } else {
                 if (this.isClockInError(result.error)) {
                     this.showClockInPrompt();
