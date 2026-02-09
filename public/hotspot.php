@@ -1102,7 +1102,7 @@ function formatValidity($days, $pkg = null) {
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
                                 <div style="font-weight: 600; color: #0f172a;"><?= htmlspecialchars($subscription['package_name']) ?></div>
-                                <div style="font-size: 12px; color: #64748b;"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : $subscription['validity_days'] . ' days' ?></div>
+                                <div style="font-size: 12px; color: #64748b;"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : ($subscription['validity_days'] ?? '0') . ' days' ?></div>
                             </div>
                             <div class="pkg-price">KES <?= number_format($subscription['package_price'] ?? 0) ?></div>
                         </div>

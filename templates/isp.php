@@ -595,13 +595,28 @@ if ($action === 'get_wifi_config') {
     
     $subscriptionId = (int)($_GET['subscription_id'] ?? 0);
     
-    $stmt = $db->prepare("
-        SELECT s.*, c.phone as customer_phone, ho.genieacs_id as onu_genieacs_id, ho.name as onu_name
-        FROM radius_subscriptions s 
-        LEFT JOIN customers c ON s.customer_id = c.id 
-        LEFT JOIN huawei_onus ho ON s.huawei_onu_id = ho.id
-        WHERE s.id = ?
-    ");
+    $hasHuaweiOnuCol = false;
+    try {
+        $colCheck = $db->query("SELECT 1 FROM information_schema.columns WHERE table_name = 'radius_subscriptions' AND column_name = 'huawei_onu_id'");
+        $hasHuaweiOnuCol = $colCheck->fetchColumn() ? true : false;
+    } catch (\Throwable $e) {}
+
+    if ($hasHuaweiOnuCol) {
+        $stmt = $db->prepare("
+            SELECT s.*, c.phone as customer_phone, ho.genieacs_id as onu_genieacs_id, ho.name as onu_name
+            FROM radius_subscriptions s 
+            LEFT JOIN customers c ON s.customer_id = c.id 
+            LEFT JOIN huawei_onus ho ON s.huawei_onu_id = ho.id
+            WHERE s.id = ?
+        ");
+    } else {
+        $stmt = $db->prepare("
+            SELECT s.*, c.phone as customer_phone, NULL as onu_genieacs_id, NULL as onu_name
+            FROM radius_subscriptions s 
+            LEFT JOIN customers c ON s.customer_id = c.id 
+            WHERE s.id = ?
+        ");
+    }
     $stmt->execute([$subscriptionId]);
     $sub = $stmt->fetch(PDO::FETCH_ASSOC);
     
