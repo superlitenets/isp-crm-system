@@ -858,12 +858,15 @@ if ($action === 'get_nas_vpn' && isset($_GET['id'])) {
 if ($action === 'get_online_subscribers') {
     header('Content-Type: application/json');
     try {
+        $syncResult = $radiusBilling->syncSessionsWithRouter();
+        
         $onlineSubs = $radiusBilling->getOnlineSubscribers();
         $onlineIds = array_keys($onlineSubs);
         echo json_encode([
             'success' => true,
             'count' => count($onlineIds),
-            'online_ids' => $onlineIds
+            'online_ids' => $onlineIds,
+            'synced' => $syncResult['closed'] ?? 0
         ]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);

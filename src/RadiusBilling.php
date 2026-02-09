@@ -2739,7 +2739,7 @@ class RadiusBilling {
         $stmt = $this->db->query("
             SELECT subscription_id, framed_ip_address, mac_address, session_start
             FROM radius_sessions 
-            WHERE session_end IS NULL
+            WHERE session_end IS NULL AND status = 'active'
             ORDER BY session_start DESC
         ");
         $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -2752,6 +2752,136 @@ class RadiusBilling {
             ];
         }
         return $result;
+    }
+    
+    public function cleanStaleSessions(int $maxHours = 6): int {
+        $stmt = $this->db->prepare("
+            UPDATE radius_sessions SET 
+                status = 'closed',
+                session_end = CURRENT_TIMESTAMP,
+                terminate_cause = 'Stale-Session-Cleanup'
+            WHERE status = 'active' 
+            AND session_end IS NULL
+            AND session_start < NOW() - INTERVAL '1 hour' * ?
+        ");
+        $stmt->execute([$maxHours]);
+        return $stmt->rowCount();
+    }
+    
+    public function syncSessionsWithRouter(): array {
+        $closed = 0;
+        $errors = [];
+        
+        $openSessions = $this->db->query("
+            SELECT rs.id, rs.subscription_id, rs.acct_session_id, rs.framed_ip_address, 
+                   rs.mac_address, rs.session_start, rs.nas_ip_address,
+                   s.username, s.access_type,
+                   n.ip_address as nas_ip, n.api_port, n.api_username, n.api_password_encrypted, n.api_enabled
+            FROM radius_sessions rs
+            JOIN radius_subscriptions s ON rs.subscription_id = s.id
+            LEFT JOIN radius_nas n ON rs.nas_id = n.id
+            WHERE rs.session_end IS NULL AND rs.status = 'active'
+            AND rs.session_start < NOW() - INTERVAL '5 minutes'
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        if (empty($openSessions)) {
+            return ['success' => true, 'checked' => 0, 'closed' => 0];
+        }
+        
+        $sessionsByNas = [];
+        foreach ($openSessions as $session) {
+            $nasIp = $session['nas_ip'] ?: $session['nas_ip_address'];
+            if ($nasIp) {
+                $sessionsByNas[$nasIp][] = $session;
+            }
+        }
+        
+        $encKey = getenv('ENCRYPTION_KEY');
+        if (empty($encKey)) {
+            $encKey = $_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me';
+        }
+        
+        foreach ($sessionsByNas as $nasIp => $sessions) {
+            $nasInfo = $sessions[0];
+            
+            if (!$nasInfo['api_enabled']) {
+                continue;
+            }
+            
+            try {
+                $apiPassword = '';
+                if (!empty($nasInfo['api_password_encrypted'])) {
+                    $decoded = base64_decode($nasInfo['api_password_encrypted']);
+                    if ($decoded !== false && strlen($decoded) > 16) {
+                        $iv = substr($decoded, 0, 16);
+                        $encrypted = substr($decoded, 16);
+                        $apiPassword = openssl_decrypt($encrypted, 'AES-256-CBC', $encKey, 0, $iv) ?: '';
+                    }
+                }
+                
+                require_once __DIR__ . '/MikroTikAPI.php';
+                $api = new \App\MikroTikAPI(
+                    $nasIp,
+                    (int)($nasInfo['api_port'] ?? 8728),
+                    $nasInfo['api_username'] ?? 'admin',
+                    $apiPassword
+                );
+                $api->connect();
+                
+                $activePPPoE = [];
+                $activeHotspot = [];
+                try {
+                    $pppActive = $api->command('/ppp/active/print');
+                    foreach ($pppActive as $p) {
+                        $activePPPoE[strtolower($p['name'] ?? '')] = true;
+                    }
+                } catch (\Exception $e) {}
+                
+                try {
+                    $hotspotActive = $api->command('/ip/hotspot/active/print');
+                    foreach ($hotspotActive as $h) {
+                        $activeHotspot[strtolower($h['user'] ?? '')] = true;
+                    }
+                } catch (\Exception $e) {}
+                
+                $api->disconnect();
+                
+                foreach ($sessions as $session) {
+                    $username = strtolower($session['username'] ?? '');
+                    $accessType = strtolower($session['access_type'] ?? 'pppoe');
+                    $isActive = false;
+                    
+                    if ($accessType === 'pppoe') {
+                        $isActive = isset($activePPPoE[$username]);
+                    } elseif ($accessType === 'hotspot') {
+                        $isActive = isset($activeHotspot[$username]);
+                    } else {
+                        continue;
+                    }
+                    
+                    if (!$isActive) {
+                        $stmt = $this->db->prepare("
+                            UPDATE radius_sessions SET 
+                                status = 'closed',
+                                session_end = CURRENT_TIMESTAMP,
+                                terminate_cause = 'Session-Sync-Cleanup'
+                            WHERE id = ? AND session_end IS NULL
+                        ");
+                        $stmt->execute([$session['id']]);
+                        $closed++;
+                    }
+                }
+            } catch (\Exception $e) {
+                $errors[] = "NAS $nasIp: " . $e->getMessage();
+            }
+        }
+        
+        return [
+            'success' => true, 
+            'checked' => count($openSessions), 
+            'closed' => $closed,
+            'errors' => $errors
+        ];
     }
     
     public function processAutoRenewals(): array {

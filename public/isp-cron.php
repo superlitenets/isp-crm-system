@@ -73,6 +73,7 @@ switch ($action) {
         $results['quota_alerts'] = sendQuotaAlerts($radiusBilling, $db, $settings);
         $results['auto_renew'] = $radiusBilling->processAutoRenewals();
         $results['disconnects'] = processScheduledDisconnects($radiusBilling, $db);
+        $results['session_sync'] = syncRadiusSessions($radiusBilling, $db);
         $results['speed_overrides'] = applySpeedOverrides($radiusBilling, $db);
         $results['blocked_list_sync'] = $radiusBilling->syncMikroTikBlockedList();
         echo json_encode(['success' => true, 'results' => $results]);
@@ -228,16 +229,15 @@ function processScheduledDisconnects($radiusBilling, $db): array {
 }
 
 function syncRadiusSessions($radiusBilling, $db): array {
-    $stmt = $db->query("
-        UPDATE radius_sessions SET 
-            status = 'closed',
-            session_end = NOW()
-        WHERE status = 'active' 
-        AND session_start < NOW() - INTERVAL '24 hours'
-        AND session_end IS NULL
-    ");
+    $routerSync = $radiusBilling->syncSessionsWithRouter();
     
-    return ['success' => true, 'stale_sessions_closed' => $stmt->rowCount()];
+    $stale = $radiusBilling->cleanStaleSessions(24);
+    
+    return [
+        'success' => true, 
+        'router_sync' => $routerSync,
+        'stale_sessions_closed' => $stale
+    ];
 }
 
 function applySpeedOverrides($radiusBilling, $db): array {
