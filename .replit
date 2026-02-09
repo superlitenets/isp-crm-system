@@ -23,10 +23,6 @@ args = "WhatsApp Service"
 task = "workflow.run"
 args = "OLT Session Manager"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "License Server"
-
 [[workflows.workflow]]
 name = "Start PHP Server"
 author = "agent"
@@ -59,18 +55,6 @@ author = "agent"
 task = "shell.exec"
 args = "cd olt-service && npm start"
 waitForPort = 3002
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "License Server"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "php -S 0.0.0.0:8080 -t license-server/public"
-waitForPort = 8080
 
 [workflows.workflow.metadata]
 outputType = "console"
