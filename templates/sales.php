@@ -4,7 +4,7 @@ $salespersonModel = new \App\Salesperson($db);
 
 $canViewAll = \App\Auth::can('sales.view_all') || \App\Auth::isAdmin();
 $currentUserId = $_SESSION['user_id'] ?? null;
-$mySalesperson = $currentUserId ? $salespersonModel->getByUserId($currentUserId) : null;
+$mySalesperson = $currentUserId ? $salespersonModel->getByUserIdOrCreate($currentUserId) : null;
 ?>
 
 <div class="container-fluid py-4">

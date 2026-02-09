@@ -332,6 +332,17 @@ class Salesperson {
 
         $synced = 0;
         foreach ($employees as $emp) {
+            $existingByUser = null;
+            if (!empty($emp['user_id'])) {
+                $existingByUser = $this->getByUserId((int)$emp['user_id']);
+            }
+            if ($existingByUser) {
+                if (empty($existingByUser['employee_id'])) {
+                    $this->db->prepare("UPDATE salespersons SET employee_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$emp['id'], $existingByUser['id']]);
+                    $synced++;
+                }
+                continue;
+            }
             $this->create([
                 'employee_id' => $emp['id'],
                 'user_id' => $emp['user_id'] ?? null,
