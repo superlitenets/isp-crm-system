@@ -229,8 +229,9 @@ class RadiusBilling {
             $stmt = $this->db->prepare("
                 INSERT INTO radius_nas (name, ip_address, secret, nas_type, ports, description, 
                                         api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id,
-                                        location_id, sub_location_id, local_ip)
-                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?, ?)
+                                        location_id, sub_location_id, local_ip,
+                                        mpesa_shortcode, mpesa_consumer_key, mpesa_consumer_secret, mpesa_passkey, mpesa_account_type, mpesa_env)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['name'],
@@ -247,7 +248,13 @@ class RadiusBilling {
                 !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null,
                 !empty($data['location_id']) ? (int)$data['location_id'] : null,
                 !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null,
-                !empty($data['local_ip']) ? $data['local_ip'] : null
+                !empty($data['local_ip']) ? $data['local_ip'] : null,
+                !empty($data['mpesa_shortcode']) ? $data['mpesa_shortcode'] : null,
+                !empty($data['mpesa_consumer_key']) ? $this->encrypt($data['mpesa_consumer_key']) : null,
+                !empty($data['mpesa_consumer_secret']) ? $this->encrypt($data['mpesa_consumer_secret']) : null,
+                !empty($data['mpesa_passkey']) ? $this->encrypt($data['mpesa_passkey']) : null,
+                $data['mpesa_account_type'] ?? 'paybill',
+                $data['mpesa_env'] ?? 'production'
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -258,7 +265,7 @@ class RadiusBilling {
     public function updateNAS(int $id, array $data): array {
         try {
             $fields = ['name', 'ip_address', 'secret', 'nas_type', 'ports', 'description', 
-                       'api_port', 'api_username', 'local_ip'];
+                       'api_port', 'api_username', 'local_ip', 'mpesa_shortcode', 'mpesa_account_type', 'mpesa_env'];
             $boolFields = ['api_enabled', 'is_active'];
             $intFields = ['location_id', 'sub_location_id'];
             $updates = [];
@@ -267,7 +274,7 @@ class RadiusBilling {
             foreach ($fields as $field) {
                 if (isset($data[$field])) {
                     $updates[] = "$field = ?";
-                    $params[] = $data[$field];
+                    $params[] = $data[$field] !== '' ? $data[$field] : null;
                 }
             }
             
@@ -295,6 +302,23 @@ class RadiusBilling {
                 $params[] = !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null;
             }
             
+            if (!empty($data['mpesa_consumer_key'])) {
+                $updates[] = "mpesa_consumer_key = ?";
+                $params[] = $this->encrypt($data['mpesa_consumer_key']);
+            }
+            if (!empty($data['mpesa_consumer_secret'])) {
+                $updates[] = "mpesa_consumer_secret = ?";
+                $params[] = $this->encrypt($data['mpesa_consumer_secret']);
+            }
+            if (!empty($data['mpesa_passkey'])) {
+                $updates[] = "mpesa_passkey = ?";
+                $params[] = $this->encrypt($data['mpesa_passkey']);
+            }
+            
+            if (isset($data['mpesa_clear']) && $data['mpesa_clear'] === '1') {
+                $updates[] = "mpesa_shortcode = NULL, mpesa_consumer_key = NULL, mpesa_consumer_secret = NULL, mpesa_passkey = NULL";
+            }
+            
             $updates[] = "updated_at = CURRENT_TIMESTAMP";
             $params[] = $id;
             
@@ -304,6 +328,23 @@ class RadiusBilling {
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+    
+    public function getNASMpesaConfig(int $nasId): ?array {
+        $nas = $this->getNAS($nasId);
+        if (!$nas || empty($nas['mpesa_shortcode'])) {
+            return null;
+        }
+        return [
+            'shortcode' => $nas['mpesa_shortcode'],
+            'consumer_key' => !empty($nas['mpesa_consumer_key']) ? $this->decrypt($nas['mpesa_consumer_key']) : '',
+            'consumer_secret' => !empty($nas['mpesa_consumer_secret']) ? $this->decrypt($nas['mpesa_consumer_secret']) : '',
+            'passkey' => !empty($nas['mpesa_passkey']) ? $this->decrypt($nas['mpesa_passkey']) : '',
+            'account_type' => $nas['mpesa_account_type'] ?? 'paybill',
+            'environment' => $nas['mpesa_env'] ?? 'production',
+            'nas_id' => $nasId,
+            'nas_name' => $nas['name']
+        ];
     }
     
     public function deleteNAS(int $id): array {
