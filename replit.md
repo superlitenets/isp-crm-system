@@ -18,7 +18,7 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **SMS & WhatsApp Integration**: Supports custom gateways and Twilio for SMS; full-featured WhatsApp integration with real-time chat via a Node.js Baileys service.
 - **Template Engine**: Custom `TemplateEngine.php` for dynamic content.
 - **Biometric Integration**: Abstract `BiometricDevice.php` with implementations for ZKTeco, Hikvision, and BioTime Cloud.
-- **M-Pesa Integration**: Handles STK Push for payments, C2B, and real-time callback processing with robust error handling and retry logic. Supports multiple PayBill/Till numbers per NAS device (site) with encrypted per-site credentials, falling back to global config. Revenue-per-site reporting with date filters, collection rates, and ARPU.
+- **M-Pesa Integration**: Handles STK Push for payments, C2B, and real-time callback processing with robust error handling and retry logic. Supports multiple PayBill/Till numbers per NAS device (site) via centralized `mpesa_accounts` table managed in CRM Settings, with NAS devices referencing accounts via `mpesa_account_id` foreign key, falling back to global config. Revenue-per-site reporting with date filters, collection rates, and ARPU.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
 - **Inventory Management**: Comprehensive multi-warehouse stock management with intake, disbursement, field usage, returns, loss reporting, and audit trails.
 - **SLA Management**: Automatic policy application based on ticket priority and business hours.
