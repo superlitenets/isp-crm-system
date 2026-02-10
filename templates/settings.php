@@ -4154,7 +4154,60 @@ function copyLandingUrl() {
 <?php
 $mpesa = new \App\Mpesa();
 $mpesaConfig = $mpesa->getConfig();
+$radiusBilling = new \App\RadiusBilling(\Database::getConnection());
 ?>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-collection"></i> M-Pesa Accounts</h5>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addMpesaAccountModal">
+            <i class="bi bi-plus-lg"></i> Add Account
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Shortcode</th>
+                        <th>Type</th>
+                        <th>Environment</th>
+                        <th>NAS Devices</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $mpesaAccounts = $radiusBilling->getMpesaAccounts();
+                    foreach ($mpesaAccounts as $acct): ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($acct['name']) ?></strong></td>
+                        <td><code><?= htmlspecialchars($acct['shortcode']) ?></code></td>
+                        <td><span class="badge bg-<?= $acct['account_type'] === 'paybill' ? 'primary' : 'info' ?>"><?= ucfirst($acct['account_type']) ?></span></td>
+                        <td><?= ucfirst($acct['environment']) ?></td>
+                        <td><span class="badge bg-secondary"><?= $acct['nas_count'] ?? 0 ?></span></td>
+                        <td><span class="badge bg-<?= $acct['is_active'] ? 'success' : 'danger' ?>"><?= $acct['is_active'] ? 'Active' : 'Inactive' ?></span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editMpesaAccount(<?= htmlspecialchars(json_encode($acct)) ?>)" data-bs-toggle="modal" data-bs-target="#editMpesaAccountModal"><i class="bi bi-pencil"></i></button>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Delete this M-Pesa account?')">
+                                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                                <input type="hidden" name="action" value="delete_mpesa_account">
+                                <input type="hidden" name="account_id" value="<?= $acct['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($mpesaAccounts)): ?>
+                    <tr><td colspan="7" class="text-center text-muted py-3">No M-Pesa accounts configured. Add one to assign to NAS devices.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <div class="row">
     <div class="col-lg-8">
@@ -4314,6 +4367,160 @@ async function testStkPush() {
     } catch (e) {
         resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
     }
+}
+</script>
+
+<!-- Add M-Pesa Account Modal -->
+<div class="modal fade" id="addMpesaAccountModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                <input type="hidden" name="action" value="create_mpesa_account">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Add M-Pesa Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Account Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" required placeholder="e.g., Main Business Account">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">PayBill/Till Number <span class="text-danger">*</span></label>
+                            <input type="text" name="shortcode" class="form-control" required placeholder="e.g., 174379">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Consumer Key <span class="text-danger">*</span></label>
+                            <input type="password" name="consumer_key" class="form-control" required placeholder="Daraja API Consumer Key">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Consumer Secret <span class="text-danger">*</span></label>
+                            <input type="password" name="consumer_secret" class="form-control" required placeholder="Daraja API Consumer Secret">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Passkey <span class="text-danger">*</span></label>
+                            <input type="password" name="passkey" class="form-control" required placeholder="Lipa Na M-Pesa Passkey">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Account Type</label>
+                            <select name="account_type" class="form-select">
+                                <option value="paybill">PayBill</option>
+                                <option value="till">Buy Goods (Till)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Environment</label>
+                            <select name="environment" class="form-select">
+                                <option value="production">Production</option>
+                                <option value="sandbox">Sandbox</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select name="is_active" class="form-select">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Callback URL</label>
+                            <input type="url" name="callback_url" class="form-control" placeholder="https://yourdomain.com/api/mpesa/callback">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit M-Pesa Account Modal -->
+<div class="modal fade" id="editMpesaAccountModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                <input type="hidden" name="action" value="update_mpesa_account">
+                <input type="hidden" name="account_id" id="edit_ma_id">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit M-Pesa Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Account Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="edit_ma_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">PayBill/Till Number <span class="text-danger">*</span></label>
+                            <input type="text" name="shortcode" id="edit_ma_shortcode" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Consumer Key</label>
+                            <input type="password" name="consumer_key" id="edit_ma_consumer_key" class="form-control" placeholder="Leave blank to keep current">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Consumer Secret</label>
+                            <input type="password" name="consumer_secret" id="edit_ma_consumer_secret" class="form-control" placeholder="Leave blank to keep current">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Passkey</label>
+                            <input type="password" name="passkey" id="edit_ma_passkey" class="form-control" placeholder="Leave blank to keep current">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Account Type</label>
+                            <select name="account_type" id="edit_ma_account_type" class="form-select">
+                                <option value="paybill">PayBill</option>
+                                <option value="till">Buy Goods (Till)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Environment</label>
+                            <select name="environment" id="edit_ma_environment" class="form-select">
+                                <option value="production">Production</option>
+                                <option value="sandbox">Sandbox</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select name="is_active" id="edit_ma_is_active" class="form-select">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Callback URL</label>
+                            <input type="url" name="callback_url" id="edit_ma_callback_url" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Update Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function editMpesaAccount(acct) {
+    document.getElementById('edit_ma_id').value = acct.id;
+    document.getElementById('edit_ma_name').value = acct.name || '';
+    document.getElementById('edit_ma_shortcode').value = acct.shortcode || '';
+    document.getElementById('edit_ma_consumer_key').value = '';
+    document.getElementById('edit_ma_consumer_secret').value = '';
+    document.getElementById('edit_ma_passkey').value = '';
+    document.getElementById('edit_ma_account_type').value = acct.account_type || 'paybill';
+    document.getElementById('edit_ma_environment').value = acct.environment || 'production';
+    document.getElementById('edit_ma_is_active').value = acct.is_active ? '1' : '0';
+    document.getElementById('edit_ma_callback_url').value = acct.callback_url || '';
 }
 </script>
 

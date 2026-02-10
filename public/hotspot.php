@@ -95,9 +95,9 @@ if (!empty($nasIP)) {
 }
 
 // Initialize M-Pesa with NAS-specific config if available, fallback to global
-if ($currentNAS && !empty($currentNAS['mpesa_shortcode'])) {
+if ($currentNAS && !empty($currentNAS['mpesa_account_id'])) {
     $mpesa = \App\Mpesa::forNAS($currentNAS['id']);
-    $mpesaPaybill = $currentNAS['mpesa_shortcode'];
+    $mpesaPaybill = $mpesa->getShortcode();
 } else {
     $mpesa = new \App\Mpesa();
 }

@@ -6593,6 +6593,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'create_mpesa_account':
+                try {
+                    $radiusBilling = new \App\RadiusBilling($db);
+                    $result = $radiusBilling->createMpesaAccount($_POST);
+                    \App\Auth::regenerateToken();
+                    if ($result['success']) {
+                        $_SESSION['flash_message'] = 'M-Pesa account created successfully!';
+                        $_SESSION['flash_type'] = 'success';
+                    } else {
+                        $_SESSION['flash_message'] = 'Error creating M-Pesa account: ' . ($result['error'] ?? 'Unknown error');
+                        $_SESSION['flash_type'] = 'danger';
+                    }
+                    header('Location: ?page=settings&subpage=mpesa');
+                    exit;
+                } catch (\Exception $e) {
+                    $message = 'Error creating M-Pesa account: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_mpesa_account':
+                try {
+                    $radiusBilling = new \App\RadiusBilling($db);
+                    $result = $radiusBilling->updateMpesaAccount((int)$_POST['account_id'], $_POST);
+                    \App\Auth::regenerateToken();
+                    if ($result['success']) {
+                        $_SESSION['flash_message'] = 'M-Pesa account updated successfully!';
+                        $_SESSION['flash_type'] = 'success';
+                    } else {
+                        $_SESSION['flash_message'] = 'Error updating M-Pesa account: ' . ($result['error'] ?? 'Unknown error');
+                        $_SESSION['flash_type'] = 'danger';
+                    }
+                    header('Location: ?page=settings&subpage=mpesa');
+                    exit;
+                } catch (\Exception $e) {
+                    $message = 'Error updating M-Pesa account: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_mpesa_account':
+                try {
+                    $radiusBilling = new \App\RadiusBilling($db);
+                    $result = $radiusBilling->deleteMpesaAccount((int)$_POST['account_id']);
+                    \App\Auth::regenerateToken();
+                    if ($result['success']) {
+                        $_SESSION['flash_message'] = 'M-Pesa account deleted successfully!';
+                        $_SESSION['flash_type'] = 'success';
+                    } else {
+                        $_SESSION['flash_message'] = 'Error deleting M-Pesa account: ' . ($result['error'] ?? 'Unknown error');
+                        $_SESSION['flash_type'] = 'danger';
+                    }
+                    header('Location: ?page=settings&subpage=mpesa');
+                    exit;
+                } catch (\Exception $e) {
+                    $message = 'Error deleting M-Pesa account: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_smartolt_settings':
                 if (!\App\Auth::isAdmin()) {
                     $message = 'Only administrators can modify SmartOLT settings.';

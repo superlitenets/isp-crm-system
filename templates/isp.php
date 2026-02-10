@@ -7424,8 +7424,8 @@ try {
                                 <tr>
                                     <td>
                                         <strong><?= htmlspecialchars($nas['name']) ?></strong>
-                                        <?php if (!empty($nas['mpesa_shortcode'])): ?>
-                                        <span class="badge bg-success ms-1" title="M-Pesa: <?= htmlspecialchars($nas['mpesa_shortcode']) ?>"><i class="bi bi-phone"></i> <?= htmlspecialchars($nas['mpesa_shortcode']) ?></span>
+                                        <?php if (!empty($nas['mpesa_account_id'])): ?>
+                                        <span class="badge bg-success ms-1" title="M-Pesa: <?= htmlspecialchars($nas['mpesa_account_name'] ?? '') ?> (<?= htmlspecialchars($nas['mpesa_account_shortcode'] ?? '') ?>)"><i class="bi bi-phone"></i> M-Pesa</span>
                                         <?php endif; ?>
                                         <?php if ($nas['description']): ?>
                                         <br><small class="text-muted"><?= htmlspecialchars($nas['description']) ?></small>
@@ -7556,41 +7556,20 @@ try {
                                     </div>
                                 </div>
                                 <hr>
-                                <h6><i class="bi bi-phone me-1"></i> M-Pesa PayBill/Till (Optional)</h6>
-                                <small class="text-muted d-block mb-2">Configure site-specific M-Pesa credentials. Leave blank to use global settings.</small>
+                                <h6><i class="bi bi-phone me-1"></i> M-Pesa Account (Optional)</h6>
+                                <small class="text-muted d-block mb-2">Select an M-Pesa account for this NAS. Leave blank to use global settings.</small>
                                 <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">PayBill/Till Number</label>
-                                        <input type="text" name="mpesa_shortcode" class="form-control" placeholder="e.g., 174379">
-                                    </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label class="form-label">Account Type</label>
-                                        <select name="mpesa_account_type" class="form-select">
-                                            <option value="paybill">PayBill</option>
-                                            <option value="till">Buy Goods (Till)</option>
+                                    <div class="col-12 mb-3">
+                                        <label class="form-label">M-Pesa Account</label>
+                                        <select name="mpesa_account_id" class="form-select">
+                                            <option value="">Use Global / None</option>
+                                            <?php 
+                                            $mpesaAccountsForDropdown = $radiusBilling->getMpesaAccountsList();
+                                            foreach ($mpesaAccountsForDropdown as $acct): ?>
+                                            <option value="<?= $acct['id'] ?>"><?= htmlspecialchars($acct['name']) ?> (<?= htmlspecialchars($acct['shortcode']) ?>)</option>
+                                            <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label class="form-label">Environment</label>
-                                        <select name="mpesa_env" class="form-select">
-                                            <option value="production">Production</option>
-                                            <option value="sandbox">Sandbox</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Consumer Key</label>
-                                        <input type="password" name="mpesa_consumer_key" class="form-control" placeholder="Daraja API Consumer Key">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Consumer Secret</label>
-                                        <input type="password" name="mpesa_consumer_secret" class="form-control" placeholder="Daraja API Consumer Secret">
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Passkey</label>
-                                    <input type="password" name="mpesa_passkey" class="form-control" placeholder="Lipa Na M-Pesa Passkey">
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -7684,45 +7663,20 @@ try {
                                     </div>
                                 </div>
                                 <hr>
-                                <h6><i class="bi bi-phone me-1"></i> M-Pesa PayBill/Till</h6>
-                                <small class="text-muted d-block mb-2">Site-specific M-Pesa credentials. Leave blank to use global settings.</small>
+                                <h6><i class="bi bi-phone me-1"></i> M-Pesa Account</h6>
+                                <small class="text-muted d-block mb-2">Select an M-Pesa account for this NAS. Leave blank to use global settings.</small>
                                 <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">PayBill/Till Number</label>
-                                        <input type="text" name="mpesa_shortcode" id="edit_mpesa_shortcode" class="form-control" placeholder="Leave blank for global">
-                                    </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label class="form-label">Account Type</label>
-                                        <select name="mpesa_account_type" id="edit_mpesa_account_type" class="form-select">
-                                            <option value="paybill">PayBill</option>
-                                            <option value="till">Buy Goods (Till)</option>
+                                    <div class="col-12 mb-3">
+                                        <label class="form-label">M-Pesa Account</label>
+                                        <select name="mpesa_account_id" id="edit_mpesa_account_id" class="form-select">
+                                            <option value="">Use Global / None</option>
+                                            <?php 
+                                            $mpesaAccountsForEditDropdown = $radiusBilling->getMpesaAccountsList();
+                                            foreach ($mpesaAccountsForEditDropdown as $acct): ?>
+                                            <option value="<?= $acct['id'] ?>"><?= htmlspecialchars($acct['name']) ?> (<?= htmlspecialchars($acct['shortcode']) ?>)</option>
+                                            <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label class="form-label">Environment</label>
-                                        <select name="mpesa_env" id="edit_mpesa_env" class="form-select">
-                                            <option value="production">Production</option>
-                                            <option value="sandbox">Sandbox</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Consumer Key</label>
-                                        <input type="password" name="mpesa_consumer_key" id="edit_mpesa_consumer_key" class="form-control" placeholder="Leave blank to keep current">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Consumer Secret</label>
-                                        <input type="password" name="mpesa_consumer_secret" id="edit_mpesa_consumer_secret" class="form-control" placeholder="Leave blank to keep current">
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Passkey</label>
-                                    <input type="password" name="mpesa_passkey" id="edit_mpesa_passkey" class="form-control" placeholder="Leave blank to keep current">
-                                </div>
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="mpesa_clear" id="edit_mpesa_clear" value="1">
-                                    <label class="form-check-label text-danger" for="edit_mpesa_clear">Clear site M-Pesa config (revert to global)</label>
                                 </div>
                                 <hr>
                                 <h6><i class="bi bi-box-seam me-1"></i> Hotspot Packages</h6>
@@ -8038,63 +7992,29 @@ try {
                         </div>
                         <div class="card shadow-sm mb-4">
                             <div class="card-header text-white" style="background-color: #198754 !important;">
-                                <h5 class="mb-0"><i class="bi bi-phone me-2"></i> M-Pesa PayBill/Till</h5>
+                                <h5 class="mb-0"><i class="bi bi-phone me-2"></i> M-Pesa Account</h5>
                             </div>
                             <div class="card-body">
                                 <div class="alert alert-info small mb-3">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Configure site-specific M-Pesa credentials for this NAS. If left blank, the global M-Pesa settings will be used.
+                                    Select an M-Pesa account for this NAS. If left blank, the global M-Pesa settings will be used.
                                 </div>
                                 <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">PayBill/Till Number</label>
-                                        <input type="text" name="mpesa_shortcode" class="form-control"
-                                               value="<?= htmlspecialchars($editNas['mpesa_shortcode'] ?? '') ?>"
-                                               placeholder="e.g., 174379">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Account Type</label>
-                                        <select name="mpesa_account_type" class="form-select">
-                                            <option value="paybill" <?= ($editNas['mpesa_account_type'] ?? '') === 'paybill' ? 'selected' : '' ?>>PayBill</option>
-                                            <option value="till" <?= ($editNas['mpesa_account_type'] ?? '') === 'till' ? 'selected' : '' ?>>Buy Goods (Till)</option>
+                                    <div class="col-12">
+                                        <label class="form-label">M-Pesa Account</label>
+                                        <select name="mpesa_account_id" class="form-select">
+                                            <option value="">Use Global / None</option>
+                                            <?php 
+                                            $mpesaAccountsForNasEdit = $radiusBilling->getMpesaAccountsList();
+                                            foreach ($mpesaAccountsForNasEdit as $acct): ?>
+                                            <option value="<?= $acct['id'] ?>" <?= ($editNas['mpesa_account_id'] ?? '') == $acct['id'] ? 'selected' : '' ?>><?= htmlspecialchars($acct['name']) ?> (<?= htmlspecialchars($acct['shortcode']) ?>)</option>
+                                            <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Environment</label>
-                                        <select name="mpesa_env" class="form-select">
-                                            <option value="production" <?= ($editNas['mpesa_env'] ?? '') === 'production' ? 'selected' : '' ?>>Production</option>
-                                            <option value="sandbox" <?= ($editNas['mpesa_env'] ?? '') === 'sandbox' ? 'selected' : '' ?>>Sandbox</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Consumer Key</label>
-                                        <input type="password" name="mpesa_consumer_key" class="form-control"
-                                               placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Daraja API Consumer Key' ?>">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Consumer Secret</label>
-                                        <input type="password" name="mpesa_consumer_secret" class="form-control"
-                                               placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Daraja API Consumer Secret' ?>">
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label">Passkey</label>
-                                        <input type="password" name="mpesa_passkey" class="form-control"
-                                               placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Lipa Na M-Pesa Passkey' ?>">
-                                    </div>
-                                    <?php if ($editNas && !empty($editNas['mpesa_shortcode'])): ?>
-                                    <div class="col-12">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="mpesa_clear" id="mpesa_clear_edit" value="1">
-                                            <label class="form-check-label text-danger" for="mpesa_clear_edit">
-                                                <i class="bi bi-x-circle me-1"></i> Clear site M-Pesa config (revert to global)
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <?php endif; ?>
                                 </div>
-                                <?php if ($editNas && !empty($editNas['mpesa_shortcode'])): ?>
+                                <?php if ($editNas && !empty($editNas['mpesa_account_id'])): ?>
                                 <div class="mt-3 p-2 bg-light rounded">
-                                    <small class="text-success"><i class="bi bi-check-circle me-1"></i> Using site-specific M-Pesa: <strong><?= htmlspecialchars($editNas['mpesa_shortcode']) ?></strong> (<?= ucfirst($editNas['mpesa_account_type'] ?? 'paybill') ?>)</small>
+                                    <small class="text-success"><i class="bi bi-check-circle me-1"></i> Using M-Pesa account assigned to this NAS</small>
                                 </div>
                                 <?php elseif ($editNas): ?>
                                 <div class="mt-3 p-2 bg-light rounded">
@@ -8804,7 +8724,7 @@ try {
                                     <td>
                                         <?php if (!empty($site['mpesa_shortcode'])): ?>
                                         <span class="badge bg-success"><i class="bi bi-phone me-1"></i><?= htmlspecialchars($site['mpesa_shortcode']) ?></span>
-                                        <br><small class="text-muted"><?= ucfirst($site['mpesa_account_type'] ?? 'paybill') ?></small>
+                                        <br><small class="text-muted"><?= htmlspecialchars($site['mpesa_account_name'] ?? ucfirst($site['mpesa_account_type'] ?? 'paybill')) ?></small>
                                         <?php else: ?>
                                         <span class="badge bg-secondary">Global</span>
                                         <?php endif; ?>
@@ -11395,13 +11315,7 @@ try {
         document.getElementById('edit_api_username').value = nas.api_username || '';
         document.getElementById('edit_nas_vpn_peer').value = nas.wireguard_peer_id || '';
         
-        document.getElementById('edit_mpesa_shortcode').value = nas.mpesa_shortcode || '';
-        document.getElementById('edit_mpesa_account_type').value = nas.mpesa_account_type || 'paybill';
-        document.getElementById('edit_mpesa_env').value = nas.mpesa_env || 'production';
-        document.getElementById('edit_mpesa_consumer_key').value = '';
-        document.getElementById('edit_mpesa_consumer_secret').value = '';
-        document.getElementById('edit_mpesa_passkey').value = '';
-        document.getElementById('edit_mpesa_clear').checked = false;
+        document.getElementById('edit_mpesa_account_id').value = nas.mpesa_account_id || '';
         
         // Reset all package checkboxes
         document.querySelectorAll('.nas-package-checkbox').forEach(cb => cb.checked = false);

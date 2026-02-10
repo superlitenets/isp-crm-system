@@ -24,6 +24,32 @@ class RadiusBilling {
                 $this->db->exec($sql);
             }
         }
+        $this->ensureMpesaAccountsTable();
+    }
+    
+    private function ensureMpesaAccountsTable(): void {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS mpesa_accounts (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    shortcode VARCHAR(20) NOT NULL,
+                    consumer_key TEXT NOT NULL,
+                    consumer_secret TEXT NOT NULL,
+                    passkey TEXT NOT NULL,
+                    account_type VARCHAR(20) DEFAULT 'paybill',
+                    environment VARCHAR(20) DEFAULT 'production',
+                    callback_url TEXT,
+                    is_active BOOLEAN DEFAULT true,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+            $this->db->exec("
+                ALTER TABLE radius_nas ADD COLUMN IF NOT EXISTS mpesa_account_id INTEGER REFERENCES mpesa_accounts(id)
+            ");
+        } catch (\Exception $e) {
+        }
     }
     
     private function encrypt(string $data): string {
@@ -110,10 +136,12 @@ class RadiusBilling {
         $stmt = $this->db->query("
             SELECT n.*, 
                    wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
-                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr
+                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr,
+                   ma.name as mpesa_account_name, ma.shortcode as mpesa_account_shortcode
             FROM radius_nas n
             LEFT JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
             LEFT JOIN wireguard_servers ws ON wp.server_id = ws.id
+            LEFT JOIN mpesa_accounts ma ON n.mpesa_account_id = ma.id
             ORDER BY n.name
         ");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -229,9 +257,8 @@ class RadiusBilling {
             $stmt = $this->db->prepare("
                 INSERT INTO radius_nas (name, ip_address, secret, nas_type, ports, description, 
                                         api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id,
-                                        location_id, sub_location_id, local_ip,
-                                        mpesa_shortcode, mpesa_consumer_key, mpesa_consumer_secret, mpesa_passkey, mpesa_account_type, mpesa_env)
-                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        location_id, sub_location_id, local_ip, mpesa_account_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['name'],
@@ -249,12 +276,7 @@ class RadiusBilling {
                 !empty($data['location_id']) ? (int)$data['location_id'] : null,
                 !empty($data['sub_location_id']) ? (int)$data['sub_location_id'] : null,
                 !empty($data['local_ip']) ? $data['local_ip'] : null,
-                !empty($data['mpesa_shortcode']) ? $data['mpesa_shortcode'] : null,
-                !empty($data['mpesa_consumer_key']) ? $this->encrypt($data['mpesa_consumer_key']) : null,
-                !empty($data['mpesa_consumer_secret']) ? $this->encrypt($data['mpesa_consumer_secret']) : null,
-                !empty($data['mpesa_passkey']) ? $this->encrypt($data['mpesa_passkey']) : null,
-                $data['mpesa_account_type'] ?? 'paybill',
-                $data['mpesa_env'] ?? 'production'
+                !empty($data['mpesa_account_id']) ? (int)$data['mpesa_account_id'] : null,
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -265,9 +287,9 @@ class RadiusBilling {
     public function updateNAS(int $id, array $data): array {
         try {
             $fields = ['name', 'ip_address', 'secret', 'nas_type', 'ports', 'description', 
-                       'api_port', 'api_username', 'local_ip', 'mpesa_shortcode', 'mpesa_account_type', 'mpesa_env'];
+                       'api_port', 'api_username', 'local_ip'];
             $boolFields = ['api_enabled', 'is_active'];
-            $intFields = ['location_id', 'sub_location_id'];
+            $intFields = ['location_id', 'sub_location_id', 'mpesa_account_id'];
             $updates = [];
             $params = [];
             
@@ -302,23 +324,6 @@ class RadiusBilling {
                 $params[] = !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null;
             }
             
-            if (!empty($data['mpesa_consumer_key'])) {
-                $updates[] = "mpesa_consumer_key = ?";
-                $params[] = $this->encrypt($data['mpesa_consumer_key']);
-            }
-            if (!empty($data['mpesa_consumer_secret'])) {
-                $updates[] = "mpesa_consumer_secret = ?";
-                $params[] = $this->encrypt($data['mpesa_consumer_secret']);
-            }
-            if (!empty($data['mpesa_passkey'])) {
-                $updates[] = "mpesa_passkey = ?";
-                $params[] = $this->encrypt($data['mpesa_passkey']);
-            }
-            
-            if (isset($data['mpesa_clear']) && $data['mpesa_clear'] === '1') {
-                $updates[] = "mpesa_shortcode = NULL, mpesa_consumer_key = NULL, mpesa_consumer_secret = NULL, mpesa_passkey = NULL";
-            }
-            
             $updates[] = "updated_at = CURRENT_TIMESTAMP";
             $params[] = $id;
             
@@ -331,20 +336,149 @@ class RadiusBilling {
     }
     
     public function getNASMpesaConfig(int $nasId): ?array {
-        $nas = $this->getNAS($nasId);
-        if (!$nas || empty($nas['mpesa_shortcode'])) {
-            return null;
-        }
+        $stmt = $this->db->prepare("
+            SELECT ma.* FROM mpesa_accounts ma
+            JOIN radius_nas n ON n.mpesa_account_id = ma.id
+            WHERE n.id = ? AND ma.is_active = true
+        ");
+        $stmt->execute([$nasId]);
+        $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$account) return null;
         return [
-            'shortcode' => $nas['mpesa_shortcode'],
-            'consumer_key' => !empty($nas['mpesa_consumer_key']) ? $this->decrypt($nas['mpesa_consumer_key']) : '',
-            'consumer_secret' => !empty($nas['mpesa_consumer_secret']) ? $this->decrypt($nas['mpesa_consumer_secret']) : '',
-            'passkey' => !empty($nas['mpesa_passkey']) ? $this->decrypt($nas['mpesa_passkey']) : '',
-            'account_type' => $nas['mpesa_account_type'] ?? 'paybill',
-            'environment' => $nas['mpesa_env'] ?? 'production',
+            'shortcode' => $account['shortcode'],
+            'consumer_key' => $this->decrypt($account['consumer_key']),
+            'consumer_secret' => $this->decrypt($account['consumer_secret']),
+            'passkey' => $this->decrypt($account['passkey']),
+            'account_type' => $account['account_type'] ?? 'paybill',
+            'environment' => $account['environment'] ?? 'production',
             'nas_id' => $nasId,
-            'nas_name' => $nas['name']
+            'account_name' => $account['name']
         ];
+    }
+    
+    // ==================== M-Pesa Accounts Management ====================
+    
+    public function getMpesaAccounts(): array {
+        $stmt = $this->db->query("
+            SELECT ma.*, 
+                   COUNT(n.id) as nas_count
+            FROM mpesa_accounts ma
+            LEFT JOIN radius_nas n ON n.mpesa_account_id = ma.id
+            GROUP BY ma.id
+            ORDER BY ma.name
+        ");
+        $accounts = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($accounts as &$acct) {
+            $acct['consumer_key_masked'] = '••••••••' . substr($this->decrypt($acct['consumer_key']), -4);
+            $acct['consumer_secret_masked'] = '••••••••' . substr($this->decrypt($acct['consumer_secret']), -4);
+            $acct['passkey_masked'] = '••••••••' . substr($this->decrypt($acct['passkey']), -4);
+            unset($acct['consumer_key'], $acct['consumer_secret'], $acct['passkey']);
+        }
+        return $accounts;
+    }
+    
+    public function getMpesaAccount(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM mpesa_accounts WHERE id = ?");
+        $stmt->execute([$id]);
+        $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$account) return null;
+        $account['consumer_key'] = $this->decrypt($account['consumer_key']);
+        $account['consumer_secret'] = $this->decrypt($account['consumer_secret']);
+        $account['passkey'] = $this->decrypt($account['passkey']);
+        return $account;
+    }
+    
+    public function createMpesaAccount(array $data): array {
+        try {
+            if (empty($data['name']) || empty($data['shortcode']) || empty($data['consumer_key']) || empty($data['consumer_secret']) || empty($data['passkey'])) {
+                return ['success' => false, 'error' => 'Name, shortcode, consumer key, consumer secret, and passkey are required'];
+            }
+            $stmt = $this->db->prepare("
+                INSERT INTO mpesa_accounts (name, shortcode, consumer_key, consumer_secret, passkey, account_type, environment, callback_url, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::boolean)
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['shortcode'],
+                $this->encrypt($data['consumer_key']),
+                $this->encrypt($data['consumer_secret']),
+                $this->encrypt($data['passkey']),
+                $data['account_type'] ?? 'paybill',
+                $data['environment'] ?? 'production',
+                $data['callback_url'] ?? null,
+                !empty($data['is_active']) ? 'true' : 'true',
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function updateMpesaAccount(int $id, array $data): array {
+        try {
+            $updates = [];
+            $params = [];
+            
+            $stringFields = ['name', 'shortcode', 'account_type', 'environment', 'callback_url'];
+            foreach ($stringFields as $field) {
+                if (isset($data[$field])) {
+                    $updates[] = "$field = ?";
+                    $params[] = $data[$field];
+                }
+            }
+            
+            if (!empty($data['consumer_key'])) {
+                $updates[] = "consumer_key = ?";
+                $params[] = $this->encrypt($data['consumer_key']);
+            }
+            if (!empty($data['consumer_secret'])) {
+                $updates[] = "consumer_secret = ?";
+                $params[] = $this->encrypt($data['consumer_secret']);
+            }
+            if (!empty($data['passkey'])) {
+                $updates[] = "passkey = ?";
+                $params[] = $this->encrypt($data['passkey']);
+            }
+            
+            if (isset($data['is_active'])) {
+                $updates[] = "is_active = ?::boolean";
+                $params[] = !empty($data['is_active']) ? 'true' : 'false';
+            }
+            
+            if (empty($updates)) {
+                return ['success' => true];
+            }
+            
+            $updates[] = "updated_at = CURRENT_TIMESTAMP";
+            $params[] = $id;
+            
+            $stmt = $this->db->prepare("UPDATE mpesa_accounts SET " . implode(', ', $updates) . " WHERE id = ?");
+            $stmt->execute($params);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteMpesaAccount(int $id): array {
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM radius_nas WHERE mpesa_account_id = ?");
+            $stmt->execute([$id]);
+            $count = $stmt->fetchColumn();
+            if ($count > 0) {
+                return ['success' => false, 'error' => "Cannot delete: this account is in use by $count NAS device(s). Remove the association first."];
+            }
+            $stmt = $this->db->prepare("DELETE FROM mpesa_accounts WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getMpesaAccountsList(): array {
+        $stmt = $this->db->query("SELECT id, name, shortcode FROM mpesa_accounts WHERE is_active = true ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function deleteNAS(int $id): array {
@@ -3843,8 +3977,9 @@ class RadiusBilling {
                 n.id as nas_id,
                 n.name as nas_name,
                 n.ip_address,
-                n.mpesa_shortcode,
-                n.mpesa_account_type,
+                ma.shortcode as mpesa_shortcode,
+                ma.account_type as mpesa_account_type,
+                ma.name as mpesa_account_name,
                 COUNT(DISTINCT rs.id) as total_subscriptions,
                 COUNT(DISTINCT CASE WHEN rs.status = 'active' THEN rs.id END) as active_subscriptions,
                 COUNT(rb.id) as total_transactions,
@@ -3862,8 +3997,9 @@ class RadiusBilling {
             FROM radius_nas n
             LEFT JOIN radius_subscriptions rs ON rs.nas_id = n.id
             LEFT JOIN radius_billing rb ON rb.subscription_id = rs.id {$dateFilter}
+            LEFT JOIN mpesa_accounts ma ON n.mpesa_account_id = ma.id
             WHERE n.is_active = true
-            GROUP BY n.id, n.name, n.ip_address, n.mpesa_shortcode, n.mpesa_account_type
+            GROUP BY n.id, n.name, n.ip_address, ma.shortcode, ma.account_type, ma.name
             ORDER BY paid_revenue DESC
         ");
         $stmt->execute($params);
@@ -3885,7 +4021,7 @@ class RadiusBilling {
             SELECT 
                 COALESCE(n.name, 'Global / Unassigned') as nas_name,
                 n.ip_address,
-                n.mpesa_shortcode,
+                ma.shortcode as mpesa_shortcode,
                 COUNT(mt.id) as total_transactions,
                 COALESCE(SUM(mt.amount), 0) as total_amount,
                 COALESCE(SUM(CASE WHEN mt.status = 'completed' THEN mt.amount ELSE 0 END), 0) as completed_amount,
@@ -3894,8 +4030,9 @@ class RadiusBilling {
                 COUNT(CASE WHEN mt.status = 'failed' THEN 1 END) as failed_count
             FROM mpesa_transactions mt
             LEFT JOIN radius_nas n ON mt.nas_id = n.id
+            LEFT JOIN mpesa_accounts ma ON n.mpesa_account_id = ma.id
             WHERE mt.transaction_type = 'stkpush' {$dateFilter}
-            GROUP BY n.id, n.name, n.ip_address, n.mpesa_shortcode
+            GROUP BY n.id, n.name, n.ip_address, ma.shortcode
             ORDER BY completed_amount DESC
         ");
         $stmt->execute($params);
@@ -3906,7 +4043,7 @@ class RadiusBilling {
         $stmt = $this->db->query("
             SELECT 
                 COUNT(DISTINCT n.id) as total_sites,
-                COUNT(DISTINCT CASE WHEN n.mpesa_shortcode IS NOT NULL THEN n.id END) as sites_with_mpesa,
+                COUNT(DISTINCT CASE WHEN n.mpesa_account_id IS NOT NULL THEN n.id END) as sites_with_mpesa,
                 COUNT(DISTINCT rs.id) FILTER (WHERE rs.status = 'active') as total_active_subs,
                 COALESCE(SUM(rb.amount) FILTER (WHERE rb.status = 'paid' AND rb.created_at >= date_trunc('month', CURRENT_DATE)), 0) as mtd_revenue,
                 COALESCE(SUM(rb.amount) FILTER (WHERE rb.status = 'paid' AND rb.created_at >= CURRENT_DATE), 0) as today_revenue,
