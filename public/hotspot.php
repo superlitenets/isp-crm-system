@@ -60,9 +60,9 @@ $ispLogo = $radiusBilling->getSetting('isp_logo') ?: '';
 $hotspotWelcome = $radiusBilling->getSetting('hotspot_welcome') ?: 'Connect to the internet';
 $mpesaPaybill = $radiusBilling->getSetting('mpesa_paybill') ?: '';
 
-// Check M-Pesa configuration
-$mpesa = new \App\Mpesa();
-$mpesaEnabled = $mpesa->isConfigured();
+// M-Pesa will be initialized after NAS detection (below) to use NAS-specific config
+$mpesa = null;
+$mpesaEnabled = false;
 
 // Detect NAS device and MAC from URL path (/hotspot/{nas_ip}/{mac}), query params, or session
 $nasIP = $_GET['nas'] ?? $_GET['server'] ?? $_GET['nasip'] ?? '';
@@ -93,6 +93,15 @@ $currentNAS = null;
 if (!empty($nasIP)) {
     $currentNAS = $radiusBilling->getNASByIP($nasIP);
 }
+
+// Initialize M-Pesa with NAS-specific config if available, fallback to global
+if ($currentNAS && !empty($currentNAS['mpesa_shortcode'])) {
+    $mpesa = \App\Mpesa::forNAS($currentNAS['id']);
+    $mpesaPaybill = $currentNAS['mpesa_shortcode'];
+} else {
+    $mpesa = new \App\Mpesa();
+}
+$mpesaEnabled = $mpesa->isConfigured();
 
 // Get available hotspot packages (filtered by NAS if detected)
 $packages = [];

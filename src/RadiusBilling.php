@@ -3827,6 +3827,98 @@ class RadiusBilling {
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     
+    public function getRevenuePerSite(?string $startDate = null, ?string $endDate = null): array {
+        $dateFilter = '';
+        $params = [];
+        if ($startDate && $endDate) {
+            $dateFilter = "AND rb.created_at BETWEEN ? AND ?";
+            $params = [$startDate, $endDate . ' 23:59:59'];
+        } elseif ($startDate) {
+            $dateFilter = "AND rb.created_at >= ?";
+            $params = [$startDate];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                n.id as nas_id,
+                n.name as nas_name,
+                n.ip_address,
+                n.mpesa_shortcode,
+                n.mpesa_account_type,
+                COUNT(DISTINCT rs.id) as total_subscriptions,
+                COUNT(DISTINCT CASE WHEN rs.status = 'active' THEN rs.id END) as active_subscriptions,
+                COUNT(rb.id) as total_transactions,
+                COALESCE(SUM(rb.amount), 0) as total_revenue,
+                COALESCE(SUM(CASE WHEN rb.status = 'paid' THEN rb.amount ELSE 0 END), 0) as paid_revenue,
+                COALESCE(SUM(CASE WHEN rb.status = 'pending' THEN rb.amount ELSE 0 END), 0) as pending_revenue,
+                CASE WHEN COUNT(rb.id) > 0 
+                    THEN ROUND(SUM(CASE WHEN rb.status = 'paid' THEN rb.amount ELSE 0 END)::numeric / NULLIF(SUM(rb.amount), 0) * 100, 1) 
+                    ELSE 0 
+                END as collection_rate,
+                CASE WHEN COUNT(DISTINCT CASE WHEN rs.status = 'active' THEN rs.id END) > 0 
+                    THEN ROUND(COALESCE(SUM(CASE WHEN rb.status = 'paid' THEN rb.amount ELSE 0 END), 0)::numeric / COUNT(DISTINCT CASE WHEN rs.status = 'active' THEN rs.id END), 0) 
+                    ELSE 0 
+                END as arpu
+            FROM radius_nas n
+            LEFT JOIN radius_subscriptions rs ON rs.nas_id = n.id
+            LEFT JOIN radius_billing rb ON rb.subscription_id = rs.id {$dateFilter}
+            WHERE n.is_active = true
+            GROUP BY n.id, n.name, n.ip_address, n.mpesa_shortcode, n.mpesa_account_type
+            ORDER BY paid_revenue DESC
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getMpesaRevenuePerSite(?string $startDate = null, ?string $endDate = null): array {
+        $dateFilter = '';
+        $params = [];
+        if ($startDate && $endDate) {
+            $dateFilter = "AND mt.created_at BETWEEN ? AND ?";
+            $params = [$startDate, $endDate . ' 23:59:59'];
+        } elseif ($startDate) {
+            $dateFilter = "AND mt.created_at >= ?";
+            $params = [$startDate];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                COALESCE(n.name, 'Global / Unassigned') as nas_name,
+                n.ip_address,
+                n.mpesa_shortcode,
+                COUNT(mt.id) as total_transactions,
+                COALESCE(SUM(mt.amount), 0) as total_amount,
+                COALESCE(SUM(CASE WHEN mt.status = 'completed' THEN mt.amount ELSE 0 END), 0) as completed_amount,
+                COALESCE(SUM(CASE WHEN mt.status = 'pending' THEN mt.amount ELSE 0 END), 0) as pending_amount,
+                COUNT(CASE WHEN mt.status = 'completed' THEN 1 END) as completed_count,
+                COUNT(CASE WHEN mt.status = 'failed' THEN 1 END) as failed_count
+            FROM mpesa_transactions mt
+            LEFT JOIN radius_nas n ON mt.nas_id = n.id
+            WHERE mt.transaction_type = 'stkpush' {$dateFilter}
+            GROUP BY n.id, n.name, n.ip_address, n.mpesa_shortcode
+            ORDER BY completed_amount DESC
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSiteRevenueSummary(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(DISTINCT n.id) as total_sites,
+                COUNT(DISTINCT CASE WHEN n.mpesa_shortcode IS NOT NULL THEN n.id END) as sites_with_mpesa,
+                COUNT(DISTINCT rs.id) FILTER (WHERE rs.status = 'active') as total_active_subs,
+                COALESCE(SUM(rb.amount) FILTER (WHERE rb.status = 'paid' AND rb.created_at >= date_trunc('month', CURRENT_DATE)), 0) as mtd_revenue,
+                COALESCE(SUM(rb.amount) FILTER (WHERE rb.status = 'paid' AND rb.created_at >= CURRENT_DATE), 0) as today_revenue,
+                COALESCE(SUM(rb.amount) FILTER (WHERE rb.status = 'paid' AND rb.created_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' AND rb.created_at < date_trunc('month', CURRENT_DATE)), 0) as last_month_revenue
+            FROM radius_nas n
+            LEFT JOIN radius_subscriptions rs ON rs.nas_id = n.id
+            LEFT JOIN radius_billing rb ON rb.subscription_id = rs.id
+            WHERE n.is_active = true
+        ");
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
     // ==================== Usage Analytics ====================
     
     public function getTopUsers(int $limit = 20, string $period = 'today'): array {

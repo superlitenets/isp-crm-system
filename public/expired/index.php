@@ -160,7 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $messageType = 'danger';
         } else {
             try {
-                $mpesa = new \App\Mpesa();
+                $nasId = $subscription['nas_id'] ?? null;
+                $mpesa = $nasId ? \App\Mpesa::forNAS((int)$nasId) : new \App\Mpesa();
                 if ($mpesa->isConfigured()) {
                     $result = $mpesa->stkPush($phone, $amount, $accountRef, "Internet Renewal - {$subscription['package_name']}");
                     if ($result && isset($result['ResponseCode']) && $result['ResponseCode'] == '0') {

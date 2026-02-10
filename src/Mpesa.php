@@ -15,10 +15,67 @@ class Mpesa {
     private string $confirmationUrl;
     private bool $isSandbox;
     private string $baseUrl;
+    private ?int $nasId = null;
+    private string $accountType = 'paybill';
     
-    public function __construct() {
+    public function __construct(?array $nasConfig = null) {
         $this->db = \Database::getConnection();
-        $this->loadConfig();
+        if ($nasConfig) {
+            $this->loadNasConfig($nasConfig);
+        } else {
+            $this->loadConfig();
+        }
+    }
+    
+    public static function forNAS(int $nasId): self {
+        $db = \Database::getConnection();
+        $radiusBilling = new \App\RadiusBilling($db);
+        $nasConfig = $radiusBilling->getNASMpesaConfig($nasId);
+        if ($nasConfig) {
+            return new self($nasConfig);
+        }
+        return new self();
+    }
+    
+    private function loadNasConfig(array $config): void {
+        $this->consumerKey = $config['consumer_key'] ?? '';
+        $this->consumerSecret = $config['consumer_secret'] ?? '';
+        $this->shortcode = $config['shortcode'] ?? '';
+        $this->passkey = $config['passkey'] ?? '';
+        $this->accountType = $config['account_type'] ?? 'paybill';
+        $this->nasId = $config['nas_id'] ?? null;
+        $this->isSandbox = ($config['environment'] ?? 'production') === 'sandbox';
+        
+        $this->baseUrl = $this->isSandbox 
+            ? 'https://sandbox.safaricom.co.ke' 
+            : 'https://api.safaricom.co.ke';
+        
+        $baseCallbackUrl = $this->getBaseCallbackUrl();
+        $this->callbackUrl = "{$baseCallbackUrl}/?page=mpesa_callback&type=stkpush";
+        $this->validationUrl = "{$baseCallbackUrl}/?page=mpesa_callback&type=validation";
+        $this->confirmationUrl = "{$baseCallbackUrl}/?page=mpesa_callback&type=confirmation";
+    }
+    
+    private function getBaseCallbackUrl(): string {
+        if (isset($_SERVER['HTTP_HOST'])) {
+            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'https';
+            return "{$protocol}://{$_SERVER['HTTP_HOST']}";
+        }
+        $domain = $_ENV['REPL_SLUG'] ?? '';
+        $owner = $_ENV['REPL_OWNER'] ?? '';
+        return "https://{$domain}.{$owner}.repl.co";
+    }
+    
+    public function getNasId(): ?int {
+        return $this->nasId;
+    }
+    
+    public function getShortcode(): string {
+        return $this->shortcode;
+    }
+    
+    public function getAccountType(): string {
+        return $this->accountType;
     }
     
     private function loadConfig(): void {
@@ -200,11 +257,13 @@ class Mpesa {
         $timestamp = date('YmdHis');
         $password = base64_encode($this->shortcode . $this->passkey . $timestamp);
         
+        $transactionType = ($this->accountType === 'till') ? 'CustomerBuyGoodsOnline' : 'CustomerPayBillOnline';
+        
         $data = [
             'BusinessShortCode' => $this->shortcode,
             'Password' => $password,
             'Timestamp' => $timestamp,
-            'TransactionType' => 'CustomerPayBillOnline',
+            'TransactionType' => $transactionType,
             'Amount' => (int)$amount,
             'PartyA' => $phone,
             'PartyB' => $this->shortcode,
@@ -796,12 +855,13 @@ class Mpesa {
     
     private function saveTransaction(array $data): bool {
         try {
+            $nasId = $data['nas_id'] ?? $this->nasId;
             $stmt = $this->db->prepare("
                 INSERT INTO mpesa_transactions (
                     transaction_type, merchant_request_id, checkout_request_id,
                     phone_number, amount, account_reference, transaction_desc,
-                    customer_id, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    customer_id, status, nas_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             
             return $stmt->execute([
@@ -813,7 +873,8 @@ class Mpesa {
                 $data['account_reference'],
                 $data['transaction_desc'],
                 $data['customer_id'],
-                $data['status']
+                $data['status'],
+                $nasId
             ]);
         } catch (\Exception $e) {
             error_log("Save transaction error: " . $e->getMessage());

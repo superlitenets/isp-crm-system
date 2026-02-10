@@ -2668,6 +2668,9 @@ try {
                 <a class="nav-link <?= $view === 'reports' ? 'active' : '' ?>" href="?page=isp&view=reports">
                     <i class="bi bi-graph-up me-2"></i> Reports
                 </a>
+                <a class="nav-link <?= $view === 'site_revenue' ? 'active' : '' ?>" href="?page=isp&view=site_revenue">
+                    <i class="bi bi-building me-2"></i> Site Revenue
+                </a>
                 <a class="nav-link <?= $view === 'analytics' ? 'active' : '' ?>" href="?page=isp&view=analytics">
                     <i class="bi bi-bar-chart me-2"></i> Analytics
                 </a>
@@ -2737,6 +2740,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'reports' ? 'active' : '' ?>" href="?page=isp&view=reports">
                     <i class="bi bi-graph-up me-2"></i> Reports
+                </a>
+                <a class="nav-link <?= $view === 'site_revenue' ? 'active' : '' ?>" href="?page=isp&view=site_revenue">
+                    <i class="bi bi-building me-2"></i> Site Revenue
                 </a>
                 <a class="nav-link <?= $view === 'analytics' ? 'active' : '' ?>" href="?page=isp&view=analytics">
                     <i class="bi bi-bar-chart me-2"></i> Analytics
@@ -7418,6 +7424,9 @@ try {
                                 <tr>
                                     <td>
                                         <strong><?= htmlspecialchars($nas['name']) ?></strong>
+                                        <?php if (!empty($nas['mpesa_shortcode'])): ?>
+                                        <span class="badge bg-success ms-1" title="M-Pesa: <?= htmlspecialchars($nas['mpesa_shortcode']) ?>"><i class="bi bi-phone"></i> <?= htmlspecialchars($nas['mpesa_shortcode']) ?></span>
+                                        <?php endif; ?>
                                         <?php if ($nas['description']): ?>
                                         <br><small class="text-muted"><?= htmlspecialchars($nas['description']) ?></small>
                                         <?php endif; ?>
@@ -7546,6 +7555,43 @@ try {
                                         <input type="password" name="api_password" class="form-control">
                                     </div>
                                 </div>
+                                <hr>
+                                <h6><i class="bi bi-phone me-1"></i> M-Pesa PayBill/Till (Optional)</h6>
+                                <small class="text-muted d-block mb-2">Configure site-specific M-Pesa credentials. Leave blank to use global settings.</small>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">PayBill/Till Number</label>
+                                        <input type="text" name="mpesa_shortcode" class="form-control" placeholder="e.g., 174379">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Account Type</label>
+                                        <select name="mpesa_account_type" class="form-select">
+                                            <option value="paybill">PayBill</option>
+                                            <option value="till">Buy Goods (Till)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Environment</label>
+                                        <select name="mpesa_env" class="form-select">
+                                            <option value="production">Production</option>
+                                            <option value="sandbox">Sandbox</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Consumer Key</label>
+                                        <input type="password" name="mpesa_consumer_key" class="form-control" placeholder="Daraja API Consumer Key">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Consumer Secret</label>
+                                        <input type="password" name="mpesa_consumer_secret" class="form-control" placeholder="Daraja API Consumer Secret">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Passkey</label>
+                                    <input type="password" name="mpesa_passkey" class="form-control" placeholder="Lipa Na M-Pesa Passkey">
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -7636,6 +7682,47 @@ try {
                                         <label class="form-label">API Password</label>
                                         <input type="password" name="api_password" class="form-control" placeholder="Leave blank to keep">
                                     </div>
+                                </div>
+                                <hr>
+                                <h6><i class="bi bi-phone me-1"></i> M-Pesa PayBill/Till</h6>
+                                <small class="text-muted d-block mb-2">Site-specific M-Pesa credentials. Leave blank to use global settings.</small>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">PayBill/Till Number</label>
+                                        <input type="text" name="mpesa_shortcode" id="edit_mpesa_shortcode" class="form-control" placeholder="Leave blank for global">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Account Type</label>
+                                        <select name="mpesa_account_type" id="edit_mpesa_account_type" class="form-select">
+                                            <option value="paybill">PayBill</option>
+                                            <option value="till">Buy Goods (Till)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Environment</label>
+                                        <select name="mpesa_env" id="edit_mpesa_env" class="form-select">
+                                            <option value="production">Production</option>
+                                            <option value="sandbox">Sandbox</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Consumer Key</label>
+                                        <input type="password" name="mpesa_consumer_key" id="edit_mpesa_consumer_key" class="form-control" placeholder="Leave blank to keep current">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Consumer Secret</label>
+                                        <input type="password" name="mpesa_consumer_secret" id="edit_mpesa_consumer_secret" class="form-control" placeholder="Leave blank to keep current">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Passkey</label>
+                                    <input type="password" name="mpesa_passkey" id="edit_mpesa_passkey" class="form-control" placeholder="Leave blank to keep current">
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="mpesa_clear" id="edit_mpesa_clear" value="1">
+                                    <label class="form-check-label text-danger" for="edit_mpesa_clear">Clear site M-Pesa config (revert to global)</label>
                                 </div>
                                 <hr>
                                 <h6><i class="bi bi-box-seam me-1"></i> Hotspot Packages</h6>
@@ -7945,6 +8032,73 @@ try {
                                 <div class="alert alert-light mb-0">
                                     <i class="bi bi-info-circle me-1"></i>
                                     No VPN peers configured. <a href="?page=isp&view=vpn">Manage VPN</a>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header text-white" style="background-color: #198754 !important;">
+                                <h5 class="mb-0"><i class="bi bi-phone me-2"></i> M-Pesa PayBill/Till</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Configure site-specific M-Pesa credentials for this NAS. If left blank, the global M-Pesa settings will be used.
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">PayBill/Till Number</label>
+                                        <input type="text" name="mpesa_shortcode" class="form-control"
+                                               value="<?= htmlspecialchars($editNas['mpesa_shortcode'] ?? '') ?>"
+                                               placeholder="e.g., 174379">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Account Type</label>
+                                        <select name="mpesa_account_type" class="form-select">
+                                            <option value="paybill" <?= ($editNas['mpesa_account_type'] ?? '') === 'paybill' ? 'selected' : '' ?>>PayBill</option>
+                                            <option value="till" <?= ($editNas['mpesa_account_type'] ?? '') === 'till' ? 'selected' : '' ?>>Buy Goods (Till)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Environment</label>
+                                        <select name="mpesa_env" class="form-select">
+                                            <option value="production" <?= ($editNas['mpesa_env'] ?? '') === 'production' ? 'selected' : '' ?>>Production</option>
+                                            <option value="sandbox" <?= ($editNas['mpesa_env'] ?? '') === 'sandbox' ? 'selected' : '' ?>>Sandbox</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Consumer Key</label>
+                                        <input type="password" name="mpesa_consumer_key" class="form-control"
+                                               placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Daraja API Consumer Key' ?>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Consumer Secret</label>
+                                        <input type="password" name="mpesa_consumer_secret" class="form-control"
+                                               placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Daraja API Consumer Secret' ?>">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Passkey</label>
+                                        <input type="password" name="mpesa_passkey" class="form-control"
+                                               placeholder="<?= $editNas ? 'Leave blank to keep current' : 'Lipa Na M-Pesa Passkey' ?>">
+                                    </div>
+                                    <?php if ($editNas && !empty($editNas['mpesa_shortcode'])): ?>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="mpesa_clear" id="mpesa_clear_edit" value="1">
+                                            <label class="form-check-label text-danger" for="mpesa_clear_edit">
+                                                <i class="bi bi-x-circle me-1"></i> Clear site M-Pesa config (revert to global)
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($editNas && !empty($editNas['mpesa_shortcode'])): ?>
+                                <div class="mt-3 p-2 bg-light rounded">
+                                    <small class="text-success"><i class="bi bi-check-circle me-1"></i> Using site-specific M-Pesa: <strong><?= htmlspecialchars($editNas['mpesa_shortcode']) ?></strong> (<?= ucfirst($editNas['mpesa_account_type'] ?? 'paybill') ?>)</small>
+                                </div>
+                                <?php elseif ($editNas): ?>
+                                <div class="mt-3 p-2 bg-light rounded">
+                                    <small class="text-muted"><i class="bi bi-globe me-1"></i> Using global M-Pesa configuration</small>
                                 </div>
                                 <?php endif; ?>
                             </div>
@@ -8525,6 +8679,176 @@ try {
                                 <?php endforeach; ?>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <?php elseif ($view === 'site_revenue'): ?>
+            <?php 
+            $startDate = $_GET['start_date'] ?? date('Y-m-01');
+            $endDate = $_GET['end_date'] ?? date('Y-m-d');
+            $siteRevenue = $radiusBilling->getRevenuePerSite($startDate, $endDate);
+            $revenueSummary = $radiusBilling->getSiteRevenueSummary();
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-building"></i> Revenue Per Site</h4>
+                <form class="d-flex gap-2" method="get">
+                    <input type="hidden" name="page" value="isp">
+                    <input type="hidden" name="view" value="site_revenue">
+                    <input type="date" name="start_date" class="form-control form-control-sm" value="<?= htmlspecialchars($startDate) ?>">
+                    <input type="date" name="end_date" class="form-control form-control-sm" value="<?= htmlspecialchars($endDate) ?>">
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                </form>
+            </div>
+            
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-start border-4 border-primary">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-muted small">Total Sites</div>
+                                    <div class="fs-2 fw-bold text-primary"><?= number_format($revenueSummary['total_sites'] ?? 0) ?></div>
+                                </div>
+                                <div class="text-primary opacity-50"><i class="bi bi-building fs-1"></i></div>
+                            </div>
+                            <small class="text-muted"><?= number_format($revenueSummary['sites_with_mpesa'] ?? 0) ?> with M-Pesa config</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-start border-4 border-success">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-muted small">Active Subscribers</div>
+                                    <div class="fs-2 fw-bold text-success"><?= number_format($revenueSummary['total_active_subs'] ?? 0) ?></div>
+                                </div>
+                                <div class="text-success opacity-50"><i class="bi bi-people fs-1"></i></div>
+                            </div>
+                            <small class="text-muted">Across all sites</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-start border-4 border-warning">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-muted small">MTD Revenue</div>
+                                    <div class="fs-2 fw-bold text-warning">KES <?= number_format($revenueSummary['mtd_revenue'] ?? 0) ?></div>
+                                </div>
+                                <div class="text-warning opacity-50"><i class="bi bi-cash-stack fs-1"></i></div>
+                            </div>
+                            <small class="text-muted">Month to date</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-start border-4 border-info">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-muted small">Today's Revenue</div>
+                                    <div class="fs-2 fw-bold text-info">KES <?= number_format($revenueSummary['today_revenue'] ?? 0) ?></div>
+                                </div>
+                                <div class="text-info opacity-50"><i class="bi bi-calendar-check fs-1"></i></div>
+                            </div>
+                            <?php 
+                            $lastMonth = $revenueSummary['last_month_revenue'] ?? 0;
+                            $mtd = $revenueSummary['mtd_revenue'] ?? 0;
+                            $growth = $lastMonth > 0 ? round(($mtd - $lastMonth) / $lastMonth * 100, 1) : 0;
+                            ?>
+                            <small class="<?= $growth >= 0 ? 'text-success' : 'text-danger' ?>">
+                                <i class="bi bi-arrow-<?= $growth >= 0 ? 'up' : 'down' ?>"></i> <?= abs($growth) ?>% vs last month
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-table me-2"></i>Revenue Breakdown by NAS Device (<?= date('M j', strtotime($startDate)) ?> - <?= date('M j, Y', strtotime($endDate)) ?>)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Site / NAS</th>
+                                    <th>M-Pesa</th>
+                                    <th class="text-center">Subscribers</th>
+                                    <th class="text-center">Transactions</th>
+                                    <th class="text-end">Total Revenue</th>
+                                    <th class="text-end">Collected</th>
+                                    <th class="text-end">Pending</th>
+                                    <th class="text-center">Collection %</th>
+                                    <th class="text-end">ARPU</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $grandTotal = 0; $grandPaid = 0; $grandPending = 0; $grandSubs = 0;
+                                foreach ($siteRevenue as $site): 
+                                $grandTotal += $site['total_revenue'];
+                                $grandPaid += $site['paid_revenue'];
+                                $grandPending += $site['pending_revenue'];
+                                $grandSubs += $site['active_subscriptions'];
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= htmlspecialchars($site['nas_name']) ?></strong>
+                                        <br><small class="text-muted"><code><?= htmlspecialchars($site['ip_address']) ?></code></small>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($site['mpesa_shortcode'])): ?>
+                                        <span class="badge bg-success"><i class="bi bi-phone me-1"></i><?= htmlspecialchars($site['mpesa_shortcode']) ?></span>
+                                        <br><small class="text-muted"><?= ucfirst($site['mpesa_account_type'] ?? 'paybill') ?></small>
+                                        <?php else: ?>
+                                        <span class="badge bg-secondary">Global</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary"><?= number_format($site['active_subscriptions']) ?> active</span>
+                                        <br><small class="text-muted"><?= number_format($site['total_subscriptions']) ?> total</small>
+                                    </td>
+                                    <td class="text-center"><?= number_format($site['total_transactions']) ?></td>
+                                    <td class="text-end"><strong>KES <?= number_format($site['total_revenue']) ?></strong></td>
+                                    <td class="text-end text-success">KES <?= number_format($site['paid_revenue']) ?></td>
+                                    <td class="text-end text-warning">KES <?= number_format($site['pending_revenue']) ?></td>
+                                    <td class="text-center">
+                                        <?php 
+                                        $rate = (float)$site['collection_rate'];
+                                        $rateClass = $rate >= 90 ? 'success' : ($rate >= 70 ? 'warning' : 'danger');
+                                        ?>
+                                        <span class="badge bg-<?= $rateClass ?>"><?= $rate ?>%</span>
+                                    </td>
+                                    <td class="text-end">KES <?= number_format($site['arpu']) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($siteRevenue)): ?>
+                                <tr><td colspan="9" class="text-center text-muted py-4">No site data available for the selected period</td></tr>
+                                <?php else: ?>
+                                <tr class="table-dark fw-bold">
+                                    <td colspan="2">TOTALS</td>
+                                    <td class="text-center"><?= number_format($grandSubs) ?> active</td>
+                                    <td></td>
+                                    <td class="text-end">KES <?= number_format($grandTotal) ?></td>
+                                    <td class="text-end text-success">KES <?= number_format($grandPaid) ?></td>
+                                    <td class="text-end text-warning">KES <?= number_format($grandPending) ?></td>
+                                    <td class="text-center">
+                                        <?php $overallRate = $grandTotal > 0 ? round($grandPaid / $grandTotal * 100, 1) : 0; ?>
+                                        <span class="badge bg-light text-dark"><?= $overallRate ?>%</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <?php $overallArpu = $grandSubs > 0 ? round($grandPaid / $grandSubs) : 0; ?>
+                                        KES <?= number_format($overallArpu) ?>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -11070,6 +11394,14 @@ try {
         document.getElementById('edit_api_port').value = nas.api_port || 8728;
         document.getElementById('edit_api_username').value = nas.api_username || '';
         document.getElementById('edit_nas_vpn_peer').value = nas.wireguard_peer_id || '';
+        
+        document.getElementById('edit_mpesa_shortcode').value = nas.mpesa_shortcode || '';
+        document.getElementById('edit_mpesa_account_type').value = nas.mpesa_account_type || 'paybill';
+        document.getElementById('edit_mpesa_env').value = nas.mpesa_env || 'production';
+        document.getElementById('edit_mpesa_consumer_key').value = '';
+        document.getElementById('edit_mpesa_consumer_secret').value = '';
+        document.getElementById('edit_mpesa_passkey').value = '';
+        document.getElementById('edit_mpesa_clear').checked = false;
         
         // Reset all package checkboxes
         document.querySelectorAll('.nas-package-checkbox').forEach(cb => cb.checked = false);
