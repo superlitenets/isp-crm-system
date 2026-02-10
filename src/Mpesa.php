@@ -557,7 +557,7 @@ class Mpesa {
             // Use the proper processPayment method which handles wallet credits
             $result = $radiusBilling->processPayment($receiptNumber ?? $checkoutRequestId, $phoneNumber ?? '', $amount, $accountRef, $subscription['id']);
             
-            if ($result['success']) {
+            if ($result['success'] && empty($result['duplicate'])) {
                 if (!empty($result['wallet_topup'])) {
                     // Partial payment - credited to wallet
                     error_log("RADIUS: KES {$amount} credited to wallet for {$subscription['username']}. Balance: KES {$result['new_balance']}. Ref: {$receiptNumber}");
@@ -598,8 +598,10 @@ class Mpesa {
                             $sms = new SMSGateway();
                             $expiryDate = $result['expiry_date'] ?? date('Y-m-d', strtotime('+30 days'));
                             $walletMsg = !empty($result['wallet_remaining']) ? " Wallet balance: KES " . number_format($result['wallet_remaining'], 2) . "." : "";
+                            $hasTime = strpos($expiryDate, ':') !== false;
+                            $formattedExpiry = $hasTime ? date('M j, Y g:i A', strtotime($expiryDate)) : date('M j, Y', strtotime($expiryDate));
                             $message = "Payment received! Your {$subscription['package_name']} subscription has been renewed until " . 
-                                       date('M j, Y', strtotime($expiryDate)) . ".{$walletMsg} " .
+                                       $formattedExpiry . ".{$walletMsg} " .
                                        "Ref: {$receiptNumber}. Thank you!";
                             $sms->send($subscription['phone'], $message);
                         } catch (\Exception $e) {
@@ -607,6 +609,8 @@ class Mpesa {
                         }
                     }
                 }
+            } elseif ($result['success'] && !empty($result['duplicate'])) {
+                error_log("RADIUS: Skipping duplicate SMS for {$subscription['username']} - payment already processed. Ref: {$receiptNumber}");
             } else {
                 error_log("RADIUS payment processing failed: " . ($result['error'] ?? 'Unknown error'));
             }
@@ -712,8 +716,8 @@ class Mpesa {
             $subscription = null;
             $subscriptionId = null;
             
-            // Priority 1: Check if accountRef is in "radius_X" format (subscription ID)
-            if (preg_match('/^radius_(\d+)$/i', $accountRef, $matches)) {
+            // Priority 1: Check if accountRef is in "radius_X" or "HS-X" format (subscription ID)
+            if (preg_match('/^(?:radius_|HS-)(\d+)$/i', $accountRef, $matches)) {
                 $subscriptionId = (int)$matches[1];
                 $stmt = $this->db->prepare("
                     SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price

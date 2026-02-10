@@ -1053,12 +1053,18 @@ class RadiusBilling {
             
             // For inactive accounts, start fresh from today
             // For active/expired accounts, extend from expiry date
-            if ($wasInactive || empty($sub['expiry_date'])) {
-                $startDate = date('Y-m-d');
+            if (!empty($package['session_duration_hours']) && (float)$package['session_duration_hours'] > 0) {
+                $durationSeconds = (int)((float)$package['session_duration_hours'] * 3600);
+                $startDate = date('Y-m-d H:i:s');
+                $expiryDate = date('Y-m-d H:i:s', time() + $durationSeconds);
             } else {
-                $startDate = max(date('Y-m-d'), $sub['expiry_date']);
+                if ($wasInactive || empty($sub['expiry_date'])) {
+                    $startDate = date('Y-m-d');
+                } else {
+                    $startDate = max(date('Y-m-d'), $sub['expiry_date']);
+                }
+                $expiryDate = date('Y-m-d', strtotime($startDate . " +{$package['validity_days']} days"));
             }
-            $expiryDate = date('Y-m-d', strtotime($startDate . " +{$package['validity_days']} days"));
             
             $stmt = $this->db->prepare("
                 UPDATE radius_subscriptions SET
