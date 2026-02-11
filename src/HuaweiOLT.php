@@ -5407,6 +5407,24 @@ class HuaweiOLT {
             }
             $this->updateONU($onuDbId, $updateData);
             
+            if ($vlanId) {
+                try {
+                    $vlanName = '';
+                    $vnStmt = $this->db->prepare("SELECT description FROM huawei_vlans WHERE olt_id = ? AND vlan_id = ?");
+                    $vnStmt->execute([$oltId, $vlanId]);
+                    $vlanName = $vnStmt->fetchColumn() ?: '';
+                    $svStmt = $this->db->prepare("
+                        INSERT INTO huawei_onu_service_vlans (onu_id, vlan_id, vlan_name, interface_type, port_mode, is_native)
+                        VALUES (?, ?, ?, 'eth', 'access', TRUE)
+                        ON CONFLICT (onu_id, vlan_id, interface_type) DO UPDATE 
+                        SET vlan_name = EXCLUDED.vlan_name, is_native = TRUE
+                    ");
+                    $svStmt->execute([$onuDbId, $vlanId, $vlanName ?: null]);
+                } catch (\Exception $e) {
+                    error_log("Failed to insert service VLAN during authorization: " . $e->getMessage());
+                }
+            }
+            
             // Mark discovery log as authorized
             try {
                 $stmt = $this->db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = CURRENT_TIMESTAMP WHERE serial_number = ? AND olt_id = ?");
@@ -6493,12 +6511,26 @@ class HuaweiOLT {
                 || ($spResult['success'] && !empty($servicePortOutput) && !preg_match('/does not exist|is not valid|Unrecognized command/i', $servicePortOutput));
             
             if ($servicePortSuccess) {
-                // Update both vlan_id and attached_vlans
                 $attachedVlans = [$vlanId];
                 $this->updateONU($onuId, [
                     'vlan_id' => $vlanId,
                     'attached_vlans' => json_encode($attachedVlans)
                 ]);
+                try {
+                    $vlanName = '';
+                    $vnStmt = $this->db->prepare("SELECT description FROM huawei_vlans WHERE olt_id = ? AND vlan_id = ?");
+                    $vnStmt->execute([$oltId, $vlanId]);
+                    $vlanName = $vnStmt->fetchColumn() ?: '';
+                    $svStmt = $this->db->prepare("
+                        INSERT INTO huawei_onu_service_vlans (onu_id, vlan_id, vlan_name, interface_type, port_mode, is_native)
+                        VALUES (?, ?, ?, 'eth', 'access', TRUE)
+                        ON CONFLICT (onu_id, vlan_id, interface_type) DO UPDATE 
+                        SET vlan_name = EXCLUDED.vlan_name, is_native = TRUE
+                    ");
+                    $svStmt->execute([$onuId, $vlanId, $vlanName ?: null]);
+                } catch (\Exception $e) {
+                    error_log("Failed to insert service VLAN during authorization: " . $e->getMessage());
+                }
             }
         }
         
