@@ -9614,7 +9614,7 @@ try {
                                 <td><strong>wifi_0/<?= $i ?></strong></td>
                                 <td><button class="btn btn-sm btn-secondary wifi-enable-toggle" data-index="<?= $i ?>" data-enabled="false" disabled>Disabled</button></td>
                                 <td class="wifi-mode"><span class="badge bg-secondary">--</span></td>
-                                <td class="wifi-ssid"><span class="text-muted fst-italic">Loading...</span></td>
+                                <td class="wifi-ssid"><span class="text-muted fst-italic"><?= !empty($currentOnu['tr069_ip']) ? 'Loading...' : 'No TR-069' ?></span></td>
                                 <td class="wifi-encryption">
                                     <select class="form-select form-select-sm wifi-encryption-select" data-index="<?= $i ?>" style="width:110px" onchange="saveWiFiEncryption(<?= $i ?>, this.value)">
                                         <option value="AES" selected>AES</option>
@@ -9720,11 +9720,19 @@ try {
                     refreshBtn.disabled = false;
                     
                     if (!data.success) {
+                        document.querySelectorAll('.wifi-row').forEach(row => {
+                            const ssidCell = row.querySelector('.wifi-ssid');
+                            if (ssidCell) ssidCell.innerHTML = '<span class="text-muted fst-italic">Unavailable</span>';
+                        });
                         if (!silent) showToast(data.error || 'Failed to load WiFi data', 'warning');
                         return;
                     }
                     
                     if (!data.interfaces || data.interfaces.length === 0) {
+                        document.querySelectorAll('.wifi-row').forEach(row => {
+                            const ssidCell = row.querySelector('.wifi-ssid');
+                            if (ssidCell) ssidCell.innerHTML = '<span class="text-muted fst-italic">Not configured</span>';
+                        });
                         if (!silent) showToast('No WiFi interfaces found on this device', 'warning');
                         return;
                     }
@@ -10203,14 +10211,6 @@ try {
                 else stopLivePolling();
             });
             
-            if (onuOltId && onuDbId) {
-                const autoToggle = document.getElementById('liveMonitorToggle');
-                if (autoToggle) {
-                    autoToggle.checked = true;
-                    startLivePolling();
-                }
-            }
-            
             document.addEventListener('visibilitychange', function() {
                 const toggle = document.getElementById('liveMonitorToggle');
                 if (!toggle || !toggle.checked) return;
@@ -10243,6 +10243,15 @@ try {
                 } finally {
                     pollInFlight = false;
                     if (icon) icon.classList.remove('spin-animation');
+                }
+            }
+            
+            // Auto-enable live monitoring on page load
+            if (onuOltId && onuDbId) {
+                const autoToggle = document.getElementById('liveMonitorToggle');
+                if (autoToggle) {
+                    autoToggle.checked = true;
+                    startLivePolling();
                 }
             }
             
