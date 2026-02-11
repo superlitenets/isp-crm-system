@@ -11780,7 +11780,15 @@ class HuaweiOLT {
         $port = $onu['port'];
         $onuId = $onu['onu_id'];
         
-        $cmd = "interface gpon {$frame}/{$slot}\r\n";
+        $status = $this->getOLTSessionStatus($oltId);
+        if (!($status['connected'] ?? false)) {
+            $connectResult = $this->connectToOLTSession($oltId);
+            if (!($connectResult['success'] ?? false)) {
+                return ['success' => false, 'error' => 'Failed to establish OLT session: ' . ($connectResult['error'] ?? 'Unknown error')];
+            }
+        }
+        
+        $script = "interface gpon {$frame}/{$slot}\n";
         
         foreach ($portConfigs as $ethPort => $config) {
             $mode = $config['mode'] ?? 'access';
@@ -11788,34 +11796,29 @@ class HuaweiOLT {
             $priority = $config['priority'] ?? 0;
             $allowedVlans = $config['allowed_vlans'] ?? '';
             
-            // Note: ont port route only accepts enable|disable for routing mode
-            // For bridge/access mode, only use ont port native-vlan
-            // For transparent mode, no VLAN commands needed
-            
             if ($mode === 'transparent') {
-                // Transparent mode: disable routing, no VLAN assignment
-                $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} disable\r\n";
+                $script .= "ont port route {$port} {$onuId} eth {$ethPort} disable\n";
             } elseif ($mode === 'access' && $vlanId) {
-                // Access mode: set native VLAN (bridge mode)
-                $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
+                $script .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\n";
             } elseif ($mode === 'trunk' && !empty($allowedVlans)) {
-                // Trunk mode: add allowed VLANs
-                $cmd .= "ont port vlan {$port} {$onuId} eth {$ethPort} add vlan {$allowedVlans}\r\n";
+                $script .= "ont port vlan {$port} {$onuId} eth {$ethPort} add vlan {$allowedVlans}\n";
                 if ($vlanId) {
-                    // Set native VLAN for trunk
-                    $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
+                    $script .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\n";
                 }
             } elseif ($mode === 'hybrid' && $vlanId) {
-                // Hybrid mode: set native VLAN
-                $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
+                $script .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\n";
             }
         }
         
-        $cmd .= "quit";
+        $script .= "quit";
         
-        $result = $this->executeCommand($oltId, $cmd);
+        $result = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => $script,
+            'timeout' => 30000
+        ]);
         
-        $success = !empty($result['output']) && strpos($result['output'], 'error') === false;
+        $success = ($result['success'] ?? false) && (empty($result['output']) || strpos($result['output'], 'error') === false);
         
         // Store port configuration in database
         try {
@@ -11832,8 +11835,8 @@ class HuaweiOLT {
             'onu_id' => $onuDbId,
             'action' => 'configure_ports',
             'status' => $success ? 'success' : 'error',
-            'message' => "Configured " . count($portConfigs) . " ETH ports",
-            'command_sent' => $cmd,
+            'message' => "Configured " . count($portConfigs) . " ETH ports via raw script",
+            'command_sent' => $script,
             'command_response' => $result['output'] ?? '',
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
@@ -11842,7 +11845,7 @@ class HuaweiOLT {
             'success' => $success,
             'output' => $result['output'] ?? '',
             'ports_configured' => count($portConfigs),
-            'error' => $success ? null : 'Some commands may have failed'
+            'error' => $success ? null : ($result['error'] ?? 'Some commands may have failed')
         ];
     }
     
