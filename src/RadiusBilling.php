@@ -1897,12 +1897,15 @@ class RadiusBilling {
         
         // Handle expired users
         if ($isExpired) {
+            if ($isHotspot) {
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Hotspot expired - reject for captive portal redirect');
+                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Subscription expired'];
+            }
             if ($useExpiredPool) {
-                // Accept with restricted pool for captive portal
                 $attrs = [
                     'Framed-Pool' => $expiredPoolName,
                     'Mikrotik-Rate-Limit' => $expiredRateLimit,
-                    'Session-Timeout' => 300, // 5 min sessions to force re-auth
+                    'Session-Timeout' => 300,
                     'Acct-Interim-Interval' => 60
                 ];
                 $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Accept', 'Expired - expired pool', null, $attrs);

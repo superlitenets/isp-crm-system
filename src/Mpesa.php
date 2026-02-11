@@ -639,7 +639,7 @@ class Mpesa {
                     // Full renewal
                     error_log("RADIUS subscription renewed for {$subscription['username']} via M-Pesa {$receiptNumber}");
                     
-                    // Disconnect expired users so they can reconnect with new session
+                    // Disconnect expired users so they can reconnect with fresh RADIUS session
                     $wasExpired = $subscription['status'] === 'expired' || $subscription['status'] === 'inactive' ||
                                   ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
                     

@@ -37,6 +37,8 @@ if (!$lookupId && !$mac) {
     exit;
 }
 
+$triggerDisconnect = (int)($_GET['disconnect'] ?? 0);
+
 try {
     $db = Database::getConnection();
     
@@ -44,7 +46,7 @@ try {
     
     if ($lookupId) {
         $stmt = $db->prepare("
-            SELECT s.id, s.status, s.expiry_date, s.package_id,
+            SELECT s.id, s.status, s.expiry_date, s.package_id, s.needs_disconnect,
                    p.name as package_name, p.download_speed, p.max_devices,
                    p.session_duration_hours, p.validity_days
             FROM radius_subscriptions s
@@ -64,7 +66,7 @@ try {
         }
         
         $stmt = $db->prepare("
-            SELECT s.id, s.status, s.expiry_date, s.package_id,
+            SELECT s.id, s.status, s.expiry_date, s.package_id, s.needs_disconnect,
                    p.name as package_name, p.download_speed, p.max_devices,
                    p.session_duration_hours, p.validity_days
             FROM radius_subscriptions s
@@ -77,7 +79,7 @@ try {
         
         if (!$subscription) {
             $stmt = $db->prepare("
-                SELECT s.id, s.status, s.expiry_date, s.package_id,
+                SELECT s.id, s.status, s.expiry_date, s.package_id, s.needs_disconnect,
                        p.name as package_name, p.download_speed, p.max_devices,
                        p.session_duration_hours, p.validity_days
                 FROM radius_subscription_devices d
@@ -93,6 +95,20 @@ try {
     
     if (!$subscription) {
         echo json_encode(['status' => 'not_found']);
+        exit;
+    }
+    
+    if ($triggerDisconnect && $subscription['status'] === 'active' && !empty($subscription['needs_disconnect'])) {
+        try {
+            require_once __DIR__ . '/../../src/RadiusBilling.php';
+            $radiusBilling = new \App\RadiusBilling($db);
+            $disconnectResult = $radiusBilling->disconnectSubscription($subscription['id']);
+            $db->prepare("UPDATE radius_subscriptions SET needs_disconnect = false WHERE id = ?")->execute([$subscription['id']]);
+            error_log("HOTSPOT-STATUS: Delayed disconnect for subscription ID={$subscription['id']}, result: " . ($disconnectResult['success'] ? 'success' : 'failed'));
+        } catch (Exception $e) {
+            error_log("HOTSPOT-STATUS: Disconnect error: " . $e->getMessage());
+        }
+        echo json_encode(['status' => 'disconnected', 'success' => true]);
         exit;
     }
     
@@ -124,7 +140,7 @@ try {
             
             $activateStmt = $db->prepare("
                 UPDATE radius_subscriptions 
-                SET status = 'active', expiry_date = ?, updated_at = CURRENT_TIMESTAMP 
+                SET status = 'active', expiry_date = ?, needs_disconnect = true, updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ? AND status = 'pending_payment'
             ");
             $activateStmt->execute([$expiryDate, $subscription['id']]);
@@ -133,6 +149,7 @@ try {
             
             $subscription['status'] = 'active';
             $subscription['expiry_date'] = $expiryDate;
+            $subscription['needs_disconnect'] = true;
             $isActive = true;
             $isExpiredByDate = false;
         }
@@ -146,6 +163,7 @@ try {
             'download_speed' => $subscription['download_speed'],
             'expiry_date' => $subscription['expiry_date'],
             'max_devices' => (int)($subscription['max_devices'] ?? 1),
+            'needs_disconnect' => !empty($subscription['needs_disconnect']),
         ]);
     } elseif ($subscription['status'] === 'pending_payment') {
         echo json_encode([
