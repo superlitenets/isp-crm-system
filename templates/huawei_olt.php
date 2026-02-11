@@ -7,6 +7,7 @@ $allBranches = $branchService->getAll();
 $view = $_GET['view'] ?? 'dashboard';
 $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
 $action = $_POST['action'] ?? null;
+$csrfToken = $_SESSION['csrf_token'] ?? '';
 $message = '';
 $messageType = '';
 // Handle AJAX GET requests for VPN configs
