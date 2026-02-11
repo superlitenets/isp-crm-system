@@ -17287,11 +17287,17 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     </div>
     
     <?php
-    // Get all VLANs from OLT for ETH port modal
+    // Get attached VLANs (with service ports) for ETH port modal
     $ethPortVlans = [];
-    if (isset($db) && isset($currentOnu["olt_id"])) {
-        $ethVlanStmt = $db->query("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = " . intval($currentOnu["olt_id"]) . " ORDER BY vlan_id");
+    if (isset($attachedVlans) && !empty($attachedVlans) && isset($db) && isset($currentOnu["olt_id"])) {
+        $vlanIds = implode(",", array_map("intval", $attachedVlans));
+        $ethVlanStmt = $db->query("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = " . intval($currentOnu["olt_id"]) . " AND vlan_id IN ($vlanIds) ORDER BY vlan_id");
         $ethPortVlans = $ethVlanStmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($ethPortVlans)) {
+            foreach ($attachedVlans as $vid) {
+                $ethPortVlans[] = ["vlan_id" => (int)$vid, "description" => "Service VLAN"];
+            }
+        }
     }
     ?>
     <div class="modal fade" id="ethPortModal" tabindex="-1">
