@@ -10203,6 +10203,14 @@ try {
                 else stopLivePolling();
             });
             
+            if (onuOltId && onuDbId) {
+                const autoToggle = document.getElementById('liveMonitorToggle');
+                if (autoToggle) {
+                    autoToggle.checked = true;
+                    startLivePolling();
+                }
+            }
+            
             document.addEventListener('visibilitychange', function() {
                 const toggle = document.getElementById('liveMonitorToggle');
                 if (!toggle || !toggle.checked) return;
