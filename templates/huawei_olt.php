@@ -17307,7 +17307,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <h5 class="modal-title" id="ethPortModalLabel"><i class="bi bi-ethernet me-2"></i>Configure ETH Port</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="ethPortForm" method="POST" action="?page=huawei-olt">
+                <form id="ethPortForm" method="POST" action="?page=huawei-olt" onsubmit="event.preventDefault(); submitEthPortConfig(event); return false;">
                     <input type="hidden" name="action" value="configure_eth_port_omci">
                     <input type="hidden" name="onu_id" id="ethPortOnuId">
                     <input type="hidden" name="port_num" id="ethPortNum">
