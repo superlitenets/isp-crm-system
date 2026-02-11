@@ -7772,8 +7772,8 @@ try {
             
             <div class="alert alert-info small">
                 <i class="bi bi-info-circle me-1"></i>
-                Live Monitor fetches real-time ONU data directly from the OLT including optical power levels.
-                Initial load may take 30-60 seconds depending on the number of ONUs.
+                Live Monitor shows ONU data from the database, kept fresh by background SNMP polling every 30 seconds.
+                Data loads instantly without blocking CLI commands.
             </div>
             
             <div class="card shadow-sm">
@@ -7784,8 +7784,8 @@ try {
                 <div class="card-body p-0">
                     <div id="liveOnuLoading" class="text-center p-5 d-none">
                         <div class="spinner-border text-primary mb-3" role="status"></div>
-                        <div class="text-muted">Fetching live ONU data from OLT...</div>
-                        <div class="text-muted small mt-1">This may take up to 60 seconds</div>
+                        <div class="text-muted">Loading ONU data from database...</div>
+                        <div class="text-muted small mt-1">Data is kept fresh by background SNMP polling</div>
                     </div>
                     <div id="liveOnuEmpty" class="text-center text-muted p-5">
                         <i class="bi bi-router fs-1 mb-2 d-block"></i>

@@ -871,38 +871,21 @@ if ($page === 'api' && $action === 'poll_onu_live') {
     }
     
     try {
-        $ch = curl_init('http://localhost:3002/poll-onu');
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode(['oltId' => $oltId, 'onuDbId' => $onuDbId]),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 8,
-            CURLOPT_CONNECTTIMEOUT => 3,
-        ]);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        
-        if ($response && $httpCode === 200) {
-            echo $response;
+        $stmt = $db->prepare("SELECT id, status, snmp_status, rx_power, tx_power, distance, last_down_cause, online_since, updated_at FROM huawei_onus WHERE id = ? AND olt_id = ?");
+        $stmt->execute([$onuDbId, $oltId]);
+        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($onu) {
+            echo json_encode(['success' => true, 'fromCache' => true, 'onu' => [
+                'id' => (int)$onu['id'],
+                'status' => $onu['status'],
+                'rx_power' => $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null,
+                'tx_power' => $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null,
+                'distance' => $onu['distance'] !== null ? (int)$onu['distance'] : null,
+                'last_down_cause' => $onu['last_down_cause'],
+                'online_since' => $onu['online_since'],
+            ]]);
         } else {
-            $stmt = $db->prepare("SELECT id, status, snmp_status, rx_power, tx_power, distance, last_down_cause, online_since, updated_at FROM huawei_onus WHERE id = ?");
-            $stmt->execute([$onuDbId]);
-            $onu = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($onu) {
-                echo json_encode(['success' => true, 'fromCache' => true, 'onu' => [
-                    'id' => (int)$onu['id'],
-                    'status' => $onu['status'],
-                    'rx_power' => $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null,
-                    'tx_power' => $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null,
-                    'distance' => $onu['distance'] !== null ? (int)$onu['distance'] : null,
-                    'last_down_cause' => $onu['last_down_cause'],
-                    'online_since' => $onu['online_since'],
-                ]]);
-            } else {
-                echo json_encode(['success' => false, 'error' => 'ONU not found']);
-            }
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
         }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
