@@ -349,43 +349,55 @@ class SNMPPollingWorker {
 
     getONUStatuses(session, oltId) {
         return new Promise((resolve, reject) => {
-            const statuses = [];
-            
-            // Primary OID for ONU run status (hwGponDeviceOntRunStatus)
-            const primaryOid = this.OIDs.onuStatusBase;
-            // Alternative OIDs for different Huawei versions
-            const altOids = [
-                '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15',  // hwGponDeviceOntRunStatus
+            const oidsToTry = [
+                '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15',  // hwGponDeviceOntRunStatus (primary)
                 '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9',   // hwGponDeviceOntRunState (alternate)
-                '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.2'    // hwGponDeviceOntOpticalDdmStatus (optical status)
             ];
 
-            const tryWalk = (oid, callback) => {
-                const maxOid = oid + '.4294967295';
-                session.subtree(oid, maxOid, (varbinds) => {
-                    varbinds.forEach(vb => {
-                        if (snmp.isVarbindError(vb)) return;
-                        
-                        const oidParts = vb.oid.split('.');
-                        const onuIndex = oidParts.slice(-2).join('.');
-                        const statusCode = parseInt(vb.value);
-                        const status = this.STATUS_MAP[statusCode] || 'unknown';
-                        
-                        statuses.push({
-                            index: onuIndex,
-                            statusCode,
-                            status
+            const tryWalk = (oid) => {
+                return new Promise((res) => {
+                    const results = [];
+                    session.subtree(oid, 20, (varbinds) => {
+                        varbinds.forEach(vb => {
+                            if (snmp.isVarbindError(vb)) return;
+                            
+                            const oidParts = vb.oid.split('.');
+                            const onuIndex = oidParts.slice(-2).join('.');
+                            const statusCode = parseInt(vb.value);
+                            const status = this.STATUS_MAP[statusCode] || 'unknown';
+                            
+                            results.push({
+                                index: onuIndex,
+                                statusCode,
+                                status
+                            });
                         });
+                    }, (error) => {
+                        if (error) {
+                            console.log(`[SNMP] Walk ${oid} for OLT ${oltId} error: ${error.message || error}`);
+                        }
+                        res(results);
                     });
-                }, (error) => {
-                    callback(error);
                 });
             };
 
-            // Try primary OID first
-            tryWalk(primaryOid, (error) => {
+            const tryNextOid = async () => {
+                for (const oid of oidsToTry) {
+                    const results = await tryWalk(oid);
+                    console.log(`[SNMP] Walk OID ${oid.split('.').slice(-3).join('.')} for OLT ${oltId}: ${results.length} ONUs`);
+                    if (results.length > 0) {
+                        return results;
+                    }
+                }
+                return [];
+            };
+
+            tryNextOid().then(statuses => {
                 console.log(`[SNMP] ONU status walk completed for OLT ${oltId}: ${statuses.length} ONUs`);
                 resolve(statuses);
+            }).catch(err => {
+                console.error(`[SNMP] All OID walks failed for OLT ${oltId}: ${err.message}`);
+                resolve([]);
             });
         });
     }
