@@ -10230,14 +10230,8 @@ try {
                 }
             }
             
-            // Auto-enable live monitoring on page load
-            if (onuOltId && onuDbId) {
-                const autoToggle = document.getElementById('liveMonitorToggle');
-                if (autoToggle) {
-                    autoToggle.checked = true;
-                    startLivePolling();
-                }
-            }
+            // Do NOT auto-start live polling - page shows cached DB data on load
+            // User can enable live monitoring manually when needed
             
             function updateLiveDisplay(onu, fromCache) {
                 const statusMap = {

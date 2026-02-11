@@ -877,8 +877,8 @@ if ($page === 'api' && $action === 'poll_onu_live') {
             CURLOPT_POSTFIELDS => json_encode(['oltId' => $oltId, 'onuDbId' => $onuDbId]),
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_CONNECTTIMEOUT => 3,
         ]);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

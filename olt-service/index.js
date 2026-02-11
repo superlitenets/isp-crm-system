@@ -246,13 +246,11 @@ async function refreshSingleONU(oltId, onuDbId) {
         }
         
         const interfaceCmd = `interface gpon ${frame}/${slot}`;
-        await sessionManager.execute(oltId.toString(), interfaceCmd, { timeout: 10000 });
+        await sessionManager.execute(oltId.toString(), interfaceCmd, { timeout: 5000 });
         
-        // Get optical info
         const opticalCmd = `display ont optical-info ${port} ${onu_id}`;
-        const opticalResult = await sessionManager.execute(oltId.toString(), opticalCmd, { timeout: 15000 });
+        const opticalResult = await sessionManager.execute(oltId.toString(), opticalCmd, { timeout: 5000 });
         
-        // Parse optical data
         let rxPower = null, txPower = null;
         const cleanOutput = (opticalResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
         
@@ -262,9 +260,8 @@ async function refreshSingleONU(oltId, onuDbId) {
         const txMatch = cleanOutput.match(/Tx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i);
         if (txMatch) txPower = parseFloat(txMatch[1]);
         
-        // Get status
         const infoCmd = `display ont info ${port} ${onu_id}`;
-        const infoResult = await sessionManager.execute(oltId.toString(), infoCmd, { timeout: 15000 });
+        const infoResult = await sessionManager.execute(oltId.toString(), infoCmd, { timeout: 5000 });
         const cleanInfo = (infoResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
         
         let status = 'offline';
@@ -320,10 +317,10 @@ app.post('/poll-onu', async (req, res) => {
         }
         
         const interfaceCmd = `interface gpon ${frame}/${slot}`;
-        await sessionManager.execute(oltId.toString(), interfaceCmd, { timeout: 10000 });
+        await sessionManager.execute(oltId.toString(), interfaceCmd, { timeout: 5000 });
         
         const opticalCmd = `display ont optical-info ${port} ${onu_id}`;
-        const opticalResult = await sessionManager.execute(oltId.toString(), opticalCmd, { timeout: 15000 });
+        const opticalResult = await sessionManager.execute(oltId.toString(), opticalCmd, { timeout: 5000 });
         
         let rxPower = null, txPower = null, oltRx = null, temperature = null;
         const cleanOptical = (opticalResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
@@ -341,7 +338,7 @@ app.post('/poll-onu', async (req, res) => {
         if (tempMatch) temperature = parseFloat(tempMatch[1]);
         
         const infoCmd = `display ont info ${port} ${onu_id}`;
-        const infoResult = await sessionManager.execute(oltId.toString(), infoCmd, { timeout: 15000 });
+        const infoResult = await sessionManager.execute(oltId.toString(), infoCmd, { timeout: 5000 });
         const cleanInfo = (infoResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
         
         let status = 'offline';
