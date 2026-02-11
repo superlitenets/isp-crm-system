@@ -2141,14 +2141,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     ]
                 ];
                 $result = $huaweiOLT->configureOnuPorts($onuId, $portConfig);
-                if ($result['success']) {
-                    $message = "ETH port {$portNum} configured successfully via OMCI.";
-                    $messageType = 'success';
+                header("Content-Type: application/json");
+                if ($result["success"]) {
+                    echo json_encode(["success" => true, "message" => "ETH port {$portNum} configured successfully via OMCI.", "output" => $result["output"] ?? ""]);
                 } else {
-                    $message = 'Port configuration failed: ' . ($result['error'] ?? 'Unknown error');
-                    $messageType = 'danger';
+                    echo json_encode(["success" => false, "error" => $result["error"] ?? "Configuration failed"]);
                 }
-                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
                 break;
             case 'move_onu':
@@ -17289,11 +17287,10 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     </div>
     
     <?php
-    // Get attached VLANs with descriptions for ETH port modal
+    // Get all VLANs from OLT for ETH port modal
     $ethPortVlans = [];
-    if (isset($attachedVlans) && !empty($attachedVlans) && isset($db) && isset($currentOnu['olt_id'])) {
-        $vlanIds = implode(',', array_map('intval', $attachedVlans));
-        $ethVlanStmt = $db->query("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = " . intval($currentOnu['olt_id']) . " AND vlan_id IN ($vlanIds) ORDER BY vlan_id");
+    if (isset($db) && isset($currentOnu["olt_id"])) {
+        $ethVlanStmt = $db->query("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = " . intval($currentOnu["olt_id"]) . " ORDER BY vlan_id");
         $ethPortVlans = $ethVlanStmt->fetchAll(PDO::FETCH_ASSOC);
     }
     ?>
