@@ -17751,3 +17751,94 @@ END $$;
 --
 
 
+-- ============================================================================
+-- Idempotent column additions for huawei_onus
+-- These ensure all required columns exist on databases created before
+-- these columns were added to the CREATE TABLE statement above.
+-- Safe to re-run on any database version.
+-- ============================================================================
+
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN port_config jsonb; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN smartolt_external_id character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN provisioning_stage integer DEFAULT 0; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN wan_mode character varying(20); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN attached_vlans text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN phone character varying(50); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN latitude numeric(10,8); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN longitude numeric(11,8); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN installation_date date; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN pppoe_username character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN pppoe_password character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN address text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN uptime character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN online_since timestamp without time zone; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN ont_ip character varying(45); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN genieacs_id character varying(255) DEFAULT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN last_provision_at timestamp without time zone; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN provision_state character varying(50) DEFAULT 'DISCOVERED'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN wan_device_path character varying(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN wan_conn_path character varying(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN ppp_path character varying(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN wan_profile_id integer DEFAULT 1; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN onu_mode character varying(20) DEFAULT 'router'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN snmp_status character varying(50) DEFAULT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN discovered_eqid character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN tr069_device_id character varying(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN tr069_serial character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN tr069_ip character varying(45); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN tr069_status character varying(50) DEFAULT 'pending'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN tr069_last_inform timestamp without time zone; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN onu_type_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN optical_updated_at timestamp without time zone; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN olt_sync_pending boolean DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN zone_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN subzone_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN apartment_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN odb_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN line_profile_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN srv_profile_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN tr069_profile_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN vlan_id integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN vlan_priority integer DEFAULT 0; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN ip_mode character varying(20) DEFAULT 'dhcp'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN zone character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN area character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN customer_name character varying(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN auth_date date; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN apartment character varying(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.huawei_onus ADD COLUMN odb character varying(50); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+
+-- ============================================================================
+-- Idempotent table: huawei_onu_service_vlans
+-- Tracks VLANs attached to each ONU (source of truth for Attached VLANs display)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.huawei_onu_service_vlans (
+    id integer NOT NULL,
+    onu_id integer NOT NULL,
+    vlan_id integer NOT NULL,
+    interface_type character varying(10) DEFAULT 'eth'::character varying,
+    port_number integer DEFAULT 1,
+    port_mode character varying(10) DEFAULT 'access'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT huawei_onu_service_vlans_interface_type_check CHECK (((interface_type)::text = ANY ((ARRAY['wifi'::character varying, 'eth'::character varying, 'all'::character varying])::text[]))),
+    CONSTRAINT huawei_onu_service_vlans_port_mode_check CHECK (((port_mode)::text = ANY ((ARRAY['access'::character varying, 'trunk'::character varying])::text[])))
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.huawei_onu_service_vlans_id_seq
+    AS integer START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;
+ALTER SEQUENCE public.huawei_onu_service_vlans_id_seq OWNED BY public.huawei_onu_service_vlans.id;
+SELECT setval('public.huawei_onu_service_vlans_id_seq', COALESCE((SELECT MAX(id) FROM public.huawei_onu_service_vlans), 0) + 1, false);
+
+DO $$ BEGIN
+    ALTER TABLE ONLY public.huawei_onu_service_vlans ALTER COLUMN id SET DEFAULT nextval('public.huawei_onu_service_vlans_id_seq'::regclass);
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE ONLY public.huawei_onu_service_vlans ADD CONSTRAINT huawei_onu_service_vlans_pkey PRIMARY KEY (id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+
