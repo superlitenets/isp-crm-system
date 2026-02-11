@@ -9583,9 +9583,17 @@ try {
             <?php if ($wifiCount > 0): ?>
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
-                    <strong><i class="bi bi-wifi me-2"></i>WiFi</strong>
                     <div>
+                        <strong><i class="bi bi-wifi me-2"></i>WiFi</strong>
+                        <div class="form-check form-check-inline ms-3">
+                            <input class="form-check-input" type="checkbox" id="wifiEnableAll" checked>
+                            <label class="form-check-label small" for="wifiEnableAll">Enable</label>
+                        </div>
+                    </div>
+                    <div>
+                        <?php if (!empty($currentOnu['tr069_ip'])): ?>
                         <span class="badge bg-info me-2">TR-069</span>
+                        <?php endif; ?>
                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="loadWiFiFromTR069()" id="wifiRefreshBtn">
                             <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                         </button>
@@ -9597,43 +9605,35 @@ try {
                         <span class="text-muted">Loading WiFi data from TR-069...</span>
                     </div>
                     <table class="table table-sm table-hover mb-0" id="wifiTable">
-                        <thead class="table-dark">
-                            <tr>
+                        <thead>
+                            <tr class="table-light">
                                 <th>Port</th>
-                                <th>Status</th>
+                                <th>Admin state</th>
                                 <th>Mode</th>
                                 <th>SSID</th>
-                                <th>Encryption</th>
-                                <th>VLAN</th>
+                                <th>DHCP</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="wifiPortsTable">
-                            <?php for ($i = 1; $i <= $wifiCount; $i++): ?>
+                            <?php for ($i = 1; $i <= $wifiCount; $i++): 
+                                $isFirstWifi = ($i === 1);
+                            ?>
                             <tr class="wifi-row" data-index="<?= $i ?>">
-                                <td><strong>wifi_0/<?= $i ?></strong></td>
-                                <td><button class="btn btn-sm btn-secondary wifi-enable-toggle" data-index="<?= $i ?>" data-enabled="false" disabled>Disabled</button></td>
-                                <td class="wifi-mode"><span class="badge bg-secondary">--</span></td>
-                                <td class="wifi-ssid"><span class="text-muted fst-italic"><?= !empty($currentOnu['tr069_ip']) ? 'Loading...' : 'No TR-069' ?></span></td>
-                                <td class="wifi-encryption">
-                                    <select class="form-select form-select-sm wifi-encryption-select" data-index="<?= $i ?>" style="width:110px" onchange="saveWiFiEncryption(<?= $i ?>, this.value)">
-                                        <option value="AES" selected>AES</option>
-                                        <option value="TKIP">TKIP</option>
-                                        <option value="TKIP+AES">TKIP+AES</option>
-                                        <option value="Open">Open</option>
-                                    </select>
+                                <td>wifi_0/<?= $i ?></td>
+                                <td class="wifi-admin-state"><?= $isFirstWifi ? 'Enabled' : 'Disabled' ?></td>
+                                <td class="wifi-mode">LAN</td>
+                                <td class="wifi-ssid"></td>
+                                <td class="wifi-dhcp">No control</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="openTR069WiFiConfig('<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>', <?= $i ?>)">
+                                        <i class="bi bi-gear me-1"></i>Configure
+                                    </button>
                                 </td>
-                                <td class="wifi-vlan"><span class="text-muted">--</span></td>
-                                <td><button class="btn btn-sm btn-outline-primary" onclick="openTR069WiFiConfig('<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>', <?= $i ?>)"><i class="bi bi-gear me-1"></i>Configure</button></td>
                             </tr>
                             <?php endfor; ?>
                         </tbody>
                     </table>
-                    <?php if (empty($currentOnu['tr069_ip'])): ?>
-                    <div class="alert alert-warning m-2 mb-0 py-2">
-                        <i class="bi bi-exclamation-triangle me-1"></i> Device not connected to TR-069. Click Configure to set up WiFi once device connects.
-                    </div>
-                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -9686,14 +9686,8 @@ try {
                     loading.classList.add('d-none');
                     refreshBtn.disabled = false;
                     // Update all rows to show "No TR-069" instead of "Loading..."
-                    document.querySelectorAll('.wifi-row').forEach(row => {
-                        const ssidCell = row.querySelector('.wifi-ssid');
-                        const modeCell = row.querySelector('.wifi-mode');
-                        const vlanCell = row.querySelector('.wifi-vlan');
-                        if (ssidCell) ssidCell.innerHTML = '<span class="text-muted fst-italic">Not connected</span>';
-                        if (modeCell) modeCell.innerHTML = '<span class="badge bg-secondary">--</span>';
-                        if (vlanCell) vlanCell.innerHTML = '<span class="text-muted">--</span>';
-                    });
+                    // No TR-069 - defaults already shown in HTML
+                    return;
                     if (!silent) showToast('Device not connected to TR-069', 'warning');
                     return;
                 }
@@ -9720,19 +9714,11 @@ try {
                     refreshBtn.disabled = false;
                     
                     if (!data.success) {
-                        document.querySelectorAll('.wifi-row').forEach(row => {
-                            const ssidCell = row.querySelector('.wifi-ssid');
-                            if (ssidCell) ssidCell.innerHTML = '<span class="text-muted fst-italic">Unavailable</span>';
-                        });
                         if (!silent) showToast(data.error || 'Failed to load WiFi data', 'warning');
                         return;
                     }
                     
                     if (!data.interfaces || data.interfaces.length === 0) {
-                        document.querySelectorAll('.wifi-row').forEach(row => {
-                            const ssidCell = row.querySelector('.wifi-ssid');
-                            if (ssidCell) ssidCell.innerHTML = '<span class="text-muted fst-italic">Not configured</span>';
-                        });
                         if (!silent) showToast('No WiFi interfaces found on this device', 'warning');
                         return;
                     }
@@ -9746,81 +9732,44 @@ try {
                         const isEnabled = iface.enabled;
                         const ssid = iface.ssid || '';
                         
-                        // Update enable button
-                        const btn = row.querySelector('.wifi-enable-toggle');
-                        if (btn) {
-                            btn.disabled = false;
-                            btn.dataset.enabled = String(isEnabled);
-                            btn.className = isEnabled ? 'btn btn-sm btn-success wifi-enable-toggle' : 'btn btn-sm btn-secondary wifi-enable-toggle';
-                            btn.innerHTML = isEnabled ? 'Enabled' : 'Disabled';
+                        // Update Admin state
+                        const adminCell = row.querySelector('.wifi-admin-state');
+                        if (adminCell) {
+                            adminCell.textContent = isEnabled ? 'Enabled' : 'Disabled';
                         }
                         
-                        // Update Mode column (connection mode: route/bridge with WAN binding)
+                        // Update Mode column
                         const modeCell = row.querySelector('.wifi-mode');
                         if (modeCell) {
-                            let modeHtml = '';
                             const connMode = iface.conn_mode || '';
-                            const bindWan = iface.bind_wan || '';
                             const vlanId = iface.vlan_id || '';
-                            
-                            // Priority: Show Access VLAN if VLAN is configured
                             if (vlanId) {
-                                modeHtml = 'Access VLAN: ' + vlanId;
+                                modeCell.textContent = 'Access VLAN: ' + vlanId;
                             } else if (connMode && connMode.toLowerCase().includes('bridge')) {
-                                modeHtml = 'Bridge';
+                                modeCell.textContent = 'Bridge';
                             } else if (connMode && connMode.toLowerCase().includes('route')) {
-                                modeHtml = 'Route';
+                                modeCell.textContent = 'Route';
                             } else {
-                                modeHtml = 'LAN';
+                                modeCell.textContent = 'LAN';
                             }
-                            modeCell.textContent = modeHtml;
                         }
                         
                         // Update SSID
                         const ssidCell = row.querySelector('.wifi-ssid');
                         if (ssidCell) {
-                            ssidCell.innerHTML = ssid || '<span class="text-muted fst-italic">Not set</span>';
+                            ssidCell.textContent = ssid;
                         }
                         
-                        // Update Encryption dropdown
-                        const encCell = row.querySelector('.wifi-encryption');
-                        if (encCell) {
-                            const encSelect = encCell.querySelector('select');
-                            if (encSelect) {
-                                // Map TR-069 values to dropdown values
-                                let encValue = 'AES';
-                                const rawEnc = iface.encryption || iface.encryption_mode || '';
-                                if (rawEnc.includes('TKIP') && rawEnc.includes('AES')) {
-                                    encValue = 'TKIP+AES';
-                                } else if (rawEnc.includes('TKIP')) {
-                                    encValue = 'TKIP';
-                                } else if (rawEnc === 'None' || rawEnc === 'Basic' || iface.beacon_type === 'Basic') {
-                                    encValue = 'Open';
-                                }
-                                encSelect.value = encValue;
-                            }
-                        }
-                        
-                        // Update VLAN column
-                        const vlanCell = row.querySelector('.wifi-vlan');
-                        if (vlanCell) {
-                            const vlanId = iface.vlan_id || '';
-                            const vlanMode = iface.vlan_mode || '';
-                            if (vlanId) {
-                                let vlanHtml = '<span class="badge bg-primary">' + vlanId + '</span>';
-                                if (vlanMode) vlanHtml += ' <small>(' + escapeHtml(vlanMode) + ')</small>';
-                                vlanCell.innerHTML = vlanHtml;
-                            } else {
-                                vlanCell.innerHTML = '<span class="text-muted">--</span>';
-                            }
+                        // Update DHCP column
+                        const dhcpCell = row.querySelector('.wifi-dhcp');
+                        if (dhcpCell) {
+                            const dhcpEnabled = iface.dhcp_enabled || false;
+                            dhcpCell.textContent = dhcpEnabled ? 'Enabled' : 'No control';
                         }
                         
                         // Update row style
-                        row.className = isEnabled ? 'wifi-row' : 'wifi-row table-secondary';
+                        row.className = isEnabled ? 'wifi-row' : 'wifi-row';
                     });
-                    
-                    // Attach click handlers to enable buttons
-                    attachWifiToggleHandlers();
                     
                     if (!silent) showToast('WiFi data refreshed', 'success');
                 })
