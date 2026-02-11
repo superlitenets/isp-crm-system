@@ -9930,14 +9930,19 @@ try {
                 .catch(err => console.log('Summon error:', err.message));
             }
             
-            // Auto-summon and load WiFi when page opens
+            // Auto-summon when page opens (lightweight)
             if (onuSerial) {
                 summonOnu();
             }
-            if (hasTR069 && document.getElementById('wifiTable')) {
-                loadWiFiFromTR069();
-            }
-            </script>
+            // WiFi TR-069 data loads on-demand via Refresh button to avoid blocking
+
+
+
+
+
+
+
+
             
             <!-- Signal History Chart -->
             <div class="row">
@@ -9952,13 +9957,13 @@ try {
                             </div>
                         </div>
                         <div class="card-body">
-                            <canvas id="signalHistoryChart" height="120"></canvas>
+                            <canvas id="signalHistoryChart" height="120" style="display:none;"></canvas>
                             <div id="signalHistoryLoading" class="text-center py-4 d-none">
                                 <div class="spinner-border text-primary"></div>
                             </div>
-                            <div id="signalHistoryNoData" class="text-center py-4 text-muted d-none">
+                            <div id="signalHistoryNoData" class="text-center py-4 text-muted">
                                 <i class="bi bi-bar-chart fs-1 d-block mb-2"></i>
-                                No signal history data available yet
+                                Click a period button above (7D, 30D, 90D) to load signal history
                             </div>
                         </div>
                     </div>
@@ -10073,8 +10078,9 @@ try {
                     });
                 });
                 
-                // Initial load
-                loadSignalHistory(7);
+                // Signal history loads on-demand via period buttons (disabled auto-load to avoid blocking)
+
+
                 
                 // Auto-refresh optical data if missing
                 <?php if ($rx === null || $tx === null): ?>
