@@ -11788,6 +11788,8 @@ class HuaweiOLT {
             }
         }
         
+        $this->pauseDiscovery($oltId, 60000);
+        
         $script = "interface gpon {$frame}/{$slot}\n";
         
         foreach ($portConfigs as $ethPort => $config) {
@@ -11830,6 +11832,10 @@ class HuaweiOLT {
             // Column might not exist yet
         }
         
+        if ($success) {
+            $this->savePortVlansToServiceTable($onuDbId, $oltId, $portConfigs);
+        }
+        
         $this->addLog([
             'olt_id' => $oltId,
             'onu_id' => $onuDbId,
@@ -11847,6 +11853,82 @@ class HuaweiOLT {
             'ports_configured' => count($portConfigs),
             'error' => $success ? null : ($result['error'] ?? 'Some commands may have failed')
         ];
+    }
+    
+    private function savePortVlansToServiceTable(int $onuDbId, int $oltId, array $portConfigs): void {
+        try {
+            $newVlans = [];
+            foreach ($portConfigs as $ethPort => $config) {
+                $mode = $config['mode'] ?? 'transparent';
+                $vlanId = $config['vlan_id'] ?? null;
+                $allowedVlans = $config['allowed_vlans'] ?? '';
+                
+                if ($vlanId) {
+                    $portMode = ($mode === 'trunk') ? 'trunk' : 'access';
+                    $key = $vlanId . '_eth';
+                    if (!isset($newVlans[$key])) {
+                        $newVlans[$key] = ['vlan_id' => $vlanId, 'port_mode' => $portMode];
+                    }
+                }
+                
+                if ($mode === 'trunk' && !empty($allowedVlans)) {
+                    foreach (explode(',', str_replace(' ', '', $allowedVlans)) as $av) {
+                        $av = (int)trim($av);
+                        if ($av > 0) {
+                            $key = $av . '_eth';
+                            if (!isset($newVlans[$key])) {
+                                $newVlans[$key] = ['vlan_id' => $av, 'port_mode' => 'trunk'];
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (empty($newVlans)) {
+                return;
+            }
+            
+            foreach ($newVlans as $entry) {
+                $vlanName = '';
+                try {
+                    $stmt = $this->db->prepare("SELECT description FROM huawei_vlans WHERE olt_id = ? AND vlan_id = ?");
+                    $stmt->execute([$oltId, $entry['vlan_id']]);
+                    $vlanName = $stmt->fetchColumn() ?: '';
+                } catch (\Exception $e) {}
+                
+                $stmt = $this->db->prepare("
+                    INSERT INTO huawei_onu_service_vlans (onu_id, vlan_id, vlan_name, interface_type, port_mode, is_native)
+                    VALUES (?, ?, ?, 'eth', ?, FALSE)
+                    ON CONFLICT (onu_id, vlan_id, interface_type) DO UPDATE 
+                    SET vlan_name = EXCLUDED.vlan_name, port_mode = EXCLUDED.port_mode
+                ");
+                $stmt->execute([$onuDbId, $entry['vlan_id'], $vlanName ?: null, $entry['port_mode']]);
+            }
+            
+            $existingJson = [];
+            try {
+                $stmt = $this->db->prepare("SELECT attached_vlans FROM huawei_onus WHERE id = ?");
+                $stmt->execute([$onuDbId]);
+                $existing = $stmt->fetchColumn();
+                if ($existing) {
+                    $existingJson = json_decode($existing, true) ?: [];
+                }
+            } catch (\Exception $e) {}
+            
+            $existingMap = [];
+            foreach ($existingJson as $v) {
+                $existingMap[$v['vlan_id']] = $v;
+            }
+            foreach ($newVlans as $entry) {
+                $existingMap[$entry['vlan_id']] = ['vlan_id' => $entry['vlan_id']];
+            }
+            
+            $mergedJson = json_encode(array_values($existingMap));
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET attached_vlans = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$mergedJson, $onuDbId]);
+        } catch (\Exception $e) {
+            // Non-critical - port config was still applied successfully
+        }
     }
     
     public function applyPortTemplate(int $onuDbId, string $template): array {
