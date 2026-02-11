@@ -268,17 +268,17 @@ class SNMPPollingWorker {
                         if (status === 'online' && onu.status !== 'online') {
                             // ONU just came online - set online_since
                             await this.pool.query(`
-                                UPDATE huawei_onus SET status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                                UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         } else if (status !== 'online' && onu.status === 'online') {
                             // ONU went offline - clear online_since
                             await this.pool.query(`
-                                UPDATE huawei_onus SET status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                                UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         } else {
                             // No transition, just update status
                             await this.pool.query(`
-                                UPDATE huawei_onus SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                                UPDATE huawei_onus SET status = $1, snmp_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         }
                         updated++;
@@ -290,11 +290,11 @@ class SNMPPollingWorker {
                         // Only clear online_since if ONU was online before
                         if (onu.status === 'online') {
                             await this.pool.query(`
-                                UPDATE huawei_onus SET status = 'offline', online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1
+                                UPDATE huawei_onus SET status = 'offline', snmp_status = 'offline', online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1
                             `, [onu.id]);
                         } else {
                             await this.pool.query(`
-                                UPDATE huawei_onus SET status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
+                                UPDATE huawei_onus SET status = 'offline', snmp_status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
                             `, [onu.id]);
                         }
                         updated++;
@@ -450,21 +450,21 @@ class SNMPPollingWorker {
                     // ONU just came online - set online_since
                     result = await client.query(`
                         UPDATE huawei_onus 
-                        SET status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                        SET status = $1, snmp_status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                         WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
                     `, [s.status, oltId, slot, port, onuId]);
                 } else if (s.status !== 'online' && prevStatus === 'online') {
                     // ONU went offline - clear online_since
                     result = await client.query(`
                         UPDATE huawei_onus 
-                        SET status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP
+                        SET status = $1, snmp_status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP
                         WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
                     `, [s.status, oltId, slot, port, onuId]);
                 } else {
                     // No transition, just update status
                     result = await client.query(`
                         UPDATE huawei_onus 
-                        SET status = $1, updated_at = CURRENT_TIMESTAMP
+                        SET status = $1, snmp_status = $1, updated_at = CURRENT_TIMESTAMP
                         WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
                     `, [s.status, oltId, slot, port, onuId]);
                 }

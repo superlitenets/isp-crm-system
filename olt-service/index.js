@@ -260,6 +260,7 @@ async function refreshSingleONU(oltId, onuDbId) {
             SET rx_power = COALESCE($1, rx_power),
                 tx_power = COALESCE($2, tx_power),
                 status = COALESCE($3, status),
+                snmp_status = COALESCE($3, snmp_status),
                 updated_at = NOW()
             WHERE id = $4
         `, [rxPower, txPower, status, onuDbId]);

@@ -254,8 +254,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                             $onuTypeIdForOnu = $onuTypeId ?: ($discoveredOnu['onu_type_id'] ?? null);
                             
                             $insertStmt = $db->prepare("
-                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, created_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', NOW())
+                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, snmp_status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', 'offline', NOW())
                                 RETURNING id
                             ");
                             $insertStmt->execute([
@@ -486,7 +486,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
         
-        $sql = "SELECT o.id, o.sn, o.name, o.status, o.rx_power, o.tx_power, 
+        $sql = "SELECT o.id, o.sn, o.name, o.status, o.snmp_status, o.rx_power, o.tx_power, 
                        o.frame, o.slot, o.port, o.onu_id, o.olt_id, 
                        o.tr069_ip, o.distance, o.vlan_id,
                        ol.name as olt_name, o.updated_at,
@@ -1440,8 +1440,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $onuTypeIdForOnu = $onuTypeId ?: ($discoveredOnu['onu_type_id'] ?? null);
                             
                             $insertStmt = $db->prepare("
-                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, created_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', NOW())
+                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, snmp_status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', 'offline', NOW())
                                 RETURNING id
                             ");
                             $insertStmt->execute([
@@ -1592,8 +1592,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $onuTypeIdForOnu = $onuTypeId ?: ($discoveredOnu['onu_type_id'] ?? null);
                             
                             $insertStmt = $db->prepare("
-                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, created_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', NOW())
+                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, snmp_status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', 'offline', NOW())
                                 RETURNING id
                             ");
                             $insertStmt->execute([
@@ -1807,8 +1807,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $onuTypeIdForOnu = $onuTypeId ?: ($discoveredOnu['onu_type_id'] ?? null);
                             
                             $insertStmt = $db->prepare("
-                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, created_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', NOW())
+                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, snmp_status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', 'offline', NOW())
                                 RETURNING id
                             ");
                             $insertStmt->execute([
@@ -2249,6 +2249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 'port' => (int)($smartOnu['port'] ?? 0),
                                 'onu_id' => (int)($smartOnu['onu_number'] ?? $smartOnu['onu_id'] ?? 0),
                                 'status' => strtolower($smartOnu['status'] ?? 'offline'),
+                                'snmp_status' => strtolower($smartOnu['status'] ?? 'offline'),
                                 'is_authorized' => true,
                                 'rx_power' => isset($smartOnu['rx_power']) ? (float)str_replace(' dBm', '', $smartOnu['rx_power']) : null,
                                 'tx_power' => isset($smartOnu['tx_power']) ? (float)str_replace(' dBm', '', $smartOnu['tx_power']) : null,
@@ -2387,12 +2388,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             
                             try {
                                 if ($existing) {
-                                    $stmt = $db->prepare("UPDATE huawei_onus SET name = ?, description = ?, slot = ?, port = ?, onu_id = ?, status = ?, zone = ?, zone_id = ?, onu_type_id = ?, vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?, distance = ?, is_authorized = true, updated_at = NOW() WHERE id = ?");
-                                    $stmt->execute([$name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat, $existing['id']]);
+                                    $stmt = $db->prepare("UPDATE huawei_onus SET name = ?, description = ?, slot = ?, port = ?, onu_id = ?, status = ?, snmp_status = ?, zone = ?, zone_id = ?, onu_type_id = ?, vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?, distance = ?, is_authorized = true, updated_at = NOW() WHERE id = ?");
+                                    $stmt->execute([$name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat, $existing['id']]);
                                     $updated++;
                                 } else {
-                                    $stmt = $db->prepare("INSERT INTO huawei_onus (sn, olt_id, name, description, frame, slot, port, onu_id, status, is_authorized, zone, zone_id, onu_type_id, vlan_id, smartolt_external_id, rx_power, tx_power, distance, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
-                                    $stmt->execute([$sn, $oltId, $name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat]);
+                                    $stmt = $db->prepare("INSERT INTO huawei_onus (sn, olt_id, name, description, frame, slot, port, onu_id, status, snmp_status, is_authorized, zone, zone_id, onu_type_id, vlan_id, smartolt_external_id, rx_power, tx_power, distance, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
+                                    $stmt->execute([$sn, $oltId, $name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat]);
                                     $imported++;
                                 }
                             } catch (\Exception $e) {
@@ -2480,6 +2481,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 'port' => (int)($smartOnu['port'] ?? 0),
                                 'onu_id' => (int)($smartOnu['onu_number'] ?? $smartOnu['onu_id'] ?? 0),
                                 'status' => strtolower($smartOnu['status'] ?? 'offline'),
+                                'snmp_status' => strtolower($smartOnu['status'] ?? 'offline'),
                                 'is_authorized' => true,
                                 'rx_power' => isset($smartOnu['rx_power']) ? (float)str_replace(' dBm', '', $smartOnu['rx_power']) : null,
                                 'tx_power' => isset($smartOnu['tx_power']) ? (float)str_replace(' dBm', '', $smartOnu['tx_power']) : null,
@@ -8457,7 +8459,7 @@ try {
                         
                         const statusBadge = row.querySelector('.badge');
                         if (statusBadge) {
-                            const newStatus = onu.status || 'offline';
+                            const snmpStatus = (onu.snmp_status || "").toLowerCase(); const faultStatuses = ["los","dying-gasp","dyinggasp","power_fail"]; let newStatus; if (faultStatuses.includes(snmpStatus)) { newStatus = snmpStatus; } else if (snmpStatus === "offline") { newStatus = "offline"; } else if (snmpStatus === "online") { newStatus = "online"; } else { newStatus = onu.status || "offline"; }
                             const statusCfg = {
                                 online: { class: 'bg-success', icon: 'check-circle-fill' },
                                 offline: { class: 'bg-secondary', icon: 'circle' },

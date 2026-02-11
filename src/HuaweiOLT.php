@@ -3699,14 +3699,14 @@ class HuaweiOLT {
     public function addONU(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO huawei_onus (olt_id, customer_id, sn, name, description, frame, slot, port, onu_id,
-                                     onu_type, mac_address, status, service_profile_id, line_profile, srv_profile,
+                                     onu_type, mac_address, status, snmp_status, service_profile_id, line_profile, srv_profile,
                                      is_authorized, auth_type, password, vlan_id, vlan_priority, ip_mode,
                                      line_profile_id, srv_profile_id, tr069_profile_id, zone, area, customer_name, auth_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (olt_id, sn) DO UPDATE SET
                 name = EXCLUDED.name, description = EXCLUDED.description, frame = EXCLUDED.frame,
                 slot = EXCLUDED.slot, port = EXCLUDED.port, onu_id = EXCLUDED.onu_id,
-                onu_type = EXCLUDED.onu_type, status = EXCLUDED.status, vlan_id = EXCLUDED.vlan_id,
+                onu_type = EXCLUDED.onu_type, status = EXCLUDED.status, snmp_status = EXCLUDED.snmp_status, vlan_id = EXCLUDED.vlan_id,
                 vlan_priority = EXCLUDED.vlan_priority, ip_mode = EXCLUDED.ip_mode,
                 line_profile_id = EXCLUDED.line_profile_id, srv_profile_id = EXCLUDED.srv_profile_id,
                 tr069_profile_id = EXCLUDED.tr069_profile_id, zone = EXCLUDED.zone, area = EXCLUDED.area,
@@ -3726,6 +3726,7 @@ class HuaweiOLT {
             $data['onu_id'] ?? null,
             $data['onu_type'] ?? '',
             $data['mac_address'] ?? '',
+            $data['status'] ?? 'offline',
             $data['status'] ?? 'offline',
             $data['service_profile_id'] ?? null,
             $data['line_profile'] ?? '',
@@ -3823,7 +3824,7 @@ class HuaweiOLT {
     
     public function updateONU(int $id, array $data): bool {
         $fields = ['customer_id', 'name', 'description', 'frame', 'slot', 'port', 'onu_id', 'onu_type',
-                   'mac_address', 'status', 'rx_power', 'tx_power', 'distance', 'service_profile_id',
+                   'mac_address', 'status', 'snmp_status', 'rx_power', 'tx_power', 'distance', 'service_profile_id',
                    'line_profile', 'srv_profile', 'firmware_version', 'ip_address',
                    'config_state', 'run_state', 'auth_type', 'password', 'last_down_cause',
                    'vlan_id', 'vlan_priority', 'ip_mode', 'line_profile_id', 'srv_profile_id',
