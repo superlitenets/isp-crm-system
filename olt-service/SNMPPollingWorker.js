@@ -50,6 +50,8 @@ class SNMPPollingWorker {
             this.cronJob = cron.schedule(cronSchedule, () => this.runPolling());
         }
         
+        this.signalHistoryInterval = setInterval(() => this.recordSignalHistory(), 5 * 60 * 1000);
+        
         setTimeout(() => this.runPolling(), 5000);
     }
 
@@ -61,6 +63,10 @@ class SNMPPollingWorker {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             console.log('[SNMP] Stopped interval polling');
+        }
+        if (this.signalHistoryInterval) {
+            clearInterval(this.signalHistoryInterval);
+            console.log('[SNMP] Stopped signal history recording');
         }
     }
 
@@ -128,9 +134,13 @@ class SNMPPollingWorker {
             try {
                 const sysInfo = await this.getSysInfo(session);
                 const onuStatuses = await this.getONUStatuses(session, olt.id);
+                const opticalData = await this.getONUOpticalPower(session, olt.id);
                 
                 await this.updateOltInfo(olt.id, sysInfo);
                 await this.updateONUStatuses(olt.id, onuStatuses);
+                if (Object.keys(opticalData).length > 0) {
+                    await this.updateONUOpticalPower(olt.id, opticalData, onuStatuses);
+                }
                 await this.updatePollingStats(olt.id, true, null, 'snmp');
                 
                 session.close();
@@ -400,6 +410,107 @@ class SNMPPollingWorker {
                 resolve([]);
             });
         });
+    }
+
+    getONUOpticalPower(session, oltId) {
+        return new Promise((resolve) => {
+            const powerData = {};
+            const rxOid = this.OIDs.onuRxPowerBase;
+            const txOid = this.OIDs.onuTxPowerBase;
+            let completedWalks = 0;
+
+            const walkOid = (oid, field) => {
+                session.subtree(oid, 20, (varbinds) => {
+                    varbinds.forEach(vb => {
+                        if (snmp.isVarbindError(vb)) return;
+                        const oidParts = vb.oid.split('.');
+                        const index = oidParts.slice(-2).join('.');
+                        const rawValue = parseInt(vb.value);
+                        if (isNaN(rawValue) || rawValue === 2147483647 || rawValue === -2147483648) return;
+                        const dbm = rawValue / 100.0;
+                        if (dbm < -50 || dbm > 10) return;
+                        if (!powerData[index]) powerData[index] = {};
+                        powerData[index][field] = dbm;
+                    });
+                }, (error) => {
+                    if (error) {
+                        console.log(`[SNMP] Optical ${field} walk error for OLT ${oltId}: ${error.message || error}`);
+                    }
+                    completedWalks++;
+                    if (completedWalks >= 2) {
+                        const count = Object.keys(powerData).length;
+                        if (count > 0) {
+                            console.log(`[SNMP] Optical power collected for OLT ${oltId}: ${count} ONUs`);
+                        }
+                        resolve(powerData);
+                    }
+                });
+            };
+
+            walkOid(rxOid, 'rx_power');
+            walkOid(txOid, 'tx_power');
+        });
+    }
+
+    async updateONUOpticalPower(oltId, powerData, statuses) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            let updated = 0;
+            const statusMap = {};
+            for (const s of statuses) {
+                statusMap[s.index] = s.status;
+            }
+
+            for (const [index, power] of Object.entries(powerData)) {
+                const parts = index.split('.');
+                if (parts.length < 2) continue;
+
+                const slotPortId = parseInt(parts[0]);
+                const onuId = parseInt(parts[1]);
+                const slot = Math.floor((slotPortId - 4294901760) / 256);
+                const port = (slotPortId - 4294901760) % 256;
+
+                const rx = power.rx_power ?? null;
+                const tx = power.tx_power ?? null;
+
+                const result = await client.query(`
+                    UPDATE huawei_onus SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), updated_at = CURRENT_TIMESTAMP
+                    WHERE olt_id = $3 AND slot = $4 AND port = $5 AND onu_id = $6
+                    RETURNING id
+                `, [rx, tx, oltId, slot, port, onuId]);
+
+                if (result.rowCount > 0) {
+                    updated++;
+                }
+            }
+
+            await client.query('COMMIT');
+            if (updated > 0) {
+                console.log(`[SNMP] Updated optical power for ${updated} ONUs on OLT ${oltId}`);
+            }
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error(`[SNMP] Failed to update optical power for OLT ${oltId}:`, error.message);
+        } finally {
+            client.release();
+        }
+    }
+
+    async recordSignalHistory() {
+        try {
+            const result = await this.pool.query(`
+                INSERT INTO onu_signal_history (onu_id, rx_power, tx_power, status, recorded_at)
+                SELECT id, rx_power, tx_power, status, CURRENT_TIMESTAMP
+                FROM huawei_onus
+                WHERE is_authorized = true AND rx_power IS NOT NULL AND status IS NOT NULL
+            `);
+            if (result.rowCount > 0) {
+                console.log(`[SNMP] Recorded signal history for ${result.rowCount} ONUs`);
+            }
+        } catch (error) {
+            console.error('[SNMP] Failed to record signal history:', error.message);
+        }
     }
 
     async updateOltInfo(oltId, sysInfo) {
