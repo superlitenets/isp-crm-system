@@ -639,11 +639,14 @@ class Mpesa {
                     // Full renewal
                     error_log("RADIUS subscription renewed for {$subscription['username']} via M-Pesa {$receiptNumber}");
                     
-                    // Disconnect expired users so they can reconnect with fresh RADIUS session
+                    // For non-hotspot (PPPoE etc), disconnect expired users so they reconnect with fresh session
+                    // Hotspot users are already rejected by RADIUS when expired, so no disconnect needed
+                    $isHotspotSub = strpos($subscription['username'] ?? '', 'HS-') === 0 || 
+                                    ($subscription['access_type'] ?? '') === 'hotspot';
                     $wasExpired = $subscription['status'] === 'expired' || $subscription['status'] === 'inactive' ||
                                   ($subscription['expiry_date'] && strtotime($subscription['expiry_date']) < time());
                     
-                    if ($wasExpired && empty($result['disconnected'])) {
+                    if ($wasExpired && !$isHotspotSub && empty($result['disconnected'])) {
                         $disconnectResult = $radiusBilling->disconnectSubscription($subscription['id']);
                         if ($disconnectResult['success']) {
                             error_log("Disconnected expired {$subscription['username']} after STK payment for session refresh");
