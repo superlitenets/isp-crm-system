@@ -17248,7 +17248,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <h5 class="modal-title"><i class="bi bi-speedometer2 me-2"></i>Configure Speed Profile (DBA)</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="ethPortForm" onsubmit="return submitEthPortConfig(event)">
+                <form id="dbaProfileForm" onsubmit="return submitDbaProfile(event)">
                     <input type="hidden" name="action" value="update_dba_profile">
                     <input type="hidden" name="onu_id" id="dbaOnuId">
                     <input type="hidden" name="vlan_id" id="dbaVlanId">
@@ -17427,6 +17427,73 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const mode = document.getElementById('ethPortMode').value;
         document.getElementById('ethPortAllowedField').style.display = (mode === 'trunk' || mode === 'hybrid') ? 'block' : 'none';
     }
+    async function submitDbaProfile(event) {
+        event.preventDefault();
+        const form = document.getElementById("dbaProfileForm");
+        const btn = form.querySelector("button[type=submit]");
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = "<span class="spinner-border spinner-border-sm me-1"></span> Applying...";
+        try {
+            const formData = new FormData(form);
+            const response = await fetch("?page=huawei-olt&t=" + Date.now(), { method: "POST", body: new URLSearchParams(formData) });
+            const text = await response.text();
+            let data;
+            try { data = JSON.parse(text); } catch(e) {
+                if (text.includes("success") || text.includes("configured")) {
+                    showToast("DBA Profile applied successfully", "success");
+                    setTimeout(() => location.reload(), 1000);
+                    return false;
+                }
+                throw new Error("Invalid response");
+            }
+            if (data.success) {
+                showToast(data.message || "DBA Profile applied successfully", "success");
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                throw new Error(data.error || "Configuration failed");
+            }
+        } catch (err) {
+            showToast("Error: " + err.message, "danger");
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+        return false;
+    }
+
+    async function submitPppoeConfig(event) {
+        event.preventDefault();
+        const form = document.getElementById("pppoeConfigForm");
+        const btn = form.querySelector("button[type=submit]");
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = "<span class="spinner-border spinner-border-sm me-1"></span> Configuring...";
+        try {
+            const formData = new FormData(form);
+            const response = await fetch("?page=huawei-olt&t=" + Date.now(), { method: "POST", body: new URLSearchParams(formData) });
+            const text = await response.text();
+            let data;
+            try { data = JSON.parse(text); } catch(e) {
+                if (text.includes("success") || text.includes("configured")) {
+                    showToast("WAN configured successfully", "success");
+                    setTimeout(() => location.reload(), 1000);
+                    return false;
+                }
+                throw new Error("Invalid response");
+            }
+            if (data.success) {
+                showToast(data.message || "WAN configured successfully", "success");
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                throw new Error(data.error || "Configuration failed");
+            }
+        } catch (err) {
+            showToast("Error: " + err.message, "danger");
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+        return false;
+    }
     </script>
     
     <div class="modal fade" id="onuConfigModal" tabindex="-1">
@@ -17459,7 +17526,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <h5 class="modal-title"><i class="bi bi-globe me-2"></i>Configure WAN/PPPoE</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="ethPortForm" onsubmit="return submitEthPortConfig(event)">
+                <form id="pppoeConfigForm" onsubmit="return submitPppoeConfig(event)">
                     <input type="hidden" name="action" value="configure_pppoe">
                     <input type="hidden" name="serial" id="pppoeSerialInput">
                     <div class="modal-body">
