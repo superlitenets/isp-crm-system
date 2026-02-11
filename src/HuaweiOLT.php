@@ -3827,11 +3827,11 @@ class HuaweiOLT {
                    'mac_address', 'status', 'snmp_status', 'rx_power', 'tx_power', 'distance', 'service_profile_id',
                    'line_profile', 'srv_profile', 'firmware_version', 'ip_address',
                    'config_state', 'run_state', 'auth_type', 'password', 'last_down_cause',
-                   'vlan_id', 'vlan_priority', 'ip_mode', 'line_profile_id', 'srv_profile_id',
+                   'vlan_id', 'vlan_priority', 'ip_mode', 'onu_mode', 'line_profile_id', 'srv_profile_id',
                    'tr069_profile_id', 'zone', 'zone_id', 'area', 'customer_name', 'auth_date',
                    'phone', 'address', 'latitude', 'longitude', 'installation_date',
                    'pppoe_username', 'pppoe_password', 'onu_type_id', 'tr069_status', 'tr069_ip',
-                   'provisioning_stage'];
+                   'provisioning_stage', 'port_config', 'attached_vlans'];
         $booleanFields = ['is_authorized'];
         $updates = [];
         $params = [];
