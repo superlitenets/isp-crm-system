@@ -3862,23 +3862,34 @@ class HuaweiOLT {
     }
     
     public function deleteONU(int $id, bool $deauthorizeOnOLT = true, bool $async = true): array {
-        // Extend timeout for OLT operations
         set_time_limit(120);
         
-        // Get ONU details first
         $onu = $this->getONU($id);
         if (!$onu) {
             return ['success' => false, 'error' => 'ONU not found'];
         }
         
         $deauthResult = null;
+        $needsOLTDeauth = $deauthorizeOnOLT && $onu['olt_id'] && $onu['frame'] !== null && $onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id'];
         
-        // Try to deauthorize on OLT if requested (use async to avoid timeouts)
-        if ($deauthorizeOnOLT && $onu['olt_id'] && $onu['frame'] !== null && $onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id']) {
+        if ($needsOLTDeauth) {
             $deauthResult = $this->deleteONUFromOLT($id, $async);
+            if ($deauthResult['success'] ?? false) {
+                return [
+                    'success' => true,
+                    'deauthorized' => true,
+                    'deauth_message' => $deauthResult['message'] ?? 'ONU deleted from OLT and database'
+                ];
+            }
+            $this->addLog([
+                'olt_id' => $onu['olt_id'],
+                'action' => 'delete_onu',
+                'status' => 'warning',
+                'message' => "OLT deauth failed for ONU {$onu['sn']}: " . ($deauthResult['message'] ?? 'Unknown error') . " - still removing from database",
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
         }
         
-        // Reset discovery log entry so ONU reappears in discovery
         if (!empty($onu['sn'])) {
             try {
                 $stmt = $this->db->prepare("
@@ -3888,11 +3899,9 @@ class HuaweiOLT {
                 ");
                 $stmt->execute([$onu['sn']]);
             } catch (\Exception $e) {
-                // Table may not exist, ignore
             }
         }
         
-        // Delete from database
         $stmt = $this->db->prepare("DELETE FROM huawei_onus WHERE id = ?");
         $deleted = $stmt->execute([$id]);
         
@@ -3900,7 +3909,7 @@ class HuaweiOLT {
             'olt_id' => $onu['olt_id'],
             'action' => 'delete_onu',
             'status' => 'success',
-            'message' => "Deleted ONU {$onu['sn']} from database" . ($deauthResult ? ", OLT deauth: " . ($deauthResult['success'] ? 'OK' : 'Failed') : ''),
+            'message' => "Deleted ONU {$onu['sn']} from database" . ($deauthResult ? ", OLT deauth: " . ($deauthResult['success'] ? 'OK' : 'Failed') : ' (no OLT deauth needed)'),
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         

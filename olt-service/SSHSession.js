@@ -305,12 +305,11 @@ class SSHSession {
             let response = '';
             let resolved = false;
             let timeoutId = null;
-            let firstChunkSeen = false;
+            let allCommandsSent = false;
             let confirmationSent = false;
 
             const dataHandler = (chunk) => {
                 response += chunk;
-                firstChunkSeen = true;
                 const cleanResponse = this.stripAnsi(response);
                 
                 if (response.includes('---- More') || response.includes('--More--')) {
@@ -332,10 +331,12 @@ class SSHSession {
                     }
                 }
                 
-                if (firstChunkSeen && this.promptPattern.test(cleanResponse)) {
-                    const lines = cleanResponse.split(/\r?\n/);
-                    const lastLine = lines[lines.length - 1] || lines[lines.length - 2] || '';
-                    if (this.promptPattern.test(lastLine) && !lastLine.includes('interface') && !lastLine.includes('gpon')) {
+                if (!allCommandsSent) return;
+                
+                if (this.promptPattern.test(cleanResponse)) {
+                    const lines = cleanResponse.split(/\r?\n/).filter(l => l.trim());
+                    const lastLine = lines[lines.length - 1] || '';
+                    if (this.promptPattern.test(lastLine)) {
                         if (!resolved) {
                             resolved = true;
                             clearTimeout(timeoutId);
@@ -371,14 +372,21 @@ class SSHSession {
             console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
             
             let delay = 0;
-            for (const line of lines) {
+            const commandDelay = 1000;
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const isLast = (i === lines.length - 1);
                 setTimeout(() => {
                     if (this.stream && this.connected) {
                         console.log(`[OLT ${this.oltId}] SSH raw> ${line}`);
                         this.stream.write(line + '\r');
+                        if (isLast) {
+                            allCommandsSent = true;
+                            console.log(`[OLT ${this.oltId}] SSH raw script: all ${lines.length} commands sent, waiting for final prompt`);
+                        }
                     }
                 }, delay);
-                delay += 800;
+                delay += commandDelay;
             }
         });
     }
