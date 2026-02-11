@@ -17838,7 +17838,7 @@ END $$;
 
 DO $$ BEGIN
     ALTER TABLE ONLY public.huawei_onu_service_vlans ADD CONSTRAINT huawei_onu_service_vlans_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 
