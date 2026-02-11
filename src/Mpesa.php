@@ -856,28 +856,60 @@ class Mpesa {
     private function saveTransaction(array $data): bool {
         try {
             $nasId = $data['nas_id'] ?? $this->nasId;
-            $stmt = $this->db->prepare("
-                INSERT INTO mpesa_transactions (
-                    transaction_type, merchant_request_id, checkout_request_id,
-                    phone_number, amount, account_reference, transaction_desc,
-                    customer_id, status, nas_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
+            $hasNasId = $this->columnExists('mpesa_transactions', 'nas_id');
             
-            return $stmt->execute([
-                $data['transaction_type'],
-                $data['merchant_request_id'],
-                $data['checkout_request_id'],
-                $data['phone_number'],
-                $data['amount'],
-                $data['account_reference'],
-                $data['transaction_desc'],
-                $data['customer_id'],
-                $data['status'],
-                $nasId
-            ]);
+            if ($hasNasId) {
+                $stmt = $this->db->prepare("
+                    INSERT INTO mpesa_transactions (
+                        transaction_type, merchant_request_id, checkout_request_id,
+                        phone_number, amount, account_reference, transaction_desc,
+                        customer_id, status, nas_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                return $stmt->execute([
+                    $data['transaction_type'],
+                    $data['merchant_request_id'],
+                    $data['checkout_request_id'],
+                    $data['phone_number'],
+                    $data['amount'],
+                    $data['account_reference'],
+                    $data['transaction_desc'],
+                    $data['customer_id'],
+                    $data['status'],
+                    $nasId
+                ]);
+            } else {
+                $stmt = $this->db->prepare("
+                    INSERT INTO mpesa_transactions (
+                        transaction_type, merchant_request_id, checkout_request_id,
+                        phone_number, amount, account_reference, transaction_desc,
+                        customer_id, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                return $stmt->execute([
+                    $data['transaction_type'],
+                    $data['merchant_request_id'],
+                    $data['checkout_request_id'],
+                    $data['phone_number'],
+                    $data['amount'],
+                    $data['account_reference'],
+                    $data['transaction_desc'],
+                    $data['customer_id'],
+                    $data['status']
+                ]);
+            }
         } catch (\Exception $e) {
             error_log("Save transaction error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    private function columnExists(string $table, string $column): bool {
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?");
+            $stmt->execute([$table, $column]);
+            return (int)$stmt->fetchColumn() > 0;
+        } catch (\Exception $e) {
             return false;
         }
     }
