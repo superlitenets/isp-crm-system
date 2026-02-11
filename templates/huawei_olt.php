@@ -8348,10 +8348,12 @@ try {
                                     </td>
                                     <td>
                                         <?php
-                                        $rx = $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null;
-                                        $tx = $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null;
-                                        $rxClass = 'success';
+                                        $listOnuOnline = (strtolower($onu['status'] ?? '') === 'online');
+                                        $rx = ($listOnuOnline && $onu['rx_power'] !== null) ? (float)$onu['rx_power'] : null;
+                                        $tx = ($listOnuOnline && $onu['tx_power'] !== null) ? (float)$onu['tx_power'] : null;
+                                        $rxClass = 'secondary';
                                         if ($rx !== null) {
+                                            $rxClass = 'success';
                                             if ($rx <= -28) $rxClass = 'danger';
                                             elseif ($rx <= -25) $rxClass = 'warning';
                                         }
@@ -8751,13 +8753,24 @@ try {
             <?php
             // Get provisioning stage info
             $provisioningStage = (int)($currentOnu['provisioning_stage'] ?? 0);
+            $onuIsOnline = (strtolower($currentOnu['status'] ?? '') === 'online');
             $rx = isset($currentOnu['rx_power']) && $currentOnu['rx_power'] !== null && $currentOnu['rx_power'] !== '' ? (float)$currentOnu['rx_power'] : null;
             $tx = isset($currentOnu['tx_power']) && $currentOnu['tx_power'] !== null && $currentOnu['tx_power'] !== '' ? (float)$currentOnu['tx_power'] : null;
             $distance = isset($currentOnu['distance']) && $currentOnu['distance'] !== null && $currentOnu['distance'] !== '' ? (float)$currentOnu['distance'] : null;
+            if (!$onuIsOnline) {
+                $rx = null;
+                $tx = null;
+            }
             $distanceDisplay = $distance !== null ? ($distance >= 1000 ? number_format($distance/1000, 2).'km' : $distance.'m') : '-';
-            $rxClass = 'success';
-            $rxLabel = 'Excellent';
-            if ($rx !== null) {
+            $rxClass = 'secondary';
+            $rxLabel = 'Offline';
+            if ($onuIsOnline && $rx !== null) {
+                if ($rx <= -28) { $rxClass = 'danger'; $rxLabel = 'Critical'; }
+                elseif ($rx <= -25) { $rxClass = 'warning'; $rxLabel = 'Fair'; }
+                elseif ($rx <= -20) { $rxClass = 'success'; $rxLabel = 'Good'; }
+                else { $rxClass = 'success'; $rxLabel = 'Excellent'; }
+            } elseif ($rx !== null) {
+                $rxClass = 'success'; $rxLabel = 'Excellent';
                 if ($rx <= -28) { $rxClass = 'danger'; $rxLabel = 'Critical'; }
                 elseif ($rx <= -25) { $rxClass = 'warning'; $rxLabel = 'Fair'; }
                 elseif ($rx <= -20) { $rxClass = 'success'; $rxLabel = 'Good'; }
@@ -9149,14 +9162,18 @@ try {
                             statusEl.className = statusEl.className.replace(/text-\w+/g, 'text-' + statusClass);
                             statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
                         });
-                        if (rxEl && onu.rx_power !== null) {
+                        const isOnl = (onu.status === 'online');
+                        if (isOnl && rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
+                        } else if (!isOnl && rxEl) {
+                            rxEl.textContent = '-';
                         }
-                        if (txEl && onu.tx_power !== null) {
+                        if (isOnl && txEl && onu.tx_power !== null) {
                             txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
+                        } else if (!isOnl && txEl) {
+                            txEl.textContent = '-';
                         }
                         
-                        // Update TR-069 WAN IP
                         const tr069El = document.getElementById('tr069IpDisplay');
                         if (tr069El && onu.tr069_ip) {
                             tr069El.textContent = onu.tr069_ip;
@@ -9166,7 +9183,7 @@ try {
                         const toast = document.createElement('div');
                         toast.className = 'position-fixed bottom-0 end-0 p-3';
                         toast.style.zIndex = '9999';
-                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A') + '</div></div>';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (isOnl && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
                         document.body.appendChild(toast);
                         setTimeout(() => toast.remove(), 3000);
                     } else {
@@ -10096,25 +10113,42 @@ try {
                             badge.innerHTML = `<i class="bi bi-${st.icon} me-1"></i>${onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown'}`;
                         }
                         
-                        // Update optical power displays
+                        const isOnlineRef = (onu.status === 'online');
                         const rxEl = document.querySelector('[data-live-rx]');
                         const txEl = document.querySelector('[data-live-tx]');
-                        if (rxEl && onu.rx_power !== null) {
+                        const distEl = document.querySelector('[data-live-distance]');
+                        const rxMeterR = document.getElementById('liveRxMeter');
+                        const rxLabelR = document.getElementById('liveRxLabel');
+                        
+                        if (isOnlineRef && rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(1);
+                            let rxCls = 'success', rxLbl = 'Excellent';
+                            if (onu.rx_power <= -28) { rxCls = 'danger'; rxLbl = 'Critical'; }
+                            else if (onu.rx_power <= -25) { rxCls = 'warning'; rxLbl = 'Fair'; }
+                            else if (onu.rx_power <= -20) { rxCls = 'success'; rxLbl = 'Good'; }
+                            rxEl.className = `h4 text-${rxCls} fw-bold mb-0`;
+                            if (rxMeterR) { rxMeterR.className = `signal-meter-fill bg-${rxCls}`; rxMeterR.style.width = Math.min(100, Math.max(0, ((onu.rx_power + 30) / 20) * 100)) + '%'; }
+                            if (rxLabelR) { rxLabelR.className = `badge bg-${rxCls} mt-1`; rxLabelR.style.fontSize = '0.65rem'; rxLabelR.textContent = rxLbl; }
+                        } else if (!isOnlineRef) {
+                            if (rxEl) { rxEl.textContent = '-'; rxEl.className = 'h4 text-secondary fw-bold mb-0'; }
+                            if (rxMeterR) { rxMeterR.className = 'signal-meter-fill bg-secondary'; rxMeterR.style.width = '0%'; }
+                            if (rxLabelR) { rxLabelR.className = 'badge bg-secondary mt-1'; rxLabelR.style.fontSize = '0.65rem'; rxLabelR.textContent = 'Offline'; }
                         }
-                        if (txEl && onu.tx_power !== null) {
+                        if (isOnlineRef && txEl && onu.tx_power !== null) {
                             txEl.textContent = onu.tx_power.toFixed(1);
+                        } else if (!isOnlineRef && txEl) {
+                            txEl.textContent = '-';
                         }
                         
-                        // Update distance display
-                        const distEl = document.querySelector('[data-live-distance]');
                         if (distEl && onu.distance !== null) {
                             const dist = parseInt(onu.distance);
                             distEl.textContent = dist >= 1000 ? (dist / 1000).toFixed(2) + ' km' : dist + ' m';
+                        } else if (!isOnlineRef && distEl) {
+                            distEl.textContent = '-';
                         }
                         
                         if (!silent) {
-                            showToast(`Status: ${onu.status}, RX: ${onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A'}`, 'success', 3000);
+                            showToast(`Status: ${onu.status}, RX: ${isOnlineRef && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-'}`, 'success', 3000);
                         }
                     } else if (!silent) {
                         showToast(data.error || 'Could not fetch live status', 'warning', 5000);
@@ -10290,8 +10324,14 @@ try {
                     else cacheEl.classList.add('d-none');
                 }
                 
-                if (onu.rx_power !== null && onu.rx_power !== undefined) {
-                    const rxEl = document.getElementById('liveRxDisplay');
+                const isOnline = (onu.status === 'online');
+                const rxEl = document.getElementById('liveRxDisplay');
+                const txEl = document.getElementById('liveTxDisplay');
+                const distEl = document.getElementById('liveDistanceDisplay');
+                const rxMeter = document.getElementById('liveRxMeter');
+                const rxLabel = document.getElementById('liveRxLabel');
+                
+                if (isOnline && onu.rx_power !== null && onu.rx_power !== undefined) {
                     if (rxEl) rxEl.textContent = onu.rx_power.toFixed(1);
                     
                     let rxCls = 'success', rxLbl = 'Good';
@@ -10300,28 +10340,30 @@ try {
                     else if (onu.rx_power <= -20) { rxCls = 'success'; rxLbl = 'Good'; }
                     else { rxCls = 'success'; rxLbl = 'Excellent'; }
                     
-                    const rxMeter = document.getElementById('liveRxMeter');
                     if (rxMeter) {
                         rxMeter.className = `signal-meter-fill bg-${rxCls}`;
                         rxMeter.style.width = Math.min(100, Math.max(0, ((onu.rx_power + 30) / 20) * 100)) + '%';
                     }
-                    const rxLabel = document.getElementById('liveRxLabel');
                     if (rxLabel) { rxLabel.className = `badge bg-${rxCls} mt-1`; rxLabel.style.fontSize = '0.65rem'; rxLabel.textContent = rxLbl; }
-                    
                     if (rxEl) rxEl.className = `h4 text-${rxCls} fw-bold mb-0`;
+                } else if (!isOnline) {
+                    if (rxEl) { rxEl.textContent = '-'; rxEl.className = 'h4 text-secondary fw-bold mb-0'; }
+                    if (txEl) txEl.textContent = '-';
+                    if (rxMeter) { rxMeter.className = 'signal-meter-fill bg-secondary'; rxMeter.style.width = '0%'; }
+                    if (rxLabel) { rxLabel.className = 'badge bg-secondary mt-1'; rxLabel.style.fontSize = '0.65rem'; rxLabel.textContent = 'Offline'; }
                 }
                 
-                if (onu.tx_power !== null && onu.tx_power !== undefined) {
-                    const txEl = document.getElementById('liveTxDisplay');
+                if (isOnline && onu.tx_power !== null && onu.tx_power !== undefined) {
                     if (txEl) txEl.textContent = onu.tx_power.toFixed(1);
                 }
                 
                 if (onu.distance !== null && onu.distance !== undefined) {
-                    const distEl = document.getElementById('liveDistanceDisplay');
                     if (distEl) {
                         const d = parseInt(onu.distance);
                         distEl.textContent = d >= 1000 ? (d / 1000).toFixed(2) + ' km' : d + ' m';
                     }
+                } else if (!isOnline) {
+                    if (distEl) distEl.textContent = '-';
                 }
                 
                 const lastPoll = document.getElementById('liveLastPolled');
@@ -10516,18 +10558,22 @@ try {
                             statusEl.className = 'text-' + statusClass + ' fw-bold';
                             statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
                         }
-                        if (rxEl && onu.rx_power !== null) {
+                        const isOnl2 = (onu.status === 'online');
+                        if (isOnl2 && rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
+                        } else if (!isOnl2 && rxEl) {
+                            rxEl.textContent = '-';
                         }
-                        if (txEl && onu.tx_power !== null) {
+                        if (isOnl2 && txEl && onu.tx_power !== null) {
                             txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
+                        } else if (!isOnl2 && txEl) {
+                            txEl.textContent = '-';
                         }
                         
-                        // Show toast notification
                         const toast = document.createElement('div');
                         toast.className = 'position-fixed bottom-0 end-0 p-3';
                         toast.style.zIndex = '9999';
-                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Live status updated: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A') + '</div></div>';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Live status updated: ' + (onu.status || 'Unknown') + ', RX: ' + (isOnl2 && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
                         document.body.appendChild(toast);
                         setTimeout(() => toast.remove(), 3000);
                     } else {
@@ -21845,17 +21891,22 @@ function saveDeviceStatus() {
                     statusEl.className = 'text-' + statusClass + ' fw-bold';
                     statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
                 }
-                if (rxEl && onu.rx_power !== null) {
+                const isOnl3 = (onu.status === 'online');
+                if (isOnl3 && rxEl && onu.rx_power !== null) {
                     rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
+                } else if (!isOnl3 && rxEl) {
+                    rxEl.textContent = '-';
                 }
-                if (txEl && onu.tx_power !== null) {
+                if (isOnl3 && txEl && onu.tx_power !== null) {
                     txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
+                } else if (!isOnl3 && txEl) {
+                    txEl.textContent = '-';
                 }
                 
                 const toast = document.createElement('div');
                 toast.className = 'position-fixed bottom-0 end-0 p-3';
                 toast.style.zIndex = '9999';
-                toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A') + '</div></div>';
+                toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (isOnl3 && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 3000);
             } else {
