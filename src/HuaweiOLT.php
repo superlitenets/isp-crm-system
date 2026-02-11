@@ -11720,12 +11720,24 @@ class HuaweiOLT {
         
         $success = ($result['success'] ?? false) && (empty($result['output']) || strpos($result['output'], 'error') === false);
         
-        // Store port configuration in database
+        // Store port configuration in database (merge with existing config)
         try {
+            $existingPortConfig = [];
+            $stmt = $this->db->prepare("SELECT port_config FROM huawei_onus WHERE id = ?");
+            $stmt->execute([$onuDbId]);
+            $existing = $stmt->fetchColumn();
+            if ($existing) {
+                $existingPortConfig = json_decode($existing, true) ?: [];
+            }
+            
+            foreach ($portConfigs as $portKey => $portCfg) {
+                $existingPortConfig[$portKey] = $portCfg;
+            }
+            
             $stmt = $this->db->prepare("
                 UPDATE huawei_onus SET port_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
             ");
-            $stmt->execute([json_encode($portConfigs), $onuDbId]);
+            $stmt->execute([json_encode($existingPortConfig), $onuDbId]);
         } catch (\Exception $e) {
             // Column might not exist yet
         }
