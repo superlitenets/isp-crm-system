@@ -894,85 +894,90 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        // Try CLI first (faster and more reliable when SNMP port is blocked)
-        $cliResult = $this->getONUOpticalInfoViaCLI($oltId, $frame, $slot, $port, $onuId);
-        if ($cliResult['success'] && !empty($cliResult['optical']) && 
-            ($cliResult['optical']['rx_power'] !== null || $cliResult['optical']['tx_power'] !== null)) {
-            return $cliResult;
-        }
-        
-        // Fall back to SNMP if CLI didn't work
-        if (!function_exists('snmpget')) {
-            return $cliResult; // Return CLI result even if incomplete
-        }
-        
-        $community = $olt['snmp_community'] ?? 'public';
-        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
-        
-        if (function_exists('snmp_set_quick_print')) {
-            snmp_set_quick_print(true);
-        }
-        if (function_exists('snmp_set_valueretrieval')) {
-            snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
-        }
-        
-        // Huawei optical power OIDs - index format: ponIndex.onuId
-        // MA5800 series: ponIndex = 4194304000 + slot*8192 + port*256
-        // Legacy: ponIndex = frame*8192 + slot*256 + port
-        $ponIndex = 4194304000 + $slot * 8192 + $port * 256;
-        $indexSuffix = "{$ponIndex}.{$onuId}";
-        
-        // Use short timeout (500ms) and no retries since CLI is primary
-        $timeout = 500000; // 500ms
-        $retries = 0;
-        
-        // Try primary OID set only
-        $rxOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.7.{$indexSuffix}";
-        $txOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8.{$indexSuffix}";
-        
-        $rxPower = @snmpget($host, $community, $rxOid, $timeout, $retries);
-        $txPower = @snmpget($host, $community, $txOid, $timeout, $retries);
-        
-        $rxValue = $this->parseOpticalPower($rxPower, 1);
-        $txValue = $this->parseOpticalPower($txPower, 1);
-        
-        // Validate range
-        if ($rxValue !== null && ($rxValue < -50 || $rxValue > 10)) $rxValue = null;
-        if ($txValue !== null && ($txValue < -50 || $txValue > 10)) $txValue = null;
-        
-        // Fetch distance via SNMP
-        // hwGponDeviceOntDistance OID (meters)
-        $distanceOID = "1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20.{$indexSuffix}";
-        $distanceRaw = @snmpget($host, $community, $distanceOID, $timeout, $retries);
+        $rxValue = null;
+        $txValue = null;
         $distance = null;
-        if ($distanceRaw !== false) {
-            $cleaned = $this->cleanSnmpValue((string)$distanceRaw);
-            if (is_numeric($cleaned) && (int)$cleaned > 0) {
-                $distance = (int)$cleaned;
+        $status = null;
+        $method = 'none';
+        $debugInfo = [];
+        
+        if (function_exists('snmpget')) {
+            $community = $olt['snmp_community'] ?? 'public';
+            $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+            
+            if (function_exists('snmp_set_quick_print')) {
+                snmp_set_quick_print(true);
+            }
+            if (function_exists('snmp_set_valueretrieval')) {
+                snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
+            }
+            
+            $ponIndex = 4194304000 + $slot * 8192 + $port * 256;
+            $indexSuffix = "{$ponIndex}.{$onuId}";
+            
+            $timeout = 2000000;
+            $retries = 1;
+            
+            $rxOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.7.{$indexSuffix}";
+            $txOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8.{$indexSuffix}";
+            
+            $rxPower = @snmpget($host, $community, $rxOid, $timeout, $retries);
+            $txPower = @snmpget($host, $community, $txOid, $timeout, $retries);
+            
+            $rxValue = $this->parseOpticalPower($rxPower, 1);
+            $txValue = $this->parseOpticalPower($txPower, 1);
+            
+            if ($rxValue !== null && ($rxValue < -50 || $rxValue > 10)) $rxValue = null;
+            if ($txValue !== null && ($txValue < -50 || $txValue > 10)) $txValue = null;
+            
+            $distanceOID = "1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20.{$indexSuffix}";
+            $distanceRaw = @snmpget($host, $community, $distanceOID, $timeout, $retries);
+            if ($distanceRaw !== false) {
+                $cleaned = $this->cleanSnmpValue((string)$distanceRaw);
+                if (is_numeric($cleaned) && (int)$cleaned > 0) {
+                    $distance = (int)$cleaned;
+                }
+            }
+            
+            $statusOID = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.{$indexSuffix}";
+            $statusRaw = @snmpget($host, $community, $statusOID, $timeout, $retries);
+            if ($statusRaw !== false) {
+                $statusCode = (int)$this->cleanSnmpValue((string)$statusRaw);
+                $statusMap = [1 => 'online', 2 => 'offline', 3 => 'los', 4 => 'power_fail', 5 => 'auth_fail'];
+                $status = $statusMap[$statusCode] ?? null;
+            }
+            
+            if ($rxValue !== null || $txValue !== null) {
+                $method = 'snmp';
+            }
+            
+            $debugInfo = [
+                'ponIndex' => $ponIndex,
+                'index' => $indexSuffix,
+                'rx_oid' => $rxOid,
+                'tx_oid' => $txOid,
+                'rx_raw' => $rxPower ?? false,
+                'tx_raw' => $txPower ?? false,
+                'distance_raw' => $distanceRaw ?? false,
+                'status_raw' => $statusRaw ?? false,
+            ];
+        }
+        
+        if ($rxValue === null && $txValue === null) {
+            $cliResult = $this->getONUOpticalInfoViaCLI($oltId, $frame, $slot, $port, $onuId);
+            if ($cliResult['success'] && !empty($cliResult['optical'])) {
+                $rxValue = $cliResult['optical']['rx_power'] ?? null;
+                $txValue = $cliResult['optical']['tx_power'] ?? null;
+                if ($distance === null) $distance = $cliResult['optical']['distance'] ?? null;
+                if ($status === null) $status = $cliResult['optical']['status'] ?? null;
+                if ($rxValue !== null || $txValue !== null) {
+                    $method = 'cli_fallback';
+                }
             }
         }
         
-        // Fetch status via SNMP
-        $statusOID = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.{$indexSuffix}";
-        $statusRaw = @snmpget($host, $community, $statusOID, $timeout, $retries);
-        $status = null;
-        if ($statusRaw !== false) {
-            $statusCode = (int)$this->cleanSnmpValue((string)$statusRaw);
-            $statusMap = [1 => 'online', 2 => 'offline', 3 => 'los', 4 => 'power_fail', 5 => 'auth_fail'];
-            $status = $statusMap[$statusCode] ?? null;
-        }
-        
-        // Use CLI data if SNMP didn't get distance
-        if ($distance === null && isset($cliResult['optical']['distance'])) {
-            $distance = $cliResult['optical']['distance'];
-        }
-        if ($status === null && isset($cliResult['optical']['status'])) {
-            $status = $cliResult['optical']['status'];
-        }
-        
-        // Return SNMP data if we got it, otherwise return CLI result
         if ($rxValue === null && $txValue === null) {
-            return $cliResult;
+            return ['success' => false, 'error' => 'Could not retrieve optical data via SNMP or CLI'];
         }
         
         return [
@@ -983,17 +988,7 @@ class HuaweiOLT {
                 'distance' => $distance,
                 'status' => $status,
             ],
-            'debug' => [
-                'ponIndex' => $ponIndex,
-                'index' => $indexSuffix,
-                'rx_oid' => $rxOid,
-                'tx_oid' => $txOid,
-                'rx_raw' => $rxPower ?? false,
-                'tx_raw' => $txPower ?? false,
-                'distance_raw' => $distanceRaw ?? false,
-                'status_raw' => $statusRaw ?? false,
-                'method' => 'snmp',
-            ]
+            'debug' => array_merge($debugInfo, ['method' => $method])
         ];
     }
     
