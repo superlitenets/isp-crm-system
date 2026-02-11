@@ -17507,7 +17507,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         }
         return false;
     }
-    document.getElementById("ethPortForm").addEventListener("submit", submitEthPortConfig);
     </script>
     
     <div class="modal fade" id="onuConfigModal" tabindex="-1">
