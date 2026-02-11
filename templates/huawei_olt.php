@@ -8926,7 +8926,7 @@ try {
                             <span id="onuStatusBadge" class="badge bg-<?= $statusClass ?> fs-6" data-live-status>
                                 <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= ucfirst($onuStatus) ?>
                             </span>
-                            <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshLiveStatus()" title="Refresh">
+                            <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="pollOnuLive()" title="Refresh">
                                 <i class="bi bi-arrow-clockwise" id="liveStatusRefreshIcon"></i>
                             </button>
                         </div>
@@ -9384,25 +9384,71 @@ try {
                 </div>
             </div>
             
+            <div class="card shadow-sm mb-3" id="liveMonitorCard">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="liveMonitorToggle" role="switch">
+                                <label class="form-check-label fw-semibold small" for="liveMonitorToggle">
+                                    <i class="bi bi-broadcast me-1"></i>Live Monitoring
+                                </label>
+                            </div>
+                            <span id="liveMonitorIndicator" class="d-none">
+                                <span class="spinner-grow spinner-grow-sm text-success" style="width:8px;height:8px"></span>
+                                <small class="text-success fw-medium ms-1">Polling every <span id="livePollInterval">10</span>s</small>
+                            </span>
+                            <span id="liveMonitorOff" class="">
+                                <small class="text-muted">Off</small>
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3 flex-wrap" id="liveStatusDetail">
+                            <div id="liveDetailStatus" class="d-flex align-items-center gap-1">
+                                <span id="liveStatusIcon"></span>
+                                <span id="liveStatusText" class="fw-medium small"></span>
+                            </div>
+                            <div id="liveDetailCause" class="d-none">
+                                <small class="text-muted">Cause:</small>
+                                <span id="liveDownCause" class="badge bg-warning text-dark" style="font-size:0.7rem"></span>
+                            </div>
+                            <div id="liveDetailDuration" class="d-none">
+                                <small class="text-muted" id="liveDurationLabel">Down:</small>
+                                <span id="liveDurationValue" class="badge bg-secondary" style="font-size:0.7rem"></span>
+                            </div>
+                            <div id="liveFromCache" class="d-none">
+                                <span class="badge border text-muted" style="font-size:0.6rem">from cache</span>
+                            </div>
+                            <small class="text-muted" id="liveLastPolled"></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
                         <!-- Optical Signal Card (Mobile shows on status bar) -->
             <div class="onu-info-card signal-card p-3 mb-3 d-md-block">
                 <div class="section-header mb-3 d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-reception-4 me-2"></i>Optical Signal</span>
-                    <button type="button" class="btn btn-link btn-sm p-0" onclick="refreshOpticalData(<?= $currentOnu['id'] ?>)" title="Refresh optical data">
-                        <i class="bi bi-arrow-clockwise" id="opticalRefreshIcon"></i>
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="opticalLiveIndicator" class="d-none">
+                            <span class="spinner-grow spinner-grow-sm text-success" style="width:6px;height:6px"></span>
+                            <small class="text-success">LIVE</small>
+                        </span>
+                        <button type="button" class="btn btn-link btn-sm p-0" onclick="refreshOpticalData(<?= $currentOnu['id'] ?>)" title="Refresh optical data">
+                            <i class="bi bi-arrow-clockwise" id="opticalRefreshIcon"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="row align-items-center g-2">
                     <div class="col-4 col-md-3 text-center">
-                        <div class="h4 text-<?= $rxClass ?> fw-bold mb-0" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
+                        <div class="h4 text-<?= $rxClass ?> fw-bold mb-0" id="liveRxDisplay" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
                         <div class="text-muted small">RX (dBm)</div>
                         <div class="signal-meter mt-1 mx-auto" style="max-width: 100px;">
-                            <div class="signal-meter-fill bg-<?= $rxClass ?>" style="width: <?= $rx !== null ? min(100, max(0, (($rx + 30) / 20) * 100)) : 0 ?>%"></div>
+                            <div id="liveRxMeter" class="signal-meter-fill bg-<?= $rxClass ?>" style="width: <?= $rx !== null ? min(100, max(0, (($rx + 30) / 20) * 100)) : 0 ?>%"></div>
                         </div>
-                        <span class="badge bg-<?= $rxClass ?> mt-1" style="font-size: 0.65rem;"><?= $rxLabel ?></span>
+                        <span id="liveRxLabel" class="badge bg-<?= $rxClass ?> mt-1" style="font-size: 0.65rem;"><?= $rxLabel ?></span>
                     </div>
                     <div class="col-4 col-md-3 text-center">
-                        <div class="h4 fw-bold mb-0" data-live-tx><?= $tx !== null ? number_format($tx, 1) : '-' ?></div>
+                        <div class="h4 fw-bold mb-0" id="liveTxDisplay" data-live-tx><?= $tx !== null ? number_format($tx, 1) : '-' ?></div>
                         <div class="text-muted small">TX (dBm)</div>
                     </div>
                     <div class="col-4 col-md-3 text-center">
@@ -10123,9 +10169,201 @@ try {
                 }
             }
             
-            // Auto-refresh live ONU status on page load
-            // Auto-refresh disabled to prevent page lag (users can click refresh button)
-            // setTimeout(() => refreshLiveStatus(true), 300);
+            // === LIVE MONITORING SYSTEM ===
+            let livePollingTimer = null;
+            let livePollingActive = false;
+            const LIVE_POLL_INTERVAL = 10000;
+            
+            function startLivePolling() {
+                if (livePollingActive || !onuOltId || !onuDbId) return;
+                livePollingActive = true;
+                const indEl = document.getElementById('liveMonitorIndicator');
+                const offEl = document.getElementById('liveMonitorOff');
+                const optEl = document.getElementById('opticalLiveIndicator');
+                if (indEl) indEl.classList.remove('d-none');
+                if (offEl) offEl.classList.add('d-none');
+                if (optEl) optEl.classList.remove('d-none');
+                pollOnuLive();
+                livePollingTimer = setInterval(pollOnuLive, LIVE_POLL_INTERVAL);
+            }
+            
+            function stopLivePolling() {
+                livePollingActive = false;
+                if (livePollingTimer) { clearInterval(livePollingTimer); livePollingTimer = null; }
+                const indEl = document.getElementById('liveMonitorIndicator');
+                const offEl = document.getElementById('liveMonitorOff');
+                const optEl = document.getElementById('opticalLiveIndicator');
+                if (indEl) indEl.classList.add('d-none');
+                if (offEl) offEl.classList.remove('d-none');
+                if (optEl) optEl.classList.add('d-none');
+            }
+            
+            document.getElementById('liveMonitorToggle').addEventListener('change', function() {
+                if (this.checked) startLivePolling();
+                else stopLivePolling();
+            });
+            
+            document.addEventListener('visibilitychange', function() {
+                const toggle = document.getElementById('liveMonitorToggle');
+                if (!toggle || !toggle.checked) return;
+                if (document.hidden) {
+                    if (livePollingTimer) { clearInterval(livePollingTimer); livePollingTimer = null; }
+                } else {
+                    if (!livePollingTimer && livePollingActive) {
+                        pollOnuLive();
+                        livePollingTimer = setInterval(pollOnuLive, LIVE_POLL_INTERVAL);
+                    }
+                }
+            });
+            
+            let pollInFlight = false;
+            async function pollOnuLive() {
+                if (pollInFlight) return;
+                pollInFlight = true;
+                const icon = document.getElementById('liveStatusRefreshIcon');
+                if (icon) icon.classList.add('spin-animation');
+                
+                try {
+                    const resp = await fetch(`?page=api&action=poll_onu_live&olt_id=${onuOltId}&onu_id=${onuDbId}&t=${Date.now()}`);
+                    const data = await resp.json();
+                    
+                    if (data.success && data.onu) {
+                        updateLiveDisplay(data.onu, data.fromCache || false);
+                    }
+                } catch (e) {
+                    console.error('Live poll error:', e);
+                } finally {
+                    pollInFlight = false;
+                    if (icon) icon.classList.remove('spin-animation');
+                }
+            }
+            
+            function updateLiveDisplay(onu, fromCache) {
+                const statusMap = {
+                    'online': { cls: 'success', icon: 'check-circle-fill', label: 'Online' },
+                    'offline': { cls: 'secondary', icon: 'x-circle', label: 'Offline' },
+                    'los': { cls: 'danger', icon: 'exclamation-triangle-fill', label: 'LOS' }
+                };
+                const st = statusMap[onu.status] || statusMap.offline;
+                
+                const badge = document.getElementById('onuStatusBadge');
+                if (badge) {
+                    badge.className = `badge bg-${st.cls} fs-6`;
+                    let badgeText = st.label;
+                    if (onu.status === 'online' && onu.online_duration) {
+                        badgeText += ` (${onu.online_duration})`;
+                    }
+                    badge.innerHTML = `<i class="bi bi-${st.icon} me-1"></i>${badgeText}`;
+                }
+                
+                const statusIcon = document.getElementById('liveStatusIcon');
+                const statusText = document.getElementById('liveStatusText');
+                if (statusIcon && statusText) {
+                    statusIcon.innerHTML = `<i class="bi bi-${st.icon} text-${st.cls}"></i>`;
+                    let detailText = st.label;
+                    if (onu.status === 'offline' && onu.last_down_cause) {
+                        const cause = onu.last_down_cause.toLowerCase();
+                        if (cause.includes('dying') || cause.includes('power')) detailText = 'Offline - Power Fail';
+                        else if (cause.includes('los')) detailText = 'Offline - LOS';
+                        else detailText = 'Offline - ' + onu.last_down_cause;
+                    } else if (onu.status === 'los') {
+                        detailText = 'LOS';
+                    } else if (onu.status === 'online' && onu.online_duration) {
+                        detailText = 'Online (' + onu.online_duration + ')';
+                    }
+                    statusText.textContent = detailText;
+                    statusText.className = `fw-medium small text-${st.cls}`;
+                }
+                
+                const causeEl = document.getElementById('liveDetailCause');
+                const causeText = document.getElementById('liveDownCause');
+                if (causeEl && causeText) {
+                    if (onu.last_down_cause && onu.status !== 'online') {
+                        causeEl.classList.remove('d-none');
+                        causeText.textContent = onu.last_down_cause;
+                        const cause = onu.last_down_cause.toLowerCase();
+                        if (cause.includes('dying') || cause.includes('power')) {
+                            causeText.className = 'badge bg-danger';
+                            causeText.style.fontSize = '0.7rem';
+                        } else if (cause.includes('los')) {
+                            causeText.className = 'badge bg-warning text-dark';
+                            causeText.style.fontSize = '0.7rem';
+                        } else {
+                            causeText.className = 'badge bg-secondary';
+                            causeText.style.fontSize = '0.7rem';
+                        }
+                    } else {
+                        causeEl.classList.add('d-none');
+                    }
+                }
+                
+                const durEl = document.getElementById('liveDetailDuration');
+                const durLabel = document.getElementById('liveDurationLabel');
+                const durValue = document.getElementById('liveDurationValue');
+                if (durEl && durValue) {
+                    if (onu.status === 'online' && onu.online_duration) {
+                        durEl.classList.remove('d-none');
+                        durLabel.textContent = 'Uptime:';
+                        durValue.textContent = onu.online_duration;
+                        durValue.className = 'badge bg-success';
+                        durValue.style.fontSize = '0.7rem';
+                    } else if (onu.status !== 'online' && onu.down_since) {
+                        durEl.classList.remove('d-none');
+                        durLabel.textContent = 'Down:';
+                        durValue.textContent = onu.down_since;
+                        durValue.className = 'badge bg-danger';
+                        durValue.style.fontSize = '0.7rem';
+                    } else {
+                        durEl.classList.add('d-none');
+                    }
+                }
+                
+                const cacheEl = document.getElementById('liveFromCache');
+                if (cacheEl) {
+                    if (fromCache) cacheEl.classList.remove('d-none');
+                    else cacheEl.classList.add('d-none');
+                }
+                
+                if (onu.rx_power !== null && onu.rx_power !== undefined) {
+                    const rxEl = document.getElementById('liveRxDisplay');
+                    if (rxEl) rxEl.textContent = onu.rx_power.toFixed(1);
+                    
+                    let rxCls = 'success', rxLbl = 'Good';
+                    if (onu.rx_power <= -28) { rxCls = 'danger'; rxLbl = 'Critical'; }
+                    else if (onu.rx_power <= -25) { rxCls = 'warning'; rxLbl = 'Fair'; }
+                    else if (onu.rx_power <= -20) { rxCls = 'success'; rxLbl = 'Good'; }
+                    else { rxCls = 'success'; rxLbl = 'Excellent'; }
+                    
+                    const rxMeter = document.getElementById('liveRxMeter');
+                    if (rxMeter) {
+                        rxMeter.className = `signal-meter-fill bg-${rxCls}`;
+                        rxMeter.style.width = Math.min(100, Math.max(0, ((onu.rx_power + 30) / 20) * 100)) + '%';
+                    }
+                    const rxLabel = document.getElementById('liveRxLabel');
+                    if (rxLabel) { rxLabel.className = `badge bg-${rxCls} mt-1`; rxLabel.style.fontSize = '0.65rem'; rxLabel.textContent = rxLbl; }
+                    
+                    if (rxEl) rxEl.className = `h4 text-${rxCls} fw-bold mb-0`;
+                }
+                
+                if (onu.tx_power !== null && onu.tx_power !== undefined) {
+                    const txEl = document.getElementById('liveTxDisplay');
+                    if (txEl) txEl.textContent = onu.tx_power.toFixed(1);
+                }
+                
+                if (onu.distance !== null && onu.distance !== undefined) {
+                    const distEl = document.getElementById('liveDistanceDisplay');
+                    if (distEl) {
+                        const d = parseInt(onu.distance);
+                        distEl.textContent = d >= 1000 ? (d / 1000).toFixed(2) + ' km' : d + ' m';
+                    }
+                }
+                
+                const lastPoll = document.getElementById('liveLastPolled');
+                if (lastPoll) {
+                    const now = new Date();
+                    lastPoll.textContent = 'Updated ' + now.toLocaleTimeString();
+                }
+            }
             
             // Refresh optical data (RX/TX power, distance)
             async function refreshOpticalData(onuId) {

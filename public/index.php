@@ -853,6 +853,63 @@ if ($page === 'api' && $action === 'huawei_live_onu') {
     exit;
 }
 
+if ($page === 'api' && $action === 'poll_onu_live') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuDbId = isset($_GET['onu_id']) ? (int)$_GET['onu_id'] : 0;
+    $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : 0;
+    
+    if (!$onuDbId || !$oltId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID and OLT ID required']);
+        exit;
+    }
+    
+    try {
+        $ch = curl_init('http://localhost:3002/poll-onu');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode(['oltId' => $oltId, 'onuDbId' => $onuDbId]),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($response && $httpCode === 200) {
+            echo $response;
+        } else {
+            $stmt = $db->prepare("SELECT id, status, snmp_status, rx_power, tx_power, distance, last_down_cause, online_since, updated_at FROM huawei_onus WHERE id = ?");
+            $stmt->execute([$onuDbId]);
+            $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($onu) {
+                echo json_encode(['success' => true, 'fromCache' => true, 'onu' => [
+                    'id' => (int)$onu['id'],
+                    'status' => $onu['status'],
+                    'rx_power' => $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null,
+                    'tx_power' => $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null,
+                    'distance' => $onu['distance'] !== null ? (int)$onu['distance'] : null,
+                    'last_down_cause' => $onu['last_down_cause'],
+                    'online_since' => $onu['online_since'],
+                ]]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'ONU not found']);
+            }
+        }
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Get ONU Details API
 if ($page === 'api' && $action === 'get_onu_details') {
     ob_clean();

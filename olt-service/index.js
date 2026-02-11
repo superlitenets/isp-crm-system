@@ -11,6 +11,9 @@ process.env.TZ = process.env.TZ || 'Africa/Nairobi';
 const app = express();
 app.use(express.json());
 
+const { Pool } = require('pg');
+const sharedPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
+
 const sessionManager = new OLTSessionManager();
 const discoveryWorker = new DiscoveryWorker(sessionManager);
 const snmpWorker = new SNMPPollingWorker(sessionManager, discoveryWorker);
@@ -218,6 +221,30 @@ async function refreshSingleONU(oltId, onuDbId) {
         if (slot === null || port === null || onu_id === null) return;
         
         // Execute CLI commands via session manager
+        if (!sessionManager.sessions.has(oltId.toString())) {
+            const oltResult = await sharedPool.query(
+                'SELECT * FROM huawei_olts WHERE id = $1 AND is_active = true', [oltId]
+            );
+            if (oltResult.rows.length > 0) {
+                const olt = oltResult.rows[0];
+                const crypto = require('crypto');
+                let password = olt.password;
+                if (olt.password && olt.password.includes(':')) {
+                    try {
+                        const [ivHex, encrypted] = olt.password.split(':');
+                        const key = Buffer.from(process.env.OLT_ENCRYPTION_KEY || 'default-encryption-key-change-me!', 'utf8').slice(0, 32);
+                        const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(ivHex, 'hex'));
+                        password = decipher.update(encrypted, 'hex', 'utf8') + decipher.final('utf8');
+                    } catch(e) {}
+                }
+                await sessionManager.connect(oltId.toString(), {
+                    host: olt.ip_address, port: olt.port || 23,
+                    username: olt.username, password: password,
+                    protocol: olt.protocol || 'telnet', sshPort: olt.ssh_port || 22
+                });
+            }
+        }
+        
         const interfaceCmd = `interface gpon ${frame}/${slot}`;
         await sessionManager.execute(oltId.toString(), interfaceCmd, { timeout: 10000 });
         
@@ -272,6 +299,156 @@ async function refreshSingleONU(oltId, onuDbId) {
         await pool.end();
     }
 }
+
+app.post('/poll-onu', async (req, res) => {
+    const { oltId, onuDbId } = req.body;
+    if (!oltId || !onuDbId) {
+        return res.json({ success: false, error: 'Missing oltId or onuDbId' });
+    }
+    
+    try {
+        const onuResult = await sharedPool.query('SELECT * FROM huawei_onus WHERE id = $1', [onuDbId]);
+        if (onuResult.rows.length === 0) {
+            return res.json({ success: false, error: 'ONU not found' });
+        }
+        
+        const onu = onuResult.rows[0];
+        const { frame, slot, port, onu_id } = onu;
+        
+        if (slot === null || port === null || onu_id === null) {
+            return res.json({ success: false, error: 'ONU position incomplete' });
+        }
+        
+        const interfaceCmd = `interface gpon ${frame}/${slot}`;
+        await sessionManager.execute(oltId.toString(), interfaceCmd, { timeout: 10000 });
+        
+        const opticalCmd = `display ont optical-info ${port} ${onu_id}`;
+        const opticalResult = await sessionManager.execute(oltId.toString(), opticalCmd, { timeout: 15000 });
+        
+        let rxPower = null, txPower = null, oltRx = null, temperature = null;
+        const cleanOptical = (opticalResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        
+        const rxMatch = cleanOptical.match(/Rx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i);
+        if (rxMatch) rxPower = parseFloat(rxMatch[1]);
+        
+        const txMatch = cleanOptical.match(/Tx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i);
+        if (txMatch) txPower = parseFloat(txMatch[1]);
+        
+        const oltRxMatch = cleanOptical.match(/OLT\s+Rx\s+ONT\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i);
+        if (oltRxMatch) oltRx = parseFloat(oltRxMatch[1]);
+        
+        const tempMatch = cleanOptical.match(/Temperature\s*\([^)]*\)\s*:\s*([-\d.]+)/i);
+        if (tempMatch) temperature = parseFloat(tempMatch[1]);
+        
+        const infoCmd = `display ont info ${port} ${onu_id}`;
+        const infoResult = await sessionManager.execute(oltId.toString(), infoCmd, { timeout: 15000 });
+        const cleanInfo = (infoResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        
+        let status = 'offline';
+        let lastDownCause = null;
+        let lastDownTime = null;
+        let lastUpTime = null;
+        let onlineDuration = null;
+        let distance = null;
+        
+        const statusMatch = cleanInfo.match(/Run\s+state\s*:\s*(\w+)/i);
+        if (statusMatch) {
+            const state = statusMatch[1].toLowerCase();
+            if (state === 'online') status = 'online';
+            else if (state.includes('los')) status = 'los';
+        }
+        
+        const downCauseMatch = cleanInfo.match(/Last down cause\s*:\s*(.+)/i);
+        if (downCauseMatch) lastDownCause = downCauseMatch[1].trim();
+        
+        const downTimeMatch = cleanInfo.match(/Last down time\s*:\s*(.+)/i);
+        if (downTimeMatch) lastDownTime = downTimeMatch[1].trim();
+        
+        const upTimeMatch = cleanInfo.match(/Last up time\s*:\s*(.+)/i);
+        if (upTimeMatch) lastUpTime = upTimeMatch[1].trim();
+        
+        const durationMatch = cleanInfo.match(/ONT online duration\s*:\s*(.+)/i);
+        if (durationMatch) onlineDuration = durationMatch[1].trim();
+        
+        const distanceMatch = cleanInfo.match(/(?:ONT\s+)?distance\s*(?:\([^)]*\))?\s*:\s*(\d+)/i);
+        if (distanceMatch) distance = parseInt(distanceMatch[1]);
+        
+        if (status === 'offline' && rxPower !== null && rxPower > -35) {
+            status = 'online';
+        }
+        
+        await sessionManager.execute(oltId.toString(), 'quit', { timeout: 5000 }).catch(() => {});
+        
+        let losDownSince = null;
+        if (status !== 'online' && lastDownTime) {
+            const downDate = new Date(lastDownTime);
+            if (!isNaN(downDate.getTime())) {
+                const diffMs = Date.now() - downDate.getTime();
+                const mins = Math.floor(diffMs / 60000);
+                if (mins < 60) losDownSince = mins + 'm ago';
+                else if (mins < 1440) losDownSince = Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm ago';
+                else losDownSince = Math.floor(mins / 1440) + 'd ' + Math.floor((mins % 1440) / 60) + 'h ago';
+            }
+        }
+        
+        await sharedPool.query(`
+            UPDATE huawei_onus 
+            SET rx_power = COALESCE($1, rx_power),
+                tx_power = COALESCE($2, tx_power),
+                status = COALESCE($3, status),
+                snmp_status = COALESCE($3, snmp_status),
+                distance = COALESCE($4, distance),
+                last_down_cause = COALESCE($5, last_down_cause),
+                updated_at = NOW()
+            WHERE id = $6
+        `, [rxPower, txPower, status, distance, lastDownCause, onuDbId]);
+        
+        res.json({
+            success: true,
+            onu: {
+                id: parseInt(onuDbId),
+                status,
+                rx_power: rxPower,
+                tx_power: txPower,
+                olt_rx_power: oltRx,
+                temperature,
+                distance,
+                last_down_cause: lastDownCause,
+                last_down_time: lastDownTime,
+                last_up_time: lastUpTime,
+                online_duration: onlineDuration,
+                down_since: losDownSince
+            }
+        });
+        
+        console.log(`[PollONU] ONU ${onu.sn}: status=${status}, rx=${rxPower}, cause=${lastDownCause}`);
+    } catch (err) {
+        console.log(`[PollONU] Error polling ONU ${onuDbId}: ${err.message}`);
+        const dbResult = await sharedPool.query(
+            'SELECT id, status, snmp_status, rx_power, tx_power, distance, last_down_cause, online_since, updated_at FROM huawei_onus WHERE id = $1',
+            [onuDbId]
+        ).catch(() => null);
+        
+        if (dbResult && dbResult.rows.length > 0) {
+            const db = dbResult.rows[0];
+            res.json({
+                success: true,
+                fromCache: true,
+                onu: {
+                    id: db.id,
+                    status: db.status,
+                    rx_power: db.rx_power ? parseFloat(db.rx_power) : null,
+                    tx_power: db.tx_power ? parseFloat(db.tx_power) : null,
+                    distance: db.distance ? parseInt(db.distance) : null,
+                    last_down_cause: db.last_down_cause,
+                    online_since: db.online_since
+                }
+            });
+        } else {
+            res.json({ success: false, error: err.message });
+        }
+    }
+});
 
 const { exec } = require('child_process');
 const util = require('util');
