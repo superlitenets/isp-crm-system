@@ -17433,7 +17433,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const btn = form.querySelector("button[type=submit]");
         const originalHtml = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = "<span class="spinner-border spinner-border-sm me-1"></span> Applying...";
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Applying...';
         try {
             const formData = new FormData(form);
             const response = await fetch("?page=huawei-olt&t=" + Date.now(), { method: "POST", body: new URLSearchParams(formData) });
@@ -17467,7 +17467,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const btn = form.querySelector("button[type=submit]");
         const originalHtml = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = "<span class="spinner-border spinner-border-sm me-1"></span> Configuring...";
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Configuring...';
         try {
             const formData = new FormData(form);
             const response = await fetch("?page=huawei-olt&t=" + Date.now(), { method: "POST", body: new URLSearchParams(formData) });
