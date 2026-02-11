@@ -8867,9 +8867,20 @@ try {
             $attachedVlans = [];
             if (!empty($currentOnu['attached_vlans'])) {
                 $attachedVlans = json_decode($currentOnu['attached_vlans'], true) ?: [];
-            } elseif (!empty($currentOnu['vlan_id'])) {
+            }
+            if (empty($attachedVlans) && isset($db) && isset($currentOnu['onu_id'])) {
+                $svcStmt = $db->prepare("SELECT DISTINCT vlan_id FROM huawei_onu_service_vlans WHERE onu_id = ? ORDER BY vlan_id");
+                $svcStmt->execute([$currentOnu['onu_id']]);
+                $svcVlans = $svcStmt->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($svcVlans)) {
+                    $attachedVlans = array_map('intval', $svcVlans);
+                }
+            }
+            if (empty($attachedVlans) && !empty($currentOnu['vlan_id']) && (int)$currentOnu['vlan_id'] > 1) {
                 $attachedVlans = [(int)$currentOnu['vlan_id']];
             }
+            $attachedVlans = array_filter($attachedVlans, function($v) { return (int)$v > 1; });
+            $attachedVlans = array_values($attachedVlans);
             ?>
             
             <!-- Action Toolbar - Separated into OLT and TR-069 sections -->
@@ -17288,8 +17299,10 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     
     <?php
     // Get attached VLANs (with service ports) for ETH port modal
+    // Uses $attachedVlans which comes from the ONU record's attached_vlans JSON field
+    // These are VLANs that actually have service-port entries on the OLT for this ONU
     $ethPortVlans = [];
-    if (isset($attachedVlans) && !empty($attachedVlans) && isset($db) && isset($currentOnu["olt_id"])) {
+    if (!empty($attachedVlans) && isset($db) && isset($currentOnu["olt_id"])) {
         $vlanIds = implode(",", array_map("intval", $attachedVlans));
         $ethVlanStmt = $db->query("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = " . intval($currentOnu["olt_id"]) . " AND vlan_id IN ($vlanIds) ORDER BY vlan_id");
         $ethPortVlans = $ethVlanStmt->fetchAll(PDO::FETCH_ASSOC);
