@@ -56,19 +56,32 @@ server default {
         # SQL first - looks up known users and sets reply attributes
         sql
         
-        # If SQL didn't find the user (no password set), set expired pool attributes
+        # If SQL didn't find the user (no password set), handle based on user type
         if (!&control:Cleartext-Password) {
+            # Check if this is a hotspot user:
+            # 1. MAC address as username (typical hotspot CHAP login)
+            # 2. Username matches Calling-Station-Id (hotspot MAC auth)
+            # Hotspot users must be REJECTED when not active so MikroTik
+            # redirects them to the captive portal for payment
+            if ("%{User-Name}" =~ /^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$/ || \
+                (&Calling-Station-Id && "%{User-Name}" == "%{Calling-Station-Id}")) {
+                update reply {
+                    Reply-Message := "Hotspot user not authorized - redirecting to portal"
+                }
+                reject
+            }
+            
+            # PPPoE/other unknown users - give limited access via expired pool
             update reply {
                 Framed-Pool := "expired-pool"
                 Mikrotik-Rate-Limit := "128k/128k"
-                Mikrotik-Group := "expired"
                 Session-Timeout := 300
                 Acct-Interim-Interval := 60
                 Reply-Message := "Account not found - redirecting to portal"
             }
         }
         
-        # Accept ALL users - control access via SQL attributes (pool, rate limit, etc)
+        # Accept users - control access via SQL attributes (pool, rate limit, etc)
         update control {
             Auth-Type := Accept
         }
