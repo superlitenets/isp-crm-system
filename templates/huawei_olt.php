@@ -3156,6 +3156,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 echo json_encode($result);
                 exit;
                 
+            case 'configure_wifi_bridge':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                header('Content-Type: application/json');
+
+                $serial = $_POST['serial'] ?? '';
+                $wifiIndex = (int)($_POST['wifi_index'] ?? 0);
+                $vlanId = (int)($_POST['vlan_id'] ?? 0);
+                $ssidName = $_POST['ssid'] ?? '';
+
+                if (empty($serial) || $wifiIndex < 1 || $vlanId < 1) {
+                    echo json_encode(['success' => false, 'error' => 'Serial, WiFi index, and VLAN ID are required']);
+                    exit;
+                }
+
+                $genieacs = new \App\GenieACS($db);
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if (!$deviceResult['success']) {
+                    echo json_encode(['success' => false, 'error' => 'Device not found in ACS']);
+                    exit;
+                }
+                $deviceId = $deviceResult['device']['_id'];
+
+                $bridgeResult = $genieacs->configureWifiAccessVlan($deviceId, $wifiIndex, $vlanId, $ssidName);
+                echo json_encode($bridgeResult);
+                exit;
+
             case 'save_device_params':
                 // Save device parameters (batch update)
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -22643,8 +22669,15 @@ function saveDeviceStatus() {
                     document.getElementById('wifiPortEnabled').checked = iface.enabled;
                     document.getElementById('wifiPortDisabled').checked = !iface.enabled;
                     document.getElementById('wifiPortSsid').value = iface.ssid || '';
-                    
-                    // Set encryption from TR-069 BeaconType/security
+
+                    if (iface.bridge && iface.bridge.has_bridge) {
+                        document.getElementById('wifiPortMode').value = 'Access';
+                        toggleWifiModeOptions('Access');
+                    } else {
+                        document.getElementById('wifiPortMode').value = 'LAN';
+                        toggleWifiModeOptions('LAN');
+                    }
+
                     const sec = (iface.security || iface.beacon_type || '').toLowerCase();
                     const encSelect = document.getElementById('wifiPortEncryption');
                     if (sec === 'basic' || sec === 'none' || sec === 'open') {
@@ -22656,10 +22689,11 @@ function saveDeviceStatus() {
                         else encSelect.value = 'AES';
                     }
                     toggleWifiPasswordField(encSelect.value);
-                    
-                    if (iface.vlan_id) {
+
+                    const bridgeVlan = (iface.bridge && iface.bridge.vlan) ? iface.bridge.vlan : (iface.vlan_id || '');
+                    if (bridgeVlan) {
                         setTimeout(() => {
-                            document.getElementById('wifiPortVlan').value = iface.vlan_id;
+                            document.getElementById('wifiPortVlan').value = bridgeVlan;
                         }, 100);
                     }
                 }
@@ -22721,66 +22755,96 @@ function saveDeviceStatus() {
         const password = document.getElementById('wifiPortPassword').value;
         const vlan = document.getElementById('wifiPortVlan').value;
         const encryption = document.getElementById('wifiPortEncryption').value;
-        
         const mode = document.getElementById('wifiPortMode').value;
-        
-        const params = {};
-        const basePath = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + portIndex + '.';
-        
-        // Core WiFi parameters (universally supported)
-        params[basePath + 'Enable'] = enabled;
-        if (ssid) params[basePath + 'SSID'] = ssid;
-        
-        // Encryption / security settings
-        if (encryption === 'Open') {
-            params[basePath + 'BeaconType'] = 'Basic';
-            params[basePath + 'BasicAuthenticationMode'] = 'None';
-            params[basePath + 'WPAAuthenticationMode'] = '';
-            params[basePath + 'IEEE11iAuthenticationMode'] = '';
-            params[basePath + 'WPAEncryptionModes'] = '';
-        } else {
-            params[basePath + 'BeaconType'] = '11i';
-            params[basePath + 'IEEE11iAuthenticationMode'] = 'PSKAuthentication';
-            params[basePath + 'WPAAuthenticationMode'] = 'PSKAuthentication';
-            const encMap = { 'AES': 'AESEncryption', 'TKIP': 'TKIPEncryption', 'TKIP+AES': 'TKIPandAESEncryption' };
-            params[basePath + 'WPAEncryptionModes'] = encMap[encryption] || 'AESEncryption';
-            if (password && password.length >= 8) {
-                params[basePath + 'PreSharedKey.1.KeyPassphrase'] = password;
-            }
-        }
-        
-        // VLAN configuration (if specified)
-        if (vlan) {
-            params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
-        }
-        
+
         const saveBtn = document.querySelector('#wifiPortConfigModal .btn-primary');
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
-        
+
         try {
+            if (mode === 'Access') {
+                if (!vlan) {
+                    showToast('VLAN ID is required for Access (Bridge) mode', 'warning');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Configuration';
+                    return;
+                }
+
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating bridge...';
+
+                const bridgeBody = 'action=configure_wifi_bridge'
+                    + '&serial=' + encodeURIComponent(serial)
+                    + '&wifi_index=' + encodeURIComponent(portIndex)
+                    + '&vlan_id=' + encodeURIComponent(vlan)
+                    + '&ssid=' + encodeURIComponent(ssid);
+
+                const bridgeResp = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: bridgeBody
+                });
+                const bridgeData = await bridgeResp.json();
+
+                if (!bridgeData.success) {
+                    showToast('Bridge creation failed: ' + (bridgeData.error || 'Unknown error'), 'danger');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Configuration';
+                    return;
+                }
+
+                showToast(bridgeData.message || 'Bridge created for wifi_0/' + portIndex + ' on VLAN ' + vlan, 'success');
+            }
+
+            const params = {};
+            const basePath = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + portIndex + '.';
+
+            params[basePath + 'Enable'] = enabled;
+            if (ssid) params[basePath + 'SSID'] = ssid;
+
+            if (encryption === 'Open') {
+                params[basePath + 'BeaconType'] = 'Basic';
+                params[basePath + 'BasicAuthenticationMode'] = 'None';
+                params[basePath + 'WPAAuthenticationMode'] = '';
+                params[basePath + 'IEEE11iAuthenticationMode'] = '';
+                params[basePath + 'WPAEncryptionModes'] = '';
+            } else {
+                params[basePath + 'BeaconType'] = '11i';
+                params[basePath + 'IEEE11iAuthenticationMode'] = 'PSKAuthentication';
+                params[basePath + 'WPAAuthenticationMode'] = 'PSKAuthentication';
+                const encMap = { 'AES': 'AESEncryption', 'TKIP': 'TKIPEncryption', 'TKIP+AES': 'TKIPandAESEncryption' };
+                params[basePath + 'WPAEncryptionModes'] = encMap[encryption] || 'AESEncryption';
+                if (password && password.length >= 8) {
+                    params[basePath + 'PreSharedKey.1.KeyPassphrase'] = password;
+                }
+            }
+
+            if (mode !== 'Access' && vlan) {
+                params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
+            }
+
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving WiFi settings...';
+
             const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_device_params&serial=' + encodeURIComponent(serial) + '&params=' + encodeURIComponent(JSON.stringify(params))
             });
             const data = await response.json();
-            
+
             if (data.success) {
-                showToast('WiFi configuration saved', 'success');
+                showToast('WiFi configuration saved' + (mode === 'Access' ? ' with bridge on VLAN ' + vlan : ''), 'success');
                 bootstrap.Modal.getInstance(document.getElementById('wifiPortConfigModal')).hide();
-                
-                // Refresh the WiFi table
+
                 if (typeof loadWiFiFromTR069 === 'function') {
-                    loadWiFiFromTR069();
+                    setTimeout(() => loadWiFiFromTR069(), 2000);
                 }
             } else {
-                showToast('Error: ' + (data.error || 'Failed to save'), 'danger');
+                showToast('Error: ' + (data.error || 'Failed to save WiFi settings'), 'danger');
             }
         } catch (err) {
             showToast('Error: ' + err.message, 'danger');
         }
-        
+
         saveBtn.disabled = false;
         saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Configuration';
     }
