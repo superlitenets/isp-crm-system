@@ -9958,7 +9958,10 @@ try {
             if (onuSerial) {
                 summonOnu();
             }
-            // WiFi TR-069 data loads on-demand via Refresh button to avoid blocking
+            if (hasTR069) {
+                loadWifiVlans();
+                loadWiFiFromTR069(true);
+            }
 
 
 
