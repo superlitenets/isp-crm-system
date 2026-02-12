@@ -353,3 +353,9 @@ CREATE TABLE IF NOT EXISTS radius_subscription_macs (
 CREATE INDEX IF NOT EXISTS idx_subscription_macs_mac ON radius_subscription_macs(mac_address);
 CREATE INDEX IF NOT EXISTS idx_subscription_macs_sub_id ON radius_subscription_macs(subscription_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_macs_single_primary ON radius_subscription_macs(subscription_id) WHERE is_primary = TRUE;
+
+-- Add mikrotik_profile to packages for MikroTik user profile assignment
+ALTER TABLE radius_packages ADD COLUMN IF NOT EXISTS mikrotik_profile VARCHAR(100);
+
+-- Upgrade expiry_date from DATE to TIMESTAMP for sub-day hotspot package support (5min, 1hr, etc.)
+ALTER TABLE radius_subscriptions ALTER COLUMN expiry_date TYPE TIMESTAMP USING expiry_date::TIMESTAMP;
