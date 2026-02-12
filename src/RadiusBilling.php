@@ -842,9 +842,9 @@ class RadiusBilling {
             $stmt = $this->db->prepare("
                 INSERT INTO radius_packages (name, description, package_type, billing_type, price, validity_days,
                     session_duration_hours, data_quota_mb, download_speed, upload_speed, burst_download, burst_upload,
-                    burst_threshold, burst_time, priority, address_pool, ip_binding,
+                    burst_threshold, burst_time, priority, address_pool, mikrotik_profile, ip_binding,
                     simultaneous_sessions, max_devices, fup_enabled, fup_quota_mb, fup_download_speed, fup_upload_speed, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?::boolean, ?, ?, ?, ?::boolean)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?::boolean, ?, ?, ?, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -863,6 +863,7 @@ class RadiusBilling {
                 $data['burst_time'] ?? '',
                 $data['priority'] ?? 8,
                 $data['address_pool'] ?? '',
+                !empty($data['mikrotik_profile']) ? $data['mikrotik_profile'] : null,
                 $this->castBoolean($data['ip_binding'] ?? false),
                 $data['simultaneous_sessions'] ?? 1,
                 $data['max_devices'] ?? 1,
@@ -890,7 +891,7 @@ class RadiusBilling {
                     name = ?, description = ?, package_type = ?, billing_type = ?, price = ?,
                     validity_days = ?, session_duration_hours = ?, data_quota_mb = ?, download_speed = ?, upload_speed = ?,
                     burst_download = ?, burst_upload = ?, burst_threshold = ?, burst_time = ?,
-                    priority = ?, address_pool = ?, ip_binding = ?::boolean, simultaneous_sessions = ?,
+                    priority = ?, address_pool = ?, mikrotik_profile = ?, ip_binding = ?::boolean, simultaneous_sessions = ?,
                     max_devices = ?, fup_enabled = ?::boolean, fup_quota_mb = ?, fup_download_speed = ?, fup_upload_speed = ?,
                     is_active = ?::boolean, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
@@ -912,6 +913,7 @@ class RadiusBilling {
                 $data['burst_time'] ?? '',
                 $data['priority'] ?? 8,
                 $data['address_pool'] ?? '',
+                !empty($data['mikrotik_profile']) ? $data['mikrotik_profile'] : null,
                 $this->castBoolean($data['ip_binding'] ?? false),
                 $data['simultaneous_sessions'] ?? 1,
                 $data['max_devices'] ?? 1,
@@ -1085,7 +1087,7 @@ class RadiusBilling {
             SELECT s.*, c.name as customer_name, p.name as package_name,
                    p.download_speed, p.upload_speed, p.data_quota_mb,
                    p.simultaneous_sessions, p.fup_enabled, p.fup_quota_mb,
-                   p.fup_download_speed, p.fup_upload_speed
+                   p.fup_download_speed, p.fup_upload_speed, p.mikrotik_profile as package_mikrotik_profile
             FROM radius_subscriptions s
             LEFT JOIN customers c ON s.customer_id = c.id
             LEFT JOIN radius_packages p ON s.package_id = p.id
@@ -1797,13 +1799,20 @@ class RadiusBilling {
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'User not found'];
         }
         
+        // Detect hotspot early - hotspot users must always be rejected when not active
+        $isHotspot = ($sub['access_type'] ?? '') === 'hotspot';
+        
         // Get expired/suspended pool settings
         $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
         $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
         // Note: $useExpiredPool already set above
         
-        // Suspended accounts - bypass password check, just return expired pool
+        // Suspended accounts
         if ($sub['status'] === 'suspended') {
+            if ($isHotspot) {
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Hotspot suspended - reject for captive portal redirect');
+                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
+            }
             $attrs = [
                 'Framed-Pool' => $expiredPoolName,
                 'Mikrotik-Rate-Limit' => $expiredRateLimit,
@@ -1822,6 +1831,11 @@ class RadiusBilling {
         
         // Check password (only for non-suspended accounts)
         if ($this->decrypt($sub['password_encrypted']) !== $password) {
+            if ($isHotspot) {
+                $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Hotspot invalid password - reject for captive portal redirect');
+                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
+            }
+            
             $redirectInvalidPassword = (bool)$this->getSetting('redirect_invalid_password', false);
             
             if ($redirectInvalidPassword) {
@@ -1848,7 +1862,6 @@ class RadiusBilling {
         // Check MAC binding - use multi-MAC table for device locking
         $enforceMacBinding = (bool)$this->getSetting('enforce_mac_binding', false);
         $autoCaptureMac = (bool)$this->getSetting('auto_capture_mac', true);
-        $isHotspot = ($sub['access_type'] ?? '') === 'hotspot';
         
         if ($enforceMacBinding && !$isHotspot && !empty($callingStationId)) {
             $normalizedCallingMac = $this->normalizeMAC($callingStationId);
@@ -1925,8 +1938,11 @@ class RadiusBilling {
         // Check quota
         if ($sub['data_quota_mb'] && $sub['data_used_mb'] >= $sub['data_quota_mb']) {
             if (!$sub['fup_enabled']) {
+                if ($isHotspot) {
+                    $this->logAuthAttempt($sub['id'], $username, $nasIp, $callingStationId, 'Reject', 'Hotspot quota exhausted - reject for captive portal redirect');
+                    return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Data quota exhausted'];
+                }
                 if ($useExpiredPool) {
-                    // Put quota-exhausted users in expired pool too
                     $attrs = [
                         'Framed-Pool' => $expiredPoolName,
                         'Mikrotik-Rate-Limit' => $expiredRateLimit,
@@ -1951,6 +1967,13 @@ class RadiusBilling {
         $attributes = [
             'Mikrotik-Rate-Limit' => $this->buildRateLimit($sub),
         ];
+        
+        // Add MikroTik hotspot user profile (Mikrotik-Group) from subscription or package
+        if (!empty($sub['mikrotik_profile'])) {
+            $attributes['Mikrotik-Group'] = $sub['mikrotik_profile'];
+        } elseif (!empty($sub['package_mikrotik_profile'])) {
+            $attributes['Mikrotik-Group'] = $sub['package_mikrotik_profile'];
+        }
         
         // Add address pool from package if set
         if (!empty($sub['address_pool'])) {

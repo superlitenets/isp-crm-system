@@ -6633,6 +6633,11 @@ try {
                                         <label class="form-label">Address Pool</label>
                                         <input type="text" name="address_pool" class="form-control" placeholder="e.g., pool1">
                                     </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">MikroTik Profile</label>
+                                        <input type="text" name="mikrotik_profile" class="form-control" placeholder="e.g., default or hotspot-profile">
+                                        <small class="text-muted">Hotspot user profile name on MikroTik</small>
+                                    </div>
                                     <div class="col-md-3 mb-3 d-flex align-items-end">
                                         <div class="form-check">
                                             <input type="checkbox" name="ip_binding" class="form-check-input" id="ipBindingNew">
@@ -6786,6 +6791,11 @@ try {
                                         <label class="form-label">Address Pool</label>
                                         <input type="text" name="address_pool" id="editPkgPool" class="form-control">
                                     </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">MikroTik Profile</label>
+                                        <input type="text" name="mikrotik_profile" id="editPkgMikrotikProfile" class="form-control" placeholder="e.g., default">
+                                        <small class="text-muted">Hotspot user profile name</small>
+                                    </div>
                                     <div class="col-md-3 mb-3 d-flex align-items-end">
                                         <div class="form-check">
                                             <input type="checkbox" name="ip_binding" class="form-check-input" id="editPkgIpBinding">
@@ -6832,6 +6842,7 @@ try {
                 document.getElementById('editPkgBurstThreshold').value = pkg.burst_threshold || '';
                 document.getElementById('editPkgBurstTime').value = pkg.burst_time || 10;
                 document.getElementById('editPkgPool').value = pkg.address_pool || '';
+                document.getElementById('editPkgMikrotikProfile').value = pkg.mikrotik_profile || '';
                 document.getElementById('editPkgIpBinding').checked = pkg.ip_binding == true || pkg.ip_binding == 't';
                 document.getElementById('editPkgActive').checked = pkg.is_active == true || pkg.is_active == 't';
                 document.getElementById('editPkgDesc').value = pkg.description || '';
