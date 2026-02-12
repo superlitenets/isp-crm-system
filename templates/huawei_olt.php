@@ -5118,6 +5118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $connMode = $data['X_HW_WlanAccessMode'] ?? $data['X_HW_AccessMode'] ?? '';
                         $bindWan = $data['X_HW_BindWan'] ?? '';
                         
+                        $bridgeBindings = $wifiResult['bridge_bindings'] ?? [];
+                        $bridgeInfo = $bridgeBindings[(int)$idx] ?? null;
+                        
                         $wifiInterfaces[] = [
                             'index' => $idx,
                             'band' => $bandLabel,
@@ -5133,7 +5136,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             'bind_wan' => $bindWan,
                             'broadcast' => $parseBool($data['SSIDAdvertisementEnabled'] ?? null, true),
                             'security' => $data['BeaconType'] ?? '',
-                            'path' => "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
+                            'path' => "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}",
+                            'bridge' => $bridgeInfo ? [
+                                'has_bridge' => true,
+                                'vlan' => $bridgeInfo['vlan'],
+                                'wan_name' => $bridgeInfo['wan_name'],
+                                'bridge_name' => $bridgeInfo['bridge_name'],
+                                'conn_device' => $bridgeInfo['conn_device'],
+                            ] : null
                         ];
                     }
                     
@@ -9765,19 +9775,24 @@ try {
                             adminCell.textContent = isEnabled ? 'Enabled' : 'Disabled';
                         }
                         
-                        // Update Mode column
+                        // Update Mode column - check bridge bindings first, then WLAN-level config
                         const modeCell = row.querySelector('.wifi-mode');
                         if (modeCell) {
+                            const bridge = iface.bridge;
                             const connMode = iface.conn_mode || '';
                             const vlanId = iface.vlan_id || '';
-                            if (vlanId) {
-                                modeCell.textContent = 'Access VLAN: ' + vlanId;
+                            if (bridge && bridge.has_bridge && bridge.vlan) {
+                                modeCell.innerHTML = '<span class="badge bg-info text-dark">Bridge VLAN ' + bridge.vlan + '</span>';
+                            } else if (bridge && bridge.has_bridge) {
+                                modeCell.innerHTML = '<span class="badge bg-warning text-dark">Bridge (no VLAN)</span>';
+                            } else if (vlanId) {
+                                modeCell.innerHTML = '<span class="badge bg-info text-dark">VLAN ' + vlanId + '</span>';
                             } else if (connMode && connMode.toLowerCase().includes('bridge')) {
-                                modeCell.textContent = 'Bridge';
+                                modeCell.innerHTML = '<span class="badge bg-secondary">Bridge</span>';
                             } else if (connMode && connMode.toLowerCase().includes('route')) {
-                                modeCell.textContent = 'Route';
+                                modeCell.innerHTML = '<span class="badge bg-success">Route</span>';
                             } else {
-                                modeCell.textContent = 'LAN';
+                                modeCell.innerHTML = '<span class="badge bg-light text-dark">LAN</span>';
                             }
                         }
                         
@@ -20741,16 +20756,25 @@ function saveDeviceStatus() {
                 if (iface.channel > 0) {
                     html += '<div class="mb-1"><small class="text-muted">Channel:</small> <span>' + iface.channel + '</span></div>';
                 }
-                // Show VLAN and connection mode info
-                if (iface.vlan_id) {
+                // Show bridge/VLAN and connection mode info
+                if (iface.bridge && iface.bridge.has_bridge) {
+                    html += '<div class="mb-1"><small class="text-muted">Mode:</small> <span class="badge bg-warning text-dark">Bridge</span>';
+                    if (iface.bridge.vlan) {
+                        html += ' <small class="text-muted">VLAN:</small> <span class="badge bg-info">' + iface.bridge.vlan + '</span>';
+                    }
+                    html += '</div>';
+                    if (iface.bridge.bridge_name) {
+                        html += '<div class="mb-1"><small class="text-muted">WAN:</small> <span class="badge bg-secondary">' + escapeHtml(iface.bridge.bridge_name) + '</span></div>';
+                    }
+                } else if (iface.vlan_id) {
                     html += '<div class="mb-1"><small class="text-muted">VLAN:</small> <span class="badge bg-info">' + iface.vlan_id + '</span>';
                     if (iface.vlan_mode) html += ' <small>(' + escapeHtml(iface.vlan_mode) + ')</small>';
                     html += '</div>';
                 }
-                if (iface.conn_mode) {
+                if (!iface.bridge && iface.conn_mode) {
                     html += '<div class="mb-1"><small class="text-muted">Mode:</small> <span>' + escapeHtml(iface.conn_mode) + '</span></div>';
                 }
-                if (iface.bind_wan) {
+                if (!iface.bridge && iface.bind_wan) {
                     html += '<div class="mb-1"><small class="text-muted">WAN:</small> <span class="badge bg-secondary">' + escapeHtml(iface.bind_wan) + '</span></div>';
                 }
                 html += '</div>';
@@ -21173,21 +21197,32 @@ function saveDeviceStatus() {
                     html += '<option value="Open" ' + (w.encryption === 'Open' || w.encryption === 'None' || (!w.encryption && !w.password) ? 'selected' : '') + '>Open</option>';
                     html += '</select></div>';
                     
+                    // Determine effective mode from bridge binding or conn_mode
+                    const hasBridge = w.bridge && w.bridge.has_bridge;
+                    const effectiveMode = hasBridge ? 'bridge' : (w.conn_mode || 'route');
+                    const effectiveVlan = (hasBridge && w.bridge.vlan) ? w.bridge.vlan : (w.vlan_id || '');
+                    
                     // Connection Mode
                     html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Mode</label><select class="form-select form-select-sm" id="wifiConnMode' + idx + '" onchange="onConnModeChange(' + idx + ')">';
-                    html += '<option value="route" ' + (w.conn_mode !== 'bridge' ? 'selected' : '') + '>Route (NAT)</option>';
-                    html += '<option value="bridge" ' + (w.conn_mode === 'bridge' ? 'selected' : '') + '>Bridge</option>';
+                    html += '<option value="route" ' + (effectiveMode !== 'bridge' ? 'selected' : '') + '>Route (NAT)</option>';
+                    html += '<option value="bridge" ' + (effectiveMode === 'bridge' ? 'selected' : '') + '>Bridge</option>';
                     html += '</select></div>';
                     
                     // Access VLAN
                     html += '<div class="col-3"><label class="form-label small mb-0 text-muted">Access VLAN</label>';
-                    html += '<input type="number" class="form-control form-control-sm" id="wifiVlan' + idx + '" value="' + (w.vlan_id || '') + '" placeholder="e.g. 100" min="1" max="4094" ' + (w.conn_mode !== 'bridge' ? 'disabled' : '') + '></div>';
+                    html += '<input type="number" class="form-control form-control-sm" id="wifiVlan' + idx + '" value="' + effectiveVlan + '" placeholder="e.g. 100" min="1" max="4094" ' + (effectiveMode !== 'bridge' ? 'disabled' : '') + '></div>';
                     html += '</div>';
                     
                     // Save button row
                     html += '<div class="d-flex justify-content-between align-items-center border-top pt-2 mt-2">';
-                    if (w.vlan_id) {
-                        html += '<small class="text-muted"><i class="bi bi-tag me-1"></i>VLAN: <span class="badge bg-info">' + w.vlan_id + '</span></small>';
+                    if (hasBridge && w.bridge.vlan) {
+                        html += '<small class="text-muted"><i class="bi bi-diagram-3 me-1"></i>Bridge: <span class="badge bg-info">VLAN ' + w.bridge.vlan + '</span>';
+                        if (w.bridge.bridge_name) html += ' <span class="text-muted small">(' + escapeHtml(w.bridge.bridge_name) + ')</span>';
+                        html += '</small>';
+                    } else if (hasBridge) {
+                        html += '<small class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Bridge active (no VLAN set)</small>';
+                    } else if (effectiveVlan) {
+                        html += '<small class="text-muted"><i class="bi bi-tag me-1"></i>VLAN: <span class="badge bg-info">' + effectiveVlan + '</span></small>';
                     } else {
                         html += '<small class="text-muted"><i class="bi bi-info-circle me-1"></i>Bridge mode required for VLAN</small>';
                     }
