@@ -98,7 +98,11 @@ try {
     }
     
     $isActive = $subscription['status'] === 'active';
-    $isExpiredByDate = !empty($subscription['expiry_date']) && strtotime($subscription['expiry_date']) < time();
+    $expiryTs = !empty($subscription['expiry_date']) ? strtotime($subscription['expiry_date']) : 0;
+    if ($expiryTs > 0 && $expiryTs == strtotime(date('Y-m-d', $expiryTs))) {
+        $expiryTs = strtotime(date('Y-m-d', $expiryTs) . ' 23:59:59');
+    }
+    $isExpiredByDate = $expiryTs > 0 && $expiryTs < time();
     
     error_log("HOTSPOT-STATUS: sub={$subscription['id']}, status={$subscription['status']}, expiry={$subscription['expiry_date']}, isActive={$isActive}, isExpiredByDate={$isExpiredByDate}");
     

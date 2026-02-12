@@ -1,0 +1,39 @@
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=pending_payment, expiry=2026-02-12, isActive=, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:33 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=pending_payment, expiry=2026-02-12, isActive=, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:37 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=10 (username: HS-40AB74D6)
+isp_crm_php  | NOTICE: PHP message: RADIUS: Activated hotspot subscription ID=10, expires: 2026-02-12 22:09:37
+isp_crm_php  | NOTICE: PHP message: RADIUS Payment: amount=10, packagePrice=10, currentBalance=0, subscriptionId=10
+isp_crm_php  | NOTICE: PHP message: RADIUS subscription renewed for HS-40AB74D6 via M-Pesa UBCF06NPGQ
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:37 +0300 "POST /index.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=10 (username: HS-40AB74D6)
+isp_crm_php  | NOTICE: PHP message: RADIUS: Duplicate payment ignored - transaction UBCF06NPGQ already processed
+isp_crm_php  | NOTICE: PHP message: RADIUS: Skipping duplicate SMS for HS-40AB74D6 - payment already processed. Ref: UBCF06NPGQ
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:38 +0300 "POST /index.php" 200
+isp_crm_php  | NOTICE: PHP message: RADIUS: Found subscription by ID=10 (username: HS-40AB74D6)
+isp_crm_php  | NOTICE: PHP message: RADIUS: Duplicate payment ignored - transaction UBCF06NPGQ already processed
+isp_crm_php  | NOTICE: PHP message: RADIUS: Skipping duplicate SMS for HS-40AB74D6 - payment already processed. Ref: UBCF06NPGQ
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:38 +0300 "POST /index.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:40 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:43 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:46 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:49 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:52 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:56 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:09:59 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:10:01 +0300 "GET /cron.php" 403
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:10:02 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:10:05 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:10:05 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.9 -  12/Feb/2026:21:10:08 +0300 "GET /api/hotspot-payment-status.php" 200
+isp_crm_php  | NOTICE: PHP message: HOTSPOT-STATUS: sub=10, status=active, expiry=2026-02-12, isActive=1, isExpiredByDate=1

@@ -65,6 +65,16 @@ class RadiusBilling {
         return openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv);
     }
     
+    private function isDateExpired(?string $expiryDate): bool {
+        if (empty($expiryDate)) return false;
+        $ts = strtotime($expiryDate);
+        if ($ts === false) return false;
+        if ($ts == strtotime(date('Y-m-d', $ts))) {
+            $ts = strtotime(date('Y-m-d', $ts) . ' 23:59:59');
+        }
+        return $ts < time();
+    }
+
     private function castBoolean($value, bool $default = false): string {
         if ($value === '' || $value === null) {
             return $default ? 'true' : 'false';
@@ -788,7 +798,7 @@ class RadiusBilling {
             $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($sub) {
-                $sub['is_expired'] = !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time();
+                $sub['is_expired'] = $this->isDateExpired($sub['expiry_date']);
                 return $sub;
             }
         } catch (\Exception $e) {
@@ -808,7 +818,7 @@ class RadiusBilling {
         $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($sub) {
-            $sub['is_expired'] = !empty($sub['expiry_date']) && strtotime($sub['expiry_date']) < time();
+            $sub['is_expired'] = $this->isDateExpired($sub['expiry_date']);
         }
         
         return $sub ?: null;
@@ -1899,7 +1909,7 @@ class RadiusBilling {
         
         // Check if expired
         $isExpired = false;
-        if ($sub['status'] === 'expired' || ($sub['expiry_date'] && strtotime($sub['expiry_date']) < time())) {
+        if ($sub['status'] === 'expired' || $this->isDateExpired($sub['expiry_date'])) {
             // Check grace period
             $graceDays = $sub['grace_period_days'] ?? 0;
             $graceEnd = strtotime($sub['expiry_date'] . " +{$graceDays} days");
@@ -2362,7 +2372,7 @@ class RadiusBilling {
         }
         
         // Check expiry
-        if ($sub['expiry_date'] && strtotime($sub['expiry_date']) < time()) {
+        if ($this->isDateExpired($sub['expiry_date'])) {
             $useExpiredPool = (bool)$this->getSetting('use_expired_pool', false);
             if ($useExpiredPool) {
                 return [
@@ -2522,7 +2532,7 @@ class RadiusBilling {
         $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($sub) {
-            $sub['is_expired'] = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
+            $sub['is_expired'] = $this->isDateExpired($sub['expiry_date']);
             $sub['mac_formatted'] = $macFormatted;
         }
         
