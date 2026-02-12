@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS radius_packages (
     burst_time VARCHAR(20),
     priority INTEGER DEFAULT 8,
     address_pool VARCHAR(100),
+    mikrotik_profile VARCHAR(100),
     ip_binding BOOLEAN DEFAULT FALSE,
     simultaneous_sessions INTEGER DEFAULT 1,
     fup_enabled BOOLEAN DEFAULT FALSE,
