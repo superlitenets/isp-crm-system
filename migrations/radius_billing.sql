@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS radius_packages (
     billing_type VARCHAR(20) DEFAULT 'monthly', -- daily, weekly, monthly, quarterly, yearly, unlimited, quota
     price DECIMAL(10,2) NOT NULL DEFAULT 0,
     validity_days INTEGER DEFAULT 30,
+    session_duration_hours NUMERIC, -- For sub-day hotspot packages (e.g., 0.083 = 5min, 1, 12, 24)
     data_quota_mb BIGINT, -- NULL for unlimited
     download_speed VARCHAR(20), -- e.g., "10M"
     upload_speed VARCHAR(20), -- e.g., "5M"
@@ -356,6 +357,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_macs_single_primary ON radius
 
 -- Add mikrotik_profile to packages for MikroTik user profile assignment
 ALTER TABLE radius_packages ADD COLUMN IF NOT EXISTS mikrotik_profile VARCHAR(100);
+
+-- Add session_duration_hours to packages for sub-day hotspot duration support
+ALTER TABLE radius_packages ADD COLUMN IF NOT EXISTS session_duration_hours NUMERIC;
 
 -- Upgrade expiry_date from DATE to TIMESTAMP for sub-day hotspot package support (5min, 1hr, etc.)
 ALTER TABLE radius_subscriptions ALTER COLUMN expiry_date TYPE TIMESTAMP USING expiry_date::TIMESTAMP;
