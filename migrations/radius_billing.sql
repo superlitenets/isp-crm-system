@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS radius_subscriptions (
     mac_address VARCHAR(17),
     status VARCHAR(20) DEFAULT 'active', -- active, suspended, expired, terminated
     start_date DATE,
-    expiry_date DATE,
+    expiry_date TIMESTAMP,
     data_used_mb BIGINT DEFAULT 0,
     last_session_start TIMESTAMP,
     last_session_end TIMESTAMP,

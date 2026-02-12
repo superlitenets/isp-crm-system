@@ -1230,7 +1230,7 @@ class RadiusBilling {
             
             // Check if was inactive (never activated) or expired
             $wasInactive = ($sub['status'] === 'inactive' || empty($sub['start_date']));
-            $wasExpired = ($sub['status'] !== 'active' || (isset($sub['expiry_date']) && $sub['expiry_date'] < date('Y-m-d')));
+            $wasExpired = ($sub['status'] !== 'active' || (isset($sub['expiry_date']) && strtotime($sub['expiry_date']) < time()));
             
             $packageId = $packageId ?? $sub['package_id'];
             $package = $this->getPackage($packageId);
@@ -1992,6 +1992,14 @@ class RadiusBilling {
         
         if ($sub['static_ip']) {
             $attributes['Framed-IP-Address'] = $sub['static_ip'];
+        }
+        
+        // Set Session-Timeout based on remaining time until expiry
+        if (!empty($sub['expiry_date'])) {
+            $remainingSeconds = max(0, strtotime($sub['expiry_date']) - time());
+            if ($remainingSeconds > 0) {
+                $attributes['Session-Timeout'] = $remainingSeconds;
+            }
         }
         
         // Auto-assign NAS ID based on the NAS IP the user connected through
