@@ -1366,6 +1366,52 @@ document.getElementById('mpesaPaymentForm').addEventListener('submit', function(
 
 <?php elseif ($subpage === 'payments'): ?>
 
+<?php $mpesaStats = $accounting->getMpesaPaymentStats(); ?>
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-success bg-opacity-10 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1">M-Pesa Today</h6>
+                        <h3 class="mb-0 text-success">KES <?= number_format($mpesaStats['today_total'], 2) ?></h3>
+                        <small class="text-muted"><?= $mpesaStats['today_count'] ?> transaction<?= $mpesaStats['today_count'] != 1 ? 's' : '' ?></small>
+                    </div>
+                    <i class="bi bi-phone text-success" style="font-size: 2rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-primary bg-opacity-10 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1">M-Pesa This Month</h6>
+                        <h3 class="mb-0 text-primary">KES <?= number_format($mpesaStats['month_total'], 2) ?></h3>
+                        <small class="text-muted"><?= $mpesaStats['month_count'] ?> transaction<?= $mpesaStats['month_count'] != 1 ? 's' : '' ?> in <?= date('F') ?></small>
+                    </div>
+                    <i class="bi bi-calendar-check text-primary" style="font-size: 2rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info bg-opacity-10 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1">M-Pesa All Time</h6>
+                        <h3 class="mb-0 text-info">KES <?= number_format($mpesaStats['all_time_total'], 2) ?></h3>
+                        <small class="text-muted"><?= $mpesaStats['all_time_count'] ?> total transaction<?= $mpesaStats['all_time_count'] != 1 ? 's' : '' ?></small>
+                    </div>
+                    <i class="bi bi-graph-up text-info" style="font-size: 2rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-4">
     <div class="col-md-4">
         <div class="card">

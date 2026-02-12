@@ -842,6 +842,32 @@ class Accounting {
         return $stats;
     }
     
+    public function getMpesaPaymentStats(): array {
+        $stats = [];
+        $monthStart = date('Y-m-01');
+        $monthEnd = date('Y-m-t');
+        $today = date('Y-m-d');
+        
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM customer_payments WHERE payment_method = 'mpesa' AND payment_date BETWEEN ? AND ?");
+        $stmt->execute([$monthStart, $monthEnd]);
+        $row = $stmt->fetch(\PDO::FETCH_NUM);
+        $stats['month_total'] = $row[0];
+        $stats['month_count'] = $row[1];
+        
+        $stmt = $this->db->prepare("SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM customer_payments WHERE payment_method = 'mpesa' AND payment_date = ?");
+        $stmt->execute([$today]);
+        $row = $stmt->fetch(\PDO::FETCH_NUM);
+        $stats['today_total'] = $row[0];
+        $stats['today_count'] = $row[1];
+        
+        $stmt = $this->db->query("SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM customer_payments WHERE payment_method = 'mpesa'");
+        $row = $stmt->fetch(\PDO::FETCH_NUM);
+        $stats['all_time_total'] = $row[0];
+        $stats['all_time_count'] = $row[1];
+        
+        return $stats;
+    }
+    
     // Chart of Accounts
     public function getChartOfAccounts(): array {
         return $this->db->query("SELECT * FROM chart_of_accounts WHERE is_active = true ORDER BY code")->fetchAll(\PDO::FETCH_ASSOC);
