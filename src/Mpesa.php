@@ -502,6 +502,11 @@ class Mpesa {
             if ($updated && $resultCode === 0 && $amount > 0) {
                 $this->applyPaymentToInvoiceFromCallback($checkoutRequestId, $amount, $receiptNumber);
                 $this->processRadiusPayment($checkoutRequestId, $amount, $receiptNumber, $phoneNumber);
+                
+                $custStmt = $this->db->prepare("SELECT customer_id FROM mpesa_transactions WHERE checkout_request_id = ?");
+                $custStmt->execute([$checkoutRequestId]);
+                $custRow = $custStmt->fetch(\PDO::FETCH_ASSOC);
+                $this->logToFinanceModule($amount, $receiptNumber, $phoneNumber, $custRow['customer_id'] ?? null, 'STK Push');
             }
             
             return $updated;
@@ -761,6 +766,14 @@ class Mpesa {
                     $data['TransID'] ?? '',
                     $data['MSISDN'] ?? ''
                 );
+                
+                $this->logToFinanceModule(
+                    (float)($data['TransAmount'] ?? 0),
+                    $data['TransID'] ?? null,
+                    $data['MSISDN'] ?? null,
+                    $customerId,
+                    'C2B'
+                );
             }
             
             return $result;
@@ -907,6 +920,33 @@ class Mpesa {
         }
     }
     
+    private function logToFinanceModule(float $amount, ?string $receiptNumber, ?string $phoneNumber, ?int $customerId, string $source = 'STK Push'): void {
+        try {
+            $exists = $this->db->prepare("SELECT id FROM customer_payments WHERE mpesa_receipt = ? LIMIT 1");
+            $exists->execute([$receiptNumber]);
+            if ($exists->fetch()) return;
+
+            $nextNum = 'MPESA-' . date('Ymd') . '-' . substr(md5($receiptNumber ?? uniqid()), 0, 6);
+
+            $stmt = $this->db->prepare("
+                INSERT INTO customer_payments (payment_number, customer_id, invoice_id, payment_date, amount, 
+                    payment_method, mpesa_receipt, reference, notes, status)
+                VALUES (?, ?, NULL, ?, ?, 'mpesa', ?, ?, ?, 'completed')
+            ");
+            $stmt->execute([
+                $nextNum,
+                $customerId,
+                date('Y-m-d'),
+                $amount,
+                $receiptNumber,
+                $phoneNumber,
+                "M-Pesa {$source} payment. Receipt: {$receiptNumber}"
+            ]);
+        } catch (\Exception $e) {
+            error_log("Finance module logging error: " . $e->getMessage());
+        }
+    }
+
     private function columnExists(string $table, string $column): bool {
         try {
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?");
