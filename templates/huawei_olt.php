@@ -7462,6 +7462,28 @@ try {
                     font-size: 0.7rem;
                     font-weight: 700;
                 }
+                .quick-action-btn {
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 16px;
+                    text-align: center;
+                    transition: all 0.2s ease;
+                    text-decoration: none;
+                    color: #334155;
+                    display: block;
+                }
+                .quick-action-btn:hover {
+                    border-color: #3b82f6;
+                    color: #3b82f6;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+                }
+                .quick-action-btn i {
+                    font-size: 1.5rem;
+                    margin-bottom: 8px;
+                    display: block;
+                }
                 .alert-item {
                     padding: 12px 16px;
                     border-left: 3px solid;
@@ -7530,7 +7552,7 @@ try {
             
             <!-- Primary Stats Row -->
             <div class="row g-4 mb-4">
-                <div class="col-lg-3 col-md-6">
+                <div class="col-xl col-md-6">
                     <div class="mega-stat h-100">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="stat-icon-lg bg-primary bg-opacity-10 text-primary">
@@ -7547,7 +7569,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6">
+                <div class="col-xl col-md-6">
                     <div class="mega-stat h-100">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="stat-icon-lg bg-success bg-opacity-10 text-success">
@@ -7564,26 +7586,41 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6">
+                <div class="col-xl col-md-6">
+                    <div class="mega-stat h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="stat-icon-lg bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-wifi-off"></i>
+                            </div>
+                            <a href="?page=huawei-olt&view=onus&status=offline" class="stat-trend <?= $stats['offline_onus'] > 0 ? 'bg-secondary bg-opacity-10 text-secondary' : 'bg-success bg-opacity-10 text-success' ?> text-decoration-none">
+                                <?= $stats['offline_onus'] > 0 ? '<i class="bi bi-x-circle"></i> Down' : '<i class="bi bi-check-circle"></i> OK' ?>
+                            </a>
+                        </div>
+                        <div class="stat-number text-secondary"><?= $stats['offline_onus'] ?></div>
+                        <div class="text-muted mb-2">Offline</div>
+                        <div class="small text-muted">
+                            <i class="bi bi-power me-1"></i>Disconnected devices
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl col-md-6">
                     <div class="mega-stat h-100">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="stat-icon-lg bg-danger bg-opacity-10 text-danger">
                                 <i class="bi bi-exclamation-triangle"></i>
                             </div>
-                            <?php $offlineTotal = $stats['offline_onus'] + $stats['los_onus']; ?>
-                            <span class="stat-trend <?= $offlineTotal > 0 ? 'bg-danger bg-opacity-10 text-danger' : 'bg-success bg-opacity-10 text-success' ?>">
-                                <?= $offlineTotal > 0 ? '<i class="bi bi-exclamation-circle"></i> Issues' : '<i class="bi bi-check-circle"></i> OK' ?>
-                            </span>
+                            <a href="?page=huawei-olt&view=onus&status=los" class="stat-trend <?= $stats['los_onus'] > 0 ? 'bg-danger bg-opacity-10 text-danger' : 'bg-success bg-opacity-10 text-success' ?> text-decoration-none">
+                                <?= $stats['los_onus'] > 0 ? '<i class="bi bi-exclamation-circle"></i> Alert' : '<i class="bi bi-check-circle"></i> OK' ?>
+                            </a>
                         </div>
-                        <div class="stat-number text-danger"><?= $offlineTotal ?></div>
-                        <div class="text-muted mb-2">Offline / LOS</div>
-                        <div class="d-flex gap-2 small">
-                            <span class="text-muted"><i class="bi bi-x-circle me-1"></i><?= $stats['offline_onus'] ?> Offline</span>
-                            <span class="text-muted"><i class="bi bi-exclamation-diamond me-1"></i><?= $stats['los_onus'] ?> LOS</span>
+                        <div class="stat-number text-danger"><?= $stats['los_onus'] ?></div>
+                        <div class="text-muted mb-2">LOS (Loss of Signal)</div>
+                        <div class="small text-muted">
+                            <i class="bi bi-lightning me-1"></i>Fiber or power issues
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6">
+                <div class="col-xl col-md-6">
                     <div class="mega-stat h-100">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="stat-icon-lg bg-warning bg-opacity-10 text-warning">
@@ -7725,10 +7762,47 @@ try {
                 </div>
             </div>
             
-            <!-- Alerts & Activity Row -->
+            <!-- Quick Actions & Alerts Row -->
             <div class="row g-4 mb-4">
+                <!-- Quick Actions -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
+                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-lightning me-2 text-warning"></i>Quick Actions</h5>
+                        </div>
+                        <div class="card-body px-4 pb-4">
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="quick-action-btn">
+                                        <i class="bi bi-plus-circle text-success"></i>
+                                        <div class="fw-medium">Authorize ONUs</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=live_monitor" class="quick-action-btn">
+                                        <i class="bi bi-broadcast text-primary"></i>
+                                        <div class="fw-medium">Live Monitor</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=tr069" class="quick-action-btn">
+                                        <i class="bi bi-router text-info"></i>
+                                        <div class="fw-medium">TR-069</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=terminal" class="quick-action-btn">
+                                        <i class="bi bi-terminal text-dark"></i>
+                                        <div class="fw-medium">CLI Terminal</div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Recent Alerts -->
-                <div class="col-lg-6">
+                <div class="col-lg-4">
                     <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
                         <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
                             <h5 class="mb-0 fw-bold"><i class="bi bi-bell me-2 text-danger"></i>Recent Alerts</h5>
@@ -7761,7 +7835,7 @@ try {
                 </div>
                 
                 <!-- Problem ONUs -->
-                <div class="col-lg-6">
+                <div class="col-lg-4">
                     <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
                         <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
                             <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-diamond me-2 text-warning"></i>Problem ONUs</h5>
