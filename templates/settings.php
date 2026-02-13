@@ -1492,6 +1492,39 @@ function resetToDefaults() {
                     </div>
                     
                     <hr class="my-3">
+                    <h6 class="text-primary"><i class="bi bi-clock-history"></i> SLA Notifications</h6>
+                    <p class="text-muted small mb-2">SLA warning and breach alerts are sent via WhatsApp to assigned technicians automatically every 5 minutes via the cron job.</p>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">SLA Notifications</label>
+                            <select class="form-select" name="sla_notifications_enabled">
+                                <option value="1" <?= $settings->get('sla_notifications_enabled', '1') === '1' ? 'selected' : '' ?>>Enabled</option>
+                                <option value="0" <?= $settings->get('sla_notifications_enabled', '1') === '0' ? 'selected' : '' ?>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Supervisor Phone (Breach Escalation)</label>
+                            <input type="text" class="form-control" name="sla_supervisor_phone" 
+                                   value="<?= htmlspecialchars($settings->get('sla_supervisor_phone', '')) ?>"
+                                   placeholder="e.g. 254712345678">
+                            <div class="form-text">Gets summary of all SLA breaches</div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary"><i class="bi bi-alarm"></i> Daily Attendance Reminder</h6>
+                    <p class="text-muted small mb-2">WhatsApp reminder sent to all employees who haven't clocked in, Monday to Saturday.</p>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Reminder Time</label>
+                            <select class="form-select" name="attendance_reminder_hour">
+                                <?php for ($h = 5; $h <= 9; $h++): ?>
+                                <option value="<?= $h ?>" <?= $settings->get('attendance_reminder_hour', '7') == $h ? 'selected' : '' ?>><?= sprintf('%02d:00', $h) ?> (<?= date('h:i A', strtotime("$h:00")) ?>)</option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
                     
                     <div class="row g-3">
                         <div class="col-md-8">

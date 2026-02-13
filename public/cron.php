@@ -476,6 +476,8 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
 function checkAndSendScheduledSummaries(\PDO $db, \App\Settings $settings): void {
     $currentHour = (int)date('H');
     $currentMinute = (int)date('i');
+    $today = date('Y-m-d');
+    $results = [];
     
     $morningHour = (int)$settings->get('daily_summary_morning_hour', '7');
     $eveningHour = (int)$settings->get('daily_summary_evening_hour', '18');
@@ -493,24 +495,45 @@ function checkAndSendScheduledSummaries(\PDO $db, \App\Settings $settings): void
     
     if ($shouldSend) {
         $lastSent = $settings->get('last_daily_summary_' . $summaryType, '');
-        $today = date('Y-m-d');
         
         if ($lastSent !== $today) {
             sendDailySummaryToGroups($db, $settings);
             $settings->set('last_daily_summary_' . $summaryType, $today);
-            echo json_encode(['sent' => true, 'type' => $summaryType]);
+            $results['daily_summary'] = ['sent' => true, 'type' => $summaryType];
         } else {
-            echo json_encode(['sent' => false, 'reason' => 'Already sent today', 'type' => $summaryType]);
+            $results['daily_summary'] = ['sent' => false, 'reason' => 'Already sent today', 'type' => $summaryType];
         }
     } else {
-        echo json_encode([
-            'sent' => false, 
-            'reason' => 'Not scheduled time',
-            'current_hour' => $currentHour,
-            'morning_hour' => $morningHour,
-            'evening_hour' => $eveningHour
-        ]);
+        $results['daily_summary'] = ['sent' => false, 'reason' => 'Not scheduled time'];
     }
+
+    $slaEnabled = $settings->get('sla_notifications_enabled', '1') === '1';
+    if ($slaEnabled) {
+        ob_start();
+        checkSLAApproachingAndBreached($db, $settings);
+        $slaOutput = ob_get_clean();
+        $results['sla_notifications'] = json_decode($slaOutput, true) ?? ['error' => 'Failed to parse output'];
+    } else {
+        $results['sla_notifications'] = ['skipped' => true, 'reason' => 'SLA notifications disabled'];
+    }
+
+    $attendanceReminderHour = (int)$settings->get('attendance_reminder_hour', '7');
+    if ($currentHour === $attendanceReminderHour && $currentMinute < 5) {
+        $lastReminder = $settings->get('last_attendance_reminder', '');
+        if ($lastReminder !== $today) {
+            ob_start();
+            sendDailyAttendanceReminder($db, $settings);
+            $reminderOutput = ob_get_clean();
+            $settings->set('last_attendance_reminder', $today);
+            $results['attendance_reminder'] = json_decode($reminderOutput, true) ?? ['error' => 'Failed to parse output'];
+        } else {
+            $results['attendance_reminder'] = ['sent' => false, 'reason' => 'Already sent today'];
+        }
+    } else {
+        $results['attendance_reminder'] = ['sent' => false, 'reason' => 'Not scheduled time', 'scheduled_hour' => $attendanceReminderHour];
+    }
+
+    echo json_encode($results);
 }
 
 function syncAttendanceFromDevices(\PDO $db): void {
@@ -759,8 +782,8 @@ function checkSLAApproachingAndBreached(\PDO $db, \App\Settings $settings): void
 
     $stmt = $db->query("
         SELECT t.*, 
-               c.full_name AS customer_name, c.phone AS customer_phone,
-               u.full_name AS technician_name, u.phone AS technician_phone,
+               c.name AS customer_name, c.phone AS customer_phone,
+               u.name AS technician_name, u.phone AS technician_phone,
                u.email AS technician_email
         FROM tickets t
         LEFT JOIN customers c ON t.customer_id = c.id
@@ -873,10 +896,9 @@ function sendDailyAttendanceReminder(\PDO $db, \App\Settings $settings): void {
     $workStartFormatted = date('g:i A', strtotime($workStartTime));
 
     $stmt = $db->query("
-        SELECT id, full_name, phone 
+        SELECT id, name, phone 
         FROM users 
-        WHERE status = 'active' 
-          AND role != 'customer'
+        WHERE role != 'customer'
           AND phone IS NOT NULL 
           AND phone != ''
     ");
@@ -895,7 +917,7 @@ function sendDailyAttendanceReminder(\PDO $db, \App\Settings $settings): void {
             continue;
         }
 
-        $message = "Good morning {$emp['full_name']}!\n\n";
+        $message = "Good morning {$emp['name']}!\n\n";
         $message .= "This is your daily attendance reminder.\n";
         $message .= "Please clock in before {$workStartFormatted}.\n\n";
         $message .= "Have a productive day!\n";
@@ -905,7 +927,7 @@ function sendDailyAttendanceReminder(\PDO $db, \App\Settings $settings): void {
         if ($result['success'] ?? false) {
             $sent++;
         } else {
-            $errors[] = "Failed for {$emp['full_name']}: " . ($result['error'] ?? 'unknown');
+            $errors[] = "Failed for {$emp['name']}: " . ($result['error'] ?? 'unknown');
         }
     }
 

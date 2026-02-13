@@ -371,7 +371,10 @@ class Settings {
             'daily_summary_evening_hour',
             'whatsapp_operations_group_id',
             'wa_provisioning_group',
-            'min_clock_out_hour'
+            'min_clock_out_hour',
+            'sla_notifications_enabled',
+            'sla_supervisor_phone',
+            'attendance_reminder_hour'
         ];
         
         $this->set('whatsapp_enabled', $data['whatsapp_enabled'] ?? '1');
