@@ -2555,6 +2555,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $message = 'No authorized ONUs found for this OLT';
                         $messageType = 'warning';
                     } else {
+                        $huaweiOLT->clearTR069ProfileCredentials($oltId, $profileId);
+                        
                         $bound = 0;
                         $rebooted = 0;
                         $failed = 0;
