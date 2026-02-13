@@ -7930,7 +7930,10 @@ CREATE TABLE IF NOT EXISTS public.tickets (
     escalation_count integer DEFAULT 0,
     satisfaction_rating integer,
     closed_at timestamp without time zone,
-    branch_id integer
+    branch_id integer,
+    sla_started_at timestamp without time zone,
+    sla_breach_notified_at timestamp without time zone,
+    sla_warning_notified_at timestamp without time zone
 );
 
 
@@ -17841,4 +17844,20 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
+-- ============================================================================
+-- SLA Assignment-Based Timer Columns (for existing databases)
+-- ============================================================================
+DO $$ BEGIN
+    ALTER TABLE public.tickets ADD COLUMN sla_started_at timestamp without time zone;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 
+DO $$ BEGIN
+    ALTER TABLE public.tickets ADD COLUMN sla_breach_notified_at timestamp without time zone;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE public.tickets ADD COLUMN sla_warning_notified_at timestamp without time zone;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
