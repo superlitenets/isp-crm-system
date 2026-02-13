@@ -2408,11 +2408,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                     if ($zoneRow) {
                                         $zoneId = $zoneRow['id'];
                                     } else {
-                                        $stmt = $db->prepare("INSERT INTO huawei_zones (name, is_active, created_at) VALUES (?, true, NOW()) RETURNING id");
-                                        $stmt->execute([$zone]);
-                                        $newZone = $stmt->fetch(\PDO::FETCH_ASSOC);
-                                        $zoneId = $newZone['id'] ?? null;
-                                        $zonesCreated++;
+                                        try {
+                                            $stmt = $db->prepare("INSERT INTO huawei_zones (name, is_active, created_at) VALUES (?, true, NOW()) ON CONFLICT DO NOTHING RETURNING id");
+                                            $stmt->execute([$zone]);
+                                            $newZone = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                            if ($newZone) {
+                                                $zoneId = $newZone['id'];
+                                                $zonesCreated++;
+                                            } else {
+                                                $stmt = $db->prepare("SELECT id FROM huawei_zones WHERE LOWER(name) = LOWER(?) LIMIT 1");
+                                                $stmt->execute([$zone]);
+                                                $fallback = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                                $zoneId = $fallback['id'] ?? null;
+                                            }
+                                        } catch (\Exception $e) {
+                                            $stmt = $db->prepare("SELECT id FROM huawei_zones WHERE LOWER(name) = LOWER(?) LIMIT 1");
+                                            $stmt->execute([$zone]);
+                                            $fallback = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                            $zoneId = $fallback['id'] ?? null;
+                                        }
                                     }
                                     $zoneCache[$zone] = $zoneId;
                                 }
