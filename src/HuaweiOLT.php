@@ -8764,7 +8764,14 @@ class HuaweiOLT {
         // Get current attached VLANs
         $attachedVlans = [];
         if (!empty($onu['attached_vlans'])) {
-            $attachedVlans = json_decode($onu['attached_vlans'], true) ?: [];
+            $decoded = json_decode($onu['attached_vlans'], true) ?: [];
+            foreach ($decoded as $v) {
+                if (is_array($v) && isset($v['vlan_id'])) {
+                    $attachedVlans[] = (int)$v['vlan_id'];
+                } elseif (is_numeric($v)) {
+                    $attachedVlans[] = (int)$v;
+                }
+            }
         } elseif (!empty($onu['vlan_id'])) {
             $attachedVlans = [(int)$onu['vlan_id']];
         }
@@ -8889,7 +8896,14 @@ class HuaweiOLT {
         // Get current attached VLANs
         $attachedVlans = [];
         if (!empty($onu['attached_vlans'])) {
-            $attachedVlans = json_decode($onu['attached_vlans'], true) ?: [];
+            $decoded = json_decode($onu['attached_vlans'], true) ?: [];
+            foreach ($decoded as $v) {
+                if (is_array($v) && isset($v['vlan_id'])) {
+                    $attachedVlans[] = (int)$v['vlan_id'];
+                } elseif (is_numeric($v)) {
+                    $attachedVlans[] = (int)$v;
+                }
+            }
         } elseif (!empty($onu['vlan_id'])) {
             $attachedVlans = [(int)$onu['vlan_id']];
         }
@@ -11815,27 +11829,31 @@ class HuaweiOLT {
                 $stmt->execute([$onuDbId, $entry['vlan_id'], $vlanName ?: null, $entry['port_mode']]);
             }
             
-            $existingJson = [];
+            $existingVlanIds = [];
             try {
                 $stmt = $this->db->prepare("SELECT attached_vlans FROM huawei_onus WHERE id = ?");
                 $stmt->execute([$onuDbId]);
                 $existing = $stmt->fetchColumn();
                 if ($existing) {
-                    $existingJson = json_decode($existing, true) ?: [];
+                    $decoded = json_decode($existing, true) ?: [];
+                    foreach ($decoded as $v) {
+                        if (is_array($v) && isset($v['vlan_id'])) {
+                            $existingVlanIds[(int)$v['vlan_id']] = true;
+                        } elseif (is_numeric($v)) {
+                            $existingVlanIds[(int)$v] = true;
+                        }
+                    }
                 }
             } catch (\Exception $e) {}
             
-            $existingMap = [];
-            foreach ($existingJson as $v) {
-                $existingMap[$v['vlan_id']] = $v;
-            }
             foreach ($newVlans as $entry) {
-                $existingMap[$entry['vlan_id']] = ['vlan_id' => $entry['vlan_id']];
+                $existingVlanIds[(int)$entry['vlan_id']] = true;
             }
             
-            $mergedJson = json_encode(array_values($existingMap));
+            $mergedList = array_map('intval', array_keys($existingVlanIds));
+            sort($mergedList);
             $stmt = $this->db->prepare("UPDATE huawei_onus SET attached_vlans = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $stmt->execute([$mergedJson, $onuDbId]);
+            $stmt->execute([json_encode($mergedList), $onuDbId]);
         } catch (\Exception $e) {
             // Non-critical - port config was still applied successfully
         }

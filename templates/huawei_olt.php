@@ -8907,11 +8907,18 @@ try {
             <?php 
             $attachedVlans = [];
             if (!empty($currentOnu['attached_vlans'])) {
-                $attachedVlans = json_decode($currentOnu['attached_vlans'], true) ?: [];
+                $decoded = json_decode($currentOnu['attached_vlans'], true) ?: [];
+                foreach ($decoded as $v) {
+                    if (is_array($v) && isset($v['vlan_id'])) {
+                        $attachedVlans[] = (int)$v['vlan_id'];
+                    } elseif (is_numeric($v)) {
+                        $attachedVlans[] = (int)$v;
+                    }
+                }
             }
-            if (empty($attachedVlans) && isset($db) && isset($currentOnu['onu_id'])) {
+            if (empty($attachedVlans) && isset($db) && isset($currentOnu['id'])) {
                 $svcStmt = $db->prepare("SELECT DISTINCT vlan_id FROM huawei_onu_service_vlans WHERE onu_id = ? ORDER BY vlan_id");
-                $svcStmt->execute([$currentOnu['onu_id']]);
+                $svcStmt->execute([$currentOnu['id']]);
                 $svcVlans = $svcStmt->fetchAll(PDO::FETCH_COLUMN);
                 if (!empty($svcVlans)) {
                     $attachedVlans = array_map('intval', $svcVlans);
