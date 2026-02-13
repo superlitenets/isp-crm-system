@@ -1312,6 +1312,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 try {
+                    $onu = $huaweiOLT->getONU($onuId);
+                    if ($onu && $onu['olt_id']) {
+                        $tr069ProfileId = $huaweiOLT->getTR069ProfileId();
+                        if ($tr069ProfileId) {
+                            $huaweiOLT->clearTR069ProfileCredentials($onu['olt_id'], $tr069ProfileId);
+                        }
+                    }
+                    
                     $result = $huaweiOLT->configureTR069Manual($onuId);
                     
                     if ($result['success']) {
