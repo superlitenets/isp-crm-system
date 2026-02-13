@@ -6941,29 +6941,36 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'No TR-069 profile ID configured in settings'];
         }
         
-        // Step 1: Bind ONU to TR-069 profile
+        // Step 1: Detach TR-069 profile (clears stored credentials in ONU flash)
         $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
+        $cmd1 .= "ont tr069-server-config {$port} {$onuId} profile-id 0\r\n";
         $cmd1 .= "quit";
         $result1 = $this->executeCommand($oltId, $cmd1);
-        $output .= "[Step 1: TR-069 Profile Binding]\n" . ($result1['output'] ?? '') . "\n";
+        $output .= "[Step 1: Detach TR-069 Profile]\n" . ($result1['output'] ?? '') . "\n";
+        
+        // Step 2: Reattach TR-069 profile with clean credentials
+        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd2 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
+        $cmd2 .= "quit";
+        $result2 = $this->executeCommand($oltId, $cmd2);
+        $output .= "[Step 2: Attach TR-069 Profile {$tr069ProfileId}]\n" . ($result2['output'] ?? '') . "\n";
         
         // Check for errors (ignore "already configured" messages)
-        $out1 = $result1['output'] ?? '';
-        if (!$result1['success'] || (preg_match('/Failure|Error:|failed|Invalid/i', $out1) && !preg_match('/already|repeatedly/i', $out1))) {
+        $out2 = $result2['output'] ?? '';
+        if (!$result2['success'] || (preg_match('/Failure|Error:|failed|Invalid/i', $out2) && !preg_match('/already|repeatedly/i', $out2))) {
             $errors[] = "TR-069 profile binding failed";
         }
         
-        // Step 2: Restart ONU to apply config
-        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd2 .= "ont reset {$port} {$onuId}\r\n";
-        $cmd2 .= "quit";
-        $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[Step 2: ONU Restart]\n" . ($result2['output'] ?? '') . "\n";
+        // Step 3: Restart ONU to apply config
+        $cmd3 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd3 .= "ont reset {$port} {$onuId}\r\n";
+        $cmd3 .= "quit";
+        $result3 = $this->executeCommand($oltId, $cmd3);
+        $output .= "[Step 3: ONU Restart]\n" . ($result3['output'] ?? '') . "\n";
         
         $success = empty($errors);
         $message = $success 
-            ? "TR-069 profile {$tr069ProfileId} bound and ONU restarted"
+            ? "TR-069 profile detached, reattached to {$tr069ProfileId}, and ONU restarted"
             : "TR-069 configuration failed: " . implode(', ', $errors);
         
         $this->addLog([

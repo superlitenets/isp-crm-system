@@ -2577,6 +2577,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 $port = $onu['port'];
                                 $onuPortId = $onu['onu_id'];
                                 
+                                $cmdDetach = "interface gpon {$frame}/{$slot}\r\n";
+                                $cmdDetach .= "ont tr069-server-config {$port} {$onuPortId} profile-id 0\r\n";
+                                $cmdDetach .= "quit";
+                                $huaweiOLT->executeCommand($oltId, $cmdDetach);
+                                
                                 $cmd = "interface gpon {$frame}/{$slot}\r\n";
                                 $cmd .= "ont tr069-server-config {$port} {$onuPortId} profile-id {$profileId}\r\n";
                                 $cmd .= "quit";
