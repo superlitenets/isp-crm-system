@@ -8404,8 +8404,9 @@ try {
                                     <th>Serial Number</th>
                                     <th>ONU Type</th>
                                     <th>Name</th>
+                                    <th>Mode</th>
                                     <th>Zone</th>
-                                    <th>VLAN</th>
+                                    <th>VLANs</th>
                                     <th>Management IP</th>
                                     <th>Status</th>
                                     <th>Signal (RX/TX)</th>
@@ -8433,21 +8434,44 @@ try {
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
+                                    <td><?= htmlspecialchars($onu['name'] ?: '-') ?></td>
                                     <td>
-                                        <?= htmlspecialchars($onu['name'] ?: '-') ?>
                                         <?php
-                                        $onuModeVal = strtolower($onu['onu_mode'] ?? '');
-                                        if ($onuModeVal === 'bridge'): ?>
-                                            <span class="badge bg-warning text-dark ms-1">Bridge</span>
-                                        <?php elseif ($onuModeVal === 'router'): ?>
-                                            <span class="badge bg-info ms-1">Router</span>
-                                        <?php endif; ?>
+                                        $onuModeVal = strtolower($onu['onu_mode'] ?? $onu['wan_mode'] ?? '');
+                                        $modeDisplay = '';
+                                        if (in_array($onuModeVal, ['bridge'])) {
+                                            $modeDisplay = '<span class="badge bg-warning text-dark">Bridge</span>';
+                                        } elseif (in_array($onuModeVal, ['router', 'route', 'pppoe', 'dhcp', 'static'])) {
+                                            $modeDisplay = '<span class="badge bg-info">Router</span>';
+                                        }
+                                        echo $modeDisplay ?: '<span class="text-muted">-</span>';
+                                        ?>
                                     </td>
                                     <td><?= htmlspecialchars($onu['zone_name'] ?? '-') ?></td>
                                     <td>
-                                        <?php if (!empty($onu['vlan_id'])): ?>
-                                            <span class="badge bg-primary"><?= $onu['vlan_id'] ?></span>
-                                        <?php else: ?>
+                                        <?php
+                                        $allVlans = [];
+                                        if (!empty($onu['attached_vlans'])) {
+                                            $decoded = json_decode($onu['attached_vlans'], true);
+                                            if (is_array($decoded)) {
+                                                foreach ($decoded as $v) {
+                                                    if (is_array($v) && isset($v['vlan_id'])) {
+                                                        $allVlans[] = (int)$v['vlan_id'];
+                                                    } elseif (is_numeric($v)) {
+                                                        $allVlans[] = (int)$v;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (empty($allVlans) && !empty($onu['vlan_id'])) {
+                                            $allVlans[] = (int)$onu['vlan_id'];
+                                        }
+                                        $allVlans = array_unique($allVlans);
+                                        if (!empty($allVlans)):
+                                            foreach ($allVlans as $vid): ?>
+                                                <span class="badge bg-primary me-1"><?= $vid ?></span>
+                                            <?php endforeach;
+                                        else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
