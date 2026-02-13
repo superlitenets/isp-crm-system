@@ -354,467 +354,113 @@ function formatValidity($days, $pkg = null) {
     <title><?= htmlspecialchars($ispName) ?> - WiFi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background: #0f172a;
-            min-height: 100vh;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            color: #1e293b;
-            overflow-x: hidden;
-        }
-        .page-bg {
-            min-height: 100vh;
-            background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-            padding-bottom: 30px;
-        }
-        .hero {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-            padding: 40px 20px 60px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
-            animation: shimmer 8s ease-in-out infinite;
-        }
-        @keyframes shimmer {
-            0%, 100% { transform: translate(0, 0); }
-            50% { transform: translate(10%, 10%); }
-        }
-        .hero-content { position: relative; z-index: 1; }
-        .wifi-icon {
-            width: 80px;
-            height: 80px;
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-            font-size: 36px;
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        .wifi-icon img {
-            max-width: 56px;
-            max-height: 56px;
-            border-radius: 16px;
-        }
-        .hero h1 {
-            color: white;
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 4px;
-            letter-spacing: -0.02em;
-        }
-        .hero p {
-            color: rgba(255,255,255,0.8);
-            font-size: 14px;
-            font-weight: 400;
-        }
-        .main-content {
-            max-width: 440px;
-            margin: -30px auto 0;
-            padding: 0 16px;
-            position: relative;
-            z-index: 2;
-        }
-        .card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-            margin-bottom: 16px;
-            overflow: hidden;
-        }
-        .card-body { padding: 20px; }
-        .alert-banner {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-        .alert-warning-custom {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fde68a;
-        }
-        .alert-danger-custom {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
-        }
-        .alert-success-custom {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #a7f3d0;
-        }
-        .alert-info-custom {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 1px solid #bfdbfe;
-        }
-        .alert-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            font-size: 18px;
-        }
-        .section-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .section-title i {
-            color: #6366f1;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:#050a18;min-height:100vh;font-family:'Inter',system-ui,-apple-system,sans-serif;color:#e2e8f0;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+        .page-bg{min-height:100vh;position:relative;padding-bottom:40px}
+        .page-bg::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(99,102,241,0.15),transparent),radial-gradient(ellipse 60% 40% at 80% 60%,rgba(139,92,246,0.08),transparent);pointer-events:none;z-index:0}
 
-        /* Package Cards */
-        .pkg-card {
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 12px;
-            transition: all 0.25s ease;
-            cursor: pointer;
-            position: relative;
-        }
-        .pkg-card:hover {
-            border-color: #6366f1;
-            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
-        }
-        .pkg-card.selected {
-            border-color: #6366f1;
-            background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
-            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
-        }
-        .pkg-card input[type="radio"] { display: none; }
-        .pkg-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
-        .pkg-name {
-            font-size: 16px;
-            font-weight: 700;
-            color: #0f172a;
-        }
-        .pkg-price {
-            font-size: 22px;
-            font-weight: 800;
-            color: #059669;
-            white-space: nowrap;
-        }
-        .pkg-price small {
-            font-size: 12px;
-            font-weight: 500;
-            color: #6b7280;
-        }
-        .pkg-details {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-        .pkg-tag {
-            background: #f1f5f9;
-            color: #475569;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .pkg-tag i { font-size: 11px; color: #6366f1; }
-        .pkg-card.selected .pkg-tag {
-            background: rgba(99, 102, 241, 0.12);
-            color: #4338ca;
-        }
-        .pkg-card.selected .pkg-tag i { color: #4338ca; }
-        .pkg-multi-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        .pkg-multi-badge i { font-size: 12px; }
-        .pkg-buy-btn {
-            display: block;
-            width: 100%;
-            margin-top: 12px;
-            padding: 10px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-            text-decoration: none;
-        }
-        .pkg-buy-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
-        }
-        .pkg-buy-btn.mpesa {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
-        }
-        .pkg-buy-btn.mpesa:hover {
-            box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
-        }
-        .pkg-card-faded { opacity: 0.6; pointer-events: none; }
+        .hero{padding:24px 20px 48px;text-align:center;position:relative;z-index:1}
+        .brand-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px}
+        .brand-logo{width:32px;height:32px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.12)}
+        .brand-icon{width:32px;height:32px;background:rgba(99,102,241,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#a5b4fc;border:1px solid rgba(99,102,241,0.3)}
+        .brand-name{font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.02em}
+        .hero-sub{color:rgba(255,255,255,0.45);font-size:13px;font-weight:400}
 
-        /* Forms */
-        .form-input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 14px;
-            font-size: 16px;
-            font-family: inherit;
-            color: #0f172a;
-            background: #f8fafc;
-            transition: all 0.2s;
-            outline: none;
-        }
-        .form-input:focus {
-            border-color: #6366f1;
-            background: white;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
-        }
-        .form-input::placeholder { color: #94a3b8; }
-        .btn-main {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 14px;
-            font-size: 16px;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            color: white;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        .btn-main:hover { transform: translateY(-1px); }
-        .btn-mpesa {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
-        }
-        .btn-mpesa:hover { box-shadow: 0 8px 24px rgba(5, 150, 105, 0.3); }
-        .btn-voucher {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        }
-        .btn-voucher:hover { box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3); }
-        .btn-primary {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        }
-        .btn-primary:hover { box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3); }
-        .btn-outline {
-            background: transparent;
-            border: 2px solid #e2e8f0;
-            color: #475569;
-            padding: 13px;
-        }
-        .btn-outline:hover { border-color: #6366f1; color: #6366f1; }
+        .main-content{max-width:420px;margin:-20px auto 0;padding:0 16px;position:relative;z-index:2}
 
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 20px 0;
-            color: #94a3b8;
-            font-size: 13px;
-            font-weight: 500;
-        }
-        .divider::before, .divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: #e2e8f0;
-        }
+        .glass-card{background:rgba(255,255,255,0.04);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.07);border-radius:20px;margin-bottom:14px;overflow:hidden}
+        .glass-card-body{padding:20px}
 
-        /* Success State */
-        .success-state { text-align: center; padding: 30px 20px; }
-        .success-ring {
-            width: 100px;
-            height: 100px;
-            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            font-size: 48px;
-            color: white;
-            animation: popIn 0.5s ease-out;
-        }
-        @keyframes popIn {
-            0% { transform: scale(0); }
-            70% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        .info-pill {
-            background: #f1f5f9;
-            padding: 8px 16px;
-            border-radius: 100px;
-            font-size: 13px;
-            color: #475569;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            margin: 4px;
-        }
-        .info-pill i { color: #6366f1; }
+        .alert-banner{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.5}
+        .alert-warning-custom{background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.15)}
+        .alert-danger-custom{background:rgba(239,68,68,0.1);color:#fca5a5;border:1px solid rgba(239,68,68,0.15)}
+        .alert-success-custom{background:rgba(16,185,129,0.1);color:#6ee7b7;border:1px solid rgba(16,185,129,0.15)}
+        .alert-info-custom{background:rgba(99,102,241,0.1);color:#a5b4fc;border:1px solid rgba(99,102,241,0.15)}
+        .alert-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px}
 
-        /* Expired State */
-        .expired-banner {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 16px;
-            text-align: center;
-        }
-        .expired-banner h3 {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-        .expired-banner p {
-            font-size: 13px;
-            opacity: 0.9;
-            margin: 0;
-        }
+        .section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.3);margin-bottom:14px}
 
-        /* STK Push Waiting */
-        .stk-waiting {
-            text-align: center;
-            padding: 20px;
-        }
-        .phone-anim {
-            font-size: 64px;
-            color: #059669;
-            animation: vibrate 1.5s ease-in-out infinite;
-        }
-        @keyframes vibrate {
-            0%, 100% { transform: rotate(0deg); }
-            10% { transform: rotate(-5deg); }
-            20% { transform: rotate(5deg); }
-            30% { transform: rotate(-3deg); }
-            40% { transform: rotate(3deg); }
-            50% { transform: rotate(0deg); }
-        }
-        @keyframes progressPulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        .pkg-grid{display:flex;flex-direction:column;gap:10px}
+        .pkg-card{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;transition:all 0.2s ease;cursor:pointer;position:relative;overflow:hidden}
+        .pkg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#6366f1,#a855f7);opacity:0;transition:opacity 0.2s}
+        .pkg-card:hover{border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.06)}
+        .pkg-card:hover::before{opacity:1}
+        .pkg-card:active{transform:scale(0.98)}
+        .pkg-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+        .pkg-name{font-size:15px;font-weight:600;color:#f1f5f9}
+        .pkg-price{font-size:20px;font-weight:800;color:#34d399;white-space:nowrap;letter-spacing:-0.02em}
+        .pkg-price small{font-size:11px;font-weight:400;color:rgba(255,255,255,0.35)}
+        .pkg-details{display:flex;gap:6px;flex-wrap:wrap}
+        .pkg-tag{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.55);padding:4px 8px;border-radius:6px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,0.05)}
+        .pkg-tag i{font-size:10px;color:#818cf8}
+        .pkg-multi-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.15));color:#c4b5fd;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;margin-bottom:8px;border:1px solid rgba(139,92,246,0.15)}
+        .pkg-multi-badge i{font-size:11px}
+        .pkg-buy-btn{display:block;width:100%;margin-top:12px;padding:11px;background:linear-gradient(135deg,#6366f1,#7c3aed);color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:center;font-family:inherit;letter-spacing:-0.01em}
+        .pkg-buy-btn:hover{box-shadow:0 8px 24px rgba(99,102,241,0.25);transform:translateY(-1px)}
+        .pkg-card-faded{opacity:0.35;pointer-events:none}
 
-        /* Payment Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(4px);
-            z-index: 100;
-            align-items: flex-end;
-            justify-content: center;
-        }
-        .modal-overlay.active {
-            display: flex;
-        }
-        .modal-sheet {
-            background: white;
-            border-radius: 24px 24px 0 0;
-            width: 100%;
-            max-width: 440px;
-            padding: 24px;
-            animation: slideUp 0.3s ease-out;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-        .modal-handle {
-            width: 40px;
-            height: 4px;
-            background: #d1d5db;
-            border-radius: 2px;
-            margin: 0 auto 20px;
-        }
-        .modal-pkg-summary {
-            background: #f8fafc;
-            border-radius: 14px;
-            padding: 16px;
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-        }
+        .form-input{width:100%;padding:13px 16px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;font-size:15px;font-family:inherit;color:#f1f5f9;background:rgba(255,255,255,0.05);transition:all 0.2s;outline:none}
+        .form-input:focus{border-color:rgba(99,102,241,0.5);background:rgba(99,102,241,0.08);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+        .form-input::placeholder{color:rgba(255,255,255,0.25)}
 
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 20px;
-            color: rgba(255,255,255,0.4);
-            font-size: 12px;
-        }
-        .footer strong { color: rgba(255,255,255,0.6); }
+        .btn-main{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;color:white;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px}
+        .btn-main:hover{transform:translateY(-1px)}
+        .btn-mpesa{background:linear-gradient(135deg,#059669,#047857)}
+        .btn-mpesa:hover{box-shadow:0 8px 20px rgba(5,150,105,0.3)}
+        .btn-voucher{background:linear-gradient(135deg,#d97706,#b45309)}
+        .btn-voucher:hover{box-shadow:0 8px 20px rgba(217,119,6,0.3)}
+        .btn-primary{background:linear-gradient(135deg,#6366f1,#7c3aed)}
+        .btn-primary:hover{box-shadow:0 8px 20px rgba(99,102,241,0.3)}
+        .btn-outline{background:transparent;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);padding:13px}
+        .btn-outline:hover{border-color:rgba(99,102,241,0.4);color:#a5b4fc}
 
-        /* Add device section */
-        .add-device-section {
-            background: #f8fafc;
-            border-radius: 14px;
-            padding: 16px;
-            border: 1px solid #e2e8f0;
-        }
+        .divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:rgba(255,255,255,0.2);font-size:12px;font-weight:500}
+        .divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.08)}
 
-        @media (max-width: 380px) {
-            .hero { padding: 30px 16px 50px; }
-            .hero h1 { font-size: 20px; }
-            .pkg-price { font-size: 20px; }
-        }
+        .success-state{text-align:center;padding:28px 20px}
+        .success-glow{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:36px;color:white;position:relative;animation:popIn 0.5s ease-out}
+        .success-glow.green{background:linear-gradient(135deg,#059669,#10b981);box-shadow:0 0 40px rgba(16,185,129,0.3)}
+        .success-glow.blue{background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 0 40px rgba(99,102,241,0.3)}
+        @keyframes popIn{0%{transform:scale(0)}70%{transform:scale(1.1)}100%{transform:scale(1)}}
+        .info-chip{background:rgba(255,255,255,0.06);padding:6px 14px;border-radius:100px;font-size:12px;color:rgba(255,255,255,0.6);display:inline-flex;align-items:center;gap:6px;margin:3px;border:1px solid rgba(255,255,255,0.06)}
+        .info-chip i{color:#818cf8;font-size:12px}
+
+        .expired-banner{background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(220,38,38,0.1));border:1px solid rgba(239,68,68,0.2);color:#fca5a5;padding:18px;border-radius:14px;text-align:center}
+        .expired-banner h3{font-size:16px;font-weight:700;margin-bottom:2px;color:#fca5a5}
+        .expired-banner p{font-size:12px;opacity:0.7;margin:0}
+
+        .stk-waiting{text-align:center;padding:28px 20px}
+        .spinner-ring{width:80px;height:80px;border-radius:50%;border:3px solid rgba(99,102,241,0.15);border-top-color:#6366f1;animation:spin 1s linear infinite;margin:0 auto 8px;display:flex;align-items:center;justify-content:center}
+        .spinner-ring .inner{width:64px;height:64px;border-radius:50%;border:3px solid rgba(139,92,246,0.1);border-top-color:#a855f7;animation:spin 1.5s linear infinite reverse;display:flex;align-items:center;justify-content:center}
+        .spinner-ring .inner .phone-icon{font-size:24px;color:#a5b4fc;animation:noneSpin 1.5s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes noneSpin{to{transform:rotate(-360deg)}}
+        .stk-dots{display:flex;justify-content:center;gap:6px;margin:16px 0}
+        .stk-dots span{width:8px;height:8px;border-radius:50%;background:rgba(99,102,241,0.3);animation:dotPulse 1.4s ease-in-out infinite}
+        .stk-dots span:nth-child(2){animation-delay:0.2s}
+        .stk-dots span:nth-child(3){animation-delay:0.4s}
+        @keyframes dotPulse{0%,80%,100%{background:rgba(99,102,241,0.2);transform:scale(0.8)}40%{background:#6366f1;transform:scale(1.2)}}
+        @keyframes progressPulse{0%,100%{opacity:1}50%{opacity:0.5}}
+
+        .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100;align-items:flex-end;justify-content:center}
+        .modal-overlay.active{display:flex}
+        .modal-sheet{background:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:24px 24px 0 0;width:100%;max-width:420px;padding:24px;animation:slideUp 0.3s ease-out;max-height:90vh;overflow-y:auto}
+        @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+        .modal-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:0 auto 20px}
+        .modal-pkg-summary{background:rgba(255,255,255,0.04);border-radius:14px;padding:16px;margin-bottom:20px;border:1px solid rgba(255,255,255,0.07)}
+
+        .footer{text-align:center;padding:24px 20px;color:rgba(255,255,255,0.2);font-size:11px;position:relative;z-index:1}
+        .footer strong{color:rgba(255,255,255,0.35)}
+
+        .add-device-section{background:rgba(255,255,255,0.03);border-radius:14px;padding:16px;border:1px solid rgba(255,255,255,0.06)}
+
+        @media(max-width:380px){.hero{padding:20px 16px 44px}.brand-name{font-size:16px}.pkg-price{font-size:18px}}
     </style>
 </head>
 <body>
     <div class="page-bg">
         <?php if ($loginSuccess): ?>
-        <!-- SUCCESS STATE -->
         <?php 
         $mikrotikLoginUrl = '';
         $mikrotikLoginUser = '';
@@ -855,45 +501,41 @@ function formatValidity($days, $pkg = null) {
             <input type="hidden" name="dst" value="<?= htmlspecialchars($mikrotikDst) ?>">
             <?php endif; ?>
         </form>
-        <script>
-            setTimeout(function() {
-                document.getElementById('mikrotikLoginForm').submit();
-            }, <?= $canAddMore ? '4000' : '2000' ?>);
-        </script>
+        <script>setTimeout(function(){document.getElementById('mikrotikLoginForm').submit();},<?= $canAddMore ? '4000' : '2000' ?>);</script>
         <?php endif; ?>
         
-        <div class="hero" style="padding-bottom: 40px;">
-            <div class="hero-content">
-                <div class="wifi-icon"><?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt=""><?php else: ?><i class="bi bi-wifi"></i><?php endif; ?></div>
-                <h1><?= htmlspecialchars($ispName) ?></h1>
+        <div class="hero">
+            <div class="brand-row">
+                <?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt="" class="brand-logo"><?php else: ?><div class="brand-icon"><i class="bi bi-wifi"></i></div><?php endif; ?>
+                <span class="brand-name"><?= htmlspecialchars($ispName) ?></span>
             </div>
         </div>
         <div class="main-content">
-            <div class="card">
+            <div class="glass-card">
                 <div class="success-state">
-                    <div class="success-ring"><i class="bi bi-wifi"></i></div>
-                    <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 6px;">You're Connected!</h2>
-                    <p style="color: #64748b; margin-bottom: 16px;">Enjoy browsing the internet</p>
+                    <div class="success-glow green"><i class="bi bi-wifi"></i></div>
+                    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px;color:#f1f5f9">You're Connected!</h2>
+                    <p style="color:rgba(255,255,255,0.45);margin-bottom:16px;font-size:13px">Enjoy browsing the internet</p>
                     
                     <?php if ($subscription): ?>
-                    <div style="margin-bottom: 20px;">
-                        <div class="info-pill"><i class="bi bi-speedometer2"></i> <?= htmlspecialchars($subscription['download_speed'] ?? 'Unlimited') ?></div>
+                    <div style="margin-bottom:18px">
+                        <span class="info-chip"><i class="bi bi-speedometer2"></i> <?= htmlspecialchars($subscription['download_speed'] ?? 'Unlimited') ?></span>
                         <?php if (!empty($subscription['expiry_date'])): ?>
-                        <div class="info-pill"><i class="bi bi-clock"></i> <?= date('M j, g:i A', strtotime($subscription['expiry_date'])) ?></div>
+                        <span class="info-chip"><i class="bi bi-clock"></i> <?= date('M j, g:i A', strtotime($subscription['expiry_date'])) ?></span>
                         <?php endif; ?>
                         <?php if ($subMaxDevices > 1): ?>
-                        <div class="info-pill"><i class="bi bi-people"></i> <?= $subDeviceCount ?>/<?= $subMaxDevices ?> devices</div>
+                        <span class="info-chip"><i class="bi bi-people"></i> <?= $subDeviceCount ?>/<?= $subMaxDevices ?> devices</span>
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>
                     
                     <?php if (!empty($mikrotikLoginUrl)): ?>
-                    <p style="color: #94a3b8; font-size: 13px; margin-bottom: 12px;">Redirecting to network...</p>
+                    <p style="color:rgba(255,255,255,0.35);font-size:12px;margin-bottom:12px">Redirecting to network...</p>
                     <button type="button" onclick="document.getElementById('mikrotikLoginForm').submit();" class="btn-main btn-primary">
                         <i class="bi bi-arrow-right-circle"></i> Click Here if Not Redirected
                     </button>
                     <?php elseif (!empty($linkOrig)): ?>
-                    <a href="<?= htmlspecialchars($linkOrig) ?>" class="btn-main btn-primary" style="text-decoration: none;">
+                    <a href="<?= htmlspecialchars($linkOrig) ?>" class="btn-main btn-primary" style="text-decoration:none">
                         <i class="bi bi-globe"></i> Continue Browsing
                     </a>
                     <?php endif; ?>
@@ -901,46 +543,46 @@ function formatValidity($days, $pkg = null) {
             </div>
             
             <?php if ($canAddMore): ?>
-            <div class="card">
-                <div class="card-body">
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
-                        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="bi bi-people-fill" style="color: white; font-size: 20px;"></i>
+            <div class="glass-card">
+                <div class="glass-card-body">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+                        <div style="width:40px;height:40px;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.2));border:1px solid rgba(99,102,241,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <i class="bi bi-people-fill" style="color:#a5b4fc;font-size:18px"></i>
                         </div>
                         <div>
-                            <div style="font-size: 15px; font-weight: 700; color: #0f172a;">Add More Devices</div>
-                            <div style="font-size: 12px; color: #64748b;">Your plan supports <?= $subMaxDevices ?> devices (<?= $subMaxDevices - $subDeviceCount ?> slots left)</div>
+                            <div style="font-size:14px;font-weight:700;color:#f1f5f9">Add More Devices</div>
+                            <div style="font-size:11px;color:rgba(255,255,255,0.4)"><?= $subMaxDevices ?> devices supported, <?= $subMaxDevices - $subDeviceCount ?> slots left</div>
                         </div>
                     </div>
                     
-                    <div style="background: linear-gradient(135deg, #eef2ff, #f5f3ff); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; border: 1px solid #c7d2fe;">
-                        <p style="font-size: 13px; color: #4338ca; margin: 0;">
+                    <div style="background:rgba(99,102,241,0.08);border-radius:10px;padding:10px 12px;margin-bottom:14px;border:1px solid rgba(99,102,241,0.12)">
+                        <p style="font-size:12px;color:#a5b4fc;margin:0">
                             <i class="bi bi-info-circle"></i>
-                            Share your phone number <strong><?= htmlspecialchars($subscription['customer_phone'] ?? '') ?></strong> with others so they can connect their devices to your plan.
+                            Share your phone number <strong style="color:#c4b5fd"><?= htmlspecialchars($subscription['customer_phone'] ?? '') ?></strong> with others to connect their devices.
                         </p>
                     </div>
                     
                     <?php if (!empty($subDevices)): ?>
-                    <div style="margin-bottom: 14px;">
-                        <div style="font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Connected Devices:</div>
+                    <div style="margin-bottom:14px">
+                        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Connected Devices</div>
                         <?php foreach ($subDevices as $dev): ?>
-                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 10px; margin-bottom: 6px; border: 1px solid #e2e8f0;">
-                            <i class="bi bi-phone" style="color: #6366f1;"></i>
-                            <div style="flex: 1;">
-                                <div style="font-size: 13px; font-weight: 500; color: #0f172a;"><?= htmlspecialchars($dev['device_name'] ?: 'Device') ?></div>
-                                <div style="font-size: 11px; color: #94a3b8;"><?= htmlspecialchars($dev['mac_address']) ?></div>
+                        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:5px;border:1px solid rgba(255,255,255,0.05)">
+                            <i class="bi bi-phone" style="color:#818cf8"></i>
+                            <div style="flex:1">
+                                <div style="font-size:13px;font-weight:500;color:#e2e8f0"><?= htmlspecialchars($dev['device_name'] ?: 'Device') ?></div>
+                                <div style="font-size:10px;color:rgba(255,255,255,0.3)"><?= htmlspecialchars($dev['mac_address']) ?></div>
                             </div>
                             <?php if ($dev['mac_address'] === strtoupper(preg_replace('/[^A-Fa-f0-9:]/', '', $clientMAC))): ?>
-                            <span style="font-size: 11px; background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 6px;">This device</span>
+                            <span style="font-size:10px;background:rgba(16,185,129,0.15);color:#6ee7b7;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.15)">This device</span>
                             <?php endif; ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
                     <?php endif; ?>
                     
-                    <p style="font-size: 12px; color: #64748b; margin-bottom: 0;">
-                        <i class="bi bi-lightbulb" style="color: #f59e0b;"></i>
-                        Other devices can connect by visiting this WiFi page and tapping <strong>"Already have a plan?"</strong>
+                    <p style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:0">
+                        <i class="bi bi-lightbulb" style="color:#fbbf24"></i>
+                        Other devices can connect via this WiFi page using <strong style="color:rgba(255,255,255,0.5)">"Already have a plan?"</strong>
                     </p>
                 </div>
             </div>
@@ -948,31 +590,36 @@ function formatValidity($days, $pkg = null) {
         </div>
 
         <?php elseif ($stkPushSent): ?>
-        <!-- STK PUSH WAITING - Auto-polls for payment confirmation -->
         <?php $pendingSubId = $_SESSION['pending_subscription_id'] ?? 0; ?>
-        <div class="hero" style="padding-bottom: 40px;">
-            <div class="hero-content">
-                <div class="wifi-icon"><?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt=""><?php else: ?><i class="bi bi-wifi"></i><?php endif; ?></div>
-                <h1><?= htmlspecialchars($ispName) ?></h1>
+        <div class="hero">
+            <div class="brand-row">
+                <?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt="" class="brand-logo"><?php else: ?><div class="brand-icon"><i class="bi bi-wifi"></i></div><?php endif; ?>
+                <span class="brand-name"><?= htmlspecialchars($ispName) ?></span>
             </div>
         </div>
         <div class="main-content">
-            <div class="card" id="stkWaitingCard">
+            <div class="glass-card" id="stkWaitingCard">
                 <div class="stk-waiting">
-                    <div class="phone-anim"><i class="bi bi-phone-vibrate"></i></div>
-                    <h2 style="font-size: 22px; font-weight: 700; margin: 16px 0 8px;">Check Your Phone</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Enter your M-Pesa PIN to complete payment</p>
+                    <div class="spinner-ring">
+                        <div class="inner">
+                            <span class="phone-icon"><i class="bi bi-phone"></i></span>
+                        </div>
+                    </div>
+                    <h2 style="font-size:20px;font-weight:700;margin:14px 0 6px;color:#f1f5f9">Check Your Phone</h2>
+                    <p style="color:rgba(255,255,255,0.45);font-size:13px;margin-bottom:6px">Enter your M-Pesa PIN to complete payment</p>
                     
-                    <div class="alert-banner alert-info-custom" style="margin-bottom: 20px;" id="stkStatusBanner">
-                        <div class="alert-icon" style="background: #bfdbfe;"><i class="bi bi-hourglass-split" id="stkStatusIcon"></i></div>
-                        <div id="stkStatusText">Waiting for payment confirmation... <span id="pollTimer"></span></div>
+                    <div class="stk-dots"><span></span><span></span><span></span></div>
+                    
+                    <div class="alert-banner alert-info-custom" style="margin-bottom:16px;text-align:left" id="stkStatusBanner">
+                        <div class="alert-icon" style="background:rgba(99,102,241,0.15)"><i class="bi bi-hourglass-split" id="stkStatusIcon"></i></div>
+                        <div id="stkStatusText" style="font-size:12px">Waiting for payment confirmation...</div>
                     </div>
                     
-                    <div id="stkProgressBar" style="background: #e2e8f0; border-radius: 100px; height: 6px; margin-bottom: 20px; overflow: hidden;">
-                        <div id="stkProgressFill" style="background: linear-gradient(90deg, #6366f1, #8b5cf6); height: 100%; width: 0%; border-radius: 100px; transition: width 3s linear;"></div>
+                    <div id="stkProgressBar" style="background:rgba(255,255,255,0.06);border-radius:100px;height:4px;margin-bottom:18px;overflow:hidden">
+                        <div id="stkProgressFill" style="background:linear-gradient(90deg,#6366f1,#a855f7);height:100%;width:0%;border-radius:100px;transition:width 3s linear"></div>
                     </div>
                     
-                    <a href="<?= $_SERVER['REQUEST_URI'] ?>" class="btn-main btn-primary" style="text-decoration: none; display: none;" id="stkRefreshBtn">
+                    <a href="<?= $_SERVER['REQUEST_URI'] ?>" class="btn-main btn-primary" style="text-decoration:none;display:none" id="stkRefreshBtn">
                         <i class="bi bi-arrow-clockwise"></i> Refresh Page
                     </a>
                     
@@ -981,23 +628,23 @@ function formatValidity($days, $pkg = null) {
                     <form method="POST">
                         <input type="hidden" name="action" value="voucher">
                         <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
-                        <div style="display: flex; gap: 8px;">
-                            <input type="text" name="voucher_code" class="form-input" placeholder="Voucher code" style="text-transform: uppercase; flex: 1;">
-                            <button type="submit" class="btn-main btn-voucher" style="width: auto; padding: 14px 20px;">Apply</button>
+                        <div style="display:flex;gap:8px">
+                            <input type="text" name="voucher_code" class="form-input" placeholder="Voucher code" style="text-transform:uppercase;flex:1">
+                            <button type="submit" class="btn-main btn-voucher" style="width:auto;padding:13px 18px;font-size:13px">Apply</button>
                         </div>
                     </form>
                 </div>
             </div>
             
-            <div class="card" id="stkSuccessCard" style="display: none;">
+            <div class="glass-card" id="stkSuccessCard" style="display:none">
                 <div class="success-state">
-                    <div class="success-ring"><i class="bi bi-check-lg"></i></div>
-                    <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 6px;">Payment Received!</h2>
-                    <p style="color: #64748b; margin-bottom: 16px;" id="stkSuccessPkg"></p>
-                    <div style="margin-bottom: 20px;" id="stkSuccessInfo"></div>
-                    <p style="color: #94a3b8; font-size: 13px; margin-bottom: 12px;">Connecting you to the internet...</p>
-                    <div style="background: #e2e8f0; border-radius: 100px; height: 4px; overflow: hidden;">
-                        <div style="background: linear-gradient(90deg, #059669, #10b981); height: 100%; width: 100%; animation: progressPulse 1.5s ease-in-out infinite;"></div>
+                    <div class="success-glow green"><i class="bi bi-check-lg"></i></div>
+                    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px;color:#f1f5f9">Payment Received!</h2>
+                    <p style="color:rgba(255,255,255,0.45);margin-bottom:16px;font-size:13px" id="stkSuccessPkg"></p>
+                    <div style="margin-bottom:18px" id="stkSuccessInfo"></div>
+                    <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-bottom:10px">Connecting you to the internet...</p>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:100px;height:3px;overflow:hidden">
+                        <div style="background:linear-gradient(90deg,#059669,#10b981);height:100%;width:100%;animation:progressPulse 1.5s ease-in-out infinite"></div>
                     </div>
                 </div>
             </div>
@@ -1007,7 +654,7 @@ function formatValidity($days, $pkg = null) {
             var subId = <?= (int)$pendingSubId ?>;
             var mac = '<?= htmlspecialchars($clientMAC) ?>';
             var pollInterval = 3000;
-            var maxPolls = 40; // 2 minutes max
+            var maxPolls = 40;
             var pollCount = 0;
             var confirmed = false;
             
@@ -1029,24 +676,21 @@ function formatValidity($days, $pkg = null) {
                 
                 var infoHtml = '';
                 if (data.download_speed) {
-                    infoHtml += '<span class="info-pill"><i class="bi bi-speedometer2"></i> ' + data.download_speed + '</span>';
+                    infoHtml += '<span class="info-chip"><i class="bi bi-speedometer2"></i> ' + data.download_speed + '</span>';
                 }
                 if (data.expiry_date) {
-                    infoHtml += '<span class="info-pill"><i class="bi bi-clock"></i> ' + new Date(data.expiry_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + '</span>';
+                    infoHtml += '<span class="info-chip"><i class="bi bi-clock"></i> ' + new Date(data.expiry_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + '</span>';
                 }
                 if (data.max_devices > 1) {
-                    infoHtml += '<span class="info-pill"><i class="bi bi-people"></i> ' + data.max_devices + ' devices</span>';
+                    infoHtml += '<span class="info-chip"><i class="bi bi-people"></i> ' + data.max_devices + ' devices</span>';
                 }
                 document.getElementById('stkSuccessInfo').innerHTML = infoHtml;
                 
                 setTimeout(function() {
-                    // Redirect to HTTP URL so MikroTik intercepts and generates fresh CHAP params
-                    // MikroTik will redirect back to captive portal with new chapId/chapChallenge
                     var dst = '<?= htmlspecialchars($linkOrig ?: "http://detectportal.firefox.com/") ?>';
                     if (dst.indexOf('http://') === 0) {
                         window.location.href = dst;
                     } else {
-                        // Fallback: reload page (CHAP may be stale but will still show success)
                         window.location.href = '<?= $_SERVER['REQUEST_URI'] ?>';
                     }
                 }, 3000);
@@ -1055,11 +699,13 @@ function formatValidity($days, $pkg = null) {
             function showTimeout() {
                 var banner = document.getElementById('stkStatusBanner');
                 banner.className = 'alert-banner alert-warning-custom';
-                banner.querySelector('.alert-icon').style.background = '#fde68a';
+                banner.querySelector('.alert-icon').style.background = 'rgba(251,191,36,0.15)';
                 document.getElementById('stkStatusIcon').className = 'bi bi-exclamation-triangle';
                 document.getElementById('stkStatusText').innerHTML = 'Payment not yet confirmed. Tap <strong>Refresh</strong> to check again.';
                 document.getElementById('stkRefreshBtn').style.display = 'flex';
                 document.getElementById('stkProgressBar').style.display = 'none';
+                var dots = document.querySelector('.stk-dots');
+                if (dots) dots.style.display = 'none';
             }
             
             function pollStatus() {
@@ -1100,18 +746,17 @@ function formatValidity($days, $pkg = null) {
         </script>
 
         <?php elseif ($deviceStatus === 'expired'): ?>
-        <!-- EXPIRED STATE -->
-        <div class="hero" style="padding-bottom: 40px;">
-            <div class="hero-content">
-                <div class="wifi-icon"><?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt=""><?php else: ?><i class="bi bi-wifi"></i><?php endif; ?></div>
-                <h1><?= htmlspecialchars($ispName) ?></h1>
+        <div class="hero">
+            <div class="brand-row">
+                <?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt="" class="brand-logo"><?php else: ?><div class="brand-icon"><i class="bi bi-wifi"></i></div><?php endif; ?>
+                <span class="brand-name"><?= htmlspecialchars($ispName) ?></span>
             </div>
         </div>
         <div class="main-content">
             <?php if ($message): ?>
-            <div class="card"><div class="card-body">
+            <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-<?= $messageType === 'danger' ? 'danger' : ($messageType === 'success' ? 'success' : 'info') ?>-custom">
-                    <div class="alert-icon" style="background: <?= $messageType === 'danger' ? '#fecaca' : ($messageType === 'success' ? '#a7f3d0' : '#bfdbfe') ?>;">
+                    <div class="alert-icon" style="background:<?= $messageType === 'danger' ? 'rgba(239,68,68,0.15)' : ($messageType === 'success' ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)') ?>">
                         <i class="bi bi-<?= $messageType === 'danger' ? 'x-circle' : ($messageType === 'success' ? 'check-circle' : 'info-circle') ?>"></i>
                     </div>
                     <div><?= htmlspecialchars($message) ?></div>
@@ -1119,20 +764,20 @@ function formatValidity($days, $pkg = null) {
             </div></div>
             <?php endif; ?>
             
-            <div class="card">
-                <div class="card-body">
-                    <div class="expired-banner" style="margin-bottom: 20px;">
-                        <i class="bi bi-clock-history" style="font-size: 32px; margin-bottom: 8px; display: block;"></i>
+            <div class="glass-card">
+                <div class="glass-card-body">
+                    <div class="expired-banner" style="margin-bottom:18px">
+                        <i class="bi bi-clock-history" style="font-size:28px;margin-bottom:6px;display:block"></i>
                         <h3>Subscription Expired</h3>
                         <p>Renew your plan to get back online</p>
                     </div>
                     
                     <?php if ($subscription): ?>
-                    <div style="background: #f8fafc; border-radius: 14px; padding: 14px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
                             <div>
-                                <div style="font-weight: 600; color: #0f172a;">Previous: <?= htmlspecialchars($subscription['package_name']) ?></div>
-                                <div style="font-size: 12px; color: #64748b;"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : ($subscription['validity_days'] ?? '0') . ' days' ?></div>
+                                <div style="font-weight:600;color:#e2e8f0;font-size:14px">Previous: <?= htmlspecialchars($subscription['package_name']) ?></div>
+                                <div style="font-size:11px;color:rgba(255,255,255,0.35)"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : ($subscription['validity_days'] ?? '0') . ' days' ?></div>
                             </div>
                             <div class="pkg-price">KES <?= number_format($subscription['package_price'] ?? 0) ?></div>
                         </div>
@@ -1140,9 +785,8 @@ function formatValidity($days, $pkg = null) {
                     <?php endif; ?>
 
                     <?php if (!empty($packages)): ?>
-                    <div class="section-title" style="margin-bottom: 12px;">
-                        <i class="bi bi-box-seam"></i> Choose a Plan
-                    </div>
+                    <div class="section-label">Choose a Plan</div>
+                    <div class="pkg-grid">
                     <?php foreach ($packages as $i => $pkg): ?>
                     <?php
                         $validityText = formatValidity($pkg['validity_days'] ?? 0, $pkg);
@@ -1151,9 +795,9 @@ function formatValidity($days, $pkg = null) {
                         $maxDevices = (int)($pkg['max_devices'] ?? 1);
                         $isCurrentPkg = $subscription && ($pkg['id'] == ($subscription['package_id'] ?? 0));
                     ?>
-                    <div class="pkg-card" onclick="openExpiredPayment(<?= $pkg['id'] ?>, '<?= htmlspecialchars(addslashes($pkg['name'])) ?>', <?= $pkg['price'] ?>, '<?= htmlspecialchars(addslashes($pkg['download_speed'] ?? '')) ?>', '<?= htmlspecialchars($validityText) ?>', '<?= htmlspecialchars($dataText) ?>', <?= $maxDevices ?>)" style="cursor: pointer;">
+                    <div class="pkg-card" onclick="openExpiredPayment(<?= $pkg['id'] ?>, '<?= htmlspecialchars(addslashes($pkg['name'])) ?>', <?= $pkg['price'] ?>, '<?= htmlspecialchars(addslashes($pkg['download_speed'] ?? '')) ?>', '<?= htmlspecialchars($validityText) ?>', '<?= htmlspecialchars($dataText) ?>', <?= $maxDevices ?>)">
                         <?php if ($isCurrentPkg): ?>
-                        <div style="position: absolute; top: 8px; right: 8px;"><span class="pkg-tag" style="background: #dbeafe; color: #2563eb; font-size: 10px;">Previous Plan</span></div>
+                        <div style="position:absolute;top:8px;right:8px"><span class="pkg-tag" style="background:rgba(99,102,241,0.15);color:#a5b4fc;font-size:10px;border-color:rgba(99,102,241,0.2)">Previous Plan</span></div>
                         <?php endif; ?>
                         <?php if ($maxDevices > 1): ?>
                         <div class="pkg-multi-badge"><i class="bi bi-people-fill"></i> <?= $maxDevices ?> Devices</div>
@@ -1177,25 +821,26 @@ function formatValidity($days, $pkg = null) {
                         </button>
                     </div>
                     <?php endforeach; ?>
+                    </div>
                     <?php endif; ?>
 
-                    <div id="expired-payment-modal" style="display:none; background: #f8fafc; border-radius: 14px; padding: 16px; margin-bottom: 16px; border: 2px solid #6366f1;">
-                        <h5 style="margin-bottom: 12px; color: #0f172a;"><i class="bi bi-bag-check"></i> <span id="exp-pkg-name"></span></h5>
-                        <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
+                    <div id="expired-payment-modal" style="display:none;background:rgba(99,102,241,0.06);border-radius:14px;padding:16px;margin-top:14px;border:1px solid rgba(99,102,241,0.15)">
+                        <h5 style="margin-bottom:12px;color:#e2e8f0;font-size:15px"><i class="bi bi-bag-check" style="color:#818cf8"></i> <span id="exp-pkg-name"></span></h5>
+                        <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:12px">
                             <span id="exp-pkg-speed"></span> | <span id="exp-pkg-validity"></span> | <span id="exp-pkg-data"></span>
                         </div>
                         <?php if ($mpesaEnabled): ?>
-                        <form method="POST" style="margin-bottom: 12px;">
+                        <form method="POST" style="margin-bottom:10px">
                             <input type="hidden" name="action" value="renew">
                             <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
                             <input type="hidden" name="package_id" id="exp-package-id" value="">
-                            <input type="tel" name="phone" class="form-input" placeholder="M-Pesa Phone (e.g., 0712345678)" value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" required style="margin-bottom: 12px;">
+                            <input type="tel" name="phone" class="form-input" placeholder="M-Pesa Phone (e.g., 0712345678)" value="<?= htmlspecialchars($subscription['customer_phone'] ?? '') ?>" required style="margin-bottom:12px">
                             <button type="submit" class="btn-main btn-mpesa">
                                 <i class="bi bi-phone"></i> Pay KES <span id="exp-pkg-price"></span> via M-Pesa
                             </button>
                         </form>
                         <?php endif; ?>
-                        <button type="button" onclick="document.getElementById('expired-payment-modal').style.display='none'" class="btn-main" style="background: #e2e8f0; color: #475569; font-size: 13px; padding: 10px;">Cancel</button>
+                        <button type="button" onclick="document.getElementById('expired-payment-modal').style.display='none'" class="btn-main btn-outline" style="font-size:13px;padding:10px">Cancel</button>
                     </div>
                     
                     <div class="divider">or use voucher</div>
@@ -1203,7 +848,7 @@ function formatValidity($days, $pkg = null) {
                     <form method="POST">
                         <input type="hidden" name="action" value="voucher">
                         <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
-                        <input type="text" name="voucher_code" class="form-input" placeholder="Enter voucher code" style="text-transform: uppercase; margin-bottom: 12px;" required>
+                        <input type="text" name="voucher_code" class="form-input" placeholder="Enter voucher code" style="text-transform:uppercase;margin-bottom:12px" required>
                         <button type="submit" class="btn-main btn-voucher">
                             <i class="bi bi-ticket-perforated"></i> Redeem Voucher
                         </button>
@@ -1213,19 +858,18 @@ function formatValidity($days, $pkg = null) {
         </div>
 
         <?php else: ?>
-        <!-- NEW DEVICE / REGISTRATION -->
         <div class="hero">
-            <div class="hero-content">
-                <div class="wifi-icon"><?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt=""><?php else: ?><i class="bi bi-wifi"></i><?php endif; ?></div>
-                <h1><?= htmlspecialchars($ispName) ?></h1>
-                <p><?= htmlspecialchars($hotspotWelcome) ?></p>
+            <div class="brand-row">
+                <?php if ($ispLogo): ?><img src="<?= htmlspecialchars($ispLogo) ?>" alt="" class="brand-logo"><?php else: ?><div class="brand-icon"><i class="bi bi-wifi"></i></div><?php endif; ?>
+                <span class="brand-name"><?= htmlspecialchars($ispName) ?></span>
             </div>
+            <p class="hero-sub"><?= htmlspecialchars($hotspotWelcome) ?></p>
         </div>
         <div class="main-content">
             <?php if ($message): ?>
-            <div class="card"><div class="card-body">
+            <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-<?= $messageType === 'danger' ? 'danger' : ($messageType === 'success' ? 'success' : ($messageType === 'warning' ? 'warning' : 'info')) ?>-custom">
-                    <div class="alert-icon" style="background: <?= $messageType === 'danger' ? '#fecaca' : ($messageType === 'success' ? '#a7f3d0' : ($messageType === 'warning' ? '#fde68a' : '#bfdbfe')) ?>;">
+                    <div class="alert-icon" style="background:<?= $messageType === 'danger' ? 'rgba(239,68,68,0.15)' : ($messageType === 'success' ? 'rgba(16,185,129,0.15)' : ($messageType === 'warning' ? 'rgba(251,191,36,0.15)' : 'rgba(99,102,241,0.15)')) ?>">
                         <i class="bi bi-<?= $messageType === 'danger' ? 'x-circle' : ($messageType === 'success' ? 'check-circle' : 'info-circle') ?>"></i>
                     </div>
                     <div><?= htmlspecialchars($message) ?></div>
@@ -1234,25 +878,25 @@ function formatValidity($days, $pkg = null) {
             <?php endif; ?>
             
             <?php if (empty($clientMAC)): ?>
-            <div class="card"><div class="card-body">
+            <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-warning-custom">
-                    <div class="alert-icon" style="background: #fde68a;"><i class="bi bi-wifi-off"></i></div>
+                    <div class="alert-icon" style="background:rgba(251,191,36,0.15)"><i class="bi bi-wifi-off"></i></div>
                     <div>
                         <strong>Device not detected</strong><br>
-                        <span style="font-size: 12px;">Connect to <strong><?= htmlspecialchars($ispName) ?></strong> WiFi first, then this page loads automatically.</span>
+                        <span style="font-size:12px;opacity:0.8">Connect to <strong><?= htmlspecialchars($ispName) ?></strong> WiFi first, then this page loads automatically.</span>
                     </div>
                 </div>
             </div></div>
             <?php endif; ?>
             
             <?php if (!empty($packages)): ?>
-            <div class="card">
-                <div class="card-body">
-                    <div class="section-title">
-                        <i class="bi bi-box-seam"></i>
+            <div class="glass-card">
+                <div class="glass-card-body">
+                    <div class="section-label">
                         <?= !empty($clientMAC) ? 'Choose a Plan' : 'Available Plans' ?>
                     </div>
                     
+                    <div class="pkg-grid">
                     <?php foreach ($packages as $i => $pkg): ?>
                     <?php
                         $validityText = formatValidity($pkg['validity_days'], $pkg);
@@ -1285,25 +929,26 @@ function formatValidity($days, $pkg = null) {
                         <?php endif; ?>
                     </div>
                     <?php endforeach; ?>
+                    </div>
                 </div>
             </div>
             <?php else: ?>
-            <div class="card"><div class="card-body">
+            <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-info-custom">
-                    <div class="alert-icon" style="background: #bfdbfe;"><i class="bi bi-info-circle"></i></div>
+                    <div class="alert-icon" style="background:rgba(99,102,241,0.15)"><i class="bi bi-info-circle"></i></div>
                     <div>No packages available for this hotspot.</div>
                 </div>
             </div></div>
             <?php endif; ?>
             
             <?php if (!empty($clientMAC)): ?>
-            <div class="card">
-                <div class="card-body">
-                    <div class="section-title"><i class="bi bi-ticket-perforated"></i> Have a Voucher?</div>
+            <div class="glass-card">
+                <div class="glass-card-body">
+                    <div class="section-label">Have a Voucher?</div>
                     <form method="POST">
                         <input type="hidden" name="action" value="voucher">
                         <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
-                        <input type="text" name="voucher_code" class="form-input" placeholder="Enter voucher code" style="text-transform: uppercase; margin-bottom: 12px;" required>
+                        <input type="text" name="voucher_code" class="form-input" placeholder="Enter voucher code" style="text-transform:uppercase;margin-bottom:12px" required>
                         <button type="submit" class="btn-main btn-voucher">
                             <i class="bi bi-ticket-perforated"></i> Redeem Voucher
                         </button>
@@ -1311,28 +956,28 @@ function formatValidity($days, $pkg = null) {
                 </div>
             </div>
             
-            <div class="card">
-                <div class="card-body">
+            <div class="glass-card">
+                <div class="glass-card-body">
                     <div class="add-device-section">
-                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                            <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                <i class="bi bi-phone-fill" style="color: white; font-size: 20px;"></i>
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+                            <div style="width:38px;height:38px;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.2));border:1px solid rgba(99,102,241,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="bi bi-phone-fill" style="color:#a5b4fc;font-size:16px"></i>
                             </div>
                             <div>
-                                <div style="font-size: 15px; font-weight: 700; color: #0f172a;">Already have a plan?</div>
-                                <div style="font-size: 12px; color: #64748b;">Add this device to your existing subscription</div>
+                                <div style="font-size:14px;font-weight:700;color:#f1f5f9">Already have a plan?</div>
+                                <div style="font-size:11px;color:rgba(255,255,255,0.35)">Add this device to your existing subscription</div>
                             </div>
                         </div>
-                        <p style="font-size: 12px; color: #64748b; margin-bottom: 12px; background: #f1f5f9; padding: 10px 12px; border-radius: 10px;">
-                            <i class="bi bi-info-circle" style="color: #6366f1;"></i>
+                        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:12px;background:rgba(99,102,241,0.06);padding:10px 12px;border-radius:10px;border:1px solid rgba(99,102,241,0.1)">
+                            <i class="bi bi-info-circle" style="color:#818cf8"></i>
                             If someone shared their plan with you, enter their registered phone number below to connect this device.
                         </p>
                         <form method="POST">
                             <input type="hidden" name="action" value="add_device">
                             <input type="hidden" name="new_mac" value="<?= htmlspecialchars($clientMAC) ?>">
-                            <input type="tel" name="phone" class="form-input" placeholder="Registered phone number" required style="margin-bottom: 8px; padding: 12px 14px; font-size: 14px;">
-                            <input type="text" name="device_name" class="form-input" placeholder="Device name (e.g., My Phone)" style="margin-bottom: 10px; padding: 12px 14px; font-size: 14px;">
-                            <button type="submit" class="btn-main btn-primary" style="font-size: 14px; padding: 12px;">
+                            <input type="tel" name="phone" class="form-input" placeholder="Registered phone number" required style="margin-bottom:8px;font-size:14px">
+                            <input type="text" name="device_name" class="form-input" placeholder="Device name (e.g., My Phone)" style="margin-bottom:10px;font-size:14px">
+                            <button type="submit" class="btn-main btn-primary" style="font-size:14px;padding:12px">
                                 <i class="bi bi-plus-circle"></i> Add This Device
                             </button>
                         </form>
@@ -1353,26 +998,25 @@ function formatValidity($days, $pkg = null) {
     </div>
 
     <?php if (!empty($clientMAC)): ?>
-    <!-- Payment Bottom Sheet Modal -->
     <div class="modal-overlay" id="paymentModal">
         <div class="modal-sheet">
             <div class="modal-handle"></div>
-            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">Complete Purchase</h3>
+            <h3 style="font-size:17px;font-weight:700;margin-bottom:16px;color:#f1f5f9">Complete Purchase</h3>
             
             <div class="modal-pkg-summary">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display:flex;justify-content:space-between;align-items:center">
                     <div>
-                        <div id="modalPkgName" style="font-weight: 600; color: #0f172a;"></div>
-                        <div id="modalPkgDetails" style="font-size: 12px; color: #64748b; margin-top: 4px;"></div>
+                        <div id="modalPkgName" style="font-weight:600;color:#e2e8f0;font-size:14px"></div>
+                        <div id="modalPkgDetails" style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px"></div>
                     </div>
                     <div id="modalPkgPrice" class="pkg-price"></div>
                 </div>
-                <div id="modalMultiDevice" style="display: none; margin-top: 12px; background: linear-gradient(135deg, #eef2ff, #f5f3ff); border-radius: 10px; padding: 10px 14px; border: 1px solid #c7d2fe;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="bi bi-people-fill" style="color: #6366f1; font-size: 16px;"></i>
+                <div id="modalMultiDevice" style="display:none;margin-top:12px;background:rgba(99,102,241,0.08);border-radius:10px;padding:10px 14px;border:1px solid rgba(99,102,241,0.12)">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <i class="bi bi-people-fill" style="color:#818cf8;font-size:15px"></i>
                         <div>
-                            <div style="font-size: 13px; font-weight: 600; color: #4338ca;" id="modalDeviceText"></div>
-                            <div style="font-size: 11px; color: #6366f1;">You can add more devices after purchase</div>
+                            <div style="font-size:12px;font-weight:600;color:#a5b4fc" id="modalDeviceText"></div>
+                            <div style="font-size:10px;color:rgba(255,255,255,0.35)">You can add more devices after purchase</div>
                         </div>
                     </div>
                 </div>
@@ -1383,10 +1027,10 @@ function formatValidity($days, $pkg = null) {
                 <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
                 <input type="hidden" name="package_id" id="modalPackageId">
                 
-                <label style="font-size: 14px; font-weight: 600; color: #374151; display: block; margin-bottom: 8px;">M-Pesa Phone Number</label>
-                <input type="tel" name="phone" class="form-input" id="phoneInput" placeholder="e.g., 0712345678" required style="margin-bottom: 16px;">
+                <label style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.5);display:block;margin-bottom:8px">M-Pesa Phone Number</label>
+                <input type="tel" name="phone" class="form-input" id="phoneInput" placeholder="e.g., 0712345678" required style="margin-bottom:16px">
                 
-                <button type="submit" class="btn-main btn-mpesa" style="margin-bottom: 10px;">
+                <button type="submit" class="btn-main btn-mpesa" style="margin-bottom:10px">
                     <i class="bi bi-phone"></i> Pay with M-Pesa
                 </button>
                 <button type="button" class="btn-main btn-outline" onclick="closePayment()">Cancel</button>
@@ -1422,7 +1066,7 @@ function formatValidity($days, $pkg = null) {
         }
         document.getElementById('paymentModal').classList.add('active');
         document.body.style.overflow = 'hidden';
-        setTimeout(() => document.getElementById('phoneInput').focus(), 300);
+        setTimeout(function() { document.getElementById('phoneInput').focus(); }, 300);
     }
     
     function closePayment() {
@@ -1430,9 +1074,8 @@ function formatValidity($days, $pkg = null) {
         document.body.style.overflow = '';
     }
     
-    document.getElementById('paymentModal')?.addEventListener('click', function(e) {
-        if (e.target === this) closePayment();
-    });
+    var pm = document.getElementById('paymentModal');
+    if (pm) pm.addEventListener('click', function(e) { if (e.target === this) closePayment(); });
     </script>
 </body>
 </html>
