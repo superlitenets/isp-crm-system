@@ -2541,6 +2541,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'bulk_bind_tr069_profile':
                 $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $profileId = isset($_POST['tr069_profile_id']) ? (int)$_POST['tr069_profile_id'] : 3;
+                $rebootAfter = !empty($_POST['reboot_after']);
                 
                 if (!$oltId) {
                     $message = 'Please select an OLT';
@@ -2575,12 +2576,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 if ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out) || preg_match('/already|repeatedly/i', $out)) {
                                     $bound++;
                                     
-                                    $cmdReboot = "interface gpon {$frame}/{$slot}\r\n";
-                                    $cmdReboot .= "ont reset {$port} {$onuPortId}\r\n";
-                                    $cmdReboot .= "quit";
-                                    $rebootResult = $huaweiOLT->executeCommand($oltId, $cmdReboot);
-                                    if ($rebootResult['success']) {
-                                        $rebooted++;
+                                    if ($rebootAfter) {
+                                        $cmdReboot = "interface gpon {$frame}/{$slot}\r\n";
+                                        $cmdReboot .= "ont reset {$port} {$onuPortId}\r\n";
+                                        $cmdReboot .= "quit";
+                                        $rebootResult = $huaweiOLT->executeCommand($oltId, $cmdReboot);
+                                        if ($rebootResult['success']) {
+                                            $rebooted++;
+                                        }
                                     }
                                 } else {
                                     $failed++;
@@ -2592,7 +2595,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             }
                         }
                         
-                        $message = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs, {$rebooted} rebooted";
+                        $message = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs";
+                        if ($rebootAfter) {
+                            $message .= ", {$rebooted} rebooted";
+                        }
                         if ($failed > 0) {
                             $message .= ", {$failed} failed";
                             $messageType = 'warning';
@@ -8019,11 +8025,15 @@ try {
                                     <label class="form-label">TR-069 Profile ID</label>
                                     <input type="number" name="tr069_profile_id" class="form-control" value="3" required>
                                 </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="reboot_after" value="1" id="bulkBindReboot">
+                                    <label class="form-check-label" for="bulkBindReboot">Reboot ONUs after binding</label>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-danger" onclick="return confirm('This will bind all authorized ONUs to the TR-069 profile and reboot them. Continue?');">
-                                    <i class="bi bi-link-45deg me-2"></i>Bind & Reboot All
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('This will bind all authorized ONUs to the TR-069 profile. Continue?');">
+                                    <i class="bi bi-link-45deg me-2"></i>Bind All
                                 </button>
                             </div>
                         </form>
