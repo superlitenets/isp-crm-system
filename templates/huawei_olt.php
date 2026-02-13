@@ -9168,6 +9168,9 @@ try {
                                 ?>
                                 <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
                                 <?php if ($hasTr069Ip): ?><small class="text-muted ms-1"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></small><?php endif; ?>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshTR069IP()" title="Refresh TR-069 status">
+                                    <i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i>
+                                </button>
                             </div>
                         </div>
                         <!-- ONU Mode (Bridge/Router) -->
@@ -10118,14 +10121,8 @@ try {
                 .catch(err => console.log('Summon error:', err.message));
             }
             
-            // Auto-summon when page opens (lightweight)
-            if (onuSerial) {
-                summonOnu();
-            }
-            if (hasTR069) {
-                loadWifiVlans();
-                loadWiFiFromTR069(true);
-            }
+            // All network calls are user-initiated to avoid blocking the single-threaded PHP dev server
+            // Users can click the individual refresh buttons to fetch live data
 
 
 
@@ -10273,15 +10270,9 @@ try {
 
 
                 
-                // Auto-refresh optical data if missing
-                <?php if ($rx === null || $tx === null): ?>
-                setTimeout(() => refreshOpticalData(<?= $currentOnu['id'] ?>), 500);
-                <?php endif; ?>
+                // Optical data uses cached values - user can click refresh button for live data
                 
-                // Auto-refresh TR-069 IP if missing
-                <?php if (empty($currentOnu['tr069_ip'])): ?>
-                setTimeout(() => refreshTR069IP(true), 1000);
-                <?php endif; ?>
+                // TR-069 IP uses cached values - user can click refresh button for live data
             })();
             
             // Refresh live ONU status (online/offline) via SNMP
@@ -10656,10 +10647,7 @@ try {
                 }
             }
             
-            // Auto-refresh Management IP on page load if missing
-            <?php if (empty($currentOnu['tr069_ip']) && !empty($currentOnu['tr069_device_id'])): ?>
-            setTimeout(() => refreshTR069IP(true), 1000);
-            <?php endif; ?>
+            // Management IP uses cached values - user can click refresh button for live data
             
             // WAN IP (OMCI) refresh function - fetches from OLT via CLI
             async function refreshOntIP() {
