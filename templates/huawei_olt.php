@@ -1312,17 +1312,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 try {
-                    $onu = $huaweiOLT->getONU($onuId);
-                    if ($onu && $onu['olt_id']) {
-                        $tr069ProfileId = $huaweiOLT->getTR069ProfileId();
-                        if ($tr069ProfileId) {
-                            $huaweiOLT->clearTR069ProfileCredentials($onu['olt_id'], $tr069ProfileId);
-                        }
-                    }
-                    
                     $result = $huaweiOLT->configureTR069Manual($onuId);
                     
                     if ($result['success']) {
+                        $onu = $huaweiOLT->getONU($onuId);
+                        if ($onu && !empty($onu['sn'])) {
+                            require_once __DIR__ . '/../src/GenieACS.php';
+                            $genieacs = new \App\GenieACS($db);
+                            $genieacs->sendConnectionRequest($onu['sn']);
+                        }
+                        
                         $message = $result['message'];
                         $messageType = 'success';
                         
@@ -2563,8 +2562,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $message = 'No authorized ONUs found for this OLT';
                         $messageType = 'warning';
                     } else {
-                        $huaweiOLT->clearTR069ProfileCredentials($oltId, $profileId);
-                        
                         $bound = 0;
                         $rebooted = 0;
                         $failed = 0;
