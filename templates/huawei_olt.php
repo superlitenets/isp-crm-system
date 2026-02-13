@@ -7555,6 +7555,24 @@ try {
                 <div class="col-xl col-md-6">
                     <div class="mega-stat h-100">
                         <div class="d-flex justify-content-between align-items-start">
+                            <div class="stat-icon-lg bg-info bg-opacity-10 text-info">
+                                <i class="bi bi-router"></i>
+                            </div>
+                            <a href="?page=huawei-olt&view=onus" class="stat-trend bg-info bg-opacity-10 text-info text-decoration-none">
+                                View All <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                        <div class="stat-number text-info"><?= number_format($totalOnus) ?></div>
+                        <div class="text-muted mb-2">Total Authorized</div>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <?php $authPercent = ($totalOnus + $stats['unconfigured_onus']) > 0 ? ($totalOnus / ($totalOnus + $stats['unconfigured_onus']) * 100) : 0; ?>
+                            <div class="progress-bar bg-info" style="width: <?= $authPercent ?>%; border-radius: 3px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl col-md-6">
+                    <div class="mega-stat h-100">
+                        <div class="d-flex justify-content-between align-items-start">
                             <div class="stat-icon-lg bg-primary bg-opacity-10 text-primary">
                                 <i class="bi bi-hdd-rack"></i>
                             </div>
@@ -7583,24 +7601,6 @@ try {
                         <div class="text-muted mb-2">Online ONUs</div>
                         <div class="progress" style="height: 6px; border-radius: 3px;">
                             <div class="progress-bar bg-success" style="width: <?= $uptimePercent ?>%; border-radius: 3px;"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl col-md-6">
-                    <div class="mega-stat h-100">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="stat-icon-lg bg-info bg-opacity-10 text-info">
-                                <i class="bi bi-router"></i>
-                            </div>
-                            <a href="?page=huawei-olt&view=onus" class="stat-trend bg-info bg-opacity-10 text-info text-decoration-none">
-                                View All <i class="bi bi-arrow-right"></i>
-                            </a>
-                        </div>
-                        <div class="stat-number text-info"><?= number_format($totalOnus) ?></div>
-                        <div class="text-muted mb-2">Authorized ONUs</div>
-                        <div class="progress" style="height: 6px; border-radius: 3px;">
-                            <?php $authPercent = ($totalOnus + $stats['unconfigured_onus']) > 0 ? ($totalOnus / ($totalOnus + $stats['unconfigured_onus']) * 100) : 0; ?>
-                            <div class="progress-bar bg-info" style="width: <?= $authPercent ?>%; border-radius: 3px;"></div>
                         </div>
                     </div>
                 </div>
