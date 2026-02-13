@@ -961,8 +961,7 @@ class Ticket {
             'in_progress' => 'In Progress',
             'pending' => 'Pending',
             'on_hold' => 'On Hold',
-            'resolved' => 'Resolved',
-            'closed' => 'Closed'
+            'resolved' => 'Resolved'
         ];
     }
     
@@ -971,8 +970,7 @@ class Ticket {
             'in_progress' => 'In Progress',
             'pending' => 'Pending',
             'on_hold' => 'On Hold',
-            'resolved' => 'Resolved',
-            'closed' => 'Closed'
+            'resolved' => 'Resolved'
         ];
     }
 

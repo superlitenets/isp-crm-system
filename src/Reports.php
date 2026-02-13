@@ -35,7 +35,6 @@ class Reports {
                 COUNT(CASE WHEN t.status = 'open' THEN 1 END) as open_tickets,
                 COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_tickets,
                 COUNT(CASE WHEN t.status = 'resolved' THEN 1 END) as resolved_tickets,
-                COUNT(CASE WHEN t.status = 'closed' THEN 1 END) as closed_tickets,
                 COUNT(CASE WHEN t.priority = 'critical' THEN 1 END) as critical_tickets,
                 COUNT(CASE WHEN t.sla_response_breached = true THEN 1 END) as sla_breached,
                 AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, NOW()) - t.created_at))/3600) as avg_resolution_hours

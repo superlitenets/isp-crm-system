@@ -11,7 +11,7 @@ class TicketStatusLink {
     
     public function generateToken($ticketId, $employeeId = null, $allowedStatuses = null) {
         if ($allowedStatuses === null) {
-            $allowedStatuses = 'In Progress,Resolved,Closed';
+            $allowedStatuses = 'In Progress,Resolved';
         }
         
         $plainToken = bin2hex(random_bytes(32));
@@ -117,7 +117,7 @@ class TicketStatusLink {
     
     public function getAllowedStatuses($tokenRecord) {
         if (empty($tokenRecord['allowed_statuses'])) {
-            return ['In Progress', 'Resolved', 'Closed'];
+            return ['In Progress', 'Resolved'];
         }
         return array_map('trim', explode(',', $tokenRecord['allowed_statuses']));
     }

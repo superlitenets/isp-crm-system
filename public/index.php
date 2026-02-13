@@ -9390,11 +9390,11 @@ $csrfToken = \App\Auth::generateToken();
         
         try {
             // Today's open tickets
-            $ticketStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('closed', 'resolved')");
+            $ticketStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE status != 'resolved'");
             $quickStats['open_tickets'] = $ticketStmt->fetchColumn() ?: 0;
             
             // Unassigned tickets (urgent)
-            $unassignedStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status NOT IN ('closed', 'resolved')");
+            $unassignedStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status != 'resolved'");
             $unassignedCount = $unassignedStmt->fetchColumn() ?: 0;
             if ($unassignedCount > 0) {
                 $alerts[] = ['type' => 'warning', 'icon' => 'exclamation-triangle', 'text' => $unassignedCount . ' unassigned ticket(s)', 'link' => '?page=tickets&filter=unassigned'];
@@ -9416,7 +9416,7 @@ $csrfToken = \App\Auth::generateToken();
             $quickStats['today_revenue'] = $revenueStmt->fetchColumn() ?: 0;
             
             // Overdue tickets (high priority)
-            $overdueStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('closed', 'resolved') AND priority IN ('high', 'critical') AND created_at < NOW() - INTERVAL '24 hours'");
+            $overdueStmt = $db->query("SELECT COUNT(*) FROM tickets WHERE status != 'resolved' AND priority IN ('high', 'critical') AND created_at < NOW() - INTERVAL '24 hours'");
             $overdueCount = $overdueStmt->fetchColumn() ?: 0;
             if ($overdueCount > 0) {
                 $alerts[] = ['type' => 'danger', 'icon' => 'alarm', 'text' => $overdueCount . ' overdue high-priority ticket(s)', 'link' => '?page=tickets&filter=overdue'];

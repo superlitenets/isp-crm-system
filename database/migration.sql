@@ -7830,7 +7830,7 @@ CREATE TABLE IF NOT EXISTS public.ticket_status_tokens (
     ticket_id integer NOT NULL,
     employee_id integer,
     token_hash character varying(255) NOT NULL,
-    allowed_statuses text DEFAULT 'In Progress,Resolved,Closed'::text,
+    allowed_statuses text DEFAULT 'In Progress,Resolved'::text,
     expires_at timestamp without time zone NOT NULL,
     max_uses integer DEFAULT 10,
     used_count integer DEFAULT 0,
@@ -17861,3 +17861,10 @@ DO $$ BEGIN
     ALTER TABLE public.tickets ADD COLUMN sla_warning_notified_at timestamp without time zone;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
+
+-- Migrate any existing 'closed' tickets to 'resolved' (closed status removed)
+UPDATE tickets SET status = 'resolved' WHERE status = 'closed';
+
+-- Update default allowed_statuses for status tokens (remove Closed)
+ALTER TABLE ticket_status_tokens ALTER COLUMN allowed_statuses SET DEFAULT 'In Progress,Resolved';
+UPDATE ticket_status_tokens SET allowed_statuses = REPLACE(allowed_statuses, ',Closed', '') WHERE allowed_statuses LIKE '%,Closed%';

@@ -32,7 +32,7 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Production Guardrails**: Includes NTP Gating, Cool-down/Debounce, ConnectionRequestURL Validation, and Post-Provision Verification.
   - **OLT Profile Sync**: Syncs line and service profiles from OLT with database caching.
 - **Reporting & Activity Logs**: Comprehensive reports and detailed activity logging.
-- **Ticket Management**: Features timeline/activity, status changes, customer satisfaction, escalation, and secure status updates.
+- **Ticket Management**: Features timeline/activity, status changes, customer satisfaction, escalation, and secure status updates. "Resolved" is the only terminal status (no "Closed" status). Valid statuses: open, in_progress, pending, on_hold, resolved.
 - **Multi-Branch Support**: Manages operations across multiple physical locations.
 - **HR & Payroll**: Salary advance, leave management, and HR notification systems.
 - **Accounting Module**: Dashboard, Chart of Accounts, Invoices, Expenses, Quotes, Purchase Orders, financial reports, recurring invoice automation, and document delivery via email/WhatsApp (invoices, quotes, receipts as PDF).

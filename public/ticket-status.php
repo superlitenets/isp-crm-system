@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                 
                 $statusLink->useToken($tokenRecord['id']);
                 
-                if (in_array($newStatus, ['Resolved', 'Closed'])) {
+                if ($newStatus === 'Resolved') {
                     $statusLink->invalidateToken($tokenRecord['id']);
                 }
                 
@@ -197,8 +197,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
         .btn-in-progress:hover { background: #e67e22; border-color: #e67e22; color: white; }
         .btn-resolved { background: #27ae60; border-color: #27ae60; color: white; }
         .btn-resolved:hover { background: #219a52; border-color: #219a52; color: white; }
-        .btn-closed { background: #95a5a6; border-color: #95a5a6; color: white; }
-        .btn-closed:hover { background: #7f8c8d; border-color: #7f8c8d; color: white; }
         .priority-badge {
             padding: 5px 12px;
             border-radius: 20px;
@@ -217,7 +215,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
         .status-open { background: #3498db; color: white; }
         .status-in-progress, .status-in_progress { background: #f39c12; color: white; }
         .status-resolved { background: #27ae60; color: white; }
-        .status-closed { background: #95a5a6; color: white; }
         .resolution-form { display: none; }
         .resolution-form.active { display: block; }
     </style>
@@ -291,11 +288,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                             </button>
                         <?php endif; ?>
                         
-                        <?php if (in_array('Closed', $allowedStatuses)): ?>
-                            <button type="button" class="btn status-btn btn-closed" onclick="submitSimpleStatus('Closed')">
-                                <i class="bi bi-x-circle"></i> Mark as Closed
-                            </button>
-                        <?php endif; ?>
                     </div>
                 </div>
                 

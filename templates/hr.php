@@ -310,13 +310,13 @@ try {
     $statsDb = Database::getConnection();
     
     // Get tickets assigned to this employee (via user_id)
-    $ticketStats = ['total' => 0, 'open' => 0, 'closed' => 0];
+    $ticketStats = ['total' => 0, 'open' => 0, 'resolved' => 0];
     if ($employeeData['user_id']) {
         $ticketStmt = $statsDb->prepare("
             SELECT 
                 COUNT(*) as total,
-                SUM(CASE WHEN status NOT IN ('closed', 'resolved') THEN 1 ELSE 0 END) as open,
-                SUM(CASE WHEN status IN ('closed', 'resolved') THEN 1 ELSE 0 END) as closed
+                SUM(CASE WHEN status != 'resolved' THEN 1 ELSE 0 END) as open,
+                SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved
             FROM tickets WHERE assigned_to = ?
         ");
         $ticketStmt->execute([$employeeData['user_id']]);
@@ -398,7 +398,7 @@ try {
                 </div>
                 <div class="mt-2 small">
                     <span class="badge bg-light text-primary"><?= (int)($empStats['tickets']['open'] ?? 0) ?> Open</span>
-                    <span class="badge bg-light text-success"><?= (int)($empStats['tickets']['closed'] ?? 0) ?> Closed</span>
+                    <span class="badge bg-light text-success"><?= (int)($empStats['tickets']['resolved'] ?? 0) ?> Resolved</span>
                 </div>
             </div>
         </div>
@@ -3003,7 +3003,7 @@ if ($selectedEmployeeId) {
             <div class="card-body">
                 <p class="mb-2">Employees earn commissions based on ticket categories:</p>
                 <ul class="mb-0">
-                    <li>Commissions are calculated when tickets are resolved or closed</li>
+                    <li>Commissions are calculated when tickets are resolved</li>
                     <li>Team-assigned tickets split the commission equally among members</li>
                     <li>Commission rates are configured in Settings &gt; Ticket Commissions</li>
                     <li>Earnings can be included in payroll processing</li>

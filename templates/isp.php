@@ -5005,7 +5005,6 @@ try {
                                                             'open' => 'primary',
                                                             'in_progress' => 'info',
                                                             'resolved' => 'success',
-                                                            'closed' => 'secondary',
                                                             default => 'warning'
                                                         };
                                                         ?>

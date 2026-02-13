@@ -9,13 +9,13 @@ $ticketStats = $db->query("
         COUNT(*) FILTER (WHERE status IN ('open', 'pending')) as pending_count,
         COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
         COUNT(*) FILTER (WHERE status = 'waiting_customer') as waiting_customer,
-        COUNT(*) FILTER (WHERE priority = 'critical' AND status NOT IN ('closed', 'resolved')) as critical_count,
-        COUNT(*) FILTER (WHERE assigned_to IS NULL AND team_id IS NULL AND status NOT IN ('closed', 'resolved')) as unassigned,
+        COUNT(*) FILTER (WHERE priority = 'critical' AND status != 'resolved') as critical_count,
+        COUNT(*) FILTER (WHERE assigned_to IS NULL AND team_id IS NULL AND status != 'resolved') as unassigned,
         COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as created_today,
-        COUNT(*) FILTER (WHERE status = 'closed' AND DATE(updated_at) = CURRENT_DATE) as closed_today,
-        COUNT(*) FILTER (WHERE status NOT IN ('closed', 'resolved')) as total_open,
-        COUNT(*) FILTER (WHERE assigned_to IS NOT NULL AND status NOT IN ('closed', 'resolved')) as assigned_individual,
-        COUNT(*) FILTER (WHERE team_id IS NOT NULL AND assigned_to IS NULL AND status NOT IN ('closed', 'resolved')) as assigned_group
+        COUNT(*) FILTER (WHERE status = 'resolved' AND DATE(updated_at) = CURRENT_DATE) as resolved_today,
+        COUNT(*) FILTER (WHERE status != 'resolved') as total_open,
+        COUNT(*) FILTER (WHERE assigned_to IS NOT NULL AND status != 'resolved') as assigned_individual,
+        COUNT(*) FILTER (WHERE team_id IS NOT NULL AND assigned_to IS NULL AND status != 'resolved') as assigned_group
     FROM tickets
 ")->fetch(PDO::FETCH_ASSOC);
 
@@ -24,7 +24,7 @@ $teamAssignments = $db->query("
     SELECT tm.name as team_name, COUNT(t.id) as ticket_count
     FROM tickets t
     INNER JOIN teams tm ON t.team_id = tm.id
-    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) != 'resolved'
     GROUP BY tm.id, tm.name
     ORDER BY ticket_count DESC
     LIMIT 5
@@ -35,7 +35,7 @@ $individualAssignments = $db->query("
     SELECT u.name as user_name, COUNT(t.id) as ticket_count
     FROM tickets t
     INNER JOIN users u ON t.assigned_to = u.id
-    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) != 'resolved'
     GROUP BY u.id, u.name
     ORDER BY ticket_count DESC
     LIMIT 5
@@ -50,7 +50,7 @@ $branchStats = $db->query("
         COUNT(*) FILTER (WHERE t.status = 'pending') as pending_count,
         COUNT(*) FILTER (WHERE t.status = 'in_progress') as in_progress_count
     FROM branches b
-    LEFT JOIN tickets t ON t.branch_id = b.id AND t.status NOT IN ('closed', 'resolved')
+    LEFT JOIN tickets t ON t.branch_id = b.id AND t.status != 'resolved'
     GROUP BY b.id, b.name
     ORDER BY total_tickets DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
@@ -66,7 +66,7 @@ $avgResponse = $db->query("
 $avgResolution = $db->query("
     SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/60) as avg_minutes
     FROM tickets 
-    WHERE status IN ('closed', 'resolved') AND created_at >= NOW() - INTERVAL '30 days'
+    WHERE status = 'resolved' AND created_at >= NOW() - INTERVAL '30 days'
 ")->fetchColumn();
 
 // SLA Compliance (tickets resolved within SLA)
@@ -75,7 +75,7 @@ $slaStats = $db->query("
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE sla_resolution_breached = false) as met
     FROM tickets 
-    WHERE status IN ('closed', 'resolved') AND created_at >= NOW() - INTERVAL '30 days'
+    WHERE status = 'resolved' AND created_at >= NOW() - INTERVAL '30 days'
 ")->fetch(PDO::FETCH_ASSOC);
 $slaCompliance = ($slaStats['total'] > 0) ? round(($slaStats['met'] / $slaStats['total']) * 100) : 100;
 
@@ -97,7 +97,7 @@ $categoryStats = $db->query("
         COALESCE(category, 'Other') as category,
         COUNT(*) as count
     FROM tickets 
-    WHERE status NOT IN ('closed', 'resolved')
+    WHERE status != 'resolved'
     GROUP BY COALESCE(category, 'Other')
     ORDER BY count DESC
     LIMIT 5
@@ -115,7 +115,7 @@ $topOpenTickets = $db->query("
     LEFT JOIN teams tm ON t.team_id = tm.id
     LEFT JOIN users u ON t.assigned_to = u.id
     LEFT JOIN branches b ON t.branch_id = b.id
-    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) != 'resolved'
     ORDER BY 
         CASE t.priority 
             WHEN 'critical' THEN 1 
@@ -134,7 +134,7 @@ $criticalAlert = $db->query("
     FROM tickets t
     LEFT JOIN customers c ON t.customer_id = c.id
     LEFT JOIN users u ON t.assigned_to = u.id
-    WHERE t.priority = 'critical' AND t.status NOT IN ('closed', 'resolved')
+    WHERE t.priority = 'critical' AND t.status != 'resolved'
     ORDER BY t.created_at ASC
     LIMIT 1
 ")->fetch(PDO::FETCH_ASSOC);
@@ -142,7 +142,7 @@ $criticalAlert = $db->query("
 // Technicians in the field (employees who checked in today - for avatars)
 $technicians = $db->query("
     SELECT e.id, e.name,
-           (SELECT COUNT(*) FROM tickets t LEFT JOIN users u2 ON t.assigned_to = u2.id WHERE LOWER(u2.name) = LOWER(e.name) AND t.status NOT IN ('closed', 'resolved')) as ticket_count,
+           (SELECT COUNT(*) FROM tickets t LEFT JOIN users u2 ON t.assigned_to = u2.id WHERE LOWER(u2.name) = LOWER(e.name) AND t.status != 'resolved') as ticket_count,
            TO_CHAR(a.clock_in, 'HH24:MI') as clock_in
     FROM employees e
     INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE
@@ -179,7 +179,7 @@ $technicianTickets = $db->query("
     INNER JOIN users u ON t.assigned_to = u.id
     INNER JOIN employees e ON LOWER(e.name) = LOWER(u.name)
     INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE AND a.clock_out IS NULL
-    WHERE LOWER(t.status) NOT IN ('closed', 'resolved')
+    WHERE LOWER(t.status) != 'resolved'
     ORDER BY 
         CASE t.priority 
             WHEN 'critical' THEN 1 

@@ -386,8 +386,7 @@ class MobileAPI {
                 'open' => 'Open',
                 'in_progress' => 'In Progress',
                 'pending' => 'Pending',
-                'resolved' => 'Resolved',
-                'closed' => 'Closed'
+                'resolved' => 'Resolved'
             ];
             
             $statusLabel = $statusLabels[$status] ?? ucfirst($status);
@@ -696,14 +695,14 @@ class MobileAPI {
             $userId = $employee['user_id'];
             $today = date('Y-m-d');
             
-            // Get tickets resolved/closed today
+            // Get tickets resolved today
             $stmt = $this->db->prepare("
                 SELECT t.ticket_number, t.subject, t.status, c.name as customer_name
                 FROM tickets t
                 LEFT JOIN customers c ON t.customer_id = c.id
                 WHERE t.assigned_to = ? 
                   AND DATE(t.updated_at) = ?
-                  AND t.status IN ('resolved', 'closed')
+                  AND t.status = 'resolved'
                 ORDER BY t.updated_at DESC
             ");
             $stmt->execute([$userId, $today]);
@@ -1058,7 +1057,6 @@ class MobileAPI {
             SELECT 
                 COUNT(*) as total_tickets,
                 COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_tickets,
-                COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_tickets,
                 COUNT(CASE WHEN sla_resolution_breached = TRUE THEN 1 END) as sla_breached,
                 AVG(CASE WHEN resolved_at IS NOT NULL THEN 
                     EXTRACT(EPOCH FROM (resolved_at - created_at))/3600 
@@ -1070,7 +1068,7 @@ class MobileAPI {
         $thisMonthStats = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         $resolutionRate = $thisMonthStats['total_tickets'] > 0 
-            ? round((($thisMonthStats['resolved_tickets'] + $thisMonthStats['closed_tickets']) / $thisMonthStats['total_tickets']) * 100, 1) 
+            ? round(($thisMonthStats['resolved_tickets'] / $thisMonthStats['total_tickets']) * 100, 1) 
             : 0;
         
         $slaCompliance = $thisMonthStats['total_tickets'] > 0 
@@ -1083,7 +1081,7 @@ class MobileAPI {
         
         $stmt = $this->db->prepare("
             SELECT u.id, u.name, 
-                   COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved
+                   COUNT(CASE WHEN t.status = 'resolved' THEN 1 END) as resolved
             FROM users u
             LEFT JOIN tickets t ON u.id = t.assigned_to AND t.created_at >= ?
             WHERE u.role IN ('technician', 'admin')
@@ -1250,7 +1248,7 @@ class MobileAPI {
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
-            WHERE t.assigned_to IS NULL AND t.team_id IS NULL AND t.status NOT IN ('resolved', 'closed')";
+            WHERE t.assigned_to IS NULL AND t.team_id IS NULL AND t.status != 'resolved'";
         $params = [];
         
         if (!empty($branchIds)) {
@@ -1281,7 +1279,7 @@ class MobileAPI {
         
         $stmt = $this->db->prepare("
             UPDATE tickets SET assigned_to = ?, status = 'in_progress', updated_at = NOW() 
-            WHERE id = ? AND assigned_to IS NULL AND status NOT IN ('resolved', 'closed')
+            WHERE id = ? AND assigned_to IS NULL AND status != 'resolved'
         ");
         $stmt->execute([$userId, $ticketId]);
         
@@ -1503,7 +1501,7 @@ class MobileAPI {
         $stmt = $this->db->prepare("
             SELECT 
                 COUNT(*) as total_tickets,
-                COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as completed_tickets
+                COUNT(CASE WHEN status = 'resolved' THEN 1 END) as completed_tickets
             FROM tickets
             WHERE team_id = ? AND created_at >= ?
         ");

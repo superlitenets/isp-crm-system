@@ -278,7 +278,7 @@ class SLA {
             }
         }
         
-        if (in_array($ticket['status'], ['resolved', 'closed'])) {
+        if ($ticket['status'] === 'resolved') {
             $resolvedAt = new \DateTime($ticket['resolved_at'] ?? $ticket['updated_at']);
             if ($resolvedAt <= $resolutionDue) {
                 $status['resolution'] = ['status' => 'met', 'breached' => false];
@@ -347,7 +347,7 @@ class SLA {
             LEFT JOIN users u ON t.assigned_to = u.id
             LEFT JOIN sla_policies sp ON t.sla_policy_id = sp.id
             WHERE (t.sla_response_breached = TRUE OR t.sla_resolution_breached = TRUE)
-                AND t.status NOT IN ('resolved', 'closed')
+                AND t.status != 'resolved'
         ";
         
         $params = [];
@@ -370,7 +370,7 @@ class SLA {
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
             LEFT JOIN sla_policies sp ON t.sla_policy_id = sp.id
-            WHERE t.status NOT IN ('resolved', 'closed')
+            WHERE t.status != 'resolved'
                 AND t.sla_response_breached = FALSE
                 AND t.sla_resolution_breached = FALSE
                 AND (
@@ -410,7 +410,7 @@ class SLA {
                 SUM(CASE WHEN sla_resolution_breached = TRUE THEN 1 ELSE 0 END) as resolution_breached,
                 SUM(CASE WHEN first_response_at IS NOT NULL AND sla_response_due IS NOT NULL 
                          AND first_response_at <= sla_response_due THEN 1 ELSE 0 END) as response_met,
-                SUM(CASE WHEN status IN ('resolved', 'closed') AND resolved_at IS NOT NULL 
+                SUM(CASE WHEN status = 'resolved' AND resolved_at IS NOT NULL 
                          AND sla_resolution_due IS NOT NULL AND resolved_at <= sla_resolution_due 
                          THEN 1 ELSE 0 END) as resolution_met
             FROM tickets

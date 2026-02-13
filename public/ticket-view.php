@@ -68,8 +68,7 @@ $statusColors = [
     'open' => '#3498db',
     'in_progress' => '#f39c12',
     'pending' => '#9b59b6',
-    'resolved' => '#27ae60',
-    'closed' => '#95a5a6'
+    'resolved' => '#27ae60'
 ];
 
 $priorityColors = [
@@ -252,7 +251,7 @@ $priorityColors = [
                 </div>
                 <?php endif; ?>
                 
-                <?php if (in_array(strtolower($tokenRecord['status']), ['resolved', 'closed'])): ?>
+                <?php if (strtolower($tokenRecord['status']) === 'resolved'): ?>
                 <div class="border-top pt-4">
                     <h6 class="text-center mb-3">Rate Your Experience</h6>
                     

@@ -119,7 +119,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         FROM tickets t
         LEFT JOIN users u ON t.assigned_to = u.id
         LEFT JOIN customers c ON t.customer_id = c.id
-        WHERE t.status NOT IN ('resolved', 'closed')
+        WHERE t.status != 'resolved'
         ORDER BY 
             CASE t.priority 
                 WHEN 'critical' THEN 1 
@@ -219,7 +219,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
             COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_count,
             COUNT(CASE WHEN t.status = 'resolved' AND DATE(t.resolved_at) = CURRENT_DATE THEN 1 END) as resolved_today
         FROM users u
-        LEFT JOIN tickets t ON t.assigned_to = u.id AND t.status NOT IN ('closed')
+        LEFT JOIN tickets t ON t.assigned_to = u.id
         WHERE u.role IN ('technician', 'admin', 'manager')
         GROUP BY u.id, u.name
         HAVING COUNT(t.id) > 0
@@ -314,7 +314,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
                    u.name as assigned_name
             FROM tickets t
             LEFT JOIN users u ON t.assigned_to = u.id
-            WHERE t.branch_id = ? AND t.status NOT IN ('resolved', 'closed')
+            WHERE t.branch_id = ? AND t.status != 'resolved'
             ORDER BY 
                 CASE t.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
                 t.created_at ASC
@@ -383,7 +383,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         
         $slaBreachedStmt = $db->query("
             SELECT COUNT(*) FROM tickets 
-            WHERE status NOT IN ('resolved', 'closed')
+            WHERE status != 'resolved'
             AND (sla_response_breached = true OR sla_resolution_breached = true)
         ");
         $totalSlaBreached = $slaBreachedStmt->fetchColumn() ?: 0;
@@ -675,7 +675,7 @@ function repostIncompleteTickets(\PDO $db, \App\Settings $settings): void {
         FROM tickets t
         LEFT JOIN users u ON t.assigned_to = u.id
         LEFT JOIN customers c ON t.customer_id = c.id
-        WHERE t.status NOT IN ('resolved', 'closed')
+        WHERE t.status != 'resolved'
         ORDER BY 
             CASE t.priority 
                 WHEN 'critical' THEN 1 
@@ -788,7 +788,7 @@ function checkSLAApproachingAndBreached(\PDO $db, \App\Settings $settings): void
         FROM tickets t
         LEFT JOIN customers c ON t.customer_id = c.id
         LEFT JOIN users u ON t.assigned_to = u.id
-        WHERE t.status NOT IN ('resolved', 'closed', 'cancelled')
+        WHERE t.status NOT IN ('resolved', 'cancelled')
           AND t.sla_resolution_due IS NOT NULL
           AND t.assigned_to IS NOT NULL
     ");

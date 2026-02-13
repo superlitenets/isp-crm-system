@@ -108,7 +108,7 @@ class CustomerTicketLink {
             SELECT 'activity' as type, al.details::text as content, al.created_at, NULL as author
             FROM activity_logs al
             WHERE al.entity_type = 'ticket' AND al.entity_id = ?::integer
-            AND al.action_type IN ('status_change', 'resolved', 'closed')
+            AND al.action_type IN ('status_change', 'resolved')
             ORDER BY created_at DESC
             LIMIT 20
         ");

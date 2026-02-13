@@ -1280,8 +1280,7 @@ if (isset($_SESSION['portal_subscription_id'])) {
                                     'open' => 'primary',
                                     'in_progress' => 'info',
                                     'pending' => 'warning',
-                                    'resolved' => 'success',
-                                    'closed' => 'secondary'
+                                    'resolved' => 'success'
                                 ];
                                 $statusColor = $statusColors[$t['status']] ?? 'secondary';
                                 ?>
@@ -1353,7 +1352,7 @@ if (isset($_SESSION['portal_subscription_id'])) {
                             </div>
                             <?php endif; ?>
                             
-                            <?php if (!in_array($t['status'], ['closed', 'resolved'])): ?>
+                            <?php if ($t['status'] !== 'resolved'): ?>
                             <form method="post" class="mt-4">
                                 <input type="hidden" name="action" value="add_ticket_comment">
                                 <input type="hidden" name="ticket_id" value="<?= $t['id'] ?>">
