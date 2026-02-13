@@ -2538,6 +2538,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 break;
+            case 'bulk_bind_tr069_profile':
+                $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $profileId = isset($_POST['tr069_profile_id']) ? (int)$_POST['tr069_profile_id'] : 3;
+                
+                if (!$oltId) {
+                    $message = 'Please select an OLT';
+                    $messageType = 'danger';
+                } else {
+                    $stmt = $db->prepare("SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL");
+                    $stmt->execute([$oltId]);
+                    $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                    
+                    if (empty($onus)) {
+                        $message = 'No authorized ONUs found for this OLT';
+                        $messageType = 'warning';
+                    } else {
+                        $bound = 0;
+                        $rebooted = 0;
+                        $failed = 0;
+                        $errors = [];
+                        
+                        foreach ($onus as $onu) {
+                            try {
+                                $frame = $onu['frame'] ?? 0;
+                                $slot = $onu['slot'];
+                                $port = $onu['port'];
+                                $onuPortId = $onu['onu_id'];
+                                
+                                $cmd = "interface gpon {$frame}/{$slot}\r\n";
+                                $cmd .= "ont tr069-server-config {$port} {$onuPortId} profile-id {$profileId}\r\n";
+                                $cmd .= "quit";
+                                $result = $huaweiOLT->executeCommand($oltId, $cmd);
+                                
+                                $out = $result['output'] ?? '';
+                                if ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out) || preg_match('/already|repeatedly/i', $out)) {
+                                    $bound++;
+                                    
+                                    $cmdReboot = "interface gpon {$frame}/{$slot}\r\n";
+                                    $cmdReboot .= "ont reset {$port} {$onuPortId}\r\n";
+                                    $cmdReboot .= "quit";
+                                    $rebootResult = $huaweiOLT->executeCommand($oltId, $cmdReboot);
+                                    if ($rebootResult['success']) {
+                                        $rebooted++;
+                                    }
+                                } else {
+                                    $failed++;
+                                    $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . substr($out, 0, 100);
+                                }
+                            } catch (Exception $e) {
+                                $failed++;
+                                $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . $e->getMessage();
+                            }
+                        }
+                        
+                        $message = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs, {$rebooted} rebooted";
+                        if ($failed > 0) {
+                            $message .= ", {$failed} failed";
+                            $messageType = 'warning';
+                        } else {
+                            $messageType = 'success';
+                        }
+                        
+                        $huaweiOLT->addLog([
+                            'olt_id' => $oltId,
+                            'action' => 'bulk_bind_tr069_profile',
+                            'status' => $failed > 0 ? 'partial' : 'success',
+                            'message' => $message,
+                            'user_id' => $_SESSION['user_id'] ?? null
+                        ]);
+                    }
+                }
+                break;
             case 'import_smartolt':
             case 'import_from_smartolt':
                 require_once __DIR__ . '/../src/SmartOLT.php';
@@ -7633,9 +7705,6 @@ try {
                         </div>
                         <div class="stat-number text-danger"><?= $stats['los_onus'] ?></div>
                         <div class="text-muted mb-2">LOS (Loss of Signal)</div>
-                        <div class="small text-muted">
-                            <i class="bi bi-lightning me-1"></i>Fiber or power issues
-                        </div>
                     </div>
                 </div>
                 <div class="col-xl col-md-6">
@@ -7650,9 +7719,6 @@ try {
                         </div>
                         <div class="stat-number text-warning"><?= $stats['unconfigured_onus'] ?></div>
                         <div class="text-muted mb-2">Pending Authorization</div>
-                        <div class="small text-muted">
-                            <i class="bi bi-search me-1"></i>Discovered, not yet authorized
-                        </div>
                     </div>
                 </div>
             </div>
@@ -7814,6 +7880,12 @@ try {
                                         <div class="fw-medium">CLI Terminal</div>
                                     </a>
                                 </div>
+                                <div class="col-12">
+                                    <button type="button" class="quick-action-btn w-100 border-0" onclick="showBulkBindTR069Modal()" style="cursor:pointer;">
+                                        <i class="bi bi-link-45deg text-danger"></i>
+                                        <div class="fw-medium">Bind All ONUs to TR-069</div>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -7918,6 +7990,52 @@ try {
                 setInterval(updateTimer, 1000);
             })();
             </script>
+
+            <!-- Bulk Bind TR-069 Modal -->
+            <div class="modal fade" id="bulkBindTR069Modal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Bind All ONUs to TR-069 Profile</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="bulk_bind_tr069_profile">
+                            <div class="modal-body">
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    This will bind <strong>all authorized ONUs</strong> on the selected OLT to TR-069 profile ID and <strong>reboot each ONU</strong> to apply the configuration.
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Select OLT</label>
+                                    <select name="olt_id" class="form-select" required>
+                                        <option value="">-- Select OLT --</option>
+                                        <?php foreach ($olts as $olt): ?>
+                                        <option value="<?= $olt['id'] ?>"><?= htmlspecialchars($olt['name']) ?> (<?= $olt['ip_address'] ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">TR-069 Profile ID</label>
+                                    <input type="number" name="tr069_profile_id" class="form-control" value="3" required>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('This will bind all authorized ONUs to the TR-069 profile and reboot them. Continue?');">
+                                    <i class="bi bi-link-45deg me-2"></i>Bind & Reboot All
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script>
+            function showBulkBindTR069Modal() {
+                new bootstrap.Modal(document.getElementById('bulkBindTR069Modal')).show();
+            }
+            </script>
+
             <?php elseif ($view === 'live_monitor'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-activity me-2"></i>Live ONU Monitor</h4>
