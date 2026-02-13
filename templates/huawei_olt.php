@@ -7462,28 +7462,6 @@ try {
                     font-size: 0.7rem;
                     font-weight: 700;
                 }
-                .quick-action-btn {
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 12px;
-                    padding: 16px;
-                    text-align: center;
-                    transition: all 0.2s ease;
-                    text-decoration: none;
-                    color: #334155;
-                    display: block;
-                }
-                .quick-action-btn:hover {
-                    border-color: #3b82f6;
-                    color: #3b82f6;
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-                }
-                .quick-action-btn i {
-                    font-size: 1.5rem;
-                    margin-bottom: 8px;
-                    display: block;
-                }
                 .alert-item {
                     padding: 12px 16px;
                     border-left: 3px solid;
@@ -7747,47 +7725,10 @@ try {
                 </div>
             </div>
             
-            <!-- Quick Actions & Alerts Row -->
+            <!-- Alerts & Activity Row -->
             <div class="row g-4 mb-4">
-                <!-- Quick Actions -->
-                <div class="col-lg-4">
-                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
-                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
-                            <h5 class="mb-0 fw-bold"><i class="bi bi-lightning me-2 text-warning"></i>Quick Actions</h5>
-                        </div>
-                        <div class="card-body px-4 pb-4">
-                            <div class="row g-3">
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="quick-action-btn">
-                                        <i class="bi bi-plus-circle text-success"></i>
-                                        <div class="fw-medium">Authorize ONUs</div>
-                                    </a>
-                                </div>
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=live_monitor" class="quick-action-btn">
-                                        <i class="bi bi-broadcast text-primary"></i>
-                                        <div class="fw-medium">Live Monitor</div>
-                                    </a>
-                                </div>
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=tr069" class="quick-action-btn">
-                                        <i class="bi bi-router text-info"></i>
-                                        <div class="fw-medium">TR-069</div>
-                                    </a>
-                                </div>
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=terminal" class="quick-action-btn">
-                                        <i class="bi bi-terminal text-dark"></i>
-                                        <div class="fw-medium">CLI Terminal</div>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- Recent Alerts -->
-                <div class="col-lg-4">
+                <div class="col-lg-6">
                     <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
                         <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
                             <h5 class="mb-0 fw-bold"><i class="bi bi-bell me-2 text-danger"></i>Recent Alerts</h5>
@@ -7820,7 +7761,7 @@ try {
                 </div>
                 
                 <!-- Problem ONUs -->
-                <div class="col-lg-4">
+                <div class="col-lg-6">
                     <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
                         <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
                             <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-diamond me-2 text-warning"></i>Problem ONUs</h5>
