@@ -2541,7 +2541,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'bulk_bind_tr069_profile':
                 $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $profileId = isset($_POST['tr069_profile_id']) ? (int)$_POST['tr069_profile_id'] : 3;
-                $rebootAfter = !empty($_POST['reboot_after']);
+                $rebootAfter = true;
                 
                 if (!$oltId) {
                     $message = 'Please select an OLT';
@@ -8025,15 +8025,11 @@ try {
                                     <label class="form-label">TR-069 Profile ID</label>
                                     <input type="number" name="tr069_profile_id" class="form-control" value="3" required>
                                 </div>
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="reboot_after" value="1" id="bulkBindReboot">
-                                    <label class="form-check-label" for="bulkBindReboot">Reboot ONUs after binding</label>
-                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-danger" onclick="return confirm('This will bind all authorized ONUs to the TR-069 profile. Continue?');">
-                                    <i class="bi bi-link-45deg me-2"></i>Bind All
+                                    <i class="bi bi-link-45deg me-2"></i>Bind & Reboot All
                                 </button>
                             </div>
                         </form>
