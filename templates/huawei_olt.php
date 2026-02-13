@@ -922,9 +922,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'export_csv') {
     
     $output = fopen('php://output', 'w');
     if (!empty($data)) {
-        fputcsv($output, array_keys($data[0]));
+        fputcsv($output, array_keys($data[0]), ',', '"', '');
         foreach ($data as $row) {
-            fputcsv($output, $row);
+            fputcsv($output, $row, ',', '"', '');
         }
     }
     fclose($output);
@@ -2295,27 +2295,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 } else {
                     $csvFile = $_FILES['csv_file']['tmp_name'];
-                    $handle = fopen($csvFile, 'r');
+                    $contents = file_get_contents($csvFile);
+                    $contents = preg_replace('/^\xEF\xBB\xBF/', '', $contents);
+                    $tmpFile = tempnam(sys_get_temp_dir(), 'csv_');
+                    file_put_contents($tmpFile, $contents);
+                    $handle = fopen($tmpFile, 'r');
                     if (!$handle) {
                         $message = 'Failed to read CSV file';
                         $messageType = 'danger';
                     } else {
-                        fgetcsv($handle, 0, ',', '"', '\\');
-                        
+                        fgetcsv($handle, 0, ',', '"', '');
+
                         $imported = 0;
                         $updated = 0;
                         $skipped = 0;
                         $zonesCreated = 0;
+                        $continuationVlans = 0;
                         $errors = [];
                         $zoneCache = [];
-                        
-                        while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
+                        $onuTypeCache = [];
+                        $onuVlans = [];
+
+                        $statusMap = [
+                            'online' => 'online',
+                            'offline' => 'offline',
+                            'power fail' => 'offline',
+                            'los' => 'los',
+                            'dying-gasp' => 'offline',
+                            'working' => 'online',
+                            'dyinggasp' => 'offline',
+                            'losi' => 'los',
+                            'lofi' => 'los',
+                            'power-off' => 'offline',
+                            'initial' => 'offline'
+                        ];
+
+                        while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
                             $sn = strtoupper(trim($row[2] ?? ''));
                             if (empty($sn) || strlen($sn) < 12) {
                                 $skipped++;
                                 continue;
                             }
-                            
+
+                            $externalId = trim($row[0] ?? '');
+                            $isContinuationRow = empty($externalId) && empty(trim($row[1] ?? ''));
+
+                            $serviceVlan = (int)($row[33] ?? 0);
+                            if ($serviceVlan > 0) {
+                                if (!isset($onuVlans[$sn])) {
+                                    $onuVlans[$sn] = [];
+                                }
+                                if (!in_array($serviceVlan, $onuVlans[$sn])) {
+                                    $onuVlans[$sn][] = $serviceVlan;
+                                }
+                            }
+
+                            if ($isContinuationRow) {
+                                $continuationVlans++;
+                                continue;
+                            }
+
                             $onuType = trim($row[3] ?? '');
                             $name = trim($row[4] ?? '');
                             $board = (int)($row[6] ?? 0);
@@ -2323,26 +2362,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $allocatedOnu = (int)($row[8] ?? 0);
                             $zone = trim($row[9] ?? '');
                             $address = trim($row[10] ?? '');
+                            $latitude = is_numeric($row[11] ?? '') ? (float)$row[11] : null;
+                            $longitude = is_numeric($row[12] ?? '') ? (float)$row[12] : null;
+                            $wanMode = trim($row[16] ?? '');
+                            $pppoeUsername = trim($row[22] ?? '');
+                            $pppoePassword = trim($row[23] ?? '');
+                            $authDateStr = trim($row[26] ?? '');
                             $status = strtolower(trim($row[27] ?? 'offline'));
                             $rxPower = $row[30] ?? null;
                             $txPower = $row[29] ?? null;
                             $distance = $row[31] ?? null;
-                            $serviceVlan = (int)($row[33] ?? 0);
-                            $externalId = trim($row[0] ?? '');
-                            
+                            $tr069DeviceId = trim($row[41] ?? '');
+
                             $rxPowerFloat = is_numeric($rxPower) ? (float)$rxPower : null;
                             $txPowerFloat = is_numeric($txPower) ? (float)$txPower : null;
-                            $distanceFloat = is_numeric($distance) ? (float)$distance : null;
-                            
+                            $distanceInt = is_numeric($distance) ? (int)$distance : null;
+
+                            $authDate = null;
+                            if (!empty($authDateStr)) {
+                                $parsed = date_create($authDateStr);
+                                if ($parsed) $authDate = $parsed->format('Y-m-d');
+                            }
+
                             $onuTypeId = null;
                             if ($onuType) {
-                                $stmt = $db->prepare("SELECT id FROM huawei_onu_types WHERE LOWER(name) = LOWER(?) OR LOWER(model) = LOWER(?) LIMIT 1");
-                                $stmt->execute([$onuType, $onuType]);
-                                $typeRow = $stmt->fetch(\PDO::FETCH_ASSOC);
-                                $onuTypeId = $typeRow['id'] ?? null;
+                                if (isset($onuTypeCache[$onuType])) {
+                                    $onuTypeId = $onuTypeCache[$onuType];
+                                } else {
+                                    $stmt = $db->prepare("SELECT id FROM huawei_onu_types WHERE LOWER(name) = LOWER(?) OR LOWER(model) = LOWER(?) LIMIT 1");
+                                    $stmt->execute([$onuType, $onuType]);
+                                    $typeRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                    $onuTypeId = $typeRow['id'] ?? null;
+                                    $onuTypeCache[$onuType] = $onuTypeId;
+                                }
                             }
-                            
-                            // Auto-create zone if it doesn't exist
+
                             $zoneId = null;
                             if (!empty($zone)) {
                                 if (isset($zoneCache[$zone])) {
@@ -2354,7 +2408,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                     if ($zoneRow) {
                                         $zoneId = $zoneRow['id'];
                                     } else {
-                                        // Create the zone
                                         $stmt = $db->prepare("INSERT INTO huawei_zones (name, is_active, created_at) VALUES (?, true, NOW()) RETURNING id");
                                         $stmt->execute([$zone]);
                                         $newZone = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -2364,35 +2417,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                     $zoneCache[$zone] = $zoneId;
                                 }
                             }
-                            
-                            // Extended status mapping for SmartOLT
-                            $statusMap = [
-                                'online' => 'online', 
-                                'offline' => 'offline', 
-                                'power fail' => 'offline', 
-                                'los' => 'los', 
-                                'dying-gasp' => 'offline',
-                                'working' => 'online',
-                                'dyinggasp' => 'offline',
-                                'losi' => 'los',
-                                'lofi' => 'los',
-                                'power-off' => 'offline',
-                                'initial' => 'offline'
-                            ];
+
                             $mappedStatus = $statusMap[$status] ?? 'online';
-                            
+
+                            $wanModeMap = [
+                                'pppoe' => 'pppoe',
+                                'dhcp' => 'dhcp',
+                                'static' => 'static',
+                                'bridge' => 'bridge',
+                                'routing' => 'route',
+                                'setup via onu webpage' => 'route'
+                            ];
+                            $mappedWanMode = $wanModeMap[strtolower($wanMode)] ?? null;
+
                             $stmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
                             $stmt->execute([$sn]);
                             $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
-                            
+
                             try {
                                 if ($existing) {
-                                    $stmt = $db->prepare("UPDATE huawei_onus SET name = ?, description = ?, slot = ?, port = ?, onu_id = ?, status = ?, snmp_status = ?, zone = ?, zone_id = ?, onu_type_id = ?, vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?, distance = ?, is_authorized = true, updated_at = NOW() WHERE id = ?");
-                                    $stmt->execute([$name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat, $existing['id']]);
+                                    $stmt = $db->prepare("UPDATE huawei_onus SET 
+                                        name = ?, description = ?, slot = ?, port = ?, onu_id = ?,
+                                        status = ?, snmp_status = ?, zone = ?, zone_id = ?, onu_type_id = ?,
+                                        vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?,
+                                        distance = ?, is_authorized = true, latitude = ?, longitude = ?,
+                                        wan_mode = ?, pppoe_username = ?, pppoe_password = ?, auth_date = ?,
+                                        tr069_device_id = ?, address = ?, updated_at = NOW()
+                                        WHERE id = ?");
+                                    $stmt->execute([
+                                        $name ?: $sn, $address, $board, $port, $allocatedOnu,
+                                        $mappedStatus, $mappedStatus, $zone, $zoneId, $onuTypeId,
+                                        $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat,
+                                        $distanceInt, $latitude, $longitude,
+                                        $mappedWanMode, $pppoeUsername ?: null, $pppoePassword ?: null, $authDate,
+                                        $tr069DeviceId ?: null, $address ?: null, $existing['id']
+                                    ]);
                                     $updated++;
                                 } else {
-                                    $stmt = $db->prepare("INSERT INTO huawei_onus (sn, olt_id, name, description, frame, slot, port, onu_id, status, snmp_status, is_authorized, zone, zone_id, onu_type_id, vlan_id, smartolt_external_id, rx_power, tx_power, distance, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
-                                    $stmt->execute([$sn, $oltId, $name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat]);
+                                    $stmt = $db->prepare("INSERT INTO huawei_onus 
+                                        (sn, olt_id, name, description, frame, slot, port, onu_id,
+                                        status, snmp_status, is_authorized, zone, zone_id, onu_type_id,
+                                        vlan_id, smartolt_external_id, rx_power, tx_power, distance,
+                                        latitude, longitude, wan_mode, pppoe_username, pppoe_password,
+                                        auth_date, tr069_device_id, address, created_at, updated_at)
+                                        VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
+                                    $stmt->execute([
+                                        $sn, $oltId, $name ?: $sn, $address, $board, $port, $allocatedOnu,
+                                        $mappedStatus, $mappedStatus, $zone, $zoneId, $onuTypeId,
+                                        $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceInt,
+                                        $latitude, $longitude, $mappedWanMode, $pppoeUsername ?: null, $pppoePassword ?: null,
+                                        $authDate, $tr069DeviceId ?: null, $address ?: null
+                                    ]);
                                     $imported++;
                                 }
                             } catch (\Exception $e) {
@@ -2400,10 +2475,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             }
                         }
                         fclose($handle);
-                        
+                        @unlink($tmpFile);
+
+                        foreach ($onuVlans as $onuSn => $vlans) {
+                            if (count($vlans) > 0) {
+                                try {
+                                    $stmt = $db->prepare("UPDATE huawei_onus SET attached_vlans = ? WHERE sn = ?");
+                                    $stmt->execute([json_encode(array_values(array_unique($vlans))), $onuSn]);
+                                } catch (\Exception $e) {
+                                    $errors[] = "VLAN update {$onuSn}: " . $e->getMessage();
+                                }
+                            }
+                        }
+
                         $message = "CSV Import complete: {$imported} added, {$updated} updated";
                         if ($zonesCreated > 0) $message .= ", {$zonesCreated} zones created";
-                        if ($skipped > 0) $message .= ", {$skipped} skipped (continuation rows)";
+                        if ($continuationVlans > 0) $message .= ", {$continuationVlans} extra VLANs captured";
+                        if ($skipped > 0) $message .= ", {$skipped} skipped (invalid rows)";
                         if (!empty($errors)) $message .= ". Errors: " . count($errors);
                         $messageType = empty($errors) ? 'success' : 'warning';
                     }

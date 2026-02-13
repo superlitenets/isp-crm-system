@@ -4460,7 +4460,7 @@ class RadiusBilling {
     
     public function importSubscriptionsCSV(string $csvContent): array {
         $lines = explode("\n", trim($csvContent));
-        $header = str_getcsv(array_shift($lines));
+        $header = str_getcsv(array_shift($lines), ',', '"', '');
         
         $imported = 0;
         $errors = [];
@@ -4468,7 +4468,7 @@ class RadiusBilling {
         foreach ($lines as $lineNum => $line) {
             if (empty(trim($line))) continue;
             
-            $row = array_combine($header, str_getcsv($line));
+            $row = array_combine($header, str_getcsv($line, ',', '"', ''));
             
             try {
                 // Required fields: customer_id, package_id, username, password
