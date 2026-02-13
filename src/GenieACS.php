@@ -2310,6 +2310,8 @@ class GenieACS {
         
         $deviceIdEncoded = rawurlencode($deviceId);
         
+        error_log("[configureWifiAccessVlan] Starting: device={$deviceId}, wlan={$wifiIndex}, vlan={$vlanId}, ssid={$ssidName}");
+        
         try {
             $deviceResult = $this->getDevice($deviceId, false);
             $existingWanIndices = [];
@@ -2367,6 +2369,8 @@ class GenieACS {
                 $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.{$ipIndex}";
                 $wanName = "wan1.{$wanDeviceIndex}.ip{$ipIndex}";
                 
+                error_log("[configureWifiAccessVlan] Existing bridge found: WAN device={$wanDeviceIndex}, IP={$ipIndex}, route={$routeIndex}. Updating VLAN to {$vlanId}");
+                
                 $setVlanResult = $this->request(
                     "POST",
                     "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
@@ -2394,6 +2398,8 @@ class GenieACS {
             $wanDeviceIndex = !empty($existingWanIndices) ? max($existingWanIndices) + 1 : 2;
             $routeIndex = !empty($existingRouteIndices) ? max($existingRouteIndices) + 1 : 1;
             $wanName = "wan1.{$wanDeviceIndex}.ip1";
+            
+            error_log("[configureWifiAccessVlan] Creating new bridge: WAN device={$wanDeviceIndex}, route={$routeIndex}, existingWAN=" . json_encode($existingWanIndices));
             
             // Step 0: Ensure WLAN configuration exists (secondary SSIDs may need creation)
             if ($wifiIndex > 1 && $wifiIndex != 5) {
@@ -2428,6 +2434,7 @@ class GenieACS {
             }
             
             // Step 1: Add WANConnectionDevice under WANDevice.1
+            error_log("[configureWifiAccessVlan] Step 1: Adding WANConnectionDevice");
             $addWanDevResult = $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
@@ -2437,6 +2444,7 @@ class GenieACS {
                 ]
             );
             $results[] = ['step' => 'add_wan_device', 'result' => $addWanDevResult];
+            error_log("[configureWifiAccessVlan] Step 1 result: " . json_encode(['success' => $addWanDevResult['success'] ?? false, 'http_code' => $addWanDevResult['http_code'] ?? 0]));
             usleep(1000000);
             
             // Refresh device to discover actual WAN device index created
@@ -2474,6 +2482,7 @@ class GenieACS {
             usleep(500000);
             
             // Step 3: Set ConnectionType to IP_Bridged and Enable it
+            error_log("[configureWifiAccessVlan] Step 3: Setting bridge type and VLAN {$vlanId} on WAN device {$wanDeviceIndex}");
             $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1";
             $setBridgeResult = $this->request(
                 "POST",
@@ -2528,6 +2537,7 @@ class GenieACS {
             }
             
             // Step 5: Set policy_route binding SSID port to the new WAN bridge
+            error_log("[configureWifiAccessVlan] Step 5: Setting policy route - SSID port={$ssidPortName}, WAN={$wanName}, route index={$routeIndex}");
             $setRouteResult = $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
@@ -2541,6 +2551,9 @@ class GenieACS {
                 ]
             );
             $results[] = ['step' => 'set_policy_route', 'result' => $setRouteResult];
+            error_log("[configureWifiAccessVlan] Step 5 result: " . json_encode(['success' => $setRouteResult['success'] ?? false, 'http_code' => $setRouteResult['http_code'] ?? 0]));
+            
+            error_log("[configureWifiAccessVlan] Complete: WiFi {$wifiIndex} configured with VLAN {$vlanId}, WAN device {$wanDeviceIndex}");
             
             return [
                 'success' => true,

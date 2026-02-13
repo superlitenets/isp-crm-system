@@ -3165,6 +3165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $vlanId = (int)($_POST['vlan_id'] ?? 0);
                 $ssidName = $_POST['ssid'] ?? '';
 
+                error_log("[configure_wifi_bridge] Serial: {$serial}, WiFi Index: {$wifiIndex}, VLAN: {$vlanId}, SSID: {$ssidName}");
+
                 if (empty($serial) || $wifiIndex < 1 || $vlanId < 1) {
                     echo json_encode(['success' => false, 'error' => 'Serial, WiFi index, and VLAN ID are required']);
                     exit;
@@ -3173,12 +3175,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $genieacs = new \App\GenieACS($db);
                 $deviceResult = $genieacs->getDeviceBySerial($serial);
                 if (!$deviceResult['success']) {
+                    error_log("[configure_wifi_bridge] Device not found for serial: {$serial}");
                     echo json_encode(['success' => false, 'error' => 'Device not found in ACS']);
                     exit;
                 }
                 $deviceId = $deviceResult['device']['_id'];
+                error_log("[configure_wifi_bridge] Found device: {$deviceId}, calling configureWifiAccessVlan");
 
                 $bridgeResult = $genieacs->configureWifiAccessVlan($deviceId, $wifiIndex, $vlanId, $ssidName);
+                error_log("[configure_wifi_bridge] Result: " . json_encode(['success' => $bridgeResult['success'] ?? false, 'message' => $bridgeResult['message'] ?? '', 'errors' => $bridgeResult['errors'] ?? []]));
                 echo json_encode($bridgeResult);
                 exit;
 
