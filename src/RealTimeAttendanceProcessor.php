@@ -78,6 +78,10 @@ class RealTimeAttendanceProcessor {
             $notificationResult = $this->sendLateNotification($employee, $clockInTime, $date, $lateMinutes, $deduction, $rule);
             $result['notification_sent'] = $notificationResult['success'];
             $result['notification_message'] = $notificationResult['message'] ?? '';
+        } else {
+            $clockInConfirmResult = $this->sendClockInConfirmation($employee, $clockInTime, $date);
+            $result['notification_sent'] = $clockInConfirmResult['success'];
+            $result['notification_message'] = $clockInConfirmResult['message'] ?? '';
         }
         
         $result['message'] = $isLate 
@@ -207,7 +211,7 @@ class RealTimeAttendanceProcessor {
         
         $template = $this->getLateArrivalTemplate();
         
-        if (!$template || !$template['is_active'] || !$template['send_sms']) {
+        if (!$template || !$template['is_active']) {
             $result['message'] = 'Late notification template not active';
             return $result;
         }
@@ -233,7 +237,19 @@ class RealTimeAttendanceProcessor {
             $attendanceData
         );
         
-        $smsResult = $this->smsGateway->send($phone, $message);
+        $sendResult = ['success' => false];
+        $channel = 'sms';
+
+        $whatsapp = new \App\WhatsApp();
+        if ($whatsapp->isEnabled()) {
+            $channel = 'whatsapp';
+            $sendResult = $whatsapp->send($phone, $message);
+        }
+
+        if (!$sendResult['success'] && $template['send_sms']) {
+            $channel = 'sms';
+            $sendResult = $this->smsGateway->send($phone, $message);
+        }
         
         $this->logNotification(
             $employee['id'],
@@ -244,20 +260,58 @@ class RealTimeAttendanceProcessor {
             $deduction,
             $phone,
             $message,
-            $smsResult['success'] ? 'sent' : 'failed',
-            $smsResult
+            $sendResult['success'] ? 'sent' : 'failed',
+            array_merge($sendResult, ['channel' => $channel])
         );
         
-        if ($smsResult['success']) {
+        if ($sendResult['success']) {
             $result['success'] = true;
-            $result['message'] = 'Late arrival notification sent';
+            $result['message'] = "Late arrival notification sent via $channel";
         } else {
-            $result['message'] = 'Failed to send notification: ' . ($smsResult['error'] ?? 'Unknown error');
+            $result['message'] = 'Failed to send notification: ' . ($sendResult['error'] ?? 'Unknown error');
         }
         
         return $result;
     }
     
+    private function sendClockInConfirmation(array $employee, string $clockInTime, string $date): array {
+        $result = ['success' => false, 'message' => ''];
+
+        $phone = $employee['phone'] ?? null;
+        if (!$phone) {
+            $result['message'] = 'Employee phone number not available';
+            return $result;
+        }
+
+        $whatsapp = new \App\WhatsApp();
+        if (!$whatsapp->isEnabled()) {
+            $result['message'] = 'WhatsApp not enabled';
+            return $result;
+        }
+
+        $settings = new \App\Settings();
+        $companyName = $settings->get('company_name', 'Your ISP');
+        $clockInFormatted = date('g:i A', strtotime($clockInTime));
+        $dateFormatted = date('l, d M Y', strtotime($date));
+
+        $message = "Good morning {$employee['full_name']}!\n\n";
+        $message .= "Clock-in recorded at *{$clockInFormatted}*\n";
+        $message .= "Date: {$dateFormatted}\n\n";
+        $message .= "Have a productive day!\n";
+        $message .= "_{$companyName} - HR_";
+
+        $sendResult = $whatsapp->send($phone, $message);
+
+        if ($sendResult['success'] ?? false) {
+            $result['success'] = true;
+            $result['message'] = 'Clock-in confirmation sent via WhatsApp';
+        } else {
+            $result['message'] = 'Failed to send clock-in confirmation: ' . ($sendResult['error'] ?? 'Unknown');
+        }
+
+        return $result;
+    }
+
     private function getLateArrivalTemplate(): ?array {
         $stmt = $this->db->prepare("
             SELECT * FROM hr_notification_templates 

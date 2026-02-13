@@ -21,7 +21,7 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **M-Pesa Integration**: Handles STK Push for payments, C2B, and real-time callback processing with robust error handling and retry logic. Supports multiple PayBill/Till numbers per NAS device (site) via centralized `mpesa_accounts` table managed in CRM Settings, with NAS devices referencing accounts via `mpesa_account_id` foreign key, falling back to global config. Revenue-per-site reporting with date filters, collection rates, and ARPU.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
 - **Inventory Management**: Comprehensive multi-warehouse stock management with intake, disbursement, field usage, returns, loss reporting, and audit trails.
-- **SLA Management**: Automatic policy application based on ticket priority and business hours.
+- **SLA Management**: Assignment-based SLA timers (starts when ticket is assigned, not created). Automatic policy application based on ticket priority and business hours. WhatsApp notifications for SLA approaching deadlines (20% time remaining) and breach alerts to assigned technicians, with supervisor escalation summary.
 - **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning via SmartOLT cloud API.
 - **Huawei OLT Module**: Standalone direct management for Huawei OLT devices (Telnet/SSH/SNMP).
   - **SNMP-First Architecture**: Prioritizes SNMP for read operations, with CLI for write operations.

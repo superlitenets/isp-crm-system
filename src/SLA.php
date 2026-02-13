@@ -220,7 +220,7 @@ class SLA {
         return array_unique($dates);
     }
     
-    public function calculateSLAForTicket(string $priority, ?\DateTime $createdAt = null): array {
+    public function calculateSLAForTicket(string $priority, ?\DateTime $startAt = null): array {
         $policy = $this->getPolicyByPriority($priority);
         
         if (!$policy) {
@@ -231,7 +231,7 @@ class SLA {
             ];
         }
         
-        $startDate = $createdAt ?? new \DateTime();
+        $startDate = $startAt ?? new \DateTime();
         
         return [
             'policy_id' => $policy['id'],
@@ -254,6 +254,8 @@ class SLA {
         $responseDue = new \DateTime($ticket['sla_response_due']);
         $resolutionDue = new \DateTime($ticket['sla_resolution_due']);
         
+        $slaStart = !empty($ticket['sla_started_at']) ? strtotime($ticket['sla_started_at']) : strtotime($ticket['created_at']);
+
         if (!empty($ticket['first_response_at'])) {
             $responseTime = new \DateTime($ticket['first_response_at']);
             if ($responseTime <= $responseDue) {
@@ -266,7 +268,7 @@ class SLA {
                 $status['response'] = ['status' => 'breached', 'time_left' => null, 'breached' => true];
             } else {
                 $timeLeft = $responseDue->getTimestamp() - $now->getTimestamp();
-                $warningThreshold = ($responseDue->getTimestamp() - strtotime($ticket['created_at'])) * 0.2;
+                $warningThreshold = ($responseDue->getTimestamp() - $slaStart) * 0.2;
                 
                 if ($timeLeft < $warningThreshold) {
                     $status['response'] = ['status' => 'at_risk', 'time_left' => $timeLeft, 'breached' => false];
@@ -288,7 +290,7 @@ class SLA {
                 $status['resolution'] = ['status' => 'breached', 'time_left' => null, 'breached' => true];
             } else {
                 $timeLeft = $resolutionDue->getTimestamp() - $now->getTimestamp();
-                $warningThreshold = ($resolutionDue->getTimestamp() - strtotime($ticket['created_at'])) * 0.2;
+                $warningThreshold = ($resolutionDue->getTimestamp() - $slaStart) * 0.2;
                 
                 if ($timeLeft < $warningThreshold) {
                     $status['resolution'] = ['status' => 'at_risk', 'time_left' => $timeLeft, 'breached' => false];

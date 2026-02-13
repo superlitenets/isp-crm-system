@@ -68,8 +68,16 @@ try {
             runLeaveAccrual($db);
             break;
             
+        case 'sla_notifications':
+            checkSLAApproachingAndBreached($db, $settings);
+            break;
+            
+        case 'attendance_reminder':
+            sendDailyAttendanceReminder($db, $settings);
+            break;
+            
         default:
-            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'repost_incomplete', 'scheduled_summaries', 'check_schedule', 'sync_attendance', 'biometric_sync', 'leave_accrual']]);
+            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'repost_incomplete', 'scheduled_summaries', 'check_schedule', 'sync_attendance', 'biometric_sync', 'leave_accrual', 'sla_notifications', 'attendance_reminder']]);
     }
 } catch (Throwable $e) {
     http_response_code(500);
@@ -736,6 +744,175 @@ function repostIncompleteTickets(\PDO $db, \App\Settings $settings): void {
         'incomplete_tickets' => count($incompleteTickets),
         'groups_sent' => count($results),
         'success_count' => $successCount,
+        'errors' => $errors
+    ]);
+}
+
+function checkSLAApproachingAndBreached(\PDO $db, \App\Settings $settings): void {
+    $whatsapp = new \App\WhatsApp();
+    $sla = new \App\SLA();
+    $companyName = $settings->get('company_name', 'Your ISP');
+    $now = new \DateTime();
+    $warnings = [];
+    $breaches = [];
+    $errors = [];
+
+    $stmt = $db->query("
+        SELECT t.*, 
+               c.full_name AS customer_name, c.phone AS customer_phone,
+               u.full_name AS technician_name, u.phone AS technician_phone,
+               u.email AS technician_email
+        FROM tickets t
+        LEFT JOIN customers c ON t.customer_id = c.id
+        LEFT JOIN users u ON t.assigned_to = u.id
+        WHERE t.status NOT IN ('resolved', 'closed', 'cancelled')
+          AND t.sla_resolution_due IS NOT NULL
+          AND t.assigned_to IS NOT NULL
+    ");
+    $tickets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+    foreach ($tickets as $ticket) {
+        $resolutionDue = new \DateTime($ticket['sla_resolution_due']);
+        $slaStart = !empty($ticket['sla_started_at']) ? strtotime($ticket['sla_started_at']) : strtotime($ticket['created_at']);
+        $totalDuration = $resolutionDue->getTimestamp() - $slaStart;
+        $timeLeft = $resolutionDue->getTimestamp() - $now->getTimestamp();
+
+        if ($timeLeft <= 0 && empty($ticket['sla_breach_notified_at'])) {
+            $phone = $ticket['technician_phone'] ?? null;
+            if ($phone) {
+                $message = "*SLA BREACHED - Urgent Action Required*\n\n";
+                $message .= "Ticket: #{$ticket['ticket_number']}\n";
+                $message .= "Subject: {$ticket['subject']}\n";
+                $message .= "Customer: {$ticket['customer_name']}\n";
+                $message .= "Priority: " . ucfirst($ticket['priority'] ?? 'medium') . "\n";
+                $message .= "Due: " . $resolutionDue->format('d M Y H:i') . "\n";
+                $message .= "Overdue by: " . formatTimeDiff(abs($timeLeft)) . "\n\n";
+                $message .= "Please resolve this ticket immediately or escalate.\n";
+                $message .= "_$companyName - SLA Alert_";
+
+                $sendResult = $whatsapp->send($phone, $message);
+                if ($sendResult['success'] ?? false) {
+                    $db->prepare("UPDATE tickets SET sla_breach_notified_at = NOW() WHERE id = ?")->execute([$ticket['id']]);
+                    $sla->logSLAEvent($ticket['id'], 'breach_notified', "WhatsApp breach notification sent to {$ticket['technician_name']}");
+                    $breaches[] = $ticket['ticket_number'];
+                } else {
+                    $errors[] = "Breach notification failed for #{$ticket['ticket_number']}: " . ($sendResult['error'] ?? 'unknown');
+                }
+            }
+        } elseif ($timeLeft > 0 && $totalDuration > 0 && empty($ticket['sla_warning_notified_at'])) {
+            $warningThreshold = $totalDuration * 0.2;
+            if ($timeLeft < $warningThreshold) {
+                $phone = $ticket['technician_phone'] ?? null;
+                if ($phone) {
+                    $message = "*SLA Warning - Approaching Deadline*\n\n";
+                    $message .= "Ticket: #{$ticket['ticket_number']}\n";
+                    $message .= "Subject: {$ticket['subject']}\n";
+                    $message .= "Customer: {$ticket['customer_name']}\n";
+                    $message .= "Priority: " . ucfirst($ticket['priority'] ?? 'medium') . "\n";
+                    $message .= "Due: " . $resolutionDue->format('d M Y H:i') . "\n";
+                    $message .= "Time remaining: " . formatTimeDiff($timeLeft) . "\n\n";
+                    $message .= "Please prioritize this ticket to avoid SLA breach.\n";
+                    $message .= "_$companyName - SLA Alert_";
+
+                    $sendResult = $whatsapp->send($phone, $message);
+                    if ($sendResult['success'] ?? false) {
+                        $db->prepare("UPDATE tickets SET sla_warning_notified_at = NOW() WHERE id = ?")->execute([$ticket['id']]);
+                        $sla->logSLAEvent($ticket['id'], 'warning_notified', "WhatsApp warning notification sent to {$ticket['technician_name']}");
+                        $warnings[] = $ticket['ticket_number'];
+                    } else {
+                        $errors[] = "Warning notification failed for #{$ticket['ticket_number']}: " . ($sendResult['error'] ?? 'unknown');
+                    }
+                }
+            }
+        }
+    }
+
+    $supervisorPhone = $settings->get('sla_supervisor_phone', '');
+    if (!empty($supervisorPhone) && (count($breaches) > 0)) {
+        $supervisorMsg = "*SLA Breach Summary*\n\n";
+        $supervisorMsg .= "Breached tickets: " . count($breaches) . "\n";
+        foreach ($breaches as $tn) {
+            $supervisorMsg .= "  - #{$tn}\n";
+        }
+        $supervisorMsg .= "\nPlease review and take action.\n";
+        $supervisorMsg .= "_$companyName - SLA Alert_";
+        $whatsapp->send($supervisorPhone, $supervisorMsg);
+    }
+
+    echo json_encode([
+        'success' => count($errors) === 0,
+        'warnings_sent' => count($warnings),
+        'breaches_sent' => count($breaches),
+        'total_tickets_checked' => count($tickets),
+        'errors' => $errors
+    ]);
+}
+
+function formatTimeDiff(int $seconds): string {
+    if ($seconds < 60) return "{$seconds}s";
+    $minutes = floor($seconds / 60);
+    if ($minutes < 60) return "{$minutes}m";
+    $hours = floor($minutes / 60);
+    $mins = $minutes % 60;
+    if ($hours < 24) return "{$hours}h {$mins}m";
+    $days = floor($hours / 24);
+    $hrs = $hours % 24;
+    return "{$days}d {$hrs}h";
+}
+
+function sendDailyAttendanceReminder(\PDO $db, \App\Settings $settings): void {
+    $dayOfWeek = (int)date('N');
+    if ($dayOfWeek === 7) {
+        echo json_encode(['success' => true, 'message' => 'Sunday - no reminder sent', 'sent' => 0]);
+        return;
+    }
+
+    $whatsapp = new \App\WhatsApp();
+    $companyName = $settings->get('company_name', 'Your ISP');
+    $workStartTime = $settings->get('work_start_time', '08:00');
+    $workStartFormatted = date('g:i A', strtotime($workStartTime));
+
+    $stmt = $db->query("
+        SELECT id, full_name, phone 
+        FROM users 
+        WHERE status = 'active' 
+          AND role != 'customer'
+          AND phone IS NOT NULL 
+          AND phone != ''
+    ");
+    $employees = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+    $today = date('Y-m-d');
+    $sent = 0;
+    $errors = [];
+
+    foreach ($employees as $emp) {
+        $alreadyClocked = $db->prepare("
+            SELECT id FROM attendance WHERE employee_id = ? AND date = ? AND clock_in IS NOT NULL LIMIT 1
+        ");
+        $alreadyClocked->execute([$emp['id'], $today]);
+        if ($alreadyClocked->fetch()) {
+            continue;
+        }
+
+        $message = "Good morning {$emp['full_name']}!\n\n";
+        $message .= "This is your daily attendance reminder.\n";
+        $message .= "Please clock in before {$workStartFormatted}.\n\n";
+        $message .= "Have a productive day!\n";
+        $message .= "_$companyName - HR_";
+
+        $result = $whatsapp->send($emp['phone'], $message);
+        if ($result['success'] ?? false) {
+            $sent++;
+        } else {
+            $errors[] = "Failed for {$emp['full_name']}: " . ($result['error'] ?? 'unknown');
+        }
+    }
+
+    echo json_encode([
+        'success' => count($errors) === 0,
+        'employees_checked' => count($employees),
+        'reminders_sent' => $sent,
         'errors' => $errors
     ]);
 }

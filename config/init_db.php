@@ -2003,7 +2003,10 @@ function runMigrations(PDO $db): void {
         ['huawei_olts', 'snmp_write_community', 'ALTER TABLE huawei_olts ADD COLUMN snmp_write_community VARCHAR(100)'],
         ['huawei_olts', 'software_version', 'ALTER TABLE huawei_olts ADD COLUMN software_version VARCHAR(100)'],
         ['huawei_olts', 'firmware_version', 'ALTER TABLE huawei_olts ADD COLUMN firmware_version VARCHAR(100)'],
-        ['huawei_olts', 'uptime', 'ALTER TABLE huawei_olts ADD COLUMN uptime VARCHAR(100)']
+        ['huawei_olts', 'uptime', 'ALTER TABLE huawei_olts ADD COLUMN uptime VARCHAR(100)'],
+        ['tickets', 'sla_started_at', 'ALTER TABLE tickets ADD COLUMN sla_started_at TIMESTAMP'],
+        ['tickets', 'sla_breach_notified_at', 'ALTER TABLE tickets ADD COLUMN sla_breach_notified_at TIMESTAMP'],
+        ['tickets', 'sla_warning_notified_at', 'ALTER TABLE tickets ADD COLUMN sla_warning_notified_at TIMESTAMP']
     ];
     
     foreach ($columnMigrations as $migration) {

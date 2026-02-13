@@ -187,10 +187,23 @@ class Ticket {
             $data['status'] = 'in_progress';
         }
 
+        if ($isBeingAssigned && empty($ticket['sla_started_at'])) {
+            $now = new \DateTime();
+            $data['sla_started_at'] = $now->format('Y-m-d H:i:s');
+            $priority = $data['priority'] ?? $ticket['priority'] ?? 'medium';
+            $slaData = $this->getSLA()->calculateSLAForTicket($priority, $now);
+            if ($slaData['policy_id']) {
+                $data['sla_policy_id'] = $slaData['policy_id'];
+                $data['sla_response_due'] = $slaData['response_due']->format('Y-m-d H:i:s');
+                $data['sla_resolution_due'] = $slaData['resolution_due']->format('Y-m-d H:i:s');
+                $this->getSLA()->logSLAEvent($id, 'sla_started', "SLA timer started on assignment");
+            }
+        }
+
         $fields = [];
         $values = [];
         
-        foreach (['subject', 'description', 'category', 'priority', 'status', 'assigned_to', 'team_id', 'branch_id'] as $field) {
+        foreach (['subject', 'description', 'category', 'priority', 'status', 'assigned_to', 'team_id', 'branch_id', 'sla_started_at', 'sla_policy_id', 'sla_response_due', 'sla_resolution_due'] as $field) {
             if (isset($data[$field])) {
                 $fields[] = "$field = ?";
                 $values[] = $data[$field] === '' ? null : $data[$field];
