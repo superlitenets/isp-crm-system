@@ -7589,6 +7589,24 @@ try {
                 <div class="col-xl col-md-6">
                     <div class="mega-stat h-100">
                         <div class="d-flex justify-content-between align-items-start">
+                            <div class="stat-icon-lg bg-info bg-opacity-10 text-info">
+                                <i class="bi bi-router"></i>
+                            </div>
+                            <a href="?page=huawei-olt&view=onus" class="stat-trend bg-info bg-opacity-10 text-info text-decoration-none">
+                                View All <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                        <div class="stat-number text-info"><?= number_format($totalOnus) ?></div>
+                        <div class="text-muted mb-2">Authorized ONUs</div>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <?php $authPercent = ($totalOnus + $stats['unconfigured_onus']) > 0 ? ($totalOnus / ($totalOnus + $stats['unconfigured_onus']) * 100) : 0; ?>
+                            <div class="progress-bar bg-info" style="width: <?= $authPercent ?>%; border-radius: 3px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl col-md-6">
+                    <div class="mega-stat h-100">
+                        <div class="d-flex justify-content-between align-items-start">
                             <div class="stat-icon-lg bg-secondary bg-opacity-10 text-secondary">
                                 <i class="bi bi-wifi-off"></i>
                             </div>
@@ -7633,7 +7651,7 @@ try {
                         <div class="stat-number text-warning"><?= $stats['unconfigured_onus'] ?></div>
                         <div class="text-muted mb-2">Pending Authorization</div>
                         <div class="small text-muted">
-                            <i class="bi bi-router me-1"></i><?= number_format($totalOnus) ?> Total Authorized
+                            <i class="bi bi-search me-1"></i>Discovered, not yet authorized
                         </div>
                     </div>
                 </div>
