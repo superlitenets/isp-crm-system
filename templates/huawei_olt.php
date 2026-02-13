@@ -8352,7 +8352,6 @@ try {
                                     <th>Status</th>
                                     <th>Signal (RX/TX)</th>
                                     <th>Distance</th>
-                                    <th style="width: 80px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -8480,19 +8479,6 @@ try {
                                         <?php else: ?>
                                             -
                                         <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-dark" onclick="showTR069LogsModal(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn'] ?? '') ?>')" title="TR-069 Logs">
-                                                <i class="bi bi-journal-text"></i>
-                                            </button>
-                                            <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>, this)" title="Reboot ONU">
-                                                <i class="bi bi-arrow-clockwise"></i>
-                                            </button>
-                                            <button class="btn btn-outline-danger" onclick="deleteOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn'] ?? '') ?>', this)" title="Delete ONU">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
