@@ -261,40 +261,25 @@ class GenieACS {
             return ['success' => false, 'error' => 'Device ID not found'];
         }
         
-        // Check ConnectionRequestURL reachability
         $connReqUrl = $this->getConnectionRequestURL($device);
-        $reachable = !empty($connReqUrl) && $this->isConnectionRequestReachable($connReqUrl);
+        $encodedId = rawurlencode($deviceId);
         
-        $encodedId = urlencode($deviceId);
         $task = [
-            'name' => 'setParameterValues',
-            'parameterValues' => [
-                ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', '', 'xsd:string'],
-                ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', '', 'xsd:string'],
-            ]
+            'name' => 'getParameterValues',
+            'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']
         ];
         
-        // Try with connection_request for instant push
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
-        
-        // If 401, fallback to queue mode
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=5000", $task);
         $httpCode = $result['http_code'] ?? 0;
-        $queued = false;
-        if ($httpCode == 401 || (isset($result['error']) && strpos($result['error'], '401') !== false)) {
-            error_log("[GenieACS] Got 401 on sendConnectionRequest, falling back to queue mode for {$serial}");
-            $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-            $queued = true;
-        }
         
         return [
-            'success' => $result['success'] ?? true,
-            'message' => $queued 
-                ? 'Auth clear queued - will execute on next device inform, then instant push will work'
-                : 'Connection request sent and auth cleared - instant push now enabled',
+            'success' => ($httpCode == 200 || $httpCode == 202),
+            'message' => ($httpCode == 200) 
+                ? 'Device responded - connection active'
+                : 'Connection request sent - device will respond on next inform',
             'connection_request_url' => $connReqUrl,
-            'reachable' => $reachable,
-            'queued' => $queued,
-            'task_result' => $result
+            'http_code' => $httpCode,
+            'queued' => ($httpCode == 202)
         ];
     }
     
@@ -538,11 +523,19 @@ class GenieACS {
             }
         }
         
-        // Use connection_request with 60s timeout for instant push
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=60000", [
+        $task = [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
-        ]);
+        ];
+        
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
+        $httpCode = $result['http_code'] ?? 0;
+        
+        if ($httpCode == 401 || $httpCode == 0) {
+            error_log("[GenieACS] Connection request failed (HTTP {$httpCode}) for {$deviceId}, queuing task for next inform");
+            $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
+            $result['queued_fallback'] = true;
+        }
         
         error_log("[GenieACS] setParameterValues to {$deviceId}: " . json_encode([
             'params_count' => count($formattedParams), 

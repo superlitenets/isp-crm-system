@@ -3451,15 +3451,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $deviceId = $deviceResult['device']['_id'] ?? '';
                 $result = $genieacs->saveDeviceParams($deviceId, $params);
                 
-                // Check if task was queued (202) vs completed (200)
-                if ($result['success'] && isset($result['http_code'])) {
-                    if ($result['http_code'] == 202) {
-                        // Task queued but device didn't respond in time - send explicit connection request
-                        $genieacs->sendConnectionRequest($serial);
-                        $result['warning'] = 'Changes queued. Device may apply them on next connection.';
-                        $result['queued'] = true;
-                    } elseif ($result['http_code'] == 200) {
+                $httpCode = $result['http_code'] ?? 0;
+                if ($result['success'] ?? false) {
+                    if ($httpCode == 200) {
                         $result['applied'] = true;
+                    } else {
+                        $result['queued'] = true;
+                        $result['warning'] = 'Changes queued - will apply on next device inform (within 3 minutes)';
                     }
                 }
                 
@@ -19508,7 +19506,7 @@ async function saveInlineStatus() {
             saveBtn.innerHTML = originalBtnHtml;
             saveBtn.disabled = false;
             if (data.queued) {
-                showToast('Changes queued - device will apply on next connection', 'warning');
+                showToast('Changes queued - will apply within 3 minutes', 'warning');
             } else {
                 showToast('Changes applied successfully!', 'success');
             }
