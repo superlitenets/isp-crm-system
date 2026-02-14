@@ -1312,24 +1312,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 try {
-                    require_once __DIR__ . '/../src/GenieACS.php';
-                    $genieacs = new \App\GenieACS($db);
                     $steps = [];
-
-                    $provisionResult = $genieacs->setupAutoCredentialClear();
-                    if ($provisionResult['success'] ?? false) {
-                        $steps[] = 'GenieACS auto-provision ready';
-                    } elseif ($provisionResult['details']['provision']['success'] ?? false) {
-                        $steps[] = 'GenieACS auto-provision exists';
-                    } else {
-                        $steps[] = 'GenieACS provision warning: ' . ($provisionResult['error'] ?? 'check config');
-                    }
 
                     $result = $huaweiOLT->configureTR069Manual($onuId);
                     
                     if ($result['success']) {
                         $steps[] = $result['message'];
-                        $steps[] = 'ONU will auto-register in GenieACS and receive CR credentials on first Inform';
+                        $steps[] = 'ONU will auto-register in GenieACS on first Inform';
                         $message = implode(' | ', $steps);
                         $messageType = 'success';
                         $huaweiOLT->updateONU($onuId, ['tr069_status' => 'configured']);
@@ -2912,9 +2901,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
                     'genieacs_username' => $_POST['genieacs_username'] ?? '',
                     'genieacs_timeout' => $_POST['genieacs_timeout'] ?? '30',
-                    'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0',
-                    'genieacs_cr_username' => $_POST['genieacs_cr_username'] ?? 'genieacs',
-                    'genieacs_cr_password' => $_POST['genieacs_cr_password'] ?? 'genieacs'
+                    'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0'
                 ];
                 if (!empty($_POST['genieacs_password'])) {
                     $settings['genieacs_password'] = $_POST['genieacs_password'];
@@ -5835,21 +5822,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Content-Type: application/json');
                 echo json_encode($result);
                 exit;
-            case 'setup_auto_credential_clear':
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $result = $genieacs->setupAutoCredentialClear();
-                if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-                    header('Content-Type: application/json');
-                    echo json_encode($result);
-                    exit;
-                }
-                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
-                if (!$result['success'] && !empty($result['error'])) {
-                    $message = 'Failed: ' . $result['error'];
-                }
-                $messageType = $result['success'] ? 'success' : (str_contains($message ?? '', 'Warning') ? 'warning' : 'danger');
-                break;
             case 'setup_tr069_full':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
@@ -5861,18 +5833,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $message = 'Please select an OLT';
                     $messageType = 'danger';
                     break;
-                }
-
-                $provisionResult = $genieacs->setupAutoCredentialClear();
-                if ($provisionResult['success'] ?? false) {
-                    $steps[] = 'GenieACS auto-provision created/updated';
-                } else {
-                    $provErr = $provisionResult['error'] ?? 'Unknown';
-                    if (stripos($provErr, 'already') !== false || ($provisionResult['details']['provision']['success'] ?? false)) {
-                        $steps[] = 'GenieACS auto-provision already exists';
-                    } else {
-                        $steps[] = 'GenieACS provision warning: ' . $provErr;
-                    }
                 }
 
                 $stmt = $db->prepare("SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL");
@@ -5939,20 +5899,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
 
-                $genieacsConfigured = true;
-                if (!($provisionResult['success'] ?? false) && !($provisionResult['details']['provision']['success'] ?? false)) {
-                    $genieacsConfigured = false;
-                }
-
                 $steps[] = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs, {$rebooted} rebooted";
                 if ($failed > 0) {
                     $steps[] = "{$failed} failed";
                 }
-                if ($genieacsConfigured) {
-                    $steps[] = 'ONUs will auto-register in GenieACS and receive CR credentials on first Inform';
-                } else {
-                    $steps[] = 'WARNING: GenieACS provision could not be verified. ONUs will connect but CR credentials may not auto-set. Check GenieACS configuration.';
-                }
+                $steps[] = 'ONUs will auto-register in GenieACS on first Inform';
 
                 $message = implode(' | ', $steps);
                 if (!empty($errors)) {
@@ -5967,108 +5918,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'message' => $message,
                     'user_id' => $_SESSION['user_id'] ?? null
                 ]);
-                break;
-            case 'check_cr_status':
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $deviceId = $_POST['device_id'] ?? '';
-                if (empty($deviceId)) {
-                    $result = ['success' => false, 'error' => 'No device ID provided'];
-                } else {
-                    $crCreds = $genieacs->getCRCredentials();
-                    $dataModel = $genieacs->detectDataModel($deviceId);
-                    $root = ($dataModel === 'tr181') ? 'Device' : 'InternetGatewayDevice';
-
-                    $deviceResult = $genieacs->getDevice($deviceId);
-                    $currentCRUser = null;
-                    $currentCRUrl = null;
-                    if ($deviceResult['success'] ?? false) {
-                        $d = $deviceResult['data'];
-                        $userKey = "{$root}.ManagementServer.ConnectionRequestUsername";
-                        $urlKey = "{$root}.ManagementServer.ConnectionRequestURL";
-                        if (isset($d[$userKey]) && is_array($d[$userKey])) {
-                            $currentCRUser = $d[$userKey]['_value'] ?? null;
-                        } elseif (isset($d[$userKey])) {
-                            $currentCRUser = $d[$userKey];
-                        }
-                        if (isset($d[$urlKey]) && is_array($d[$urlKey])) {
-                            $currentCRUrl = $d[$urlKey]['_value'] ?? null;
-                        } elseif (isset($d[$urlKey])) {
-                            $currentCRUrl = $d[$urlKey];
-                        }
-                    }
-
-                    $tasks = $genieacs->getTasks($deviceId);
-                    $pendingTasks = [];
-                    foreach (($tasks['data'] ?? []) as $t) {
-                        if (($t['name'] ?? '') === 'setParameterValues') {
-                            $pendingTasks[] = $t;
-                        }
-                    }
-
-                    $faults = $genieacs->getFaults($deviceId);
-                    $faultList = $faults['data'] ?? [];
-
-                    $lines = [];
-                    $lines[] = "Data Model: {$root} ({$dataModel})";
-                    $lines[] = "Current CR Username: " . ($currentCRUser ?: '(empty/not set)');
-                    $lines[] = "Current CR URL: " . ($currentCRUrl ?: '(empty/not set)');
-                    $lines[] = "Expected CR Username: {$crCreds['username']}";
-                    $lines[] = "Pending setParameterValues tasks: " . count($pendingTasks);
-                    $lines[] = "Device faults: " . count($faultList);
-                    if (!empty($faultList)) {
-                        foreach (array_slice($faultList, 0, 3) as $f) {
-                            $lines[] = "  Fault: " . ($f['detail'] ?? $f['message'] ?? json_encode($f));
-                        }
-                    }
-
-                    $match = ($currentCRUser === $crCreds['username']);
-                    $result = [
-                        'success' => true,
-                        'message' => implode("\n", $lines),
-                        'cr_match' => $match,
-                        'current_username' => $currentCRUser,
-                        'expected_username' => $crCreds['username'],
-                        'pending_tasks' => count($pendingTasks),
-                        'faults' => count($faultList)
-                    ];
-                }
-                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
-                $messageType = ($result['cr_match'] ?? false) ? 'success' : 'info';
-                break;
-            case 'push_cr_credentials':
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $deviceId = $_POST['device_id'] ?? '';
-                if (empty($deviceId)) {
-                    $result = ['success' => false, 'error' => 'No device ID provided'];
-                } else {
-                    $result = $genieacs->pushConnectionRequestCredentials($deviceId);
-                }
-                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-                    header('Content-Type: application/json');
-                    echo json_encode($result);
-                    exit;
-                }
-                $message = $result['success']
-                    ? "CR credentials queued for {$deviceId}. Will apply on next Inform."
-                    : 'Failed: ' . ($result['error'] ?? 'Unknown error');
-                $messageType = $result['success'] ? 'success' : 'danger';
-                break;
-            case 'push_cr_credentials_all':
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $result = $genieacs->pushConnectionRequestCredentialsToAll();
-                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-                    header('Content-Type: application/json');
-                    echo json_encode($result);
-                    exit;
-                }
-                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
-                if (!$result['success'] && !empty($result['error'])) {
-                    $message = 'Failed: ' . $result['error'];
-                }
-                $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'clear_tr069_profile_credentials':
                 $oltId = (int)$_POST['olt_id'];
@@ -12708,18 +12557,6 @@ try {
                 <div>
                     <?php if ($genieacsEnabled): ?>
                     <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="setup_auto_credential_clear">
-                        <button type="submit" class="btn btn-outline-warning" onclick="return confirm('This will:\n1. Configure GenieACS connectionRequestAuth to accept SmartOLT credentials\n2. Create a provision to auto-clear SmartOLT credentials on device Inform\n\nThis fixes 401 errors for SmartOLT migrated devices. Continue?');">
-                            <i class="bi bi-shield-lock me-1"></i> Fix 401 Errors
-                        </button>
-                    </form>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="push_cr_credentials_all">
-                        <button type="submit" class="btn btn-outline-info" onclick="return confirm('This will queue a task on ALL GenieACS devices to set ConnectionRequest credentials (from Settings).\n\nTasks execute on each device\'s next Inform. Continue?');">
-                            <i class="bi bi-key me-1"></i> Push CR Credentials to All
-                        </button>
-                    </form>
-                    <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="sync_tr069_devices">
                         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i> Sync Devices</button>
                     </form>
@@ -12819,20 +12656,6 @@ try {
                                             <button type="button" class="btn btn-outline-warning" onclick="openAdminPasswordConfig('<?= htmlspecialchars($device['device_id']) ?>', '<?= htmlspecialchars($device['serial_number']) ?>')" title="Change Admin Password">
                                                 <i class="bi bi-key"></i>
                                             </button>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="check_cr_status">
-                                                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
-                                                <button type="submit" class="btn btn-outline-secondary" title="Check CR Credentials Status">
-                                                    <i class="bi bi-search"></i>
-                                                </button>
-                                            </form>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="push_cr_credentials">
-                                                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
-                                                <button type="submit" class="btn btn-outline-success" title="Push CR Credentials (from Settings)" onclick="return confirm('Push ConnectionRequest credentials to this device? Task will execute on next Inform.')">
-                                                    <i class="bi bi-shield-lock"></i>
-                                                </button>
-                                            </form>
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="action" value="tr069_refresh">
                                                 <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
@@ -14068,19 +13891,6 @@ try {
                                     <input type="number" name="genieacs_timeout" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_timeout'] ?? '30') ?>" min="5" max="120">
                                 </div>
 
-                                <hr>
-                                <h6 class="mb-3"><i class="bi bi-shield-lock me-2"></i>ConnectionRequest Credentials</h6>
-                                <p class="small text-muted">These credentials are pushed to each ONU so GenieACS can initiate connections back to devices. They must match what's configured in GenieACS Admin > Config > <code>cwmp.connectionRequestAuth</code>.</p>
-                                <div class="row">
-                                    <div class="col-6 mb-3">
-                                        <label class="form-label">CR Username</label>
-                                        <input type="text" name="genieacs_cr_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_username'] ?? 'genieacs') ?>" placeholder="genieacs">
-                                    </div>
-                                    <div class="col-6 mb-3">
-                                        <label class="form-label">CR Password</label>
-                                        <input type="text" name="genieacs_cr_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_password'] ?? 'genieacs') ?>" placeholder="genieacs">
-                                    </div>
-                                </div>
                                 
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Settings</button>
@@ -21163,7 +20973,7 @@ function saveDeviceStatus() {
                     html += '</tr>';
                 });
                 html += '</tbody></table></div>';
-                html += '<div class="mt-2 small text-muted"><i class="bi bi-info-circle me-1"></i>ConnectionRequest credentials are cleared per-ONU during authorization (automatic).</div>';
+                html += '<div class="mt-2 small text-muted"><i class="bi bi-info-circle me-1"></i>ConnectionRequest authentication is not required for Huawei ONUs.</div>';
             } else {
                 html += '<div class="text-center text-muted py-3">No service ports configured</div>';
             }
@@ -23656,7 +23466,7 @@ function saveDeviceStatus() {
                     </tr>`;
                 });
                 html += '</tbody></table></div>';
-                html += '<div class="mt-2 small text-muted"><i class="bi bi-info-circle me-1"></i>ConnectionRequest credentials are cleared per-ONU during authorization (automatic).</div>';
+                html += '<div class="mt-2 small text-muted"><i class="bi bi-info-circle me-1"></i>ConnectionRequest authentication is not required for Huawei ONUs.</div>';
                 container.innerHTML = html;
             } else if (data.success && (!data.profiles || data.profiles.length === 0)) {
                 container.innerHTML = '<div class="alert alert-info mb-0"><i class="bi bi-info-circle me-2"></i>No TR-069 profiles found on this OLT.</div>';
