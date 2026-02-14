@@ -5843,6 +5843,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 $messageType = $result['success'] ? 'success' : (str_contains($message ?? '', 'Warning') ? 'warning' : 'danger');
                 break;
+            case 'setup_tr069_full':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $profileId = isset($_POST['tr069_profile_id']) ? (int)$_POST['tr069_profile_id'] : 3;
+                $steps = [];
+
+                if (!$oltId) {
+                    $message = 'Please select an OLT';
+                    $messageType = 'danger';
+                    break;
+                }
+
+                $provisionResult = $genieacs->setupAutoCredentialClear();
+                if ($provisionResult['success'] ?? false) {
+                    $steps[] = 'GenieACS auto-provision created/updated';
+                } else {
+                    $provErr = $provisionResult['error'] ?? 'Unknown';
+                    if (stripos($provErr, 'already') !== false || ($provisionResult['details']['provision']['success'] ?? false)) {
+                        $steps[] = 'GenieACS auto-provision already exists';
+                    } else {
+                        $steps[] = 'GenieACS provision warning: ' . $provErr;
+                    }
+                }
+
+                $stmt = $db->prepare("SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL");
+                $stmt->execute([$oltId]);
+                $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+                if (empty($onus)) {
+                    $steps[] = 'No authorized ONUs found on this OLT';
+                    $message = implode(' | ', $steps);
+                    $messageType = 'warning';
+                    break;
+                }
+
+                $bound = 0;
+                $rebooted = 0;
+                $failed = 0;
+                $errors = [];
+                $batchSize = 20;
+
+                foreach ($onus as $idx => $onu) {
+                    try {
+                        $frame = $onu['frame'] ?? 0;
+                        $slot = $onu['slot'];
+                        $port = $onu['port'];
+                        $onuPortId = $onu['onu_id'];
+
+                        $cmdDetach = "interface gpon {$frame}/{$slot}\r\n";
+                        $cmdDetach .= "ont tr069-server-config {$port} {$onuPortId} profile-id 0\r\n";
+                        $cmdDetach .= "quit";
+                        $huaweiOLT->executeCommand($oltId, $cmdDetach);
+
+                        $cmd = "interface gpon {$frame}/{$slot}\r\n";
+                        $cmd .= "ont tr069-server-config {$port} {$onuPortId} profile-id {$profileId}\r\n";
+                        $cmd .= "quit";
+                        $result = $huaweiOLT->executeCommand($oltId, $cmd);
+
+                        $out = $result['output'] ?? '';
+                        $bindOk = ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out)) || ($result['success'] && preg_match('/already|repeatedly/i', $out));
+                        if ($bindOk) {
+                            $bound++;
+
+                            $cmdReboot = "interface gpon {$frame}/{$slot}\r\n";
+                            $cmdReboot .= "ont reset {$port} {$onuPortId}\r\n";
+                            $cmdReboot .= "quit";
+                            $rebootResult = $huaweiOLT->executeCommand($oltId, $cmdReboot);
+                            if ($rebootResult['success']) {
+                                $rebooted++;
+                            }
+                        } else {
+                            $failed++;
+                            if (count($errors) < 10) {
+                                $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . substr($out, 0, 100);
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $failed++;
+                        if (count($errors) < 10) {
+                            $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . $e->getMessage();
+                        }
+                    }
+
+                    if (($idx + 1) % $batchSize === 0) {
+                        usleep(500000);
+                    }
+                }
+
+                $genieacsConfigured = true;
+                if (!($provisionResult['success'] ?? false) && !($provisionResult['details']['provision']['success'] ?? false)) {
+                    $genieacsConfigured = false;
+                }
+
+                $steps[] = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs, {$rebooted} rebooted";
+                if ($failed > 0) {
+                    $steps[] = "{$failed} failed";
+                }
+                if ($genieacsConfigured) {
+                    $steps[] = 'ONUs will auto-register in GenieACS and receive CR credentials on first Inform';
+                } else {
+                    $steps[] = 'WARNING: GenieACS provision could not be verified. ONUs will connect but CR credentials may not auto-set. Check GenieACS configuration.';
+                }
+
+                $message = implode(' | ', $steps);
+                if (!empty($errors)) {
+                    $message .= ' | Errors: ' . implode('; ', array_slice($errors, 0, 5));
+                }
+                $messageType = $failed === 0 ? 'success' : 'warning';
+
+                $huaweiOLT->addLog([
+                    'olt_id' => $oltId,
+                    'action' => 'setup_tr069_full',
+                    'status' => $failed > 0 ? 'partial' : 'success',
+                    'message' => $message,
+                    'user_id' => $_SESSION['user_id'] ?? null
+                ]);
+                break;
             case 'push_cr_credentials':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
@@ -7949,8 +8067,8 @@ try {
                                 </div>
                                 <div class="col-12">
                                     <button type="button" class="quick-action-btn w-100 border-0" onclick="showBulkBindTR069Modal()" style="cursor:pointer;">
-                                        <i class="bi bi-link-45deg text-danger"></i>
-                                        <div class="fw-medium">Bind All ONUs to TR-069</div>
+                                        <i class="bi bi-gear-wide-connected text-primary"></i>
+                                        <div class="fw-medium">Setup TR-069 + GenieACS</div>
                                     </button>
                                 </div>
                             </div>
@@ -8058,23 +8176,33 @@ try {
             })();
             </script>
 
-            <!-- Bulk Bind TR-069 Modal -->
+            <!-- Full TR-069 Setup Modal -->
             <div class="modal fade" id="bulkBindTR069Modal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Bind All ONUs to TR-069 Profile</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-gear-wide-connected me-2"></i>Full TR-069 + GenieACS Setup</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form method="POST">
-                            <input type="hidden" name="action" value="bulk_bind_tr069_profile">
+                            <input type="hidden" name="action" value="setup_tr069_full">
                             <div class="modal-body">
-                                <div class="alert alert-warning">
-                                    <i class="bi bi-exclamation-triangle me-2"></i>
-                                    This will bind <strong>all authorized ONUs</strong> on the selected OLT to TR-069 profile ID and <strong>reboot each ONU</strong> to apply the configuration.
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>One-click setup:</strong> This will perform the entire TR-069 setup in a single step.
+                                </div>
+                                <div class="card mb-3">
+                                    <div class="card-body p-2">
+                                        <ol class="mb-0 small">
+                                            <li>Create/verify GenieACS auto-provision for CR credentials</li>
+                                            <li>Bind TR-069 profile to all authorized ONUs on the OLT</li>
+                                            <li>Reboot each ONU to apply the new profile</li>
+                                            <li>ONUs bootstrap into GenieACS and auto-receive CR credentials</li>
+                                        </ol>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Select OLT</label>
+                                    <label class="form-label fw-bold">Select OLT</label>
                                     <select name="olt_id" class="form-select" required>
                                         <option value="">-- Select OLT --</option>
                                         <?php foreach ($olts as $olt): ?>
@@ -8083,14 +8211,19 @@ try {
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">TR-069 Profile ID</label>
+                                    <label class="form-label fw-bold">TR-069 Profile ID</label>
                                     <input type="number" name="tr069_profile_id" class="form-control" value="3" required>
+                                    <div class="form-text">Profile configured on the OLT with ACS URL, username, and password.</div>
+                                </div>
+                                <div class="alert alert-warning mb-0 small">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    All authorized ONUs will be <strong>rebooted</strong>. They will reconnect within 1-2 minutes and automatically appear in GenieACS.
                                 </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-danger" onclick="return confirm('This will bind all authorized ONUs to the TR-069 profile. Continue?');">
-                                    <i class="bi bi-link-45deg me-2"></i>Bind & Reboot All
+                                <button type="submit" class="btn btn-primary" onclick="return confirm('This will:\n1. Setup GenieACS auto-provision\n2. Bind TR-069 profile to ALL authorized ONUs\n3. Reboot all ONUs\n\nONUs will temporarily go offline during reboot. Continue?');">
+                                    <i class="bi bi-gear-wide-connected me-2"></i>Setup All
                                 </button>
                             </div>
                         </form>
