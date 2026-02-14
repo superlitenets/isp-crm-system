@@ -12473,7 +12473,7 @@ try {
                     <?php if ($genieacsEnabled): ?>
                     <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="setup_auto_credential_clear">
-                        <button type="submit" class="btn btn-outline-warning" onclick="return confirm('This will create a GenieACS provision that auto-clears ConnectionRequest credentials on every device Inform. This fixes 401 errors for SmartOLT migrated devices. Continue?');">
+                        <button type="submit" class="btn btn-outline-warning" onclick="return confirm('This will:\n1. Configure GenieACS connectionRequestAuth to accept SmartOLT credentials\n2. Create a provision to auto-clear SmartOLT credentials on device Inform\n\nThis fixes 401 errors for SmartOLT migrated devices. Continue?');">
                             <i class="bi bi-shield-lock me-1"></i> Fix 401 Errors
                         </button>
                     </form>
