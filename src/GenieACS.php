@@ -707,8 +707,11 @@ class GenieACS {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
-        if ($error) return ['success' => false, 'error' => $error];
-        return ['success' => $httpCode >= 200 && $httpCode < 300, 'http_code' => $httpCode];
+        if ($error) return ['success' => false, 'error' => "cURL error: $error"];
+        if ($httpCode >= 200 && $httpCode < 300) {
+            return ['success' => true, 'http_code' => $httpCode];
+        }
+        return ['success' => false, 'error' => "HTTP $httpCode - " . ($response ?: 'No response'), 'http_code' => $httpCode];
     }
 
     public function getConfig(string $key): array {
@@ -737,12 +740,19 @@ class GenieACS {
 
     public function setupAutoCredentialClear(): array {
         $results = [];
+        $messages = [];
+        $errors = [];
 
         $configResult = $this->setConfig(
             'cwmp.connectionRequestAuth',
             'AUTH("smartolt", "") OR AUTH("", "") OR AUTH(username, password)'
         );
         $results['connectionRequestAuth'] = $configResult;
+        if ($configResult['success'] ?? false) {
+            $messages[] = 'GenieACS connectionRequestAuth configured to accept SmartOLT credentials.';
+        } else {
+            $errors[] = 'Config: ' . ($configResult['error'] ?? 'Unknown');
+        }
 
         $provisionName = 'clear-conn-req-auth';
         $script = <<<'JS'
@@ -756,14 +766,12 @@ if (username.value[0] === "smartolt" || username.value[0] !== "") {
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
-        if (!$provResult['success']) {
-            return [
-                'success' => $configResult['success'] ?? false,
-                'error' => 'Config set but provision failed: ' . ($provResult['error'] ?? 'Unknown'),
-                'details' => $results
-            ];
-        }
         $results['provision'] = $provResult;
+        if ($provResult['success'] ?? false) {
+            $messages[] = 'Provision created.';
+        } else {
+            $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
+        }
 
         $preset = [
             '_id' => 'clear-conn-req-auth',
@@ -777,24 +785,25 @@ JS;
         ];
         $presetResult = $this->createPreset($preset);
         $results['preset'] = $presetResult;
-
-        $allSuccess = ($configResult['success'] ?? false) && ($presetResult['success'] ?? false);
-
-        $messages = [];
-        if ($configResult['success'] ?? false) {
-            $messages[] = 'GenieACS connectionRequestAuth configured to accept SmartOLT credentials (smartolt/""), blank credentials, and device-stored credentials.';
-        } else {
-            $messages[] = 'Warning: Failed to set connectionRequestAuth config.';
-        }
         if ($presetResult['success'] ?? false) {
-            $messages[] = 'Provision + preset created to auto-clear SmartOLT credentials on next device Inform.';
+            $messages[] = 'Preset created to run on device Inform.';
         } else {
-            $messages[] = 'Warning: Preset creation failed.';
+            $errors[] = 'Preset: ' . ($presetResult['error'] ?? 'Unknown');
+        }
+
+        $anySuccess = !empty($messages);
+        $fullMessage = '';
+        if (!empty($messages)) {
+            $fullMessage .= implode(' ', $messages);
+        }
+        if (!empty($errors)) {
+            $fullMessage .= ($fullMessage ? ' | Errors: ' : 'Errors: ') . implode('; ', $errors);
         }
 
         return [
-            'success' => $allSuccess,
-            'message' => implode(' ', $messages),
+            'success' => $anySuccess && empty($errors),
+            'message' => $fullMessage,
+            'error' => !empty($errors) ? implode('; ', $errors) : null,
             'details' => $results
         ];
     }

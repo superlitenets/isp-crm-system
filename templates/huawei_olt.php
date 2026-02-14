@@ -5837,10 +5837,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode($result);
                     exit;
                 }
-                $message = $result['success'] 
-                    ? $result['message'] 
-                    : ('Failed: ' . ($result['error'] ?? 'Unknown error'));
-                $messageType = $result['success'] ? 'success' : 'danger';
+                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
+                if (!$result['success'] && !empty($result['error'])) {
+                    $message = 'Failed: ' . $result['error'];
+                }
+                $messageType = $result['success'] ? 'success' : (str_contains($message ?? '', 'Warning') ? 'warning' : 'danger');
                 break;
             case 'clear_tr069_profile_credentials':
                 $oltId = (int)$_POST['olt_id'];
