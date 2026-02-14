@@ -1312,26 +1312,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 try {
+                    require_once __DIR__ . '/../src/GenieACS.php';
+                    $genieacs = new \App\GenieACS($db);
+                    $steps = [];
+
+                    $provisionResult = $genieacs->setupAutoCredentialClear();
+                    if ($provisionResult['success'] ?? false) {
+                        $steps[] = 'GenieACS auto-provision ready';
+                    } elseif ($provisionResult['details']['provision']['success'] ?? false) {
+                        $steps[] = 'GenieACS auto-provision exists';
+                    } else {
+                        $steps[] = 'GenieACS provision warning: ' . ($provisionResult['error'] ?? 'check config');
+                    }
+
                     $result = $huaweiOLT->configureTR069Manual($onuId);
                     
                     if ($result['success']) {
-                        $onu = $huaweiOLT->getONU($onuId);
-                        if ($onu && !empty($onu['sn'])) {
-                            require_once __DIR__ . '/../src/GenieACS.php';
-                            $genieacs = new \App\GenieACS($db);
-                            $genieacs->sendConnectionRequest($onu['sn']);
-                        }
-                        
-                        $message = $result['message'];
+                        $steps[] = $result['message'];
+                        $steps[] = 'ONU will auto-register in GenieACS and receive CR credentials on first Inform';
+                        $message = implode(' | ', $steps);
                         $messageType = 'success';
-                        
-                        // Update ONU TR-069 status
                         $huaweiOLT->updateONU($onuId, ['tr069_status' => 'configured']);
                     } else {
-                        $message = $result['message'];
+                        $steps[] = $result['message'];
+                        $message = implode(' | ', $steps);
                         $messageType = 'warning';
-                        
-                        // Partial success - update status
                         if (!empty($result['errors'])) {
                             $huaweiOLT->updateONU($onuId, ['tr069_status' => 'partial']);
                         }
@@ -9410,11 +9415,11 @@ try {
                                 <i class="bi bi-arrow-clockwise"></i><span class="d-none d-lg-inline ms-1">Reboot</span>
                             </button>
                         </form>
-                        <form method="post" class="d-inline" onsubmit="return confirm('Push TR-069 OMCI config to OLT?')">
+                        <form method="post" class="d-inline" onsubmit="return confirm('This will:\n1. Ensure GenieACS auto-provision is ready\n2. Bind TR-069 profile to this ONU\n3. Reboot the ONU\n\nONU will temporarily go offline. Continue?')">
                             <input type="hidden" name="action" value="configure_tr069">
                             <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                            <button type="submit" class="btn btn-outline-info" title="Push TR-069 OMCI Config (enables device to connect to GenieACS)">
-                                <i class="bi bi-broadcast"></i><span class="d-none d-lg-inline ms-1">Push TR-069</span>
+                            <button type="submit" class="btn btn-outline-info" title="Full TR-069 + GenieACS Setup (bind profile, reboot, auto CR credentials)">
+                                <i class="bi bi-gear-wide-connected"></i><span class="d-none d-lg-inline ms-1">Setup TR-069</span>
                             </button>
                         </form>
                     </div>
@@ -11179,8 +11184,8 @@ try {
             <div class="modal fade" id="tr069ConfigModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
-                        <div class="modal-header bg-success text-white">
-                            <h5 class="modal-title"><i class="bi bi-broadcast me-2"></i>Push TR-069 Configuration</h5>
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-gear-wide-connected me-2"></i>Setup TR-069 + GenieACS</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form method="post" id="tr069ConfigForm">
@@ -11190,7 +11195,7 @@ try {
                                 
                                 <div class="alert alert-info small">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    This will push TR-069 configuration directly to the ONU via OMCI commands on the OLT.
+                                    This will ensure GenieACS auto-provision is ready, bind TR-069 profile to this ONU, and reboot it. The ONU will auto-register in GenieACS and receive CR credentials on first Inform.
                                 </div>
                                 
                                 <div class="mb-3">
