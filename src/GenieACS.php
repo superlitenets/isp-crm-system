@@ -747,15 +747,12 @@ class GenieACS {
         return ['success' => false, 'http_code' => $httpCode];
     }
 
-    public function setupAutoCredentialClear(): array {
+    public function setupPeriodicInform(int $intervalSeconds = 300): array {
         $results = [];
         $messages = [];
         $errors = [];
 
-        $connReqUser = $this->crUsername;
-        $connReqPass = $this->crPassword;
-
-        $provisionName = 'set-conn-req-auth';
+        $provisionName = 'set-periodic-inform';
         $script = <<<JS
 const now = Date.now();
 
@@ -765,24 +762,24 @@ if (val && val.value && val.value[0]) {
   root = "Device";
 }
 
-declare(root + ".ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$connReqUser}"});
-declare(root + ".ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$connReqPass}"});
+declare(root + ".ManagementServer.PeriodicInformEnable", {value: now}, {value: true});
+declare(root + ".ManagementServer.PeriodicInformInterval", {value: now}, {value: {$intervalSeconds}});
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
         $results['provision'] = $provResult;
         if ($provResult['success'] ?? false) {
-            $messages[] = 'Provision created (sets ConnectionRequest credentials to genieacs/genieacs).';
+            $messages[] = "Provision created (sets PeriodicInformInterval to {$intervalSeconds}s).";
         } else {
             $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
         }
 
         $preset = [
-            '_id' => 'set-conn-req-auth',
+            '_id' => 'set-periodic-inform',
             'channel' => 'default',
             'weight' => 0,
             'precondition' => '{}',
-            'events' => ['0 BOOTSTRAP', '1 BOOT', '2 PERIODIC'],
+            'events' => ['0 BOOTSTRAP', '1 BOOT'],
             'configurations' => [
                 ['type' => 'provision', 'name' => $provisionName, 'args' => []]
             ]
@@ -790,7 +787,7 @@ JS;
         $presetResult = $this->createPreset($preset);
         $results['preset'] = $presetResult;
         if ($presetResult['success'] ?? false) {
-            $messages[] = 'Preset created to run on every device Inform.';
+            $messages[] = 'Preset created to run on BOOTSTRAP and BOOT events.';
         } else {
             $errors[] = 'Preset: ' . ($presetResult['error'] ?? 'Unknown');
         }
@@ -802,10 +799,6 @@ JS;
         }
         if (!empty($errors)) {
             $fullMessage .= ($fullMessage ? ' | Errors: ' : 'Errors: ') . implode('; ', $errors);
-        }
-
-        if ($anySuccess && empty($errors)) {
-            $fullMessage .= " Now set cwmp.connectionRequestAuth in GenieACS Admin > Config to: AUTH(\"{$connReqUser}\", \"{$connReqPass}\")";
         }
 
         return [

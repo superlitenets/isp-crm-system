@@ -2902,6 +2902,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'genieacs_username' => $_POST['genieacs_username'] ?? '',
                     'genieacs_timeout' => $_POST['genieacs_timeout'] ?? '30',
                     'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0',
+                    'genieacs_inform_interval' => $_POST['genieacs_inform_interval'] ?? '300',
                     'genieacs_cr_username' => $_POST['genieacs_cr_username'] ?? '',
                     'genieacs_cr_password' => $_POST['genieacs_cr_password'] ?? ''
                 ];
@@ -3243,6 +3244,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $genieacs = new \App\GenieACS($db);
                 $result = $genieacs->testConnection();
                 $message = $result['message'];
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'setup_periodic_inform':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $interval = isset($_POST['inform_interval']) ? (int)$_POST['inform_interval'] : 300;
+                if ($interval < 60) $interval = 60;
+                if ($interval > 86400) $interval = 86400;
+                $result = $genieacs->setupPeriodicInform($interval);
+                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
+                if (!$result['success'] && !empty($result['error'])) {
+                    $message = 'Failed: ' . $result['error'];
+                }
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'sync_tr069_devices':
@@ -12548,10 +12562,16 @@ try {
             $genieacs = new \App\GenieACS($db);
             $genieacsEnabled = false;
             $tr069Devices = [];
+            $informInterval = 300;
             try {
                 $stmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_enabled'");
                 $row = $stmt->fetch(\PDO::FETCH_ASSOC);
                 $genieacsEnabled = ($row['setting_value'] ?? '0') === '1';
+                
+                $stmt2 = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_inform_interval'");
+                $row2 = $stmt2->fetch(\PDO::FETCH_ASSOC);
+                $informInterval = (int)($row2['setting_value'] ?? 300);
+                if ($informInterval < 60) $informInterval = 300;
                 
                 if ($genieacsEnabled) {
                     $stmt = $db->query("SELECT t.*, o.name as onu_name, o.sn as onu_sn FROM tr069_devices t LEFT JOIN huawei_onus o ON t.onu_id = o.id ORDER BY t.last_inform DESC LIMIT 100");
@@ -12563,6 +12583,13 @@ try {
                 <h4 class="mb-0"><i class="bi bi-gear-wide-connected me-2"></i>TR-069 / GenieACS</h4>
                 <div>
                     <?php if ($genieacsEnabled): ?>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="setup_periodic_inform">
+                        <input type="hidden" name="inform_interval" value="<?= $informInterval ?>">
+                        <button type="submit" class="btn btn-outline-success" onclick="return confirm('This creates a GenieACS provision that sets PeriodicInformInterval to <?= $informInterval ?> seconds (<?= round($informInterval / 60) ?> min) on every device at BOOTSTRAP and BOOT.\n\nDevices will check in regularly, eliminating the need for summon. Continue?');">
+                            <i class="bi bi-clock-history me-1"></i> Set Inform <?= round($informInterval / 60) ?>min
+                        </button>
+                    </form>
                     <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="sync_tr069_devices">
                         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i> Sync Devices</button>
@@ -13896,6 +13923,12 @@ try {
                                 <div class="mb-3">
                                     <label class="form-label">Timeout (seconds)</label>
                                     <input type="number" name="genieacs_timeout" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_timeout'] ?? '30') ?>" min="5" max="120">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Periodic Inform Interval (seconds)</label>
+                                    <input type="number" name="genieacs_inform_interval" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_inform_interval'] ?? '300') ?>" min="60" max="86400">
+                                    <div class="form-text">How often devices check in with GenieACS. Default 300s (5 min). Lower = more responsive but more traffic.</div>
                                 </div>
 
                                 <hr>
