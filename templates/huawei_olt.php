@@ -19505,7 +19505,9 @@ async function saveInlineStatus() {
             document.getElementById('inlineStatusSaveNotice').style.display = 'none';
             saveBtn.innerHTML = originalBtnHtml;
             saveBtn.disabled = false;
-            if (data.queued) {
+            if (data.cr_cleared) {
+                showToast('Credentials fixed & changes applied instantly!', 'success');
+            } else if (data.queued) {
                 showToast('Changes queued - will apply within 3 minutes', 'warning');
             } else {
                 showToast('Changes applied successfully!', 'success');

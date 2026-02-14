@@ -272,6 +272,27 @@ class GenieACS {
         $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=5000", $task);
         $httpCode = $result['http_code'] ?? 0;
         
+        if ($httpCode != 200) {
+            $cleared = $this->clearCRCredentialsViaOLT($serial);
+            if ($cleared['success'] ?? false) {
+                error_log("[GenieACS] CR cleared via OLT for {$serial}, retrying connection request");
+                sleep(2);
+                $retry = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
+                $retryCode = $retry['http_code'] ?? 0;
+                if ($retryCode == 200) {
+                    return [
+                        'success' => true,
+                        'message' => 'Device responded after clearing cached credentials',
+                        'connection_request_url' => $connReqUrl,
+                        'http_code' => 200,
+                        'cr_cleared' => true,
+                        'queued' => false
+                    ];
+                }
+                $httpCode = $retryCode;
+            }
+        }
+        
         return [
             'success' => ($httpCode == 200 || $httpCode == 202),
             'message' => ($httpCode == 200) 
@@ -279,7 +300,7 @@ class GenieACS {
                 : 'Connection request sent - device will respond on next inform',
             'connection_request_url' => $connReqUrl,
             'http_code' => $httpCode,
-            'queued' => ($httpCode == 202)
+            'queued' => ($httpCode != 200)
         ];
     }
     
@@ -504,10 +525,8 @@ class GenieACS {
     }
     
     public function setParameterValues(string $deviceId, array $parameterValues): array {
-        // Use rawurlencode for path safety with special characters
         $encodedId = rawurlencode($deviceId);
         
-        // GenieACS expects parameterValues as array of [name, value, type] arrays
         $formattedParams = [];
         foreach ($parameterValues as $key => $value) {
             if (is_array($value) && isset($value[0], $value[1])) {
@@ -531,10 +550,39 @@ class GenieACS {
         $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
         $httpCode = $result['http_code'] ?? 0;
         
-        if ($httpCode == 401 || $httpCode == 0) {
-            error_log("[GenieACS] Connection request failed (HTTP {$httpCode}) for {$deviceId}, queuing task for next inform");
-            $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-            $result['queued_fallback'] = true;
+        if ($httpCode == 202 || $httpCode == 401 || $httpCode == 0) {
+            $serial = $this->extractSerialFromDeviceId($deviceId);
+            if ($serial) {
+                $cleared = $this->clearCRCredentialsViaOLT($serial);
+                if ($cleared['success'] ?? false) {
+                    error_log("[GenieACS] CR credentials cleared via OLT for {$serial}, retrying instant push");
+                    sleep(2);
+                    
+                    if ($httpCode == 202) {
+                        $summonTask = ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']];
+                        $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $summonTask);
+                    } else {
+                        $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
+                    }
+                    $retryCode = $retryResult['http_code'] ?? 0;
+                    if ($retryCode == 200) {
+                        $result = $retryResult;
+                        $result['cr_cleared'] = true;
+                        $result['http_code'] = 200;
+                        error_log("[GenieACS] Retry succeeded after CR clear for {$serial}");
+                        return $result;
+                    }
+                    error_log("[GenieACS] Retry still got HTTP {$retryCode} for {$serial}");
+                }
+            }
+            
+            if ($httpCode == 202) {
+                $result['queued_fallback'] = true;
+            } else {
+                error_log("[GenieACS] Connection request failed (HTTP {$httpCode}) for {$deviceId}, queuing task");
+                $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
+                $result['queued_fallback'] = true;
+            }
         }
         
         error_log("[GenieACS] setParameterValues to {$deviceId}: " . json_encode([
@@ -544,6 +592,71 @@ class GenieACS {
         ]));
         
         return $result;
+    }
+    
+    private function extractSerialFromDeviceId(string $deviceId): ?string {
+        if (preg_match('/([A-Z0-9]{16})/i', $deviceId, $m)) {
+            return $m[1];
+        }
+        if (preg_match('/([A-Z]{4}[A-Fa-f0-9]{8,})/i', $deviceId, $m)) {
+            return $m[1];
+        }
+        $parts = explode('-', $deviceId);
+        foreach ($parts as $part) {
+            if (strlen($part) >= 12 && preg_match('/^[A-Z0-9]+$/i', $part)) {
+                return $part;
+            }
+        }
+        return null;
+    }
+    
+    public function clearCRCredentialsViaOLT(string $serial): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT o.olt_id, o.frame, o.slot, o.port, o.onu_id 
+                FROM huawei_onus o 
+                WHERE o.sn = ? AND o.olt_id IS NOT NULL
+            ");
+            $stmt->execute([$serial]);
+            $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$onu) {
+                $stmt2 = $this->db->prepare("
+                    SELECT o.olt_id, o.frame, o.slot, o.port, o.onu_id 
+                    FROM huawei_onus o 
+                    WHERE o.tr069_serial = ? AND o.olt_id IS NOT NULL
+                ");
+                $stmt2->execute([$serial]);
+                $onu = $stmt2->fetch(\PDO::FETCH_ASSOC);
+            }
+            
+            if (!$onu) {
+                error_log("[GenieACS] ONU not found in DB for serial {$serial}, cannot clear CR via OLT");
+                return ['success' => false, 'error' => 'ONU not found in database'];
+            }
+            
+            $frame = $onu['frame'] ?? 0;
+            $slot = $onu['slot'];
+            $port = $onu['port'];
+            $onuId = $onu['onu_id'];
+            $oltId = $onu['olt_id'];
+            
+            require_once __DIR__ . '/HuaweiOLT.php';
+            $huaweiOLT = new HuaweiOLT($this->db);
+            
+            $cmd = "interface gpon {$frame}/{$slot}\r\n";
+            $cmd .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"\r\n";
+            $cmd .= "quit";
+            
+            $result = $huaweiOLT->executeCommand($oltId, $cmd);
+            error_log("[GenieACS] Clear CR credentials via OLT for {$serial} (F{$frame}/S{$slot}/P{$port}/O{$onuId}): " . 
+                ($result['success'] ? 'SUCCESS' : 'FAILED'));
+            
+            return $result;
+        } catch (\Exception $e) {
+            error_log("[GenieACS] Error clearing CR credentials for {$serial}: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
     
     /**
