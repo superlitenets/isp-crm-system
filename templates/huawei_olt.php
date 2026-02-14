@@ -2901,7 +2901,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
                     'genieacs_username' => $_POST['genieacs_username'] ?? '',
                     'genieacs_timeout' => $_POST['genieacs_timeout'] ?? '30',
-                    'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0'
+                    'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0',
+                    'genieacs_cr_username' => $_POST['genieacs_cr_username'] ?? '',
+                    'genieacs_cr_password' => $_POST['genieacs_cr_password'] ?? ''
                 ];
                 if (!empty($_POST['genieacs_password'])) {
                     $settings['genieacs_password'] = $_POST['genieacs_password'];
@@ -13896,7 +13898,20 @@ try {
                                     <input type="number" name="genieacs_timeout" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_timeout'] ?? '30') ?>" min="5" max="120">
                                 </div>
 
-                                
+                                <hr>
+                                <h6 class="mb-3"><i class="bi bi-shield-lock me-2"></i>ConnectionRequest Credentials</h6>
+                                <p class="small text-muted">Optional. These are cleared per-ONU during TR-069 setup to allow GenieACS to summon devices without authentication. Huawei ONUs work fine without CR credentials.</p>
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">CR Username</label>
+                                        <input type="text" name="genieacs_cr_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_username'] ?? '') ?>" placeholder="Leave blank for no auth">
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">CR Password</label>
+                                        <input type="text" name="genieacs_cr_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_password'] ?? '') ?>" placeholder="Leave blank for no auth">
+                                    </div>
+                                </div>
+
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Settings</button>
                                     <button type="submit" name="action" value="test_genieacs" class="btn btn-outline-secondary"><i class="bi bi-plug me-1"></i> Test Connection</button>
