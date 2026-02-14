@@ -870,14 +870,14 @@ if (val && val.value && val.value[0]) {
 
 declare(root + ".ManagementServer.PeriodicInformEnable", {value: now}, {value: true});
 declare(root + ".ManagementServer.PeriodicInformInterval", {value: now}, {value: {$intervalSeconds}});
-declare(root + ".ManagementServer.ConnectionRequestUsername", {value: now}, {value: ""});
-declare(root + ".ManagementServer.ConnectionRequestPassword", {value: now}, {value: ""});
+declare(root + ".ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$this->crUsername}"});
+declare(root + ".ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$this->crPassword}"});
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
         $results['provision'] = $provResult;
         if ($provResult['success'] ?? false) {
-            $messages[] = "Provision: periodic inform {$intervalSeconds}s + clear CR credentials (takes effect immediately via TR-069 Set).";
+            $messages[] = "Provision: periodic inform {$intervalSeconds}s + set CR credentials to '{$this->crUsername}' (takes effect immediately via TR-069 Set, like SmartOLT).";
         } else {
             $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
         }
