@@ -868,22 +868,16 @@ if (val && val.value && val.value[0]) {
   root = "Device";
 }
 
-// Set periodic inform
 declare(root + ".ManagementServer.PeriodicInformEnable", {value: now}, {value: true});
 declare(root + ".ManagementServer.PeriodicInformInterval", {value: now}, {value: {$intervalSeconds}});
-
-// Clear Connection Request credentials so GenieACS can summon instantly
 declare(root + ".ManagementServer.ConnectionRequestUsername", {value: now}, {value: ""});
 declare(root + ".ManagementServer.ConnectionRequestPassword", {value: now}, {value: ""});
-
-// Reboot to apply with clean credentials
-declare(root + ".Reboot", {value: now}, {value: now});
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
         $results['provision'] = $provResult;
         if ($provResult['success'] ?? false) {
-            $messages[] = "Provision created: periodic inform {$intervalSeconds}s + clear CR credentials + reboot.";
+            $messages[] = "Provision: periodic inform {$intervalSeconds}s + clear CR credentials (takes effect immediately via TR-069 Set).";
         } else {
             $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
         }
@@ -893,7 +887,7 @@ JS;
             'channel' => 'default',
             'weight' => 0,
             'precondition' => '{}',
-            'events' => ['0 BOOTSTRAP'],
+            'events' => ['0 BOOTSTRAP', '1 BOOT'],
             'configurations' => [
                 ['type' => 'provision', 'name' => $provisionName, 'args' => []]
             ]
@@ -901,7 +895,7 @@ JS;
         $presetResult = $this->createPreset($preset);
         $results['preset'] = $presetResult;
         if ($presetResult['success'] ?? false) {
-            $messages[] = 'Preset runs on BOOTSTRAP (first contact).';
+            $messages[] = 'Preset runs on BOOTSTRAP and BOOT events.';
         } else {
             $errors[] = 'Preset: ' . ($presetResult['error'] ?? 'Unknown');
         }
