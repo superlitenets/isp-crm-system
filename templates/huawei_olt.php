@@ -5843,6 +5843,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 $messageType = $result['success'] ? 'success' : (str_contains($message ?? '', 'Warning') ? 'warning' : 'danger');
                 break;
+            case 'push_cr_credentials':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $deviceId = $_POST['device_id'] ?? '';
+                if (empty($deviceId)) {
+                    $result = ['success' => false, 'error' => 'No device ID provided'];
+                } else {
+                    $result = $genieacs->pushConnectionRequestCredentials($deviceId);
+                }
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode($result);
+                    exit;
+                }
+                $message = $result['success']
+                    ? "CR credentials queued for {$deviceId}. Will apply on next Inform."
+                    : 'Failed: ' . ($result['error'] ?? 'Unknown error');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'push_cr_credentials_all':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->pushConnectionRequestCredentialsToAll();
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode($result);
+                    exit;
+                }
+                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
+                if (!$result['success'] && !empty($result['error'])) {
+                    $message = 'Failed: ' . $result['error'];
+                }
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'clear_tr069_profile_credentials':
                 $oltId = (int)$_POST['olt_id'];
                 $profileId = (int)$_POST['profile_id'];
@@ -12479,6 +12513,12 @@ try {
                         </button>
                     </form>
                     <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="push_cr_credentials_all">
+                        <button type="submit" class="btn btn-outline-info" onclick="return confirm('This will queue a task on ALL GenieACS devices to set ConnectionRequest credentials to genieacs/genieacs.\n\nTasks execute on each device\'s next Inform. Continue?');">
+                            <i class="bi bi-key me-1"></i> Push CR Credentials to All
+                        </button>
+                    </form>
+                    <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="sync_tr069_devices">
                         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i> Sync Devices</button>
                     </form>
@@ -12578,6 +12618,13 @@ try {
                                             <button type="button" class="btn btn-outline-warning" onclick="openAdminPasswordConfig('<?= htmlspecialchars($device['device_id']) ?>', '<?= htmlspecialchars($device['serial_number']) ?>')" title="Change Admin Password">
                                                 <i class="bi bi-key"></i>
                                             </button>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="push_cr_credentials">
+                                                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
+                                                <button type="submit" class="btn btn-outline-success" title="Push CR Credentials (genieacs/genieacs)" onclick="return confirm('Push ConnectionRequest credentials to this device? Task will execute on next Inform.')">
+                                                    <i class="bi bi-shield-lock"></i>
+                                                </button>
+                                            </form>
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="action" value="tr069_refresh">
                                                 <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">

@@ -749,12 +749,8 @@ class GenieACS {
         $provisionName = 'set-conn-req-auth';
         $script = <<<JS
 const now = Date.now();
-const username = declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now});
-
-if (username.value[0] !== "{$connReqUser}") {
-  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$connReqUser}"});
-  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$connReqPass}"});
-}
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$connReqUser}"});
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$connReqPass}"});
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
@@ -804,6 +800,73 @@ JS;
         ];
     }
     
+    public function pushConnectionRequestCredentials(string $deviceId, string $username = 'genieacs', string $password = 'genieacs'): array {
+        $encodedId = rawurlencode($deviceId);
+        $task = [
+            'name' => 'setParameterValues',
+            'parameterValues' => [
+                ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $username, 'xsd:string'],
+                ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $password, 'xsd:string']
+            ]
+        ];
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
+        error_log("[GenieACS] pushConnectionRequestCredentials to {$deviceId}: " . json_encode([
+            'username' => $username,
+            'success' => $result['success'] ?? false,
+            'http_code' => $result['http_code'] ?? 0
+        ]));
+        return $result;
+    }
+
+    public function pushConnectionRequestCredentialsToAll(string $username = 'genieacs', string $password = 'genieacs'): array {
+        $success = 0;
+        $failed = 0;
+        $errors = [];
+        $skip = 0;
+        $limit = 100;
+
+        while (true) {
+            $devicesResult = $this->getDevices([], $limit, $skip);
+            if (!($devicesResult['success'] ?? false)) {
+                if ($skip === 0) {
+                    return ['success' => false, 'error' => 'Failed to fetch devices: ' . ($devicesResult['error'] ?? 'Unknown')];
+                }
+                break;
+            }
+
+            $devices = $devicesResult['data'] ?? [];
+            if (empty($devices)) break;
+
+            foreach ($devices as $device) {
+                $deviceId = $device['_id'] ?? null;
+                if (!$deviceId) continue;
+
+                $result = $this->pushConnectionRequestCredentials($deviceId, $username, $password);
+                if ($result['success'] ?? false) {
+                    $success++;
+                } else {
+                    $failed++;
+                    if (count($errors) < 10) {
+                        $errors[] = "{$deviceId}: " . ($result['error'] ?? 'Unknown');
+                    }
+                }
+            }
+
+            if (count($devices) < $limit) break;
+            $skip += $limit;
+        }
+
+        $total = $success + $failed;
+        return [
+            'success' => $total > 0 && $failed === 0,
+            'message' => "Queued CR credentials for {$success} device(s)" . ($failed > 0 ? ", {$failed} failed" : '') . ". Tasks will execute on each device's next Inform.",
+            'total' => $total,
+            'success_count' => $success,
+            'failed_count' => $failed,
+            'errors' => $errors
+        ];
+    }
+
     public function getFiles(): array {
         return $this->request('GET', '/files');
     }
