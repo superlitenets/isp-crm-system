@@ -758,8 +758,15 @@ class GenieACS {
         $provisionName = 'set-conn-req-auth';
         $script = <<<JS
 const now = Date.now();
-declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$connReqUser}"});
-declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$connReqPass}"});
+
+let root = "InternetGatewayDevice";
+let val = declare("Device.DeviceInfo.Manufacturer", {value: 1});
+if (val && val.value && val.value[0]) {
+  root = "Device";
+}
+
+declare(root + ".ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$connReqUser}"});
+declare(root + ".ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$connReqPass}"});
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
@@ -813,19 +820,35 @@ JS;
         $username = $username ?? $this->crUsername;
         $password = $password ?? $this->crPassword;
         $encodedId = rawurlencode($deviceId);
+
+        $dataModel = $this->detectDataModel($deviceId);
+        $root = ($dataModel === 'tr181') ? 'Device' : 'InternetGatewayDevice';
+
         $task = [
             'name' => 'setParameterValues',
             'parameterValues' => [
-                ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $username, 'xsd:string'],
-                ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $password, 'xsd:string']
+                ["{$root}.ManagementServer.ConnectionRequestUsername", $username, 'xsd:string'],
+                ["{$root}.ManagementServer.ConnectionRequestPassword", $password, 'xsd:string']
             ]
         ];
         $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-        error_log("[GenieACS] pushConnectionRequestCredentials to {$deviceId}: " . json_encode([
+        error_log("[GenieACS] pushConnectionRequestCredentials to {$deviceId} (model={$dataModel}): " . json_encode([
             'username' => $username,
             'success' => $result['success'] ?? false,
             'http_code' => $result['http_code'] ?? 0
         ]));
+
+        if ($result['success'] ?? false) {
+            $faults = $this->getFaults($deviceId);
+            $faultData = $faults['data'] ?? [];
+            if (!empty($faultData)) {
+                $latestFault = end($faultData);
+                $faultDetail = $latestFault['detail'] ?? ($latestFault['message'] ?? 'Unknown fault');
+                error_log("[GenieACS] Device {$deviceId} has faults after CR push: " . json_encode($faultDetail));
+                $result['warning'] = "Task queued but device has faults: {$faultDetail}";
+            }
+        }
+
         return $result;
     }
 

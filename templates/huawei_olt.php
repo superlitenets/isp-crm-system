@@ -5968,6 +5968,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'user_id' => $_SESSION['user_id'] ?? null
                 ]);
                 break;
+            case 'check_cr_status':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $deviceId = $_POST['device_id'] ?? '';
+                if (empty($deviceId)) {
+                    $result = ['success' => false, 'error' => 'No device ID provided'];
+                } else {
+                    $crCreds = $genieacs->getCRCredentials();
+                    $dataModel = $genieacs->detectDataModel($deviceId);
+                    $root = ($dataModel === 'tr181') ? 'Device' : 'InternetGatewayDevice';
+
+                    $deviceResult = $genieacs->getDevice($deviceId);
+                    $currentCRUser = null;
+                    $currentCRUrl = null;
+                    if ($deviceResult['success'] ?? false) {
+                        $d = $deviceResult['data'];
+                        $userKey = "{$root}.ManagementServer.ConnectionRequestUsername";
+                        $urlKey = "{$root}.ManagementServer.ConnectionRequestURL";
+                        if (isset($d[$userKey]) && is_array($d[$userKey])) {
+                            $currentCRUser = $d[$userKey]['_value'] ?? null;
+                        } elseif (isset($d[$userKey])) {
+                            $currentCRUser = $d[$userKey];
+                        }
+                        if (isset($d[$urlKey]) && is_array($d[$urlKey])) {
+                            $currentCRUrl = $d[$urlKey]['_value'] ?? null;
+                        } elseif (isset($d[$urlKey])) {
+                            $currentCRUrl = $d[$urlKey];
+                        }
+                    }
+
+                    $tasks = $genieacs->getTasks($deviceId);
+                    $pendingTasks = [];
+                    foreach (($tasks['data'] ?? []) as $t) {
+                        if (($t['name'] ?? '') === 'setParameterValues') {
+                            $pendingTasks[] = $t;
+                        }
+                    }
+
+                    $faults = $genieacs->getFaults($deviceId);
+                    $faultList = $faults['data'] ?? [];
+
+                    $lines = [];
+                    $lines[] = "Data Model: {$root} ({$dataModel})";
+                    $lines[] = "Current CR Username: " . ($currentCRUser ?: '(empty/not set)');
+                    $lines[] = "Current CR URL: " . ($currentCRUrl ?: '(empty/not set)');
+                    $lines[] = "Expected CR Username: {$crCreds['username']}";
+                    $lines[] = "Pending setParameterValues tasks: " . count($pendingTasks);
+                    $lines[] = "Device faults: " . count($faultList);
+                    if (!empty($faultList)) {
+                        foreach (array_slice($faultList, 0, 3) as $f) {
+                            $lines[] = "  Fault: " . ($f['detail'] ?? $f['message'] ?? json_encode($f));
+                        }
+                    }
+
+                    $match = ($currentCRUser === $crCreds['username']);
+                    $result = [
+                        'success' => true,
+                        'message' => implode("\n", $lines),
+                        'cr_match' => $match,
+                        'current_username' => $currentCRUser,
+                        'expected_username' => $crCreds['username'],
+                        'pending_tasks' => count($pendingTasks),
+                        'faults' => count($faultList)
+                    ];
+                }
+                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
+                $messageType = ($result['cr_match'] ?? false) ? 'success' : 'info';
+                break;
             case 'push_cr_credentials':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
@@ -12758,6 +12826,13 @@ try {
                                             <button type="button" class="btn btn-outline-warning" onclick="openAdminPasswordConfig('<?= htmlspecialchars($device['device_id']) ?>', '<?= htmlspecialchars($device['serial_number']) ?>')" title="Change Admin Password">
                                                 <i class="bi bi-key"></i>
                                             </button>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="check_cr_status">
+                                                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
+                                                <button type="submit" class="btn btn-outline-secondary" title="Check CR Credentials Status">
+                                                    <i class="bi bi-search"></i>
+                                                </button>
+                                            </form>
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="action" value="push_cr_credentials">
                                                 <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
