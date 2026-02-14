@@ -5873,11 +5873,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $port = $onu['port'];
                         $onuPortId = $onu['onu_id'];
 
-                        $cmdClear = "interface gpon {$frame}/{$slot}\r\n";
-                        $cmdClear .= "ont tr069-server-config {$port} {$onuPortId} connection-request-username \"\" connection-request-password \"\"\r\n";
-                        $cmdClear .= "quit";
-                        $huaweiOLT->executeCommand($oltId, $cmdClear);
-
                         $cmdDetach = "interface gpon {$frame}/{$slot}\r\n";
                         $cmdDetach .= "ont tr069-server-config {$port} {$onuPortId} profile-id 0\r\n";
                         $cmdDetach .= "quit";
@@ -5892,6 +5887,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $bindOk = ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out)) || ($result['success'] && preg_match('/already|repeatedly/i', $out));
                         if ($bindOk) {
                             $bound++;
+
+                            $cmdClear = "interface gpon {$frame}/{$slot}\r\n";
+                            $cmdClear .= "ont tr069-server-config {$port} {$onuPortId} connection-request-username \"\" connection-request-password \"\"\r\n";
+                            $cmdClear .= "quit";
+                            $huaweiOLT->executeCommand($oltId, $cmdClear);
 
                             $cmdReboot = "interface gpon {$frame}/{$slot}\r\n";
                             $cmdReboot .= "ont reset {$port} {$onuPortId}\r\n";

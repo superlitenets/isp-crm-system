@@ -6203,6 +6203,7 @@ class HuaweiOLT {
             if ($tr069ProfileId) {
                 $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
             }
+            $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} connection-request-username \"\" connection-request-password \"\"\r\n";
             $batchScript .= "quit\r\n";
             
             // Service-port for TR-069 VLAN
@@ -6617,6 +6618,7 @@ class HuaweiOLT {
             if ($tr069ProfileId) {
                 $tr069ScriptLines[] = "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}";
             }
+            $tr069ScriptLines[] = "ont tr069-server-config {$port} {$assignedOnuId} connection-request-username \"\" connection-request-password \"\"";
             $tr069ScriptLines[] = "quit";
             $tr069OmciResult = $this->callOLTService('/execute-raw', [
                 'oltId' => (string)$oltId,
@@ -6776,6 +6778,7 @@ class HuaweiOLT {
         if ($tr069ProfileId) {
             $tr069ScriptLines[] = "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}";
         }
+        $tr069ScriptLines[] = "ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"";
         $tr069ScriptLines[] = "quit";
         $result1 = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
@@ -6941,13 +6944,6 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'No TR-069 profile ID configured in settings'];
         }
         
-        // Step 0: Clear CR credentials on this specific ONU
-        $clearCmd = "interface gpon {$frame}/{$slot}\r\n";
-        $clearCmd .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"\r\n";
-        $clearCmd .= "quit";
-        $clearResult = $this->executeCommand($oltId, $clearCmd);
-        $output .= "[Step 0: Clear CR Credentials on ONU]\n" . ($clearResult['output'] ?? '') . "\n";
-        
         // Step 1: Detach TR-069 profile
         $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
         $cmd1 .= "ont tr069-server-config {$port} {$onuId} profile-id 0\r\n";
@@ -6955,7 +6951,7 @@ class HuaweiOLT {
         $result1 = $this->executeCommand($oltId, $cmd1);
         $output .= "[Step 1: Detach TR-069 Profile]\n" . ($result1['output'] ?? '') . "\n";
         
-        // Step 2: Reattach TR-069 profile with clean credentials
+        // Step 2: Reattach TR-069 profile
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
         $cmd2 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
         $cmd2 .= "quit";
@@ -6968,16 +6964,24 @@ class HuaweiOLT {
             $errors[] = "TR-069 profile binding failed";
         }
         
-        // Step 3: Restart ONU to apply config
-        $cmd3 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd3 .= "ont reset {$port} {$onuId}\r\n";
-        $cmd3 .= "quit";
-        $result3 = $this->executeCommand($oltId, $cmd3);
-        $output .= "[Step 3: ONU Restart]\n" . ($result3['output'] ?? '') . "\n";
+        // Step 3: Clear CR credentials AFTER profile is attached
+        // This clears any cached SmartOLT credentials so GenieACS can summon instantly
+        $clearCmd = "interface gpon {$frame}/{$slot}\r\n";
+        $clearCmd .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"\r\n";
+        $clearCmd .= "quit";
+        $clearResult = $this->executeCommand($oltId, $clearCmd);
+        $output .= "[Step 3: Clear CR Credentials]\n" . ($clearResult['output'] ?? '') . "\n";
+        
+        // Step 4: Reboot ONU to apply with clean credentials
+        $cmd4 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd4 .= "ont reset {$port} {$onuId}\r\n";
+        $cmd4 .= "quit";
+        $result4 = $this->executeCommand($oltId, $cmd4);
+        $output .= "[Step 4: ONU Reboot]\n" . ($result4['output'] ?? '') . "\n";
         
         $success = empty($errors);
         $message = $success 
-            ? "TR-069 profile detached, reattached to {$tr069ProfileId}, and ONU restarted"
+            ? "TR-069 profile {$tr069ProfileId} applied, credentials cleared, ONU rebooted"
             : "TR-069 configuration failed: " . implode(', ', $errors);
         
         $this->addLog([
@@ -9885,6 +9889,7 @@ class HuaweiOLT {
         
         if ($tr069ProfileId !== null) {
             $lines[] = "  ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}";
+            $lines[] = "  ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"";
         }
         
         $lines[] = "  quit";
@@ -12266,6 +12271,7 @@ class HuaweiOLT {
             }
             $batchCommands[] = "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}";
             $batchCommands[] = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
+            $batchCommands[] = "ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"";
             
             if (count($batchCommands) >= $batchSize * 4) {
                 $batchCommands[] = "quit";
