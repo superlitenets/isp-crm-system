@@ -743,17 +743,6 @@ class GenieACS {
         $messages = [];
         $errors = [];
 
-        $configResult = $this->setConfig(
-            'cwmp.connectionRequestAuth',
-            'AUTH("smartolt", "") OR AUTH("", "") OR AUTH(username, password)'
-        );
-        $results['connectionRequestAuth'] = $configResult;
-        if ($configResult['success'] ?? false) {
-            $messages[] = 'GenieACS connectionRequestAuth configured to accept SmartOLT credentials.';
-        } else {
-            $errors[] = 'Config: ' . ($configResult['error'] ?? 'Unknown');
-        }
-
         $provisionName = 'clear-conn-req-auth';
         $script = <<<'JS'
 const now = Date.now();
@@ -798,6 +787,10 @@ JS;
         }
         if (!empty($errors)) {
             $fullMessage .= ($fullMessage ? ' | Errors: ' : 'Errors: ') . implode('; ', $errors);
+        }
+
+        if ($anySuccess && empty($errors)) {
+            $fullMessage .= ' Also set cwmp.connectionRequestAuth in GenieACS Admin > Config to: AUTH("smartolt", "") OR AUTH("", "") OR AUTH(username, password)';
         }
 
         return [
