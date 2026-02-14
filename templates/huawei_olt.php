@@ -5835,6 +5835,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     break;
                 }
 
+                $clearResult = $huaweiOLT->clearTR069ProfileCredentials($oltId, $profileId);
+                if ($clearResult['success']) {
+                    $steps[] = 'CR credentials cleared on profile ' . $profileId;
+                } else {
+                    $steps[] = 'CR clear skipped: ' . ($clearResult['error'] ?? 'unknown');
+                }
+
                 $stmt = $db->prepare("SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL");
                 $stmt->execute([$oltId]);
                 $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
