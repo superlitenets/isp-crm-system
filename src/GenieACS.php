@@ -743,27 +743,30 @@ class GenieACS {
         $messages = [];
         $errors = [];
 
-        $provisionName = 'clear-conn-req-auth';
-        $script = <<<'JS'
+        $connReqUser = 'genieacs';
+        $connReqPass = 'genieacs';
+
+        $provisionName = 'set-conn-req-auth';
+        $script = <<<JS
 const now = Date.now();
 const username = declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now});
 
-if (username.value[0] === "smartolt" || username.value[0] !== "") {
-  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now}, {value: ""});
-  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now}, {value: ""});
+if (username.value[0] !== "{$connReqUser}") {
+  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$connReqUser}"});
+  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$connReqPass}"});
 }
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
         $results['provision'] = $provResult;
         if ($provResult['success'] ?? false) {
-            $messages[] = 'Provision created.';
+            $messages[] = 'Provision created (sets ConnectionRequest credentials to genieacs/genieacs).';
         } else {
             $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
         }
 
         $preset = [
-            '_id' => 'clear-conn-req-auth',
+            '_id' => 'set-conn-req-auth',
             'channel' => 'default',
             'weight' => 0,
             'precondition' => '{}',
@@ -775,7 +778,7 @@ JS;
         $presetResult = $this->createPreset($preset);
         $results['preset'] = $presetResult;
         if ($presetResult['success'] ?? false) {
-            $messages[] = 'Preset created to run on device Inform.';
+            $messages[] = 'Preset created to run on every device Inform.';
         } else {
             $errors[] = 'Preset: ' . ($presetResult['error'] ?? 'Unknown');
         }
@@ -790,7 +793,7 @@ JS;
         }
 
         if ($anySuccess && empty($errors)) {
-            $fullMessage .= ' Also set cwmp.connectionRequestAuth in GenieACS Admin > Config to: AUTH("smartolt", "") OR AUTH("", "") OR AUTH(username, password)';
+            $fullMessage .= ' Now set cwmp.connectionRequestAuth in GenieACS Admin > Config to: AUTH("genieacs", "genieacs")';
         }
 
         return [
