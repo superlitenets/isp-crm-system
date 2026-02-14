@@ -9427,13 +9427,6 @@ try {
             }
             ?>
             
-            <?php if (!empty($message)): ?>
-            <div class="alert alert-<?= $messageType ?? 'success' ?> alert-dismissible fade show mb-3" role="alert">
-                <i class="bi bi-<?= $messageType === 'success' ? 'check-circle' : ($messageType === 'danger' ? 'x-circle' : 'info-circle') ?> me-2"></i>
-                <?= htmlspecialchars($message) ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            <?php endif; ?>
             
             <!-- Simple Back Button -->
             <div class="mb-3">
