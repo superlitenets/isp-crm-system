@@ -858,7 +858,7 @@ class GenieACS {
         $messages = [];
         $errors = [];
 
-        $provisionName = 'set-periodic-inform';
+        $provisionName = 'bootstrap-setup';
         $script = <<<JS
 const now = Date.now();
 
@@ -868,24 +868,32 @@ if (val && val.value && val.value[0]) {
   root = "Device";
 }
 
+// Set periodic inform
 declare(root + ".ManagementServer.PeriodicInformEnable", {value: now}, {value: true});
 declare(root + ".ManagementServer.PeriodicInformInterval", {value: now}, {value: {$intervalSeconds}});
+
+// Clear Connection Request credentials so GenieACS can summon instantly
+declare(root + ".ManagementServer.ConnectionRequestUsername", {value: now}, {value: ""});
+declare(root + ".ManagementServer.ConnectionRequestPassword", {value: now}, {value: ""});
+
+// Reboot to apply with clean credentials
+declare(root + ".Reboot", {value: now}, {value: now});
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
         $results['provision'] = $provResult;
         if ($provResult['success'] ?? false) {
-            $messages[] = "Provision created (sets PeriodicInformInterval to {$intervalSeconds}s).";
+            $messages[] = "Provision created: periodic inform {$intervalSeconds}s + clear CR credentials + reboot.";
         } else {
             $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
         }
 
         $preset = [
-            '_id' => 'set-periodic-inform',
+            '_id' => 'bootstrap-setup',
             'channel' => 'default',
             'weight' => 0,
             'precondition' => '{}',
-            'events' => ['0 BOOTSTRAP', '1 BOOT'],
+            'events' => ['0 BOOTSTRAP'],
             'configurations' => [
                 ['type' => 'provision', 'name' => $provisionName, 'args' => []]
             ]
@@ -893,10 +901,12 @@ JS;
         $presetResult = $this->createPreset($preset);
         $results['preset'] = $presetResult;
         if ($presetResult['success'] ?? false) {
-            $messages[] = 'Preset created to run on BOOTSTRAP and BOOT events.';
+            $messages[] = 'Preset runs on BOOTSTRAP (first contact).';
         } else {
             $errors[] = 'Preset: ' . ($presetResult['error'] ?? 'Unknown');
         }
+
+        $this->deletePreset('set-periodic-inform');
 
         $anySuccess = !empty($messages);
         $fullMessage = '';

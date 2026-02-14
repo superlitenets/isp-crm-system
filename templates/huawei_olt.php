@@ -5888,11 +5888,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         if ($bindOk) {
                             $bound++;
 
-                            $cmdClear = "interface gpon {$frame}/{$slot}\r\n";
-                            $cmdClear .= "ont tr069-server-config {$port} {$onuPortId} connection-request-username \"\" connection-request-password \"\"\r\n";
-                            $cmdClear .= "quit";
-                            $huaweiOLT->executeCommand($oltId, $cmdClear);
-
                             $cmdReboot = "interface gpon {$frame}/{$slot}\r\n";
                             $cmdReboot .= "ont reset {$port} {$onuPortId}\r\n";
                             $cmdReboot .= "quit";
