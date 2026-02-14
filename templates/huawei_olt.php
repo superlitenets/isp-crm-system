@@ -5835,13 +5835,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     break;
                 }
 
-                $clearResult = $huaweiOLT->clearTR069ProfileCredentials($oltId, $profileId);
-                if ($clearResult['success']) {
-                    $steps[] = 'CR credentials cleared on profile ' . $profileId;
-                } else {
-                    $steps[] = 'CR clear skipped: ' . ($clearResult['error'] ?? 'unknown');
-                }
-
                 $stmt = $db->prepare("SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL");
                 $stmt->execute([$oltId]);
                 $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -5865,6 +5858,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $slot = $onu['slot'];
                         $port = $onu['port'];
                         $onuPortId = $onu['onu_id'];
+
+                        $cmdClear = "interface gpon {$frame}/{$slot}\r\n";
+                        $cmdClear .= "ont tr069-server-config {$port} {$onuPortId} connection-request-username \"\" connection-request-password \"\"\r\n";
+                        $cmdClear .= "quit";
+                        $huaweiOLT->executeCommand($oltId, $cmdClear);
 
                         $cmdDetach = "interface gpon {$frame}/{$slot}\r\n";
                         $cmdDetach .= "ont tr069-server-config {$port} {$onuPortId} profile-id 0\r\n";

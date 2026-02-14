@@ -6941,12 +6941,14 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'No TR-069 profile ID configured in settings'];
         }
         
-        // Step 0: Clear CR credentials on the TR-069 profile so ONUs get blank auth
-        $clearCmd = "ont tr069-server-profile modify profile-id {$tr069ProfileId} connection-request-username \"\" connection-request-password \"\"";
+        // Step 0: Clear CR credentials on this specific ONU
+        $clearCmd = "interface gpon {$frame}/{$slot}\r\n";
+        $clearCmd .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"\r\n";
+        $clearCmd .= "quit";
         $clearResult = $this->executeCommand($oltId, $clearCmd);
-        $output .= "[Step 0: Clear CR Credentials on Profile]\n" . ($clearResult['output'] ?? '') . "\n";
+        $output .= "[Step 0: Clear CR Credentials on ONU]\n" . ($clearResult['output'] ?? '') . "\n";
         
-        // Step 1: Detach TR-069 profile (clears stored credentials in ONU flash)
+        // Step 1: Detach TR-069 profile
         $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
         $cmd1 .= "ont tr069-server-config {$port} {$onuId} profile-id 0\r\n";
         $cmd1 .= "quit";
