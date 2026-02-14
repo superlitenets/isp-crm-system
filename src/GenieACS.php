@@ -13,6 +13,9 @@ class GenieACS {
         $this->loadSettings();
     }
     
+    private string $crUsername;
+    private string $crPassword;
+
     private function loadSettings(): void {
         $stmt = $this->db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'genieacs_%'");
         $settings = [];
@@ -24,6 +27,12 @@ class GenieACS {
         $this->username = $settings['genieacs_username'] ?? '';
         $this->password = $settings['genieacs_password'] ?? '';
         $this->timeout = (int)($settings['genieacs_timeout'] ?? 60);
+        $this->crUsername = $settings['genieacs_cr_username'] ?? 'genieacs';
+        $this->crPassword = $settings['genieacs_cr_password'] ?? 'genieacs';
+    }
+
+    public function getCRCredentials(): array {
+        return ['username' => $this->crUsername, 'password' => $this->crPassword];
     }
     
     public function isConfigured(): bool {
@@ -743,8 +752,8 @@ class GenieACS {
         $messages = [];
         $errors = [];
 
-        $connReqUser = 'genieacs';
-        $connReqPass = 'genieacs';
+        $connReqUser = $this->crUsername;
+        $connReqPass = $this->crPassword;
 
         $provisionName = 'set-conn-req-auth';
         $script = <<<JS
@@ -789,7 +798,7 @@ JS;
         }
 
         if ($anySuccess && empty($errors)) {
-            $fullMessage .= ' Now set cwmp.connectionRequestAuth in GenieACS Admin > Config to: AUTH("genieacs", "genieacs")';
+            $fullMessage .= " Now set cwmp.connectionRequestAuth in GenieACS Admin > Config to: AUTH(\"{$connReqUser}\", \"{$connReqPass}\")";
         }
 
         return [
@@ -800,7 +809,9 @@ JS;
         ];
     }
     
-    public function pushConnectionRequestCredentials(string $deviceId, string $username = 'genieacs', string $password = 'genieacs'): array {
+    public function pushConnectionRequestCredentials(string $deviceId, ?string $username = null, ?string $password = null): array {
+        $username = $username ?? $this->crUsername;
+        $password = $password ?? $this->crPassword;
         $encodedId = rawurlencode($deviceId);
         $task = [
             'name' => 'setParameterValues',
@@ -818,7 +829,9 @@ JS;
         return $result;
     }
 
-    public function pushConnectionRequestCredentialsToAll(string $username = 'genieacs', string $password = 'genieacs'): array {
+    public function pushConnectionRequestCredentialsToAll(?string $username = null, ?string $password = null): array {
+        $username = $username ?? $this->crUsername;
+        $password = $password ?? $this->crPassword;
         $success = 0;
         $failed = 0;
         $errors = [];

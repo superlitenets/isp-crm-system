@@ -2912,7 +2912,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
                     'genieacs_username' => $_POST['genieacs_username'] ?? '',
                     'genieacs_timeout' => $_POST['genieacs_timeout'] ?? '30',
-                    'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0'
+                    'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0',
+                    'genieacs_cr_username' => $_POST['genieacs_cr_username'] ?? 'genieacs',
+                    'genieacs_cr_password' => $_POST['genieacs_cr_password'] ?? 'genieacs'
                 ];
                 if (!empty($_POST['genieacs_password'])) {
                     $settings['genieacs_password'] = $_POST['genieacs_password'];
@@ -12652,7 +12654,7 @@ try {
                     </form>
                     <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="push_cr_credentials_all">
-                        <button type="submit" class="btn btn-outline-info" onclick="return confirm('This will queue a task on ALL GenieACS devices to set ConnectionRequest credentials to genieacs/genieacs.\n\nTasks execute on each device\'s next Inform. Continue?');">
+                        <button type="submit" class="btn btn-outline-info" onclick="return confirm('This will queue a task on ALL GenieACS devices to set ConnectionRequest credentials (from Settings).\n\nTasks execute on each device\'s next Inform. Continue?');">
                             <i class="bi bi-key me-1"></i> Push CR Credentials to All
                         </button>
                     </form>
@@ -12759,7 +12761,7 @@ try {
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="action" value="push_cr_credentials">
                                                 <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
-                                                <button type="submit" class="btn btn-outline-success" title="Push CR Credentials (genieacs/genieacs)" onclick="return confirm('Push ConnectionRequest credentials to this device? Task will execute on next Inform.')">
+                                                <button type="submit" class="btn btn-outline-success" title="Push CR Credentials (from Settings)" onclick="return confirm('Push ConnectionRequest credentials to this device? Task will execute on next Inform.')">
                                                     <i class="bi bi-shield-lock"></i>
                                                 </button>
                                             </form>
@@ -13996,6 +13998,20 @@ try {
                                 <div class="mb-3">
                                     <label class="form-label">Timeout (seconds)</label>
                                     <input type="number" name="genieacs_timeout" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_timeout'] ?? '30') ?>" min="5" max="120">
+                                </div>
+
+                                <hr>
+                                <h6 class="mb-3"><i class="bi bi-shield-lock me-2"></i>ConnectionRequest Credentials</h6>
+                                <p class="small text-muted">These credentials are pushed to each ONU so GenieACS can initiate connections back to devices. They must match what's configured in GenieACS Admin > Config > <code>cwmp.connectionRequestAuth</code>.</p>
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">CR Username</label>
+                                        <input type="text" name="genieacs_cr_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_username'] ?? 'genieacs') ?>" placeholder="genieacs">
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">CR Password</label>
+                                        <input type="text" name="genieacs_cr_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_password'] ?? 'genieacs') ?>" placeholder="genieacs">
+                                    </div>
                                 </div>
                                 
                                 <div class="d-flex gap-2">
