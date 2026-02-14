@@ -1,0 +1,318 @@
+When I reset factory everything works fine
+
+Perfect — that detail tells us exactly what’s happening.
+
+If:
+
+✅ After factory reset everything works
+❌ Without factory reset you get 401
+
+Then the problem is not GenieACS.
+The problem is leftover TR069 state inside the ONT.
+
+🔴 What Factory Reset Actually Clears
+
+Factory reset wipes:
+
+ACS URL
+
+ACS auth
+
+ConnectionRequestUsername
+
+ConnectionRequestPassword
+
+ProvisioningCode
+
+Cached ACS realm
+
+Old session tokens
+
+That’s why it works immediately after reset.
+
+🧠 Why Changing TR069 Profile Is Not Enough
+
+When you modify TR069 profile from OLT:
+
+ont tr069-server-config 0 1 profile-id X
+
+
+It updates:
+
+ACS URL
+
+But Huawei ONTs may still internally retain:
+
+Old connection request credentials
+
+Old HTTP auth realm
+
+Old digest nonce cache
+
+Old ACS provisioning state
+
+So even if credentials appear “deleted”, the ONT still expects old auth.
+
+That causes:
+
+401 Unauthorized
+
+🎯 The Real Root Cause
+
+Huawei ONTs cache TR069 authentication internally.
+
+Changing TR069 profile ≠ clearing authentication object.
+
+Factory reset clears that object.
+
+Profile change does not fully reinitialize it.
+
+✅ Clean Fix Without Factory Reset (Live Safe)
+
+Since reboot is allowed, do this:
+
+🔵 Step 1 — Change TR069 Profile
+
+Point to GenieACS.
+
+🔵 Step 2 — Reboot ONT
+
+From OLT:
+
+interface gpon 0/1
+ont reset 0 1
+
+
+Wait for Inform.
+
+🔵 Step 3 — Immediately Push New Credentials
+
+During first Inform to GenieACS, push:
+
+ConnectionRequestUsername = genie
+ConnectionRequestPassword = genie123
+PeriodicInformInterval = 300
+
+
+Do NOT try summon yet.
+
+🔵 Step 4 — Refresh Parameters in GenieACS
+
+Make sure GenieACS now shows correct credentials.
+
+🔵 Step 5 — Test Summon
+
+Now it should work.
+
+🔥 Why This Works
+
+Because you overwrite internal authentication cleanly during fresh session after reboot.
+
+You are not relying on connection request.
+
+🧠 Important Migration Rule
+
+Never use summon immediately after changing ACS.
+
+Always:
+
+Change URL
+
+Reboot
+
+Wait for Inform
+
+Push credentials
+
+Then test summon
+
+🚀 Even Better Strategy (Avoid Summon Dependency)
+
+Set:
+
+PeriodicInformInterval = 300
+
+
+Now ONT checks in every 5 minutes.
+
+Most operations won’t require summon.
+
+Big ISPs rarely rely on summon.
+
+🎯 One More Important Question
+
+Are your ONTs:
+
+Public IP on WAN?
+
+Or behind NAT?
+
+Because if behind NAT, summon will NEVER be reliable, even after reset.
+
+Tell me your WAN setup and I’ll guide you correctly.
+
+Behind NAT, but connected via VPN, 
+
+Perfect 👍 that explains everything now.
+
+You said:
+
+ONTs are behind NAT
+But reachable through VPN
+Factory reset works
+But summon gives 401 otherwise
+
+Let’s break this correctly.
+
+🔵 NAT + VPN Situation
+
+Even if ONT is behind NAT:
+
+If your GenieACS server can reach the ONT IP through VPN,
+then summon should work — authentication permitting.
+
+So NAT is NOT your problem.
+
+Your problem is still:
+
+ConnectionRequest authentication mismatch.
+
+🔴 Why Factory Reset Fixes It
+
+After factory reset:
+
+1️⃣ ONT has no cached TR069 state
+2️⃣ GenieACS provisions cleanly
+3️⃣ GenieACS stores correct:
+
+ConnectionRequestUsername
+
+ConnectionRequestPassword
+4️⃣ Summon works
+
+Without reset:
+
+ONT may still internally expect old credentials
+
+Even if parameters look empty
+
+Even if you changed TR069 profile
+
+Huawei ONTs are known for this behavior.
+
+🧠 Important: GenieACS Must Learn Credentials First
+
+Since summon = ACS → ONT
+
+GenieACS must already know:
+
+ConnectionRequestUsername
+ConnectionRequestPassword
+ConnectionRequestURL
+
+
+If GenieACS doesn't know them, it sends wrong auth → 401.
+
+✅ Correct Live-Safe Procedure (No Factory Reset)
+
+Since reboot is allowed:
+
+STEP 1 — Change TR069 Profile (to GenieACS)
+
+Good.
+
+STEP 2 — Reboot ONT (not reset)
+interface gpon 0/1
+ont reset 0 1
+
+STEP 3 — WAIT for Inform
+
+Do NOT summon yet.
+
+In GenieACS:
+
+Confirm:
+
+Last Inform = recent
+
+STEP 4 — Force Parameter Refresh
+
+Refresh:
+
+InternetGatewayDevice.ManagementServer.*
+
+
+Make sure GenieACS now reads:
+
+Correct ConnectionRequestURL
+
+Username
+
+Password
+
+STEP 5 — Now Summon
+
+Now it should work.
+
+🔥 If It Still Fails
+
+Then likely issue is:
+
+GenieACS is not using stored credentials
+
+Check your GenieACS config:
+
+cwmp.connectionRequestAuth
+
+
+If set incorrectly, it overrides device credentials.
+
+It should usually be empty so GenieACS uses device-stored credentials.
+
+🔍 VERY IMPORTANT TEST
+
+From your GenieACS server machine:
+
+Run:
+
+curl -u username:password http://ONT-IP:PORT
+
+
+Use the exact credentials shown in GenieACS.
+
+If:
+
+401 → wrong credentials
+
+200/405 → credentials correct
+
+🎯 Professional Recommendation
+
+Since ONTs are reachable over VPN:
+
+You do NOT need summon heavily.
+
+Set:
+
+PeriodicInformInterval = 300
+
+
+That gives you near real-time control without summon.
+
+Summon becomes optional.
+
+🧠 Final Diagnosis Summary
+
+Your issue is NOT:
+
+NAT
+
+VPN
+
+OLT
+
+TR069 profile
+
+Your issue is:
+
+GenieACS and ONT credentials mismatch OR GenieACS not storing them correctly.
