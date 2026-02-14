@@ -5828,6 +5828,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Content-Type: application/json');
                 echo json_encode($result);
                 exit;
+            case 'setup_auto_credential_clear':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->setupAutoCredentialClear();
+                if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode($result);
+                    exit;
+                }
+                $message = $result['success'] 
+                    ? $result['message'] 
+                    : ('Failed: ' . ($result['error'] ?? 'Unknown error'));
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'clear_tr069_profile_credentials':
                 $oltId = (int)$_POST['olt_id'];
                 $profileId = (int)$_POST['profile_id'];
@@ -12457,6 +12471,12 @@ try {
                 <h4 class="mb-0"><i class="bi bi-gear-wide-connected me-2"></i>TR-069 / GenieACS</h4>
                 <div>
                     <?php if ($genieacsEnabled): ?>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="setup_auto_credential_clear">
+                        <button type="submit" class="btn btn-outline-warning" onclick="return confirm('This will create a GenieACS provision that auto-clears ConnectionRequest credentials on every device Inform. This fixes 401 errors for SmartOLT migrated devices. Continue?');">
+                            <i class="bi bi-shield-lock me-1"></i> Fix 401 Errors
+                        </button>
+                    </form>
                     <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="sync_tr069_devices">
                         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i> Sync Devices</button>

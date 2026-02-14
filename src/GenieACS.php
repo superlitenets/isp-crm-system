@@ -668,7 +668,65 @@ class GenieACS {
     }
     
     public function createProvision(string $name, string $script): array {
-        return $this->request('PUT', "/provisions/{$name}", null);
+        $url = $this->baseUrl . "/provisions/" . rawurlencode($name);
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_CUSTOMREQUEST => 'PUT',
+            CURLOPT_POSTFIELDS => $script,
+            CURLOPT_HTTPHEADER => ['Content-Type: text/plain']
+        ]);
+        if (!empty($this->username)) {
+            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+        }
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        if ($error) return ['success' => false, 'error' => $error];
+        return ['success' => $httpCode >= 200 && $httpCode < 300, 'http_code' => $httpCode];
+    }
+
+    public function setupAutoCredentialClear(): array {
+        $provisionName = 'clear-conn-req-auth';
+        $script = <<<'JS'
+const now = Date.now();
+const username = declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now});
+const password = declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now});
+
+if (username.value[0] !== "") {
+  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", {value: now}, {value: ""});
+  declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", {value: now}, {value: ""});
+}
+JS;
+
+        $provResult = $this->createProvision($provisionName, $script);
+        if (!$provResult['success']) {
+            return ['success' => false, 'error' => 'Failed to create provision: ' . ($provResult['error'] ?? 'Unknown')];
+        }
+
+        $preset = [
+            '_id' => 'clear-conn-req-auth',
+            'channel' => 'default',
+            'weight' => 0,
+            'precondition' => '{}',
+            'events' => ['0 BOOTSTRAP', '1 BOOT', '2 PERIODIC'],
+            'configurations' => [
+                ['type' => 'provision', 'name' => $provisionName, 'args' => []]
+            ]
+        ];
+        $presetResult = $this->createPreset($preset);
+
+        return [
+            'success' => $presetResult['success'] ?? false,
+            'message' => ($presetResult['success'] ?? false)
+                ? 'Auto credential clear provision + preset created. All devices will have connection request auth cleared on next Inform.'
+                : 'Provision created but preset failed: ' . ($presetResult['error'] ?? 'Unknown'),
+            'provision' => $provResult,
+            'preset' => $presetResult
+        ];
     }
     
     public function getFiles(): array {
