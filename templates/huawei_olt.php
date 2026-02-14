@@ -2902,7 +2902,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'genieacs_username' => $_POST['genieacs_username'] ?? '',
                     'genieacs_timeout' => $_POST['genieacs_timeout'] ?? '30',
                     'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0',
-                    'genieacs_inform_interval' => $_POST['genieacs_inform_interval'] ?? '300',
+                    'genieacs_inform_interval' => $_POST['genieacs_inform_interval'] ?? '180',
                     'genieacs_cr_username' => $_POST['genieacs_cr_username'] ?? '',
                     'genieacs_cr_password' => $_POST['genieacs_cr_password'] ?? ''
                 ];
@@ -3249,7 +3249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'setup_periodic_inform':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
-                $interval = isset($_POST['inform_interval']) ? (int)$_POST['inform_interval'] : 300;
+                $interval = isset($_POST['inform_interval']) ? (int)$_POST['inform_interval'] : 180;
                 if ($interval < 60) $interval = 60;
                 if ($interval > 86400) $interval = 86400;
                 $result = $genieacs->setupPeriodicInform($interval);
@@ -12570,8 +12570,8 @@ try {
                 
                 $stmt2 = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_inform_interval'");
                 $row2 = $stmt2->fetch(\PDO::FETCH_ASSOC);
-                $informInterval = (int)($row2['setting_value'] ?? 300);
-                if ($informInterval < 60) $informInterval = 300;
+                $informInterval = (int)($row2['setting_value'] ?? 180);
+                if ($informInterval < 60) $informInterval = 180;
                 
                 if ($genieacsEnabled) {
                     $stmt = $db->query("SELECT t.*, o.name as onu_name, o.sn as onu_sn FROM tr069_devices t LEFT JOIN huawei_onus o ON t.onu_id = o.id ORDER BY t.last_inform DESC LIMIT 100");
@@ -13927,8 +13927,8 @@ try {
 
                                 <div class="mb-3">
                                     <label class="form-label">Periodic Inform Interval (seconds)</label>
-                                    <input type="number" name="genieacs_inform_interval" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_inform_interval'] ?? '300') ?>" min="60" max="86400">
-                                    <div class="form-text">How often devices check in with GenieACS. Default 300s (5 min). Lower = more responsive but more traffic.</div>
+                                    <input type="number" name="genieacs_inform_interval" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_inform_interval'] ?? '180') ?>" min="60" max="86400">
+                                    <div class="form-text">How often devices check in with GenieACS. Default 180s (3 min). Lower = more responsive but more traffic.</div>
                                 </div>
 
                                 <hr>
