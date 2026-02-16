@@ -5964,6 +5964,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $cmdDetach .= "quit";
                         $huaweiOLT->executeCommand($oltId, $cmdDetach);
 
+                        usleep(1500000);
+
                         $cmd = "interface gpon {$frame}/{$slot}\r\n";
                         $cmd .= "ont tr069-server-config {$port} {$onuPortId} profile-id {$profileId}\r\n";
                         $cmd .= "quit";

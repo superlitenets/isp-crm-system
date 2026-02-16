@@ -6831,6 +6831,9 @@ class HuaweiOLT {
             $errors[] = "TR-069 OMCI config had issues";
         }
         
+        // Pause to let OLT process OMCI config before service-port creation
+        usleep(1500000);
+        
         // Step 3: Create service-port for TR-069 VLAN
         // Determine gemport based on line profile (profile 2 has gemport 2 for TR-069)
         $lineProfileId = $onu['line_profile'] ?? 1;
@@ -6850,6 +6853,9 @@ class HuaweiOLT {
             $errors[] = "TR-069 service-port failed";
         }
         // Note: "Failure: Service virtual port has existed already" is SUCCESS (already configured)
+        
+        // Pause before bridge mode config
+        usleep(1500000);
         
         // Step 4: For BRIDGE mode, set native VLAN on ALL ETH ports (1-4)
         // Bridge mode passes traffic transparently through all ports
@@ -6990,6 +6996,9 @@ class HuaweiOLT {
         $cmd1 .= "quit";
         $result1 = $this->executeCommand($oltId, $cmd1);
         $output .= "[Step 1: Detach TR-069 Profile]\n" . ($result1['output'] ?? '') . "\n";
+        
+        // Pause to let OLT process detach before rebinding
+        usleep(1500000);
         
         // Step 2: Reattach TR-069 profile
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
