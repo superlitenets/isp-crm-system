@@ -3276,6 +3276,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'sync_genieacs_tags':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                if (!$genieacs->isConfigured()) {
+                    $message = 'GenieACS is not configured';
+                    $messageType = 'danger';
+                    break;
+                }
+                $onuId = $_POST['onu_id'] ?? '';
+                if (!empty($onuId)) {
+                    $onuStmt = $db->prepare("SELECT sn, customer_name, customer_id, tr069_device_id, genieacs_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt->execute([$onuId]);
+                    $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($onuData) {
+                        $deviceId = !empty($onuData['genieacs_id']) ? $onuData['genieacs_id'] : $onuData['tr069_device_id'];
+                        $custName = $onuData['customer_name'] ?? '';
+                        if (empty($custName) && !empty($onuData['customer_id'])) {
+                            $custStmt = $db->prepare("SELECT name FROM customers WHERE id = ?");
+                            $custStmt->execute([$onuData['customer_id']]);
+                            $cust = $custStmt->fetch(PDO::FETCH_ASSOC);
+                            $custName = $cust['name'] ?? '';
+                        }
+                        if (!empty($deviceId) && !empty($custName)) {
+                            $result = $genieacs->syncSingleOnuTag($deviceId, $custName);
+                            $message = $result['success'] ? "Tagged device with: {$result['tag']}" : "Tag failed: {$result['error']}";
+                            $messageType = $result['success'] ? 'success' : 'danger';
+                        } else {
+                            $message = empty($deviceId) ? 'No GenieACS device ID for this ONU' : 'No customer name to tag';
+                            $messageType = 'warning';
+                        }
+                    }
+                } else {
+                    $result = $genieacs->syncCustomerTags($db);
+                    $message = "GenieACS Tags: {$result['success']} tagged, {$result['failed']} failed, {$result['skipped']} skipped";
+                    $messageType = $result['failed'] > 0 ? 'warning' : 'success';
+                    if (!empty($result['errors'])) {
+                        $message .= '. Errors: ' . implode('; ', array_slice($result['errors'], 0, 3));
+                    }
+                }
+                break;
+
             case 'tr069_reboot':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
@@ -5707,6 +5748,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $result = $huaweiOLT->updateONU($onuId, $updateData);
                 $message = $result ? "ONU info updated" : 'Update failed';
                 $messageType = $result ? 'success' : 'danger';
+                
+                if ($result && !empty($updateData['customer_name'])) {
+                    try {
+                        require_once __DIR__ . '/../src/GenieACS.php';
+                        $genieacs = new \App\GenieACS($db);
+                        if ($genieacs->isConfigured()) {
+                            $tagStmt = $db->prepare("SELECT tr069_device_id, genieacs_id FROM huawei_onus WHERE id = ?");
+                            $tagStmt->execute([$onuId]);
+                            $tagData = $tagStmt->fetch(PDO::FETCH_ASSOC);
+                            $tagDeviceId = !empty($tagData['genieacs_id']) ? $tagData['genieacs_id'] : ($tagData['tr069_device_id'] ?? '');
+                            if (!empty($tagDeviceId)) {
+                                $tagResult = $genieacs->syncSingleOnuTag($tagDeviceId, $updateData['customer_name']);
+                                if ($tagResult['success']) {
+                                    $message .= " | GenieACS tagged: {$tagResult['tag']}";
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {}
+                }
                 break;
             case 'delete_service_port':
                 $result = $huaweiOLT->deleteServicePort((int)$_POST['olt_id'], (int)$_POST['service_port_index']);
@@ -13019,6 +13079,12 @@ try {
                     <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="sync_tr069_devices">
                         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i> Sync Devices</button>
+                    </form>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="sync_genieacs_tags">
+                        <button type="submit" class="btn btn-outline-info" onclick="return confirm('This will push customer names as tags to GenieACS devices. Continue?');">
+                            <i class="bi bi-tags me-1"></i> Sync Customer Tags
+                        </button>
                     </form>
                     <?php endif; ?>
                 </div>
@@ -20567,6 +20633,7 @@ function saveDeviceStatus() {
         'sync_onu_locations': 'Fixing ONU location data from SNMP...',
         'import_smartolt': 'Importing ONUs from SmartOLT...',
         'sync_tr069_devices': 'Syncing TR-069 devices...',
+        'sync_genieacs_tags': 'Syncing customer tags to GenieACS...',
         'sync_boards': 'Syncing board information...',
         'sync_vlans': 'Syncing VLANs from OLT...',
         'sync_ports': 'Syncing PON ports...',

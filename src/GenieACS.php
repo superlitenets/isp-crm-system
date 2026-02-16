@@ -147,6 +147,133 @@ class GenieACS {
         ];
     }
     
+    public function addTag(string $deviceId, string $tag): array {
+        $tag = $this->sanitizeTag($tag);
+        $url = $this->baseUrl . '/devices/' . rawurlencode($deviceId) . '/tags/' . rawurlencode($tag);
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => '',
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json']
+        ]);
+        
+        if (!empty($this->username)) {
+            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+        }
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) return ['success' => false, 'error' => $error];
+        return ($httpCode >= 200 && $httpCode < 300)
+            ? ['success' => true, 'tag' => $tag]
+            : ['success' => false, 'error' => "HTTP {$httpCode}"];
+    }
+
+    public function removeTag(string $deviceId, string $tag): array {
+        $tag = $this->sanitizeTag($tag);
+        $url = $this->baseUrl . '/devices/' . rawurlencode($deviceId) . '/tags/' . rawurlencode($tag);
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_CUSTOMREQUEST => 'DELETE'
+        ]);
+        
+        if (!empty($this->username)) {
+            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+        }
+        
+        curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) return ['success' => false, 'error' => $error];
+        return ($httpCode >= 200 && $httpCode < 300)
+            ? ['success' => true]
+            : ['success' => false, 'error' => "HTTP {$httpCode}"];
+    }
+
+    public function getDeviceTags(string $deviceId): array {
+        $result = $this->getDevice($deviceId, false);
+        if (!$result['success'] || empty($result['data'])) return [];
+        $device = $result['data'];
+        return $device['_tags'] ?? [];
+    }
+
+    public function syncCustomerTags(\PDO $db): array {
+        $stmt = $db->query("
+            SELECT o.id, o.sn, o.customer_name, o.customer_id, o.tr069_device_id, o.genieacs_id
+            FROM huawei_onus o
+            WHERE o.is_authorized = true
+              AND ((o.genieacs_id IS NOT NULL AND o.genieacs_id != '')
+                OR (o.tr069_device_id IS NOT NULL AND o.tr069_device_id != ''))
+        ");
+        
+        $results = ['success' => 0, 'failed' => 0, 'skipped' => 0, 'errors' => []];
+        
+        while ($onu = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $deviceId = !empty($onu['genieacs_id']) ? $onu['genieacs_id'] : $onu['tr069_device_id'];
+            if (empty($deviceId)) {
+                $results['skipped']++;
+                continue;
+            }
+            
+            $customerName = trim($onu['customer_name'] ?? '');
+            if (empty($customerName)) {
+                if (!empty($onu['customer_id'])) {
+                    $custStmt = $db->prepare("SELECT name FROM customers WHERE id = ?");
+                    $custStmt->execute([$onu['customer_id']]);
+                    $cust = $custStmt->fetch(\PDO::FETCH_ASSOC);
+                    $customerName = $cust['name'] ?? '';
+                }
+            }
+            
+            if (empty($customerName)) {
+                $results['skipped']++;
+                continue;
+            }
+            
+            $tag = $this->sanitizeTag($customerName);
+            $result = $this->addTag($deviceId, $tag);
+            
+            if ($result['success']) {
+                $results['success']++;
+            } else {
+                $results['failed']++;
+                $results['errors'][] = "ONU {$onu['sn']}: {$result['error']}";
+            }
+        }
+        
+        return $results;
+    }
+
+    public function syncSingleOnuTag(string $deviceId, string $customerName): array {
+        if (empty($deviceId) || empty($customerName)) {
+            return ['success' => false, 'error' => 'Device ID and customer name are required'];
+        }
+        $tag = $this->sanitizeTag($customerName);
+        return $this->addTag($deviceId, $tag);
+    }
+
+    private function sanitizeTag(string $tag): string {
+        $tag = trim($tag);
+        $tag = preg_replace('/[\/\\\\#?%&=+]/', '_', $tag);
+        $tag = preg_replace('/\s+/', '_', $tag);
+        $tag = preg_replace('/_+/', '_', $tag);
+        $tag = trim($tag, '_');
+        return substr($tag, 0, 100);
+    }
+
     public function testConnection(): array {
         $result = $this->request('GET', '/devices', null, ['limit' => 1]);
         if ($result['success']) {
