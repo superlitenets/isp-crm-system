@@ -390,7 +390,7 @@ class ISPInventory {
         return $this->db->prepare("DELETE FROM isp_drop_cables WHERE id = ?")->execute([$id]);
     }
 
-    // ==================== CPE DEVICES ====================
+    // ==================== CPE DEVICES (Legacy) ====================
 
     public function getCPEDevices(array $filters = []): array {
         $sql = "SELECT cpe.*, o.name as olt_name, sp.name as splitter_name, c.name as customer_name
@@ -448,6 +448,87 @@ class ISPInventory {
 
     public function deleteCPEDevice(int $id): bool {
         return $this->db->prepare("DELETE FROM isp_cpe_devices WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== ONT INVENTORY (from OMS) ====================
+
+    public function getOntInventory(array $filters = []): array {
+        $sql = "SELECT o.id, o.sn, o.name, o.customer_name, o.phone, o.status, o.onu_type,
+                       o.mac_address, o.rx_power, o.tx_power, o.distance,
+                       o.frame, o.slot, o.port, o.onu_id,
+                       o.zone, o.area, o.zone_id, o.subzone_id,
+                       o.is_authorized, o.auth_date, o.installation_date,
+                       o.firmware_version, o.hardware_version, o.software_version,
+                       o.ip_address, o.ont_ip, o.pppoe_username,
+                       o.config_state, o.run_state, o.uptime, o.online_since,
+                       o.olt_id, o.address, o.latitude, o.longitude,
+                       o.discovered_eqid, o.onu_mode,
+                       olt.name as olt_name, olt.ip_address as olt_ip,
+                       z.name as zone_name, sz.name as subzone_name
+                FROM huawei_onus o
+                LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+                LEFT JOIN huawei_zones z ON o.zone_id = z.id
+                LEFT JOIN huawei_subzones sz ON o.subzone_id = sz.id
+                WHERE o.is_authorized = true";
+        $params = [];
+        if (!empty($filters['status'])) {
+            $sql .= " AND o.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['olt_id'])) {
+            $sql .= " AND o.olt_id = ?";
+            $params[] = $filters['olt_id'];
+        }
+        if (!empty($filters['zone_id'])) {
+            $sql .= " AND o.zone_id = ?";
+            $params[] = $filters['zone_id'];
+        }
+        if (!empty($filters['search'])) {
+            $search = '%' . $filters['search'] . '%';
+            $sql .= " AND (o.sn ILIKE ? OR o.name ILIKE ? OR o.customer_name ILIKE ? OR o.phone ILIKE ? OR o.mac_address ILIKE ? OR o.pppoe_username ILIKE ?)";
+            $params = array_merge($params, [$search, $search, $search, $search, $search, $search]);
+        }
+        $sql .= " ORDER BY o.name ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getOntDetail(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT o.*, olt.name as olt_name, olt.ip_address as olt_ip,
+                       z.name as zone_name, sz.name as subzone_name
+                FROM huawei_onus o
+                LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+                LEFT JOIN huawei_zones z ON o.zone_id = z.id
+                LEFT JOIN huawei_subzones sz ON o.subzone_id = sz.id
+                WHERE o.id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function getOntStats(): array {
+        $stats = [];
+        $stats['total_onts'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true")->fetchColumn();
+        $stats['online_onts'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true AND status = 'online'")->fetchColumn();
+        $stats['offline_onts'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true AND status = 'offline'")->fetchColumn();
+        $stats['low_signal'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true AND rx_power < -27 AND rx_power IS NOT NULL")->fetchColumn();
+        $stats['zones'] = $this->db->query("SELECT z.name, COUNT(o.id) as ont_count,
+                    SUM(CASE WHEN o.status = 'online' THEN 1 ELSE 0 END) as online_count
+                    FROM huawei_onus o
+                    LEFT JOIN huawei_zones z ON o.zone_id = z.id
+                    WHERE o.is_authorized = true
+                    GROUP BY z.name ORDER BY ont_count DESC LIMIT 10")->fetchAll(\PDO::FETCH_ASSOC);
+        $stats['olts'] = $this->db->query("SELECT olt.name, COUNT(o.id) as ont_count,
+                    SUM(CASE WHEN o.status = 'online' THEN 1 ELSE 0 END) as online_count
+                    FROM huawei_onus o
+                    LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+                    WHERE o.is_authorized = true
+                    GROUP BY olt.name ORDER BY ont_count DESC")->fetchAll(\PDO::FETCH_ASSOC);
+        return $stats;
+    }
+
+    public function getZones(): array {
+        return $this->db->query("SELECT id, name FROM huawei_zones ORDER BY name")->fetchAll(\PDO::FETCH_ASSOC);
     }
 
     // ==================== IP ADDRESSES ====================
@@ -724,11 +805,10 @@ class ISPInventory {
         $stats = [];
         $stats['total_sites'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_network_sites WHERE status = 'active'")->fetchColumn();
         $stats['total_core_equipment'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_core_equipment WHERE status = 'active'")->fetchColumn();
-        $stats['total_splitters'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_splitters WHERE status = 'active'")->fetchColumn();
-        $stats['total_cpe_deployed'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_cpe_devices WHERE status = 'deployed'")->fetchColumn();
-        $stats['total_cpe_in_stock'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_cpe_devices WHERE status = 'in_stock'")->fetchColumn();
-        $stats['total_fiber_cores'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_fiber_cores")->fetchColumn();
-        $stats['fiber_cores_used'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_fiber_cores WHERE status = 'in_use'")->fetchColumn();
+        $stats['total_onts'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true")->fetchColumn();
+        $stats['onts_online'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true AND status = 'online'")->fetchColumn();
+        $stats['onts_offline'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true AND status = 'offline'")->fetchColumn();
+        $stats['onts_low_signal'] = (int) $this->db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = true AND rx_power < -27 AND rx_power IS NOT NULL")->fetchColumn();
         $stats['total_ips'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_ip_addresses")->fetchColumn();
         $stats['ips_assigned'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_ip_addresses WHERE status = 'assigned'")->fetchColumn();
         $stats['low_stock_count'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_warehouse_stock WHERE quantity <= min_threshold AND min_threshold > 0")->fetchColumn();

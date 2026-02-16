@@ -316,10 +316,9 @@ $olts = $ispInv->getOLTs();
     <div class="nav-section-label">Inventory Modules</div>
     <ul class="sidebar-nav">
         <li><a href="?page=isp_inventory&tab=overview" class="<?= $tab === 'overview' ? 'active' : '' ?>"><i class="bi bi-speedometer2"></i> Overview</a></li>
+        <li><a href="?page=isp_inventory&tab=ont" class="<?= $tab === 'ont' ? 'active' : '' ?>"><i class="bi bi-router"></i> ONT Inventory</a></li>
         <li><a href="?page=isp_inventory&tab=sites" class="<?= $tab === 'sites' ? 'active' : '' ?>"><i class="bi bi-geo-alt"></i> Sites</a></li>
         <li><a href="?page=isp_inventory&tab=core" class="<?= $tab === 'core' ? 'active' : '' ?>"><i class="bi bi-hdd-rack"></i> Core Network</a></li>
-        <li><a href="?page=isp_inventory&tab=ftth" class="<?= $tab === 'ftth' ? 'active' : '' ?>"><i class="bi bi-diagram-3"></i> Access / FTTH</a></li>
-        <li><a href="?page=isp_inventory&tab=cpe" class="<?= $tab === 'cpe' ? 'active' : '' ?>"><i class="bi bi-router"></i> CPE / ONU</a></li>
         <li><a href="?page=isp_inventory&tab=ipam" class="<?= $tab === 'ipam' ? 'active' : '' ?>"><i class="bi bi-globe"></i> IPAM</a></li>
         <li><a href="?page=isp_inventory&tab=warehouse" class="<?= $tab === 'warehouse' ? 'active' : '' ?>"><i class="bi bi-box-seam"></i> Warehouse</a></li>
         <li><a href="?page=isp_inventory&tab=assets" class="<?= $tab === 'assets' ? 'active' : '' ?>"><i class="bi bi-tools"></i> Field Assets</a></li>
@@ -350,46 +349,47 @@ $olts = $ispInv->getOLTs();
     // ==================== OVERVIEW TAB ====================
     if ($tab === 'overview'):
         $stats = $ispInv->getDashboardStats();
+        $ontStats = $ispInv->getOntStats();
         $lowStock = $ispInv->getLowStockAlerts();
     ?>
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3 col-lg-2">
             <div class="card text-center border-primary h-100">
                 <div class="card-body py-3">
-                    <h3 class="text-primary mb-1"><?= $stats['total_sites'] ?></h3>
-                    <small class="text-muted">Sites</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3 col-lg-2">
-            <div class="card text-center border-info h-100">
-                <div class="card-body py-3">
-                    <h3 class="text-info mb-1"><?= $stats['total_core_equipment'] ?></h3>
-                    <small class="text-muted">Core Equipment</small>
+                    <h3 class="text-primary mb-1"><?= $stats['total_onts'] ?></h3>
+                    <small class="text-muted">Total ONTs</small>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3 col-lg-2">
             <div class="card text-center border-success h-100">
                 <div class="card-body py-3">
-                    <h3 class="text-success mb-1"><?= $stats['total_splitters'] ?></h3>
-                    <small class="text-muted">Splitters</small>
+                    <h3 class="text-success mb-1"><?= $stats['onts_online'] ?></h3>
+                    <small class="text-muted">ONTs Online</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="card text-center border-danger h-100">
+                <div class="card-body py-3">
+                    <h3 class="text-danger mb-1"><?= $stats['onts_offline'] ?></h3>
+                    <small class="text-muted">ONTs Offline</small>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3 col-lg-2">
             <div class="card text-center border-warning h-100">
                 <div class="card-body py-3">
-                    <h3 class="text-warning mb-1"><?= $stats['total_cpe_deployed'] ?> / <?= $stats['total_cpe_in_stock'] ?></h3>
-                    <small class="text-muted">CPE Deployed / Stock</small>
+                    <h3 class="text-warning mb-1"><?= $stats['onts_low_signal'] ?></h3>
+                    <small class="text-muted">Low Signal</small>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3 col-lg-2">
-            <div class="card text-center border-secondary h-100">
+            <div class="card text-center border-info h-100">
                 <div class="card-body py-3">
-                    <h3 class="text-secondary mb-1"><?= $stats['fiber_cores_used'] ?> / <?= $stats['total_fiber_cores'] ?></h3>
-                    <small class="text-muted">Fiber Cores Used</small>
+                    <h3 class="text-info mb-1"><?= $stats['total_sites'] ?></h3>
+                    <small class="text-muted">Sites</small>
                 </div>
             </div>
         </div>
@@ -403,8 +403,79 @@ $olts = $ispInv->getOLTs();
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3 mb-4">
         <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-router"></i> ONTs by Zone</div>
+                <div class="card-body" style="max-height:300px;overflow-y:auto;">
+                    <?php if (empty($ontStats['zones'])): ?>
+                        <p class="text-muted mb-0">No zone data available.</p>
+                    <?php else: ?>
+                    <table class="table table-sm table-striped mb-0">
+                        <thead><tr><th>Zone</th><th>Total</th><th>Online</th><th>Rate</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($ontStats['zones'] as $z): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($z['name'] ?? 'Unassigned') ?></td>
+                                <td><strong><?= $z['ont_count'] ?></strong></td>
+                                <td><span class="text-success"><?= $z['online_count'] ?></span></td>
+                                <td>
+                                    <?php $rate = $z['ont_count'] > 0 ? round($z['online_count']/$z['ont_count']*100) : 0; ?>
+                                    <div class="progress" style="height:16px;min-width:80px;">
+                                        <div class="progress-bar bg-<?= $rate >= 80 ? 'success' : ($rate >= 50 ? 'warning' : 'danger') ?>" style="width:<?= $rate ?>%"><?= $rate ?>%</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-hdd-rack"></i> ONTs by OLT</div>
+                <div class="card-body" style="max-height:300px;overflow-y:auto;">
+                    <?php if (empty($ontStats['olts'])): ?>
+                        <p class="text-muted mb-0">No OLT data available.</p>
+                    <?php else: ?>
+                    <table class="table table-sm table-striped mb-0">
+                        <thead><tr><th>OLT</th><th>Total</th><th>Online</th><th>Rate</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($ontStats['olts'] as $ol): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($ol['name'] ?? 'Unknown') ?></td>
+                                <td><strong><?= $ol['ont_count'] ?></strong></td>
+                                <td><span class="text-success"><?= $ol['online_count'] ?></span></td>
+                                <td>
+                                    <?php $rate = $ol['ont_count'] > 0 ? round($ol['online_count']/$ol['ont_count']*100) : 0; ?>
+                                    <div class="progress" style="height:16px;min-width:80px;">
+                                        <div class="progress-bar bg-<?= $rate >= 80 ? 'success' : ($rate >= 50 ? 'warning' : 'danger') ?>" style="width:<?= $rate ?>%"><?= $rate ?>%</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-hdd-rack"></i> Infrastructure</div>
+                <div class="card-body">
+                    <p class="mb-1">Core Equipment: <strong><?= $stats['total_core_equipment'] ?></strong></p>
+                    <p class="mb-1">Field Assets: <strong><?= $stats['field_assets_total'] ?></strong></p>
+                    <p class="mb-0">Pending Maintenance: <strong class="<?= $stats['pending_maintenance'] > 0 ? 'text-warning' : '' ?>"><?= $stats['pending_maintenance'] ?></strong></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
             <div class="card">
                 <div class="card-header"><i class="bi bi-globe"></i> IP Allocation</div>
                 <div class="card-body">
@@ -418,7 +489,7 @@ $olts = $ispInv->getOLTs();
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card">
                 <div class="card-header"><i class="bi bi-exclamation-triangle"></i> Low Stock Alerts</div>
                 <div class="card-body" style="max-height:250px;overflow-y:auto;">
@@ -426,14 +497,13 @@ $olts = $ispInv->getOLTs();
                         <p class="text-success mb-0">All stock levels are healthy.</p>
                     <?php else: ?>
                         <table class="table table-sm table-striped mb-0">
-                            <thead><tr><th>Item</th><th>Qty</th><th>Min</th><th>Site</th></tr></thead>
+                            <thead><tr><th>Item</th><th>Qty</th><th>Min</th></tr></thead>
                             <tbody>
                             <?php foreach ($lowStock as $ls): ?>
                                 <tr class="table-warning">
                                     <td><?= htmlspecialchars($ls['item_name']) ?></td>
                                     <td><strong class="text-danger"><?= $ls['quantity'] ?></strong></td>
                                     <td><?= $ls['min_threshold'] ?></td>
-                                    <td><?= htmlspecialchars($ls['site_name'] ?? 'N/A') ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -733,464 +803,143 @@ $olts = $ispInv->getOLTs();
     <?php endif; ?>
 
     <?php
-    // ==================== FTTH / ACCESS NETWORK TAB ====================
-    elseif ($tab === 'ftth'):
-        $ftthSub = $_GET['sub'] ?? 'splitters';
+    // ==================== ONT INVENTORY TAB ====================
+    elseif ($tab === 'ont'):
+        $ontStatus = $_GET['ont_status'] ?? '';
+        $ontOlt = $_GET['ont_olt'] ?? '';
+        $ontZone = $_GET['ont_zone'] ?? '';
+        $ontFilters = ['status'=>$ontStatus, 'olt_id'=>$ontOlt, 'zone_id'=>$ontZone, 'search'=>$search];
+        $ontList = $ispInv->getOntInventory($ontFilters);
+        $olts = $ispInv->getOLTs();
+        $zones = $ispInv->getZones();
+        $ontOverview = $ispInv->getOntStats();
     ?>
-    <ul class="nav nav-pills mb-3">
-        <li class="nav-item"><a class="nav-link <?= $ftthSub==='splitters'?'active':'' ?>" href="?page=isp_inventory&tab=ftth&sub=splitters">Splitters</a></li>
-        <li class="nav-item"><a class="nav-link <?= $ftthSub==='fiber'?'active':'' ?>" href="?page=isp_inventory&tab=ftth&sub=fiber">Fiber Cores</a></li>
-        <li class="nav-item"><a class="nav-link <?= $ftthSub==='fdb'?'active':'' ?>" href="?page=isp_inventory&tab=ftth&sub=fdb">Distribution Boxes</a></li>
-        <li class="nav-item"><a class="nav-link <?= $ftthSub==='splice'?'active':'' ?>" href="?page=isp_inventory&tab=ftth&sub=splice">Splice Closures</a></li>
-        <li class="nav-item"><a class="nav-link <?= $ftthSub==='drop'?'active':'' ?>" href="?page=isp_inventory&tab=ftth&sub=drop">Drop Cables</a></li>
-    </ul>
 
-    <?php if ($ftthSub === 'splitters'):
-        if ($action === 'form'):
-            $item = $id ? $ispInv->getSplitters(['search'=>''])[array_search($id, array_column($ispInv->getSplitters(), 'id'))] ?? null : null;
-            $coreEquip = $ispInv->getCoreEquipment();
-    ?>
-    <div class="card">
-        <div class="card-header"><?= $item ? 'Edit' : 'Add' ?> Splitter</div>
-        <div class="card-body">
-            <form method="POST" action="?page=isp_inventory&tab=ftth&sub=splitters&action=save<?= $item ? '&id='.$item['id'] : '' ?>">
-                <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label">Name *</label><input type="text" name="name" class="form-control" value="<?= htmlspecialchars($item['name'] ?? '') ?>" required></div>
-                    <div class="col-md-4">
-                        <label class="form-label">Ratio</label>
-                        <select name="ratio" class="form-select">
-                            <?php foreach (['1:2','1:4','1:8','1:16','1:32','1:64'] as $r): ?>
-                            <option value="<?= $r ?>" <?= ($item['ratio'] ?? '1:8') === $r ? 'selected' : '' ?>><?= $r ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4"><label class="form-label">Total Ports</label><input type="number" name="total_ports" class="form-control" value="<?= $item['total_ports'] ?? 8 ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Used Ports</label><input type="number" name="used_ports" class="form-control" value="<?= $item['used_ports'] ?? 0 ?>"></div>
-                    <div class="col-md-4">
-                        <label class="form-label">Site</label>
-                        <select name="site_id" class="form-select"><option value="">-- Select --</option>
-                            <?php foreach ($sites as $s): ?><option value="<?= $s['id'] ?>" <?= ($item['site_id'] ?? '') == $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['name']) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Upstream Equipment</label>
-                        <select name="upstream_equipment_id" class="form-select"><option value="">-- Select --</option>
-                            <?php foreach ($coreEquip as $ce): ?><option value="<?= $ce['id'] ?>" <?= ($item['upstream_equipment_id'] ?? '') == $ce['id'] ? 'selected' : '' ?>><?= htmlspecialchars($ce['name']) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4"><label class="form-label">Upstream Port</label><input type="text" name="upstream_port" class="form-control" value="<?= htmlspecialchars($item['upstream_port'] ?? '') ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Pole Number</label><input type="text" name="pole_number" class="form-control" value="<?= htmlspecialchars($item['pole_number'] ?? '') ?>"></div>
-                    <div class="col-md-4"><label class="form-label">GPS Lat</label><input type="text" name="gps_lat" class="form-control" value="<?= $item['gps_lat'] ?? '' ?>"></div>
-                    <div class="col-md-4"><label class="form-label">GPS Lng</label><input type="text" name="gps_lng" class="form-control" value="<?= $item['gps_lng'] ?? '' ?>"></div>
-                    <div class="col-md-8"><label class="form-label">Location Description</label><input type="text" name="location_description" class="form-control" value="<?= htmlspecialchars($item['location_description'] ?? '') ?>"></div>
-                    <div class="col-md-4">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <?php foreach (['active'=>'Active','maintenance'=>'Maintenance','faulty'=>'Faulty','retired'=>'Retired'] as $k=>$v): ?>
-                            <option value="<?= $k ?>" <?= ($item['status'] ?? 'active') === $k ? 'selected' : '' ?>><?= $v ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2"><?= htmlspecialchars($item['notes'] ?? '') ?></textarea></div>
+    <div class="row g-3 mb-3">
+        <div class="col-auto"><span class="badge bg-primary fs-6"><?= $ontOverview['total_onts'] ?> Total</span></div>
+        <div class="col-auto"><span class="badge bg-success fs-6"><?= $ontOverview['online_onts'] ?> Online</span></div>
+        <div class="col-auto"><span class="badge bg-danger fs-6"><?= $ontOverview['offline_onts'] ?> Offline</span></div>
+        <div class="col-auto"><span class="badge bg-warning fs-6"><?= $ontOverview['low_signal'] ?> Low Signal</span></div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form class="row g-2 align-items-end" method="GET">
+                <input type="hidden" name="page" value="isp_inventory">
+                <input type="hidden" name="tab" value="ont">
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm mb-1">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Serial, name, customer, phone, PPPoE..." value="<?= htmlspecialchars($search) ?>">
                 </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
-                    <a href="?page=isp_inventory&tab=ftth&sub=splitters" class="btn btn-secondary">Cancel</a>
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1">Status</label>
+                    <select name="ont_status" class="form-select form-select-sm">
+                        <option value="">All Status</option>
+                        <option value="online" <?= $ontStatus === 'online' ? 'selected' : '' ?>>Online</option>
+                        <option value="offline" <?= $ontStatus === 'offline' ? 'selected' : '' ?>>Offline</option>
+                    </select>
                 </div>
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1">OLT</label>
+                    <select name="ont_olt" class="form-select form-select-sm">
+                        <option value="">All OLTs</option>
+                        <?php foreach ($olts as $o): ?>
+                        <option value="<?= $o['id'] ?>" <?= $ontOlt == $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1">Zone</label>
+                    <select name="ont_zone" class="form-select form-select-sm">
+                        <option value="">All Zones</option>
+                        <?php foreach ($zones as $z): ?>
+                        <option value="<?= $z['id'] ?>" <?= $ontZone == $z['id'] ? 'selected' : '' ?>><?= htmlspecialchars($z['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-primary btn-sm w-100"><i class="bi bi-search"></i></button>
+                </div>
+                <?php if ($search || $ontStatus || $ontOlt || $ontZone): ?>
+                <div class="col-md-1">
+                    <a href="?page=isp_inventory&tab=ont" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
+                </div>
+                <?php endif; ?>
             </form>
         </div>
     </div>
-    <?php else:
-        $splitterList = $ispInv->getSplitters(['search'=>$search]);
-    ?>
-    <div class="d-flex justify-content-between mb-3">
-        <form class="d-flex gap-2" method="GET">
-            <input type="hidden" name="page" value="isp_inventory"><input type="hidden" name="tab" value="ftth"><input type="hidden" name="sub" value="splitters">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search..." value="<?= htmlspecialchars($search) ?>" style="width:250px;">
-            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
-        </form>
-        <a href="?page=isp_inventory&tab=ftth&sub=splitters&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Splitter</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead><tr><th>Name</th><th>Ratio</th><th>Ports</th><th>Site</th><th>Pole</th><th>Upstream</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php if (empty($splitterList)): ?>
-                <tr><td colspan="8" class="text-center text-muted">No splitters found.</td></tr>
-            <?php else: foreach ($splitterList as $sp): ?>
-                <tr>
-                    <td><strong><?= htmlspecialchars($sp['name']) ?></strong></td>
-                    <td><?= htmlspecialchars($sp['ratio']) ?></td>
-                    <td><?= $sp['used_ports'] ?> / <?= $sp['total_ports'] ?></td>
-                    <td><?= htmlspecialchars($sp['site_name'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($sp['pole_number'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($sp['upstream_equipment_name'] ?? '') ?></td>
-                    <td><span class="badge bg-<?= $sp['status']==='active'?'success':($sp['status']==='faulty'?'danger':'warning') ?>"><?= $sp['status'] ?></span></td>
-                    <td>
-                        <a href="?page=isp_inventory&tab=ftth&sub=splitters&action=form&id=<?= $sp['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                        <form method="POST" action="?page=isp_inventory&tab=ftth&sub=splitters&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">
-                            <input type="hidden" name="id" value="<?= $sp['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
 
-    <?php elseif ($ftthSub === 'fiber'):
-        if ($action === 'form'):
-            $item = null;
-            if ($id) { $stmt = $ispInv->getFiberCores(); foreach ($stmt as $fc) { if ($fc['id'] == $id) { $item = $fc; break; } } }
-    ?>
-    <div class="card">
-        <div class="card-header"><?= $item ? 'Edit' : 'Add' ?> Fiber Core</div>
-        <div class="card-body">
-            <form method="POST" action="?page=isp_inventory&tab=ftth&sub=fiber&action=save<?= $item ? '&id='.$item['id'] : '' ?>">
-                <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label">Cable Name *</label><input type="text" name="cable_name" class="form-control" value="<?= htmlspecialchars($item['cable_name'] ?? '') ?>" required placeholder="e.g., Backbone-A"></div>
-                    <div class="col-md-2"><label class="form-label">Core # *</label><input type="number" name="core_number" class="form-control" value="<?= $item['core_number'] ?? '' ?>" required></div>
-                    <div class="col-md-3"><label class="form-label">Core Color</label><input type="text" name="core_color" class="form-control" value="<?= htmlspecialchars($item['core_color'] ?? '') ?>"></div>
-                    <div class="col-md-3"><label class="form-label">Tube Color</label><input type="text" name="tube_color" class="form-control" value="<?= htmlspecialchars($item['tube_color'] ?? '') ?>"></div>
-                    <div class="col-md-6"><label class="form-label">Start Point</label><input type="text" name="start_point" class="form-control" value="<?= htmlspecialchars($item['start_point'] ?? '') ?>"></div>
-                    <div class="col-md-6"><label class="form-label">End Point</label><input type="text" name="end_point" class="form-control" value="<?= htmlspecialchars($item['end_point'] ?? '') ?>"></div>
-                    <div class="col-md-3"><label class="form-label">Distance (m)</label><input type="number" step="0.01" name="distance_meters" class="form-control" value="<?= $item['distance_meters'] ?? '' ?>"></div>
-                    <div class="col-md-3"><label class="form-label">Attenuation (dB)</label><input type="number" step="0.001" name="attenuation_db" class="form-control" value="<?= $item['attenuation_db'] ?? '' ?>"></div>
-                    <div class="col-md-3"><label class="form-label">Assigned To</label><input type="text" name="assigned_to" class="form-control" value="<?= htmlspecialchars($item['assigned_to'] ?? '') ?>"></div>
-                    <div class="col-md-3">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <?php foreach (['available'=>'Available','in_use'=>'In Use','reserved'=>'Reserved','faulty'=>'Faulty','spliced'=>'Spliced'] as $k=>$v): ?>
-                            <option value="<?= $k ?>" <?= ($item['status'] ?? 'available') === $k ? 'selected' : '' ?>><?= $v ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-12"><label class="form-label">Route Path</label><textarea name="route_path" class="form-control" rows="2" placeholder="Describe fiber route..."><?= htmlspecialchars($item['route_path'] ?? '') ?></textarea></div>
-                    <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2"><?= htmlspecialchars($item['notes'] ?? '') ?></textarea></div>
-                </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
-                    <a href="?page=isp_inventory&tab=ftth&sub=fiber" class="btn btn-secondary">Cancel</a>
-                </div>
-            </form>
-        </div>
-    </div>
-    <?php else:
-        $fiberList = $ispInv->getFiberCores(['search'=>$search]);
-    ?>
-    <div class="d-flex justify-content-between mb-3">
-        <form class="d-flex gap-2" method="GET">
-            <input type="hidden" name="page" value="isp_inventory"><input type="hidden" name="tab" value="ftth"><input type="hidden" name="sub" value="fiber">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search..." value="<?= htmlspecialchars($search) ?>" style="width:250px;">
-            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
-        </form>
-        <a href="?page=isp_inventory&tab=ftth&sub=fiber&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Fiber Core</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead><tr><th>Cable</th><th>Core #</th><th>Colors</th><th>Route</th><th>Distance</th><th>Loss</th><th>Assigned</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php if (empty($fiberList)): ?>
-                <tr><td colspan="9" class="text-center text-muted">No fiber cores found.</td></tr>
-            <?php else: foreach ($fiberList as $fc): ?>
-                <tr>
-                    <td><strong><?= htmlspecialchars($fc['cable_name']) ?></strong></td>
-                    <td><?= $fc['core_number'] ?></td>
-                    <td><small><?= htmlspecialchars(($fc['tube_color'] ?? '') . '/' . ($fc['core_color'] ?? '')) ?></small></td>
-                    <td><small><?= htmlspecialchars($fc['start_point'] ?? '') ?> → <?= htmlspecialchars($fc['end_point'] ?? '') ?></small></td>
-                    <td><?= $fc['distance_meters'] ? $fc['distance_meters'].'m' : '' ?></td>
-                    <td><?= $fc['attenuation_db'] ? $fc['attenuation_db'].'dB' : '' ?></td>
-                    <td><?= htmlspecialchars($fc['assigned_to'] ?? '') ?></td>
-                    <td><span class="badge bg-<?= $fc['status']==='available'?'success':($fc['status']==='in_use'?'primary':($fc['status']==='faulty'?'danger':'secondary')) ?>"><?= $fc['status'] ?></span></td>
-                    <td>
-                        <a href="?page=isp_inventory&tab=ftth&sub=fiber&action=form&id=<?= $fc['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                        <form method="POST" action="?page=isp_inventory&tab=ftth&sub=fiber&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">
-                            <input type="hidden" name="id" value="<?= $fc['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
-
-    <?php elseif ($ftthSub === 'fdb'):
-        if ($action === 'form'):
-            $item = null;
-            if ($id) { foreach ($ispInv->getDistributionBoxes() as $db_item) { if ($db_item['id'] == $id) { $item = $db_item; break; } } }
-            $splitters = $ispInv->getSplitters();
-    ?>
-    <div class="card">
-        <div class="card-header"><?= $item ? 'Edit' : 'Add' ?> Distribution Box</div>
-        <div class="card-body">
-            <form method="POST" action="?page=isp_inventory&tab=ftth&sub=fdb&action=save<?= $item ? '&id='.$item['id'] : '' ?>">
-                <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label">Name *</label><input type="text" name="name" class="form-control" value="<?= htmlspecialchars($item['name'] ?? '') ?>" required></div>
-                    <div class="col-md-4">
-                        <label class="form-label">Box Type</label>
-                        <select name="box_type" class="form-select">
-                            <?php foreach (['FDB'=>'FDB','FAT'=>'FAT','FDT'=>'FDT','FTTH_Box'=>'FTTH Box'] as $k=>$v): ?>
-                            <option value="<?= $k ?>" <?= ($item['box_type'] ?? 'FDB') === $k ? 'selected' : '' ?>><?= $v ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2"><label class="form-label">Capacity</label><input type="number" name="capacity" class="form-control" value="<?= $item['capacity'] ?? 16 ?>"></div>
-                    <div class="col-md-2"><label class="form-label">Used Ports</label><input type="number" name="used_ports" class="form-control" value="<?= $item['used_ports'] ?? 0 ?>"></div>
-                    <div class="col-md-4">
-                        <label class="form-label">Site</label>
-                        <select name="site_id" class="form-select"><option value="">-- Select --</option>
-                            <?php foreach ($sites as $s): ?><option value="<?= $s['id'] ?>" <?= ($item['site_id'] ?? '') == $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['name']) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Connected Splitter</label>
-                        <select name="splitter_id" class="form-select"><option value="">-- Select --</option>
-                            <?php foreach ($splitters as $sp): ?><option value="<?= $sp['id'] ?>" <?= ($item['splitter_id'] ?? '') == $sp['id'] ? 'selected' : '' ?>><?= htmlspecialchars($sp['name']) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4"><label class="form-label">Pole Number</label><input type="text" name="pole_number" class="form-control" value="<?= htmlspecialchars($item['pole_number'] ?? '') ?>"></div>
-                    <div class="col-md-3"><label class="form-label">GPS Lat</label><input type="text" name="gps_lat" class="form-control" value="<?= $item['gps_lat'] ?? '' ?>"></div>
-                    <div class="col-md-3"><label class="form-label">GPS Lng</label><input type="text" name="gps_lng" class="form-control" value="<?= $item['gps_lng'] ?? '' ?>"></div>
-                    <div class="col-md-6"><label class="form-label">Location</label><input type="text" name="location_description" class="form-control" value="<?= htmlspecialchars($item['location_description'] ?? '') ?>"></div>
-                    <div class="col-md-4">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <?php foreach (['active'=>'Active','maintenance'=>'Maintenance','faulty'=>'Faulty','retired'=>'Retired'] as $k=>$v): ?>
-                            <option value="<?= $k ?>" <?= ($item['status'] ?? 'active') === $k ? 'selected' : '' ?>><?= $v ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2"><?= htmlspecialchars($item['notes'] ?? '') ?></textarea></div>
-                </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
-                    <a href="?page=isp_inventory&tab=ftth&sub=fdb" class="btn btn-secondary">Cancel</a>
-                </div>
-            </form>
-        </div>
-    </div>
-    <?php else:
-        $fdbList = $ispInv->getDistributionBoxes(['search'=>$search]);
-    ?>
-    <div class="d-flex justify-content-between mb-3">
-        <form class="d-flex gap-2" method="GET">
-            <input type="hidden" name="page" value="isp_inventory"><input type="hidden" name="tab" value="ftth"><input type="hidden" name="sub" value="fdb">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search..." value="<?= htmlspecialchars($search) ?>" style="width:250px;">
-            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
-        </form>
-        <a href="?page=isp_inventory&tab=ftth&sub=fdb&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Distribution Box</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead><tr><th>Name</th><th>Type</th><th>Ports</th><th>Site</th><th>Splitter</th><th>Pole</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php if (empty($fdbList)): ?>
-                <tr><td colspan="8" class="text-center text-muted">No distribution boxes found.</td></tr>
-            <?php else: foreach ($fdbList as $db_row): ?>
-                <tr>
-                    <td><strong><?= htmlspecialchars($db_row['name']) ?></strong></td>
-                    <td><?= htmlspecialchars($db_row['box_type'] ?? '') ?></td>
-                    <td><?= $db_row['used_ports'] ?> / <?= $db_row['capacity'] ?></td>
-                    <td><?= htmlspecialchars($db_row['site_name'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($db_row['splitter_name'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($db_row['pole_number'] ?? '') ?></td>
-                    <td><span class="badge bg-<?= $db_row['status']==='active'?'success':($db_row['status']==='faulty'?'danger':'warning') ?>"><?= $db_row['status'] ?></span></td>
-                    <td>
-                        <a href="?page=isp_inventory&tab=ftth&sub=fdb&action=form&id=<?= $db_row['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                        <form method="POST" action="?page=isp_inventory&tab=ftth&sub=fdb&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">
-                            <input type="hidden" name="id" value="<?= $db_row['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
-
-    <?php elseif ($ftthSub === 'splice'):
-        $spliceList = $ispInv->getSpliceClosures(['search'=>$search]);
-    ?>
-    <div class="d-flex justify-content-between mb-3">
-        <form class="d-flex gap-2" method="GET">
-            <input type="hidden" name="page" value="isp_inventory"><input type="hidden" name="tab" value="ftth"><input type="hidden" name="sub" value="splice">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search..." value="<?= htmlspecialchars($search) ?>" style="width:250px;">
-            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
-        </form>
-        <a href="?page=isp_inventory&tab=ftth&sub=splice&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Splice Closure</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead><tr><th>Name</th><th>Type</th><th>Location</th><th>Pole</th><th>Fiber Cable</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php if (empty($spliceList)): ?>
-                <tr><td colspan="7" class="text-center text-muted">No splice closures found.</td></tr>
-            <?php else: foreach ($spliceList as $sc): ?>
-                <tr>
-                    <td><strong><?= htmlspecialchars($sc['name']) ?></strong></td>
-                    <td><?= htmlspecialchars($sc['closure_type'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($sc['location_description'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($sc['pole_number'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($sc['fiber_cable_name'] ?? '') ?></td>
-                    <td><span class="badge bg-<?= $sc['status']==='active'?'success':'warning' ?>"><?= $sc['status'] ?></span></td>
-                    <td>
-                        <a href="?page=isp_inventory&tab=ftth&sub=splice&action=form&id=<?= $sc['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                        <form method="POST" action="?page=isp_inventory&tab=ftth&sub=splice&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">
-                            <input type="hidden" name="id" value="<?= $sc['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; endif; ?>
-            </tbody>
-        </table>
+    <div class="mb-2 text-muted small">
+        <i class="bi bi-info-circle"></i> Showing <?= count($ontList) ?> provisioned ONTs from OMS.
+        ONTs are automatically tracked here once provisioned on the OLT.
     </div>
 
-    <?php elseif ($ftthSub === 'drop'):
-        $dropList = $ispInv->getDropCables(['search'=>$search]);
-    ?>
-    <div class="d-flex justify-content-between mb-3">
-        <form class="d-flex gap-2" method="GET">
-            <input type="hidden" name="page" value="isp_inventory"><input type="hidden" name="tab" value="ftth"><input type="hidden" name="sub" value="drop">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search..." value="<?= htmlspecialchars($search) ?>" style="width:250px;">
-            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
-        </form>
-        <a href="?page=isp_inventory&tab=ftth&sub=drop&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Drop Cable</a>
-    </div>
     <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead><tr><th>ID</th><th>Distribution Box</th><th>Port</th><th>Customer</th><th>Type</th><th>Length</th><th>Installed</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php if (empty($dropList)): ?>
-                <tr><td colspan="9" class="text-center text-muted">No drop cables found.</td></tr>
-            <?php else: foreach ($dropList as $dc): ?>
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-dark">
                 <tr>
-                    <td><?= $dc['id'] ?></td>
-                    <td><?= htmlspecialchars($dc['box_name'] ?? '') ?></td>
-                    <td><?= $dc['box_port'] ?? '' ?></td>
-                    <td><?= htmlspecialchars($dc['customer_name'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($dc['cable_type'] ?? '') ?></td>
-                    <td><?= $dc['length_meters'] ? $dc['length_meters'].'m' : '' ?></td>
-                    <td><?= $dc['installation_date'] ?? '' ?></td>
-                    <td><span class="badge bg-<?= $dc['status']==='active'?'success':'warning' ?>"><?= $dc['status'] ?></span></td>
-                    <td>
-                        <form method="POST" action="?page=isp_inventory&tab=ftth&sub=drop&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">
-                            <input type="hidden" name="id" value="<?= $dc['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                        </form>
+                    <th>Serial Number</th>
+                    <th>Name</th>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>OLT / Port</th>
+                    <th>Zone</th>
+                    <th>Status</th>
+                    <th>Rx Power</th>
+                    <th>PPPoE</th>
+                    <th>Uptime</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php if (empty($ontList)): ?>
+                <tr><td colspan="10" class="text-center text-muted py-4">No provisioned ONTs found matching your filters.</td></tr>
+            <?php else: foreach ($ontList as $ont): ?>
+                <tr>
+                    <td><strong><code><?= htmlspecialchars($ont['sn']) ?></code></strong>
+                        <?php if ($ont['mac_address']): ?><br><small class="text-muted"><?= htmlspecialchars($ont['mac_address']) ?></small><?php endif; ?>
                     </td>
+                    <td><?= htmlspecialchars($ont['name'] ?? '') ?>
+                        <?php if ($ont['discovered_eqid']): ?><br><small class="text-muted"><?= htmlspecialchars($ont['discovered_eqid']) ?></small><?php endif; ?>
+                    </td>
+                    <td><?= htmlspecialchars($ont['customer_name'] ?? '') ?>
+                        <?php if ($ont['address']): ?><br><small class="text-muted"><?= htmlspecialchars(mb_strimwidth($ont['address'], 0, 40, '...')) ?></small><?php endif; ?>
+                    </td>
+                    <td><?= htmlspecialchars($ont['phone'] ?? '') ?></td>
+                    <td>
+                        <small><?= htmlspecialchars($ont['olt_name'] ?? '') ?></small>
+                        <br><code><?= $ont['frame'] ?>/<?= $ont['slot'] ?>/<?= $ont['port'] ?>/<?= $ont['onu_id'] ?></code>
+                    </td>
+                    <td>
+                        <?= htmlspecialchars($ont['zone_name'] ?? $ont['zone'] ?? '') ?>
+                        <?php if ($ont['subzone_name'] ?? $ont['area'] ?? ''): ?>
+                        <br><small class="text-muted"><?= htmlspecialchars($ont['subzone_name'] ?? $ont['area'] ?? '') ?></small>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($ont['status'] === 'online'): ?>
+                            <span class="badge bg-success">Online</span>
+                        <?php elseif ($ont['status'] === 'offline'): ?>
+                            <span class="badge bg-danger">Offline</span>
+                        <?php else: ?>
+                            <span class="badge bg-secondary"><?= htmlspecialchars($ont['status'] ?? 'unknown') ?></span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($ont['rx_power'] !== null): ?>
+                            <span class="<?= $ont['rx_power'] < -27 ? 'text-danger fw-bold' : ($ont['rx_power'] < -25 ? 'text-warning' : 'text-success') ?>">
+                                <?= number_format($ont['rx_power'], 2) ?> dBm
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted">--</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><small><?= htmlspecialchars($ont['pppoe_username'] ?? '') ?></small></td>
+                    <td><small><?= htmlspecialchars($ont['uptime'] ?? '') ?></small></td>
                 </tr>
             <?php endforeach; endif; ?>
             </tbody>
         </table>
     </div>
-    <?php endif; ?>
-
-    <?php
-    // ==================== CPE / ONU TAB ====================
-    elseif ($tab === 'cpe'):
-        if ($action === 'form'):
-            $item = $id ? $ispInv->getCPEDevice($id) : null;
-            $splitters = $ispInv->getSplitters();
-    ?>
-    <div class="card">
-        <div class="card-header"><?= $item ? 'Edit' : 'Add' ?> CPE / ONU Device</div>
-        <div class="card-body">
-            <form method="POST" action="?page=isp_inventory&tab=cpe&action=save<?= $item ? '&id='.$item['id'] : '' ?>">
-                <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label">Serial Number *</label><input type="text" name="serial_number" class="form-control" value="<?= htmlspecialchars($item['serial_number'] ?? '') ?>" required></div>
-                    <div class="col-md-4"><label class="form-label">MAC Address</label><input type="text" name="mac_address" class="form-control" value="<?= htmlspecialchars($item['mac_address'] ?? '') ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Model</label><input type="text" name="model" class="form-control" value="<?= htmlspecialchars($item['model'] ?? '') ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Manufacturer</label><input type="text" name="manufacturer" class="form-control" value="<?= htmlspecialchars($item['manufacturer'] ?? '') ?>" placeholder="e.g., Huawei, ZTE"></div>
-                    <div class="col-md-4"><label class="form-label">Firmware</label><input type="text" name="firmware_version" class="form-control" value="<?= htmlspecialchars($item['firmware_version'] ?? '') ?>"></div>
-                    <div class="col-md-4">
-                        <label class="form-label">OLT</label>
-                        <select name="olt_id" class="form-select"><option value="">-- Select --</option>
-                            <?php foreach ($olts as $o): ?><option value="<?= $o['id'] ?>" <?= ($item['olt_id'] ?? '') == $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-3"><label class="form-label">OLT Port</label><input type="text" name="olt_port" class="form-control" value="<?= htmlspecialchars($item['olt_port'] ?? '') ?>" placeholder="0/0/0"></div>
-                    <div class="col-md-3">
-                        <label class="form-label">Splitter</label>
-                        <select name="splitter_id" class="form-select"><option value="">-- Select --</option>
-                            <?php foreach ($splitters as $sp): ?><option value="<?= $sp['id'] ?>" <?= ($item['splitter_id'] ?? '') == $sp['id'] ? 'selected' : '' ?>><?= htmlspecialchars($sp['name']) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-3"><label class="form-label">Splitter Port</label><input type="number" name="splitter_port" class="form-control" value="<?= $item['splitter_port'] ?? '' ?>"></div>
-                    <div class="col-md-3"><label class="form-label">PPPoE Account</label><input type="text" name="pppoe_account" class="form-control" value="<?= htmlspecialchars($item['pppoe_account'] ?? '') ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Customer ID</label><input type="number" name="customer_id" class="form-control" value="<?= $item['customer_id'] ?? '' ?>" placeholder="CRM Customer ID"></div>
-                    <div class="col-md-4"><label class="form-label">Installation Date</label><input type="date" name="installation_date" class="form-control" value="<?= $item['installation_date'] ?? '' ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Warranty Expiry</label><input type="date" name="warranty_expiry" class="form-control" value="<?= $item['warranty_expiry'] ?? '' ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Supplier</label><input type="text" name="supplier" class="form-control" value="<?= htmlspecialchars($item['supplier'] ?? '') ?>"></div>
-                    <div class="col-md-4"><label class="form-label">Purchase Price</label><input type="number" step="0.01" name="purchase_price" class="form-control" value="<?= $item['purchase_price'] ?? '' ?>"></div>
-                    <div class="col-md-4">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <?php foreach (['in_stock'=>'In Stock','deployed'=>'Deployed','faulty'=>'Faulty','returned'=>'Returned','lost'=>'Lost','retired'=>'Retired'] as $k=>$v): ?>
-                            <option value="<?= $k ?>" <?= ($item['status'] ?? 'in_stock') === $k ? 'selected' : '' ?>><?= $v ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" class="form-control" rows="2"><?= htmlspecialchars($item['notes'] ?? '') ?></textarea></div>
-                </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
-                    <a href="?page=isp_inventory&tab=cpe" class="btn btn-secondary">Cancel</a>
-                </div>
-            </form>
-        </div>
-    </div>
-    <?php else:
-        $cpeStatus = $_GET['cpe_status'] ?? '';
-        $cpeList = $ispInv->getCPEDevices(['status'=>$cpeStatus, 'search'=>$search]);
-    ?>
-    <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
-        <form class="d-flex gap-2 flex-wrap" method="GET">
-            <input type="hidden" name="page" value="isp_inventory"><input type="hidden" name="tab" value="cpe">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search serial/MAC/model..." value="<?= htmlspecialchars($search) ?>" style="width:250px;">
-            <select name="cpe_status" class="form-select form-select-sm" style="width:140px;">
-                <option value="">All Status</option>
-                <?php foreach (['in_stock','deployed','faulty','returned','lost','retired'] as $st): ?>
-                <option value="<?= $st ?>" <?= $cpeStatus === $st ? 'selected' : '' ?>><?= ucfirst(str_replace('_',' ',$st)) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
-        </form>
-        <a href="?page=isp_inventory&tab=cpe&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add CPE</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead><tr><th>Serial</th><th>Model</th><th>OLT</th><th>Port</th><th>Customer</th><th>PPPoE</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php if (empty($cpeList)): ?>
-                <tr><td colspan="8" class="text-center text-muted">No CPE devices found.</td></tr>
-            <?php else: foreach ($cpeList as $cpe): ?>
-                <tr>
-                    <td><strong><code><?= htmlspecialchars($cpe['serial_number']) ?></code></strong></td>
-                    <td><?= htmlspecialchars(($cpe['manufacturer'] ?? '') . ' ' . ($cpe['model'] ?? '')) ?></td>
-                    <td><?= htmlspecialchars($cpe['olt_name'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($cpe['olt_port'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($cpe['customer_name'] ?? '') ?></td>
-                    <td><small><?= htmlspecialchars($cpe['pppoe_account'] ?? '') ?></small></td>
-                    <td><span class="badge bg-<?= $cpe['status']==='deployed'?'success':($cpe['status']==='in_stock'?'primary':($cpe['status']==='faulty'?'danger':'secondary')) ?>"><?= str_replace('_',' ',$cpe['status']) ?></span></td>
-                    <td>
-                        <a href="?page=isp_inventory&tab=cpe&action=form&id=<?= $cpe['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                        <form method="POST" action="?page=isp_inventory&tab=cpe&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">
-                            <input type="hidden" name="id" value="<?= $cpe['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
 
     <?php
     // ==================== IPAM TAB ====================
@@ -1793,10 +1542,9 @@ $olts = $ispInv->getOLTs();
         </div>
         <ul class="sidebar-nav list-unstyled p-3">
             <li class="mb-1"><a href="?page=isp_inventory&tab=overview" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none <?= $tab === 'overview' ? 'text-white' : '' ?>" style="color: var(--inv-text); <?= $tab === 'overview' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-speedometer2"></i> Overview</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=ont" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'ont' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-router"></i> ONT Inventory</a></li>
             <li class="mb-1"><a href="?page=isp_inventory&tab=sites" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'sites' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-geo-alt"></i> Sites</a></li>
             <li class="mb-1"><a href="?page=isp_inventory&tab=core" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'core' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-hdd-rack"></i> Core Network</a></li>
-            <li class="mb-1"><a href="?page=isp_inventory&tab=ftth" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'ftth' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-diagram-3"></i> Access / FTTH</a></li>
-            <li class="mb-1"><a href="?page=isp_inventory&tab=cpe" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'cpe' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-router"></i> CPE / ONU</a></li>
             <li class="mb-1"><a href="?page=isp_inventory&tab=ipam" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'ipam' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-globe"></i> IPAM</a></li>
             <li class="mb-1"><a href="?page=isp_inventory&tab=warehouse" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'warehouse' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-box-seam"></i> Warehouse</a></li>
             <li class="mb-1"><a href="?page=isp_inventory&tab=assets" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'assets' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-tools"></i> Field Assets</a></li>

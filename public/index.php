@@ -8000,63 +8000,6 @@ if ($page === 'isp_inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: ?page=isp_inventory&tab=core');
                 exit;
 
-            case 'ftth':
-                $redirectSub = $sub ?: 'splitters';
-                if ($sub === 'splitters') {
-                    if ($ispAction === 'save') {
-                        $ispInv->saveSplitter($_POST, $ispId);
-                        $_SESSION['success_message'] = 'Splitter saved.';
-                    } elseif ($ispAction === 'delete') {
-                        $ispInv->deleteSplitter((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'Splitter deleted.';
-                    }
-                } elseif ($sub === 'fiber') {
-                    if ($ispAction === 'save') {
-                        $ispInv->saveFiberCore($_POST, $ispId);
-                        $_SESSION['success_message'] = 'Fiber core saved.';
-                    } elseif ($ispAction === 'delete') {
-                        $ispInv->deleteFiberCore((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'Fiber core deleted.';
-                    }
-                } elseif ($sub === 'fdb') {
-                    if ($ispAction === 'save') {
-                        $ispInv->saveDistributionBox($_POST, $ispId);
-                        $_SESSION['success_message'] = 'Distribution box saved.';
-                    } elseif ($ispAction === 'delete') {
-                        $ispInv->deleteDistributionBox((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'Distribution box deleted.';
-                    }
-                } elseif ($sub === 'splice') {
-                    if ($ispAction === 'save') {
-                        $ispInv->saveSpliceClosure($_POST, $ispId);
-                        $_SESSION['success_message'] = 'Splice closure saved.';
-                    } elseif ($ispAction === 'delete') {
-                        $ispInv->deleteSpliceClosure((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'Splice closure deleted.';
-                    }
-                } elseif ($sub === 'drop') {
-                    if ($ispAction === 'save') {
-                        $ispInv->saveDropCable($_POST, $ispId);
-                        $_SESSION['success_message'] = 'Drop cable saved.';
-                    } elseif ($ispAction === 'delete') {
-                        $ispInv->deleteDropCable((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'Drop cable deleted.';
-                    }
-                }
-                header("Location: ?page=isp_inventory&tab=ftth&sub=$redirectSub");
-                exit;
-
-            case 'cpe':
-                if ($ispAction === 'save') {
-                    $ispInv->saveCPEDevice($_POST, $ispId);
-                    $_SESSION['success_message'] = 'CPE device saved.';
-                } elseif ($ispAction === 'delete') {
-                    $ispInv->deleteCPEDevice((int)$_POST['id']);
-                    $_SESSION['success_message'] = 'CPE device deleted.';
-                }
-                header('Location: ?page=isp_inventory&tab=cpe');
-                exit;
-
             case 'ipam':
                 if ($sub === 'vlans') {
                     if ($ispAction === 'save') {
