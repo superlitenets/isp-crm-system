@@ -710,7 +710,7 @@ class SNMPPollingWorker {
                 if (result.rowCount > 0) {
                     updated++;
                     if (prevOnu && prevStatus === 'online' && 
-                        ['offline', 'los', 'dying-gasp'].includes(s.status)) {
+                        ['los', 'dying-gasp'].includes(s.status)) {
                         faults.push({
                             onu_id: prevOnu.id,
                             sn: prevOnu.sn,
