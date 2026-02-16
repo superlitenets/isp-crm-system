@@ -2163,6 +2163,17 @@ if ($page === 'login') {
     exit;
 }
 
+// ISP Inventory Module - standalone page with its own layout
+if ($page === 'isp_inventory') {
+    \App\Auth::requireLogin();
+    if (!\App\Auth::canAny(['inventory.view', 'inventory.*'])) {
+        echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
+        exit;
+    }
+    include __DIR__ . '/../templates/isp_inventory.php';
+    exit;
+}
+
 // OMS (ONU Management System) - standalone page with its own layout
 if ($page === 'huawei-olt') {
     \App\Auth::requireLogin();
@@ -9212,11 +9223,12 @@ $csrfToken = \App\Auth::generateToken();
     $moduleInventoryEnabled = $sidebarSettings->get('module_inventory_enabled', '1') === '1';
     
     // Determine current module for top bar highlighting
-    $isCrmPage = !in_array($page, ['isp', 'huawei-olt', 'call_center', 'finance']);
+    $isCrmPage = !in_array($page, ['isp', 'huawei-olt', 'call_center', 'finance', 'isp_inventory']);
     $isIspPage = ($page === 'isp');
     $isOmsPage = ($page === 'huawei-olt');
     $isCallCenterPage = ($page === 'call_center');
     $isFinancePage = ($page === 'finance');
+    $isIspInventoryPage = ($page === 'isp_inventory');
     ?>
     
     <!-- Module Navigation Tabs - Top Bar -->
@@ -9243,6 +9255,14 @@ $csrfToken = \App\Auth::generateToken();
                         <a class="nav-link py-2 px-4 text-white <?= $isOmsPage ? 'active' : '' ?>" href="?page=huawei-olt"
                            style="border-radius: 0; background: <?= $isOmsPage ? '#6f42c1' : 'transparent' ?>; font-weight: <?= $isOmsPage ? '600' : '400' ?>;">
                             <i class="bi bi-router me-1"></i>OMS
+                        </a>
+                    </li>
+                    <?php endif; ?>
+                    <?php if ($moduleInventoryEnabled && \App\Auth::canAny(['inventory.view', 'inventory.*'])): ?>
+                    <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white <?= $isIspInventoryPage ? 'active' : '' ?>" href="?page=isp_inventory"
+                           style="border-radius: 0; background: <?= $isIspInventoryPage ? '#e83e8c' : 'transparent' ?>; font-weight: <?= $isIspInventoryPage ? '600' : '400' ?>;">
+                            <i class="bi bi-hdd-network me-1"></i>Inventory
                         </a>
                     </li>
                     <?php endif; ?>
@@ -9331,13 +9351,6 @@ $csrfToken = \App\Auth::generateToken();
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'hr' ? 'active' : '' ?>" href="?page=hr">
                         <i class="bi bi-people-fill"></i> HR
-                    </a>
-                </li>
-                <?php endif; ?>
-                <?php if (\App\Auth::can('inventory.view') && $moduleInventoryEnabled): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?= $page === 'isp_inventory' ? 'active' : '' ?>" href="?page=isp_inventory">
-                        <i class="bi bi-hdd-network"></i> ISP Inventory
                     </a>
                 </li>
                 <?php endif; ?>
@@ -9460,13 +9473,6 @@ $csrfToken = \App\Auth::generateToken();
                     <?php if ($pendingHrRequests > 0): ?>
                     <span class="badge bg-danger rounded-pill ms-1"><?= $pendingHrRequests ?></span>
                     <?php endif; ?>
-                </a>
-            </li>
-            <?php endif; ?>
-            <?php if (\App\Auth::can('inventory.view') && $moduleInventoryEnabled): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'isp_inventory' ? 'active' : '' ?>" href="?page=isp_inventory">
-                    <i class="bi bi-hdd-network"></i> ISP Inventory
                 </a>
             </li>
             <?php endif; ?>
@@ -9679,13 +9685,6 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/hr.php';
-                }
-                break;
-            case 'isp_inventory':
-                if (!\App\Auth::can('inventory.view')) {
-                    $accessDenied = true;
-                } else {
-                    include __DIR__ . '/../templates/isp_inventory.php';
                 }
                 break;
             case 'inventory':

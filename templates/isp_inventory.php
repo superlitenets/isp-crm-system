@@ -12,11 +12,326 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 $sites = $ispInv->getSites();
 $olts = $ispInv->getOLTs();
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISP Inventory Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --inv-sidebar-width: 260px;
+            --inv-sidebar-bg: #1a1c2c;
+            --inv-sidebar-hover: #252840;
+            --inv-sidebar-active: #2d3154;
+            --inv-accent: #e83e8c;
+            --inv-accent-light: rgba(232, 62, 140, 0.15);
+            --inv-text: #c8cad0;
+            --inv-text-active: #ffffff;
+            --inv-top-bar-height: 40px;
+            --inv-border: rgba(255,255,255,0.08);
+        }
 
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-hdd-network"></i> ISP Inventory</h2>
+        body {
+            padding-top: var(--inv-top-bar-height);
+            background: #f0f2f5;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        .module-top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1100;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 0;
+            height: var(--inv-top-bar-height);
+        }
+
+        .module-top-bar .nav-link {
+            font-size: 0.82rem;
+            letter-spacing: 0.3px;
+            transition: all 0.2s;
+            opacity: 0.85;
+        }
+
+        .module-top-bar .nav-link:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.1) !important;
+        }
+
+        .module-top-bar .nav-link.active {
+            opacity: 1;
+        }
+
+        .inv-sidebar {
+            position: fixed;
+            top: var(--inv-top-bar-height);
+            left: 0;
+            bottom: 0;
+            width: var(--inv-sidebar-width);
+            background: var(--inv-sidebar-bg);
+            z-index: 1050;
+            overflow-y: auto;
+            overflow-x: hidden;
+            border-right: 1px solid var(--inv-border);
+            transition: transform 0.3s ease;
+        }
+
+        .inv-sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .inv-sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.15);
+            border-radius: 4px;
+        }
+
+        .inv-sidebar .sidebar-header {
+            padding: 20px 20px 12px;
+            border-bottom: 1px solid var(--inv-border);
+        }
+
+        .inv-sidebar .sidebar-header h5 {
+            color: var(--inv-text-active);
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .inv-sidebar .sidebar-header small {
+            color: var(--inv-text);
+            font-size: 0.72rem;
+            opacity: 0.7;
+        }
+
+        .inv-sidebar .quick-nav {
+            padding: 12px 12px 8px;
+            border-bottom: 1px solid var(--inv-border);
+        }
+
+        .inv-sidebar .quick-nav a {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 0.72rem;
+            color: var(--inv-text);
+            text-decoration: none;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            margin-right: 6px;
+            transition: all 0.2s;
+        }
+
+        .inv-sidebar .quick-nav a:hover {
+            background: rgba(255,255,255,0.12);
+            color: var(--inv-text-active);
+        }
+
+        .inv-sidebar .nav-section-label {
+            padding: 16px 20px 6px;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: rgba(200,202,208,0.45);
+            font-weight: 600;
+        }
+
+        .inv-sidebar .sidebar-nav {
+            padding: 8px 12px;
+            list-style: none;
+            margin: 0;
+        }
+
+        .inv-sidebar .sidebar-nav li {
+            margin-bottom: 2px;
+        }
+
+        .inv-sidebar .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 14px;
+            color: var(--inv-text);
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .inv-sidebar .sidebar-nav a:hover {
+            background: var(--inv-sidebar-hover);
+            color: var(--inv-text-active);
+        }
+
+        .inv-sidebar .sidebar-nav a.active {
+            background: var(--inv-accent-light);
+            color: var(--inv-accent);
+            font-weight: 600;
+        }
+
+        .inv-sidebar .sidebar-nav a.active i {
+            color: var(--inv-accent);
+        }
+
+        .inv-sidebar .sidebar-nav a i {
+            font-size: 1.05rem;
+            width: 22px;
+            text-align: center;
+            color: rgba(200,202,208,0.6);
+        }
+
+        .inv-main-content {
+            margin-left: var(--inv-sidebar-width);
+            padding: 24px 28px;
+            min-height: calc(100vh - var(--inv-top-bar-height));
+        }
+
+        .inv-mobile-toggle {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            z-index: 1200;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--inv-accent);
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 15px rgba(232,62,140,0.4);
+            font-size: 1.3rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .inv-mobile-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .inv-mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+
+        @media (max-width: 991.98px) {
+            .inv-sidebar {
+                transform: translateX(-100%);
+            }
+
+            .inv-sidebar.show {
+                transform: translateX(0);
+            }
+
+            .inv-main-content {
+                margin-left: 0;
+                padding: 16px;
+            }
+
+            .inv-mobile-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .inv-mobile-overlay.show {
+                display: block;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .inv-main-content {
+                padding: 12px 8px;
+            }
+
+            .module-top-bar .nav-link {
+                font-size: 0.72rem;
+                padding: 6px 10px !important;
+            }
+        }
+
+        .card {
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-radius: 10px;
+        }
+
+        .card-header {
+            background: #fff;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+        }
+
+        .table th {
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+            border-bottom-width: 1px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="module-top-bar">
+    <div class="container-fluid px-0">
+        <div class="d-flex align-items-center ps-3">
+            <ul class="nav nav-pills mb-0" style="gap: 2px;">
+                <li class="nav-item"><a class="nav-link py-2 px-4 text-white" href="?page=dashboard" style="border-radius: 0; background: transparent;"><i class="bi bi-grid-3x3-gap me-1"></i>CRM</a></li>
+                <li class="nav-item"><a class="nav-link py-2 px-4 text-white" href="?page=isp" style="border-radius: 0; background: transparent;"><i class="bi bi-broadcast me-1"></i>ISP</a></li>
+                <li class="nav-item"><a class="nav-link py-2 px-4 text-white" href="?page=huawei-olt" style="border-radius: 0; background: transparent;"><i class="bi bi-router me-1"></i>OMS</a></li>
+                <li class="nav-item"><a class="nav-link py-2 px-4 text-white active" href="?page=isp_inventory" style="border-radius: 0; background: #e83e8c; font-weight: 600;"><i class="bi bi-hdd-network me-1"></i>Inventory</a></li>
+                <li class="nav-item"><a class="nav-link py-2 px-4 text-white" href="?page=call_center" style="border-radius: 0; background: transparent;"><i class="bi bi-telephone me-1"></i>Call Centre</a></li>
+                <li class="nav-item"><a class="nav-link py-2 px-4 text-white" href="?page=finance" style="border-radius: 0; background: transparent;"><i class="bi bi-bank me-1"></i>Finance</a></li>
+            </ul>
+        </div>
     </div>
+</div>
+
+<div class="inv-mobile-overlay" id="invMobileOverlay" onclick="toggleInvSidebar()"></div>
+
+<aside class="inv-sidebar" id="invSidebar">
+    <div class="sidebar-header">
+        <h5><i class="bi bi-hdd-network me-2"></i>Inventory</h5>
+        <small>Network Asset Management</small>
+    </div>
+
+    <div class="quick-nav">
+        <a href="?page=dashboard"><i class="bi bi-grid-3x3-gap"></i> CRM</a>
+        <a href="?page=huawei-olt"><i class="bi bi-router"></i> OMS</a>
+        <a href="?page=isp"><i class="bi bi-broadcast"></i> ISP</a>
+    </div>
+
+    <div class="nav-section-label">Inventory Modules</div>
+    <ul class="sidebar-nav">
+        <li><a href="?page=isp_inventory&tab=overview" class="<?= $tab === 'overview' ? 'active' : '' ?>"><i class="bi bi-speedometer2"></i> Overview</a></li>
+        <li><a href="?page=isp_inventory&tab=sites" class="<?= $tab === 'sites' ? 'active' : '' ?>"><i class="bi bi-geo-alt"></i> Sites</a></li>
+        <li><a href="?page=isp_inventory&tab=core" class="<?= $tab === 'core' ? 'active' : '' ?>"><i class="bi bi-hdd-rack"></i> Core Network</a></li>
+        <li><a href="?page=isp_inventory&tab=ftth" class="<?= $tab === 'ftth' ? 'active' : '' ?>"><i class="bi bi-diagram-3"></i> Access / FTTH</a></li>
+        <li><a href="?page=isp_inventory&tab=cpe" class="<?= $tab === 'cpe' ? 'active' : '' ?>"><i class="bi bi-router"></i> CPE / ONU</a></li>
+        <li><a href="?page=isp_inventory&tab=ipam" class="<?= $tab === 'ipam' ? 'active' : '' ?>"><i class="bi bi-globe"></i> IPAM</a></li>
+        <li><a href="?page=isp_inventory&tab=warehouse" class="<?= $tab === 'warehouse' ? 'active' : '' ?>"><i class="bi bi-box-seam"></i> Warehouse</a></li>
+        <li><a href="?page=isp_inventory&tab=assets" class="<?= $tab === 'assets' ? 'active' : '' ?>"><i class="bi bi-tools"></i> Field Assets</a></li>
+        <li><a href="?page=isp_inventory&tab=maintenance" class="<?= $tab === 'maintenance' ? 'active' : '' ?>"><i class="bi bi-wrench"></i> Maintenance</a></li>
+    </ul>
+</aside>
+
+<button class="inv-mobile-toggle" id="invMobileToggle" onclick="toggleInvSidebar()">
+    <i class="bi bi-list"></i>
+</button>
+
+<div class="inv-main-content">
 
     <?php if ($successMessage): ?>
     <div class="alert alert-success alert-dismissible fade show">
@@ -30,18 +345,6 @@ $olts = $ispInv->getOLTs();
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     <?php endif; ?>
-
-    <ul class="nav nav-tabs mb-4 flex-nowrap" style="overflow-x:auto;white-space:nowrap;">
-        <li class="nav-item"><a class="nav-link <?= $tab==='overview'?'active':'' ?>" href="?page=isp_inventory&tab=overview"><i class="bi bi-speedometer2"></i> Overview</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='sites'?'active':'' ?>" href="?page=isp_inventory&tab=sites"><i class="bi bi-geo-alt"></i> Sites</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='core'?'active':'' ?>" href="?page=isp_inventory&tab=core"><i class="bi bi-hdd-rack"></i> Core Network</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='ftth'?'active':'' ?>" href="?page=isp_inventory&tab=ftth"><i class="bi bi-diagram-3"></i> Access / FTTH</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='cpe'?'active':'' ?>" href="?page=isp_inventory&tab=cpe"><i class="bi bi-router"></i> CPE / ONU</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='ipam'?'active':'' ?>" href="?page=isp_inventory&tab=ipam"><i class="bi bi-globe"></i> IPAM</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='warehouse'?'active':'' ?>" href="?page=isp_inventory&tab=warehouse"><i class="bi bi-box-seam"></i> Warehouse</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='assets'?'active':'' ?>" href="?page=isp_inventory&tab=assets"><i class="bi bi-tools"></i> Field Assets</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='maintenance'?'active':'' ?>" href="?page=isp_inventory&tab=maintenance"><i class="bi bi-wrench"></i> Maintenance</a></li>
-    </ul>
 
     <?php
     // ==================== OVERVIEW TAB ====================
@@ -1476,3 +1779,49 @@ $olts = $ispInv->getOLTs();
 
     <?php endif; ?>
 </div>
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="invMobileNav" style="background: var(--inv-sidebar-bg); width: 280px;">
+    <div class="offcanvas-header border-bottom" style="border-color: var(--inv-border) !important;">
+        <h5 class="offcanvas-title text-white"><i class="bi bi-hdd-network me-2"></i>Inventory</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        <div class="quick-nav p-3 border-bottom" style="border-color: var(--inv-border) !important;">
+            <a href="?page=dashboard" class="btn btn-sm btn-outline-light me-1"><i class="bi bi-grid-3x3-gap"></i> CRM</a>
+            <a href="?page=huawei-olt" class="btn btn-sm btn-outline-light me-1"><i class="bi bi-router"></i> OMS</a>
+            <a href="?page=isp" class="btn btn-sm btn-outline-light"><i class="bi bi-broadcast"></i> ISP</a>
+        </div>
+        <ul class="sidebar-nav list-unstyled p-3">
+            <li class="mb-1"><a href="?page=isp_inventory&tab=overview" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none <?= $tab === 'overview' ? 'text-white' : '' ?>" style="color: var(--inv-text); <?= $tab === 'overview' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-speedometer2"></i> Overview</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=sites" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'sites' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-geo-alt"></i> Sites</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=core" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'core' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-hdd-rack"></i> Core Network</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=ftth" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'ftth' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-diagram-3"></i> Access / FTTH</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=cpe" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'cpe' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-router"></i> CPE / ONU</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=ipam" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'ipam' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-globe"></i> IPAM</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=warehouse" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'warehouse' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-box-seam"></i> Warehouse</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=assets" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'assets' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-tools"></i> Field Assets</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=maintenance" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'maintenance' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-wrench"></i> Maintenance</a></li>
+        </ul>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleInvSidebar() {
+    const sidebar = document.getElementById('invSidebar');
+    const overlay = document.getElementById('invMobileOverlay');
+    sidebar.classList.toggle('show');
+    overlay.classList.toggle('show');
+}
+
+document.querySelectorAll('#invSidebar .sidebar-nav a').forEach(link => {
+    link.addEventListener('click', () => {
+        if (window.innerWidth < 992) {
+            toggleInvSidebar();
+        }
+    });
+});
+</script>
+</body>
+</html>
+<?php exit; ?>

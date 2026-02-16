@@ -2569,6 +2569,11 @@ try {
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link py-2 px-4 text-white" href="?page=isp_inventory" style="border-radius: 0; background: transparent;">
+                            <i class="bi bi-hdd-network me-1"></i>Inventory
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link py-2 px-4 text-white" href="?page=call_center" style="border-radius: 0; background: transparent;">
                             <i class="bi bi-telephone me-1"></i>Call Centre
                         </a>
