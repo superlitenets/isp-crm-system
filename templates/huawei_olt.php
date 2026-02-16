@@ -693,6 +693,30 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
     exit;
 }
 // AJAX endpoint for getting available slots for an OLT
+if (isset($_GET['action']) && $_GET['action'] === 'job_status') {
+    header('Content-Type: application/json');
+    $jobId = (int)($_GET['job_id'] ?? 0);
+    $currentUserId = $_SESSION['user_id'] ?? null;
+    if (!$jobId || !$currentUserId) {
+        echo json_encode(['error' => 'Invalid request']);
+        exit;
+    }
+    try {
+        $stmt = $db->prepare("SELECT id, job_type, status, progress, total, message, result, started_at, completed_at FROM background_jobs WHERE id = ? AND user_id = ?");
+        $stmt->execute([$jobId, $currentUserId]);
+        $job = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($job) {
+            $job['result'] = $job['result'] ? json_decode($job['result'], true) : null;
+            echo json_encode($job);
+        } else {
+            echo json_encode(['error' => 'Job not found']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if (isset($_GET['action']) && $_GET['action'] === 'get_olt_slots') {
     header('Content-Type: application/json');
     $oltId = (int)($_GET['olt_id'] ?? 0);
@@ -5914,114 +5938,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 echo json_encode($result);
                 exit;
             case 'setup_tr069_full':
-                set_time_limit(300);
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
                 $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $profileId = isset($_POST['tr069_profile_id']) ? (int)$_POST['tr069_profile_id'] : 3;
                 $targetSlot = isset($_POST['target_slot']) && $_POST['target_slot'] !== '' ? (int)$_POST['target_slot'] : null;
-                $steps = [];
+                $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) || (isset($_POST['ajax']) && $_POST['ajax'] === '1');
 
                 if (!$oltId) {
+                    if ($isAjax) {
+                        header('Content-Type: application/json');
+                        echo json_encode(['success' => false, 'error' => 'Please select an OLT']);
+                        exit;
+                    }
                     $message = 'Please select an OLT';
                     $messageType = 'danger';
                     break;
                 }
 
-                $sql = "SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL";
-                $params = [$oltId];
-                if ($targetSlot !== null) {
-                    $sql .= " AND slot = ?";
-                    $params[] = $targetSlot;
-                }
-                $sql .= " ORDER BY slot, port, onu_id";
-                $stmt = $db->prepare($sql);
-                $stmt->execute($params);
-                $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                $jobParams = json_encode([
+                    'olt_id' => $oltId,
+                    'profile_id' => $profileId,
+                    'target_slot' => $targetSlot
+                ]);
+                $stmt = $db->prepare("INSERT INTO background_jobs (job_type, status, params, user_id) VALUES ('setup_tr069_full', 'pending', ?::jsonb, ?) RETURNING id");
+                $stmt->execute([$jobParams, $_SESSION['user_id'] ?? null]);
+                $jobId = $stmt->fetchColumn();
 
-                if (empty($onus)) {
-                    $slotLabel = $targetSlot !== null ? " on slot {$targetSlot}" : '';
-                    $steps[] = "No authorized ONUs found{$slotLabel}";
-                    $message = implode(' | ', $steps);
-                    $messageType = 'warning';
+                $workerPath = realpath(__DIR__ . '/../workers/tr069_bulk_worker.php');
+                if (!$workerPath || !file_exists($workerPath)) {
+                    $db->prepare("UPDATE background_jobs SET status = 'failed', message = 'Worker script not found' WHERE id = ?")->execute([$jobId]);
+                    if ($isAjax) {
+                        header('Content-Type: application/json');
+                        echo json_encode(['success' => false, 'error' => 'Worker script not found']);
+                        exit;
+                    }
+                    $message = 'Background worker not found';
+                    $messageType = 'danger';
                     break;
                 }
 
-                $bound = 0;
-                $failed = 0;
-                $errors = [];
-                $batchSize = 20;
-
-                $slotGroups = [];
-                foreach ($onus as $onu) {
-                    $key = ($onu['frame'] ?? 0) . '/' . $onu['slot'];
-                    $slotGroups[$key][] = $onu;
-                }
-
-                $processed = 0;
-                foreach ($slotGroups as $slotKey => $slotOnus) {
-                    try {
-                        $scriptLines = [];
-                        $scriptLines[] = "interface gpon {$slotKey}";
-                        foreach ($slotOnus as $onu) {
-                            $port = $onu['port'];
-                            $onuPortId = $onu['onu_id'];
-                            $scriptLines[] = "ont tr069-server-config {$port} {$onuPortId} profile-id 0";
-                            $scriptLines[] = "ont tr069-server-config {$port} {$onuPortId} profile-id {$profileId}";
-                        }
-                        $scriptLines[] = "quit";
-
-                        $slotTimeout = max(120000, count($slotOnus) * 3000);
-                        $result = $huaweiOLT->executeCommand($oltId, implode("\r\n", $scriptLines), false, $slotTimeout);
-                        $out = $result['output'] ?? '';
-
-                        if ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out)) {
-                            $bound += count($slotOnus);
-                        } elseif ($result['success'] && preg_match('/already|repeatedly/i', $out)) {
-                            $bound += count($slotOnus);
-                        } else {
-                            foreach ($slotOnus as $onu) {
-                                $failed++;
-                                if (count($errors) < 10) {
-                                    $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . substr($out, 0, 100);
-                                }
-                            }
-                        }
-                    } catch (Exception $e) {
-                        foreach ($slotOnus as $onu) {
-                            $failed++;
-                            if (count($errors) < 10) {
-                                $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . $e->getMessage();
-                            }
-                        }
-                    }
-
-                    $processed += count($slotOnus);
-                    if ($processed % $batchSize < count($slotOnus)) {
-                        usleep(500000);
-                    }
-                }
+                $logPath = '/tmp/tr069_job_' . $jobId . '.log';
+                exec("php " . escapeshellarg($workerPath) . " " . (int)$jobId . " > " . escapeshellarg($logPath) . " 2>&1 &");
 
                 $slotLabel = $targetSlot !== null ? " (Slot {$targetSlot})" : " (All slots)";
-                $steps[] = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs{$slotLabel}";
-                if ($failed > 0) {
-                    $steps[] = "{$failed} failed";
-                }
-                $steps[] = 'ONUs will auto-register in GenieACS on next Inform (no reboot)';
 
-                $message = implode(' | ', $steps);
-                if (!empty($errors)) {
-                    $message .= ' | Errors: ' . implode('; ', array_slice($errors, 0, 5));
+                if ($isAjax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true, 'job_id' => (int)$jobId, 'message' => "TR-069 bulk setup started{$slotLabel}"]);
+                    exit;
                 }
-                $messageType = $failed === 0 ? 'success' : 'warning';
 
-                $huaweiOLT->addLog([
-                    'olt_id' => $oltId,
-                    'action' => 'setup_tr069_full',
-                    'status' => $failed > 0 ? 'partial' : 'success',
-                    'message' => $message,
-                    'user_id' => $_SESSION['user_id'] ?? null
-                ]);
+                $message = "TR-069 bulk setup started in background{$slotLabel}. Job #{$jobId} - you can continue using the system.";
+                $messageType = 'info';
+                $backgroundJobId = $jobId;
                 break;
             case 'clear_tr069_profile_credentials':
                 $oltId = (int)$_POST['olt_id'];
@@ -7702,6 +7670,9 @@ try {
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php endif; ?>
+            <?php if (isset($backgroundJobId)): ?>
+            <script>var backgroundJobId = <?= (int)$backgroundJobId ?>;</script>
+            <?php endif; ?>
             
             <?php if ($view === 'dashboard'): ?>
             <!-- Enhanced Network Dashboard -->
@@ -8645,51 +8616,63 @@ try {
                             <h5 class="modal-title"><i class="bi bi-gear-wide-connected me-2"></i>Full TR-069 + GenieACS Setup</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
-                        <form method="POST">
+                        <form id="bulkTr069Form" method="POST" onsubmit="return startBulkTR069(event)">
                             <input type="hidden" name="action" value="setup_tr069_full">
                             <div class="modal-body">
-                                <div class="alert alert-info mb-3">
-                                    <i class="bi bi-info-circle me-2"></i>
-                                    <strong>One-click setup:</strong> This will bind the TR-069 profile without rebooting ONUs.
-                                </div>
-                                <div class="card mb-3">
-                                    <div class="card-body p-2">
-                                        <ol class="mb-0 small">
-                                            <li>Create/verify GenieACS auto-provision for CR credentials</li>
-                                            <li>Bind TR-069 profile to authorized ONUs on the selected slot(s)</li>
-                                            <li>ONUs will auto-register in GenieACS on their next Inform cycle</li>
-                                        </ol>
+                                <div id="bulkTr069FormFields">
+                                    <div class="alert alert-info mb-3">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <strong>One-click setup:</strong> This will bind the TR-069 profile without rebooting ONUs. Runs in background so you can continue using the system.
+                                    </div>
+                                    <div class="card mb-3">
+                                        <div class="card-body p-2">
+                                            <ol class="mb-0 small">
+                                                <li>Create/verify GenieACS auto-provision for CR credentials</li>
+                                                <li>Bind TR-069 profile to authorized ONUs on the selected slot(s)</li>
+                                                <li>ONUs will auto-register in GenieACS on their next Inform cycle</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Select OLT</label>
+                                        <select name="olt_id" id="bulkTr069OltSelect" class="form-select" required onchange="loadSlotOptions(this.value)">
+                                            <option value="">-- Select OLT --</option>
+                                            <?php foreach ($olts as $olt): ?>
+                                            <option value="<?= $olt['id'] ?>"><?= htmlspecialchars($olt['name']) ?> (<?= $olt['ip_address'] ?>)</option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Target Slot</label>
+                                        <select name="target_slot" id="bulkTr069SlotSelect" class="form-select">
+                                            <option value="">All Slots</option>
+                                        </select>
+                                        <div class="form-text">Process a specific slot or all slots at once.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">TR-069 Profile ID</label>
+                                        <input type="number" name="tr069_profile_id" class="form-control" value="3" required>
+                                        <div class="form-text">Profile configured on the OLT with ACS URL, username, and password.</div>
+                                    </div>
+                                    <div class="alert alert-success mb-0 small">
+                                        <i class="bi bi-check-circle me-2"></i>
+                                        No reboot will occur. ONUs will pick up the TR-069 profile on their next Inform cycle and auto-register in GenieACS.
                                     </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Select OLT</label>
-                                    <select name="olt_id" id="bulkTr069OltSelect" class="form-select" required onchange="loadSlotOptions(this.value)">
-                                        <option value="">-- Select OLT --</option>
-                                        <?php foreach ($olts as $olt): ?>
-                                        <option value="<?= $olt['id'] ?>"><?= htmlspecialchars($olt['name']) ?> (<?= $olt['ip_address'] ?>)</option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Target Slot</label>
-                                    <select name="target_slot" id="bulkTr069SlotSelect" class="form-select">
-                                        <option value="">All Slots</option>
-                                    </select>
-                                    <div class="form-text">Process a specific slot or all slots at once.</div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">TR-069 Profile ID</label>
-                                    <input type="number" name="tr069_profile_id" class="form-control" value="3" required>
-                                    <div class="form-text">Profile configured on the OLT with ACS URL, username, and password.</div>
-                                </div>
-                                <div class="alert alert-success mb-0 small">
-                                    <i class="bi bi-check-circle me-2"></i>
-                                    No reboot will occur. ONUs will pick up the TR-069 profile on their next Inform cycle and auto-register in GenieACS.
+                                <div id="bulkTr069Progress" style="display:none;">
+                                    <div class="text-center mb-3">
+                                        <div class="spinner-border text-primary mb-2" role="status" id="bulkTr069Spinner"></div>
+                                        <h6 id="bulkTr069StatusText">Starting background job...</h6>
+                                    </div>
+                                    <div class="progress mb-3" style="height: 25px;">
+                                        <div id="bulkTr069ProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                                    </div>
+                                    <div id="bulkTr069Message" class="alert alert-info small"></div>
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary" onclick="return confirm('This will bind the TR-069 profile to ONUs on the selected slot(s).\nNo reboot will occur.\n\nContinue?');">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="bulkTr069CloseBtn">Cancel</button>
+                                <button type="submit" class="btn btn-primary" id="bulkTr069SubmitBtn">
                                     <i class="bi bi-gear-wide-connected me-2"></i>Setup
                                 </button>
                             </div>
@@ -8718,6 +8701,92 @@ try {
                         }
                     }).catch(() => {});
             }
+            let bulkTr069PollTimer = null;
+            function startBulkTR069(e) {
+                e.preventDefault();
+                const form = document.getElementById('bulkTr069Form');
+                const formData = new FormData(form);
+                formData.append('ajax', '1');
+                document.getElementById('bulkTr069FormFields').style.display = 'none';
+                document.getElementById('bulkTr069Progress').style.display = 'block';
+                document.getElementById('bulkTr069SubmitBtn').style.display = 'none';
+                document.getElementById('bulkTr069CloseBtn').textContent = 'Close';
+                document.getElementById('bulkTr069StatusText').textContent = 'Starting background job...';
+                document.getElementById('bulkTr069Message').textContent = 'Submitting request...';
+
+                fetch(window.location.href, { method: 'POST', body: formData })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.job_id) {
+                            pollJobProgress(data.job_id);
+                        } else {
+                            document.getElementById('bulkTr069Spinner').style.display = 'none';
+                            document.getElementById('bulkTr069StatusText').textContent = 'Error';
+                            document.getElementById('bulkTr069Message').className = 'alert alert-danger small';
+                            document.getElementById('bulkTr069Message').textContent = data.error || 'Failed to start job';
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById('bulkTr069Spinner').style.display = 'none';
+                        document.getElementById('bulkTr069StatusText').textContent = 'Error';
+                        document.getElementById('bulkTr069Message').className = 'alert alert-danger small';
+                        document.getElementById('bulkTr069Message').textContent = 'Request failed: ' + err.message;
+                    });
+                return false;
+            }
+            function pollJobProgress(jobId) {
+                document.getElementById('bulkTr069StatusText').textContent = 'Job #' + jobId + ' running...';
+                bulkTr069PollTimer = setInterval(() => {
+                    fetch('?page=huawei-olt&ajax=1&action=job_status&job_id=' + jobId)
+                        .then(r => r.json())
+                        .then(job => {
+                            if (job.error) return;
+                            const pct = job.total > 0 ? Math.round((job.progress / job.total) * 100) : 0;
+                            const bar = document.getElementById('bulkTr069ProgressBar');
+                            bar.style.width = pct + '%';
+                            bar.textContent = pct + '% (' + job.progress + '/' + job.total + ')';
+                            document.getElementById('bulkTr069Message').textContent = job.message || 'Processing...';
+
+                            if (job.status === 'completed' || job.status === 'completed_with_errors' || job.status === 'failed') {
+                                clearInterval(bulkTr069PollTimer);
+                                document.getElementById('bulkTr069Spinner').style.display = 'none';
+                                bar.classList.remove('progress-bar-animated');
+                                bar.style.width = '100%';
+                                if (job.status === 'completed') {
+                                    bar.className = 'progress-bar bg-success';
+                                    bar.textContent = 'Complete';
+                                    document.getElementById('bulkTr069StatusText').textContent = 'Job #' + jobId + ' completed successfully';
+                                    document.getElementById('bulkTr069Message').className = 'alert alert-success small';
+                                } else if (job.status === 'completed_with_errors') {
+                                    bar.className = 'progress-bar bg-warning';
+                                    bar.textContent = 'Completed with errors';
+                                    document.getElementById('bulkTr069StatusText').textContent = 'Job #' + jobId + ' completed with some errors';
+                                    document.getElementById('bulkTr069Message').className = 'alert alert-warning small';
+                                } else {
+                                    bar.className = 'progress-bar bg-danger';
+                                    bar.textContent = 'Failed';
+                                    document.getElementById('bulkTr069StatusText').textContent = 'Job #' + jobId + ' failed';
+                                    document.getElementById('bulkTr069Message').className = 'alert alert-danger small';
+                                }
+                                document.getElementById('bulkTr069Message').textContent = job.message || 'Done';
+                            } else {
+                                document.getElementById('bulkTr069StatusText').textContent = 'Job #' + jobId + ' running... (' + pct + '%)';
+                            }
+                        }).catch(() => {});
+                }, 2000);
+            }
+            document.getElementById('bulkBindTR069Modal').addEventListener('hidden.bs.modal', function() {
+                if (bulkTr069PollTimer) clearInterval(bulkTr069PollTimer);
+                document.getElementById('bulkTr069FormFields').style.display = '';
+                document.getElementById('bulkTr069Progress').style.display = 'none';
+                document.getElementById('bulkTr069SubmitBtn').style.display = '';
+                document.getElementById('bulkTr069CloseBtn').textContent = 'Cancel';
+                document.getElementById('bulkTr069Spinner').style.display = '';
+                const bar = document.getElementById('bulkTr069ProgressBar');
+                bar.style.width = '0%';
+                bar.textContent = '0%';
+                bar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+            });
             </script>
 
             <?php elseif ($view === 'live_monitor'): ?>
