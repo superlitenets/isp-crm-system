@@ -7618,14 +7618,14 @@ try {
             <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
             <style>
                 .dash-header {
-                    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+                    background: linear-gradient(135deg, var(--oms-primary-dark) 0%, var(--oms-primary) 50%, var(--oms-primary-light) 100%);
                     border-radius: 14px;
                     padding: 22px 28px;
                     margin-bottom: 24px;
-                    color: #e2e8f0;
+                    color: rgba(255,255,255,0.9);
                     position: relative;
                     overflow: hidden;
-                    border: 1px solid #1e293b;
+                    border: 1px solid rgba(255,255,255,0.06);
                 }
                 .dash-header::before {
                     content: '';
@@ -7634,7 +7634,7 @@ try {
                     right: -15%;
                     width: 400px;
                     height: 400px;
-                    background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
+                    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
                     border-radius: 50%;
                 }
                 .live-dot {
@@ -7651,10 +7651,10 @@ try {
                     50% { opacity: 0.3; }
                 }
                 .kpi-card {
-                    background: #111318;
+                    background: var(--oms-primary);
                     border-radius: 12px;
                     padding: 18px 20px;
-                    border: 1px solid #1e2433;
+                    border: 1px solid rgba(255,255,255,0.06);
                     transition: all 0.25s ease;
                     position: relative;
                     overflow: hidden;
@@ -7662,8 +7662,9 @@ try {
                 }
                 .kpi-card:hover {
                     transform: translateY(-3px);
-                    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-                    border-color: #2d3748;
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+                    border-color: rgba(255,255,255,0.12);
+                    background: var(--oms-primary-light);
                 }
                 .kpi-card .kpi-icon {
                     width: 44px; height: 44px;
@@ -7678,11 +7679,11 @@ try {
                     font-weight: 700;
                     line-height: 1;
                     margin: 8px 0 2px;
-                    color: #e2e8f0;
+                    color: rgba(255,255,255,0.9);
                 }
                 .kpi-card .kpi-label {
                     font-size: 0.78rem;
-                    color: #64748b;
+                    color: rgba(255,255,255,0.5);
                     font-weight: 500;
                 }
                 .kpi-badge {
@@ -7695,14 +7696,14 @@ try {
                     gap: 3px;
                 }
                 .dash-card {
-                    background: #111318;
+                    background: var(--oms-primary);
                     border-radius: 12px;
-                    border: 1px solid #1e2433;
+                    border: 1px solid rgba(255,255,255,0.06);
                     transition: box-shadow 0.25s ease;
                     overflow: hidden;
                 }
                 .dash-card:hover {
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
                 }
                 .dash-card .card-hdr {
                     padding: 16px 20px 10px;
@@ -7714,21 +7715,21 @@ try {
                     font-weight: 600;
                     font-size: 0.9rem;
                     margin: 0;
-                    color: #cbd5e1;
+                    color: rgba(255,255,255,0.8);
                 }
                 .dash-card .card-inner {
                     padding: 0 20px 20px;
                 }
                 .olt-card-v2 {
-                    background: #0d1017;
+                    background: var(--oms-primary-dark);
                     border-radius: 10px;
                     padding: 16px;
-                    border: 1px solid #1e2433;
+                    border: 1px solid rgba(255,255,255,0.06);
                     transition: all 0.25s ease;
                 }
                 .olt-card-v2:hover {
-                    border-color: #334155;
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+                    border-color: rgba(255,255,255,0.12);
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
                 }
                 .olt-card-v2 .olt-status-dot {
                     width: 10px; height: 10px;
@@ -7739,7 +7740,7 @@ try {
                 .olt-card-v2 .mini-bar {
                     height: 6px;
                     border-radius: 3px;
-                    background: #1a1f2e;
+                    background: rgba(255,255,255,0.06);
                     overflow: hidden;
                     margin-top: 10px;
                 }
@@ -7749,23 +7750,23 @@ try {
                     transition: width 0.8s ease;
                 }
                 .quick-btn {
-                    background: #0d1017;
-                    border: 1px solid #1e2433;
+                    background: var(--oms-primary-dark);
+                    border: 1px solid rgba(255,255,255,0.06);
                     border-radius: 10px;
                     padding: 14px 12px;
                     text-align: center;
                     transition: all 0.25s ease;
                     text-decoration: none;
-                    color: #94a3b8;
+                    color: rgba(255,255,255,0.6);
                     display: block;
                     cursor: pointer;
                 }
                 .quick-btn:hover {
-                    border-color: #334155;
-                    color: #e2e8f0;
+                    border-color: rgba(99,102,241,0.3);
+                    color: rgba(255,255,255,0.9);
                     transform: translateY(-2px);
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-                    background: #151a24;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                    background: var(--oms-primary-light);
                 }
                 .quick-btn .qb-icon {
                     width: 38px; height: 38px;
@@ -7779,12 +7780,12 @@ try {
                 .alert-row {
                     padding: 10px 14px;
                     border-left: 3px solid;
-                    background: #0d1017;
+                    background: var(--oms-primary-dark);
                     border-radius: 0 8px 8px 0;
                     margin-bottom: 6px;
                     transition: background 0.2s;
                 }
-                .alert-row:hover { background: #151a24; }
+                .alert-row:hover { background: var(--oms-primary-light); }
                 .alert-row.critical { border-left-color: #ef4444; background: rgba(239,68,68,0.08); }
                 .alert-row.warning { border-left-color: #f59e0b; background: rgba(245,158,11,0.06); }
                 .alert-row.info { border-left-color: #3b82f6; background: rgba(59,130,246,0.06); }
@@ -7925,21 +7926,21 @@ try {
                             </div>
                             <div class="row text-center mt-3 g-2">
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(34,197,94,0.08);">
+                                    <div class="p-2 rounded-3" style="background: rgba(34,197,94,0.1);">
                                         <div class="fw-bold" style="color: #22c55e; font-size: 1rem;"><?= number_format($stats['online_onus']) ?></div>
-                                        <small style="color: #64748b; font-size: 0.7rem;">Online</small>
+                                        <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">Online</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(148,163,184,0.06);">
-                                        <div class="fw-bold" style="color: #94a3b8; font-size: 1rem;"><?= number_format($stats['offline_onus']) ?></div>
-                                        <small style="color: #64748b; font-size: 0.7rem;">Offline</small>
+                                    <div class="p-2 rounded-3" style="background: rgba(255,255,255,0.04);">
+                                        <div class="fw-bold" style="color: rgba(255,255,255,0.7); font-size: 1rem;"><?= number_format($stats['offline_onus']) ?></div>
+                                        <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">Offline</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(239,68,68,0.08);">
+                                    <div class="p-2 rounded-3" style="background: rgba(239,68,68,0.1);">
                                         <div class="fw-bold" style="color: #ef4444; font-size: 1rem;"><?= number_format($stats['los_onus']) ?></div>
-                                        <small style="color: #64748b; font-size: 0.7rem;">LOS</small>
+                                        <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">LOS</small>
                                     </div>
                                 </div>
                             </div>
@@ -8003,8 +8004,8 @@ try {
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="olt-status-dot online"></span>
                                             <div>
-                                                <div class="fw-bold" style="font-size: 0.9rem; color: #e2e8f0;"><?= htmlspecialchars($olt['name']) ?></div>
-                                                <div style="font-size: 0.72rem; color: #64748b;"><?= htmlspecialchars($olt['ip_address']) ?></div>
+                                                <div class="fw-bold" style="font-size: 0.9rem; color: rgba(255,255,255,0.9);"><?= htmlspecialchars($olt['name']) ?></div>
+                                                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.4);"><?= htmlspecialchars($olt['ip_address']) ?></div>
                                             </div>
                                         </div>
                                         <span class="fw-bold" style="color: <?= $hColor ?>; font-size: 1.1rem;"><?= $oHealth ?>%</span>
@@ -8015,10 +8016,10 @@ try {
                                             <?php if ($oOffline > 0): ?>
                                             <span class="fw-semibold" style="color: #ef4444;"><i class="bi bi-wifi-off me-1"></i><?= $oOffline ?></span>
                                             <?php endif; ?>
-                                            <span style="color: #64748b;"><?= $oTotal ?> total</span>
+                                            <span style="color: rgba(255,255,255,0.4);"><?= $oTotal ?> total</span>
                                         </div>
                                         <?php if ($oltUptime): ?>
-                                        <span style="color: #64748b;"><i class="bi bi-clock-history me-1"></i><?= htmlspecialchars($oltUptime) ?></span>
+                                        <span style="color: rgba(255,255,255,0.4);"><i class="bi bi-clock-history me-1"></i><?= htmlspecialchars($oltUptime) ?></span>
                                         <?php endif; ?>
                                     </div>
                                     <div class="mini-bar">
@@ -8234,14 +8235,14 @@ try {
                         plugins: {
                             legend: { display: false },
                             tooltip: {
-                                backgroundColor: '#0a0a0a',
+                                backgroundColor: 'rgba(15,16,25,0.95)',
                                 titleFont: { size: 13, weight: '600' },
-                                titleColor: '#e2e8f0',
-                                bodyColor: '#cbd5e1',
+                                titleColor: 'rgba(255,255,255,0.9)',
+                                bodyColor: 'rgba(255,255,255,0.7)',
                                 bodyFont: { size: 12 },
                                 padding: 12,
                                 cornerRadius: 8,
-                                borderColor: '#1e2433',
+                                borderColor: 'rgba(255,255,255,0.08)',
                                 borderWidth: 1,
                                 callbacks: {
                                     label: function(ctx) {
@@ -8260,10 +8261,10 @@ try {
                             const cx = left + width / 2, cy = top + height / 2;
                             ctx.save();
                             ctx.textAlign = 'center';
-                            ctx.fillStyle = '#e2e8f0';
+                            ctx.fillStyle = 'rgba(255,255,255,0.9)';
                             ctx.font = '600 26px ' + chartFont.family;
                             ctx.fillText('<?= $uptimePercent ?>%', cx, cy);
-                            ctx.fillStyle = '#64748b';
+                            ctx.fillStyle = 'rgba(255,255,255,0.4)';
                             ctx.font = '400 11px ' + chartFont.family;
                             ctx.fillText('Uptime', cx, cy + 18);
                             ctx.restore();
@@ -8303,12 +8304,12 @@ try {
                         plugins: {
                             legend: { display: false },
                             tooltip: {
-                                backgroundColor: '#0a0a0a',
-                                titleColor: '#e2e8f0',
-                                bodyColor: '#cbd5e1',
+                                backgroundColor: 'rgba(15,16,25,0.95)',
+                                titleColor: 'rgba(255,255,255,0.9)',
+                                bodyColor: 'rgba(255,255,255,0.7)',
                                 padding: 12,
                                 cornerRadius: 8,
-                                borderColor: '#1e2433',
+                                borderColor: 'rgba(255,255,255,0.08)',
                                 borderWidth: 1,
                                 callbacks: {
                                     label: function(ctx) {
@@ -8321,12 +8322,12 @@ try {
                         scales: {
                             x: { 
                                 grid: { display: false }, 
-                                ticks: { font: { size: 11 }, color: '#64748b' },
+                                ticks: { font: { size: 11 }, color: 'rgba(255,255,255,0.4)' },
                                 border: { display: false }
                             },
                             y: { 
                                 grid: { display: false }, 
-                                ticks: { font: { size: 11, weight: '500' }, color: '#94a3b8' },
+                                ticks: { font: { size: 11, weight: '500' }, color: 'rgba(255,255,255,0.6)' },
                                 border: { display: false }
                             }
                         }
@@ -8362,15 +8363,15 @@ try {
                             legend: {
                                 position: 'top',
                                 align: 'end',
-                                labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true, padding: 16, font: { size: 11, weight: '500' }, color: '#94a3b8' }
+                                labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true, padding: 16, font: { size: 11, weight: '500' }, color: 'rgba(255,255,255,0.6)' }
                             },
                             tooltip: {
-                                backgroundColor: '#0a0a0a',
-                                titleColor: '#e2e8f0',
-                                bodyColor: '#cbd5e1',
+                                backgroundColor: 'rgba(15,16,25,0.95)',
+                                titleColor: 'rgba(255,255,255,0.9)',
+                                bodyColor: 'rgba(255,255,255,0.7)',
                                 padding: 12,
                                 cornerRadius: 8,
-                                borderColor: '#1e2433',
+                                borderColor: 'rgba(255,255,255,0.08)',
                                 borderWidth: 1,
                                 callbacks: {
                                     afterBody: function(ctx) {
@@ -8386,13 +8387,13 @@ try {
                             x: {
                                 stacked: true,
                                 grid: { display: false },
-                                ticks: { font: { size: 9 }, maxRotation: 90, minRotation: 45, color: '#64748b' },
+                                ticks: { font: { size: 9 }, maxRotation: 90, minRotation: 45, color: 'rgba(255,255,255,0.4)' },
                                 border: { display: false }
                             },
                             y: {
                                 stacked: true,
                                 grid: { color: 'rgba(255,255,255,0.04)' },
-                                ticks: { font: { size: 11 }, color: '#64748b' },
+                                ticks: { font: { size: 11 }, color: 'rgba(255,255,255,0.4)' },
                                 border: { display: false }
                             }
                         }
