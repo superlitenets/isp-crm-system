@@ -7618,10 +7618,10 @@ try {
             <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
             <style>
                 .dash-header {
-                    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
-                    border-radius: 20px;
-                    padding: 28px 36px;
-                    margin-bottom: 28px;
+                    background: linear-gradient(135deg, #475569 0%, #64748b 50%, #94a3b8 100%);
+                    border-radius: 16px;
+                    padding: 22px 28px;
+                    margin-bottom: 24px;
                     color: white;
                     position: relative;
                     overflow: hidden;
@@ -7631,192 +7631,177 @@ try {
                     position: absolute;
                     top: -60%;
                     right: -15%;
-                    width: 500px;
-                    height: 500px;
-                    background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
-                    border-radius: 50%;
-                }
-                .dash-header::after {
-                    content: '';
-                    position: absolute;
-                    bottom: -40%;
-                    left: 10%;
-                    width: 300px;
-                    height: 300px;
-                    background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+                    width: 400px;
+                    height: 400px;
+                    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
                     border-radius: 50%;
                 }
                 .live-dot {
-                    width: 10px; height: 10px;
-                    background: #10b981;
+                    width: 8px; height: 8px;
+                    background: #86efac;
                     border-radius: 50%;
-                    animation: livePulse 2s infinite;
+                    animation: livePulse 2.5s ease-in-out infinite;
                     display: inline-block;
-                    margin-right: 6px;
-                    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+                    margin-right: 5px;
                 }
                 @keyframes livePulse {
-                    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px rgba(16, 185, 129, 0.6); }
-                    50% { opacity: 0.7; transform: scale(1.3); box-shadow: 0 0 16px rgba(16, 185, 129, 0.8); }
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.4; }
                 }
                 .kpi-card {
-                    background: white;
-                    border-radius: 16px;
-                    padding: 20px 24px;
-                    border: 1px solid #f1f5f9;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    background: #fff;
+                    border-radius: 12px;
+                    padding: 18px 20px;
+                    border: 1px solid #e8ecf1;
+                    transition: all 0.25s ease;
                     position: relative;
                     overflow: hidden;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
                 }
                 .kpi-card:hover {
-                    transform: translateY(-6px);
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                    transform: translateY(-3px);
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+                    border-color: #cbd5e1;
                 }
                 .kpi-card .kpi-icon {
-                    width: 52px; height: 52px;
-                    border-radius: 14px;
+                    width: 44px; height: 44px;
+                    border-radius: 10px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.4rem;
+                    font-size: 1.2rem;
                 }
                 .kpi-card .kpi-value {
-                    font-size: 2rem;
-                    font-weight: 800;
+                    font-size: 1.75rem;
+                    font-weight: 700;
                     line-height: 1;
-                    margin: 10px 0 2px;
-                    letter-spacing: -0.5px;
+                    margin: 8px 0 2px;
+                    color: #334155;
                 }
                 .kpi-card .kpi-label {
-                    font-size: 0.8rem;
-                    color: #64748b;
+                    font-size: 0.78rem;
+                    color: #94a3b8;
                     font-weight: 500;
                 }
                 .kpi-badge {
-                    font-size: 0.7rem;
-                    padding: 3px 10px;
-                    border-radius: 20px;
+                    font-size: 0.68rem;
+                    padding: 3px 8px;
+                    border-radius: 16px;
                     font-weight: 600;
                     display: inline-flex;
                     align-items: center;
-                    gap: 4px;
+                    gap: 3px;
                 }
                 .dash-card {
-                    background: white;
-                    border-radius: 16px;
-                    border: 1px solid #f1f5f9;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-                    transition: box-shadow 0.3s ease;
+                    background: #fff;
+                    border-radius: 12px;
+                    border: 1px solid #e8ecf1;
+                    transition: box-shadow 0.25s ease;
                     overflow: hidden;
                 }
                 .dash-card:hover {
-                    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.05);
                 }
                 .dash-card .card-hdr {
-                    padding: 20px 24px 12px;
+                    padding: 16px 20px 10px;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                 }
                 .dash-card .card-hdr h6 {
-                    font-weight: 700;
-                    font-size: 0.95rem;
+                    font-weight: 600;
+                    font-size: 0.9rem;
                     margin: 0;
-                    color: #1e293b;
+                    color: #475569;
                 }
                 .dash-card .card-inner {
-                    padding: 0 24px 24px;
+                    padding: 0 20px 20px;
                 }
                 .olt-card-v2 {
-                    background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
-                    border-radius: 14px;
-                    padding: 20px;
-                    border: 1px solid #e2e8f0;
-                    transition: all 0.3s ease;
-                    position: relative;
+                    background: #fafbfc;
+                    border-radius: 10px;
+                    padding: 16px;
+                    border: 1px solid #e8ecf1;
+                    transition: all 0.25s ease;
                 }
                 .olt-card-v2:hover {
-                    border-color: #3b82f6;
-                    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
-                    transform: translateY(-2px);
+                    border-color: #94a3b8;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
                 }
                 .olt-card-v2 .olt-status-dot {
-                    width: 12px; height: 12px;
+                    width: 10px; height: 10px;
                     border-radius: 50%;
                     display: inline-block;
                 }
-                .olt-card-v2 .olt-status-dot.online { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+                .olt-card-v2 .olt-status-dot.online { background: #34d399; }
                 .olt-card-v2 .mini-bar {
-                    height: 8px;
-                    border-radius: 4px;
+                    height: 6px;
+                    border-radius: 3px;
                     background: #f1f5f9;
                     overflow: hidden;
-                    margin-top: 12px;
+                    margin-top: 10px;
                 }
                 .olt-card-v2 .mini-bar .fill {
                     height: 100%;
-                    border-radius: 4px;
-                    transition: width 1s ease;
+                    border-radius: 3px;
+                    transition: width 0.8s ease;
                 }
                 .quick-btn {
-                    background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
-                    border: 1px solid #e2e8f0;
-                    border-radius: 14px;
-                    padding: 18px 16px;
+                    background: #fafbfc;
+                    border: 1px solid #e8ecf1;
+                    border-radius: 10px;
+                    padding: 14px 12px;
                     text-align: center;
-                    transition: all 0.3s ease;
+                    transition: all 0.25s ease;
                     text-decoration: none;
-                    color: #334155;
+                    color: #475569;
                     display: block;
                     cursor: pointer;
                 }
                 .quick-btn:hover {
-                    border-color: #3b82f6;
-                    color: #3b82f6;
-                    transform: translateY(-4px);
-                    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
-                    background: linear-gradient(135deg, #eff6ff 0%, #fff 100%);
+                    border-color: #94a3b8;
+                    color: #334155;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+                    background: #f1f5f9;
                 }
                 .quick-btn .qb-icon {
-                    width: 44px; height: 44px;
-                    border-radius: 12px;
+                    width: 38px; height: 38px;
+                    border-radius: 10px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.3rem;
-                    margin: 0 auto 10px;
+                    font-size: 1.15rem;
+                    margin: 0 auto 8px;
                 }
                 .alert-row {
                     padding: 10px 14px;
                     border-left: 3px solid;
-                    background: #f8fafc;
-                    border-radius: 0 10px 10px 0;
-                    margin-bottom: 8px;
+                    background: #fafbfc;
+                    border-radius: 0 8px 8px 0;
+                    margin-bottom: 6px;
                     transition: background 0.2s;
                 }
                 .alert-row:hover { background: #f1f5f9; }
-                .alert-row.critical { border-left-color: #ef4444; background: #fef2f2; }
-                .alert-row.warning { border-left-color: #f59e0b; background: #fffbeb; }
-                .alert-row.info { border-left-color: #3b82f6; background: #eff6ff; }
+                .alert-row.critical { border-left-color: #f87171; background: #fef2f2; }
+                .alert-row.warning { border-left-color: #fbbf24; background: #fffbeb; }
+                .alert-row.info { border-left-color: #60a5fa; background: #eff6ff; }
                 .issue-pill {
                     font-size: 0.65rem;
                     padding: 3px 8px;
                     border-radius: 6px;
-                    font-weight: 700;
-                    letter-spacing: 0.3px;
+                    font-weight: 600;
                 }
                 .chart-container { position: relative; }
+                .animate-in { animation: fadeInUp 0.4s ease forwards; }
                 @keyframes fadeInUp {
-                    from { opacity: 0; transform: translateY(20px); }
+                    from { opacity: 0; transform: translateY(12px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
-                .animate-in { animation: fadeInUp 0.5s ease forwards; }
-                .animate-in:nth-child(2) { animation-delay: 0.1s; }
-                .animate-in:nth-child(3) { animation-delay: 0.15s; }
-                .animate-in:nth-child(4) { animation-delay: 0.2s; }
-                .animate-in:nth-child(5) { animation-delay: 0.25s; }
-                .animate-in:nth-child(6) { animation-delay: 0.3s; }
+                .animate-in:nth-child(2) { animation-delay: 0.05s; }
+                .animate-in:nth-child(3) { animation-delay: 0.1s; }
+                .animate-in:nth-child(4) { animation-delay: 0.15s; }
+                .animate-in:nth-child(5) { animation-delay: 0.2s; }
+                .animate-in:nth-child(6) { animation-delay: 0.25s; }
             </style>
 
             <div class="dash-header">
@@ -7842,84 +7827,84 @@ try {
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
                     <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="kpi-icon" style="background: rgba(6,182,212,0.1); color: #06b6d4;">
+                            <div class="kpi-icon" style="background: rgba(71,85,105,0.08); color: #64748b;">
                                 <i class="bi bi-router-fill"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus" class="kpi-badge" style="background: rgba(6,182,212,0.1); color: #06b6d4; text-decoration:none;">
+                            <a href="?page=huawei-olt&view=onus" class="kpi-badge" style="background: rgba(71,85,105,0.08); color: #64748b; text-decoration:none;">
                                 All <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
-                        <div class="kpi-value" style="color: #06b6d4;"><?= number_format($totalOnus) ?></div>
+                        <div class="kpi-value"><?= number_format($totalOnus) ?></div>
                         <div class="kpi-label">Total Authorized</div>
                     </div>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
                     <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="kpi-icon" style="background: rgba(99,102,241,0.1); color: #6366f1;">
+                            <div class="kpi-icon" style="background: rgba(99,102,241,0.06); color: #818cf8;">
                                 <i class="bi bi-hdd-rack-fill"></i>
                             </div>
-                            <span class="kpi-badge" style="background: rgba(16,185,129,0.1); color: #10b981;">
+                            <span class="kpi-badge" style="background: rgba(52,211,153,0.1); color: #34d399;">
                                 <i class="bi bi-circle-fill" style="font-size: 5px;"></i> <?= $stats['active_olts'] ?> Active
                             </span>
                         </div>
-                        <div class="kpi-value" style="color: #6366f1;"><?= $stats['total_olts'] ?></div>
+                        <div class="kpi-value"><?= $stats['total_olts'] ?></div>
                         <div class="kpi-label">OLT Devices</div>
                     </div>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
                     <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="kpi-icon" style="background: rgba(16,185,129,0.1); color: #10b981;">
+                            <div class="kpi-icon" style="background: rgba(52,211,153,0.08); color: #34d399;">
                                 <i class="bi bi-wifi"></i>
                             </div>
-                            <span class="kpi-badge" style="background: rgba(16,185,129,0.1); color: #10b981;">
+                            <span class="kpi-badge" style="background: rgba(52,211,153,0.1); color: #34d399;">
                                 <i class="bi bi-arrow-up"></i> <?= $uptimePercent ?>%
                             </span>
                         </div>
-                        <div class="kpi-value" style="color: #10b981;"><?= number_format($stats['online_onus']) ?></div>
+                        <div class="kpi-value"><?= number_format($stats['online_onus']) ?></div>
                         <div class="kpi-label">Online ONUs</div>
                     </div>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
                     <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="kpi-icon" style="background: rgba(100,116,139,0.1); color: #64748b;">
+                            <div class="kpi-icon" style="background: rgba(148,163,184,0.1); color: #94a3b8;">
                                 <i class="bi bi-wifi-off"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&status=offline" class="kpi-badge text-decoration-none" style="background: <?= $stats['offline_onus'] > 0 ? 'rgba(100,116,139,0.1); color: #64748b;' : 'rgba(16,185,129,0.1); color: #10b981;' ?>">
+                            <a href="?page=huawei-olt&view=onus&status=offline" class="kpi-badge text-decoration-none" style="background: <?= $stats['offline_onus'] > 0 ? 'rgba(148,163,184,0.1); color: #94a3b8;' : 'rgba(52,211,153,0.1); color: #34d399;' ?>">
                                 <?= $stats['offline_onus'] > 0 ? '<i class="bi bi-x-circle"></i> Down' : '<i class="bi bi-check-circle"></i> OK' ?>
                             </a>
                         </div>
-                        <div class="kpi-value" style="color: #64748b;"><?= number_format($stats['offline_onus']) ?></div>
+                        <div class="kpi-value"><?= number_format($stats['offline_onus']) ?></div>
                         <div class="kpi-label">Offline</div>
                     </div>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
                     <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="kpi-icon" style="background: rgba(239,68,68,0.1); color: #ef4444;">
+                            <div class="kpi-icon" style="background: rgba(248,113,113,0.08); color: #f87171;">
                                 <i class="bi bi-exclamation-triangle-fill"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&status=los" class="kpi-badge text-decoration-none" style="background: <?= $stats['los_onus'] > 0 ? 'rgba(239,68,68,0.1); color: #ef4444;' : 'rgba(16,185,129,0.1); color: #10b981;' ?>">
+                            <a href="?page=huawei-olt&view=onus&status=los" class="kpi-badge text-decoration-none" style="background: <?= $stats['los_onus'] > 0 ? 'rgba(248,113,113,0.1); color: #f87171;' : 'rgba(52,211,153,0.1); color: #34d399;' ?>">
                                 <?= $stats['los_onus'] > 0 ? '<i class="bi bi-exclamation-circle"></i>' : '<i class="bi bi-check-circle"></i> OK' ?>
                             </a>
                         </div>
-                        <div class="kpi-value" style="color: #ef4444;"><?= number_format($stats['los_onus']) ?></div>
+                        <div class="kpi-value"><?= number_format($stats['los_onus']) ?></div>
                         <div class="kpi-label">LOS</div>
                     </div>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
                     <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="kpi-icon" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
+                            <div class="kpi-icon" style="background: rgba(251,191,36,0.08); color: #fbbf24;">
                                 <i class="bi bi-hourglass-split"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="kpi-badge text-decoration-none" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
+                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="kpi-badge text-decoration-none" style="background: rgba(251,191,36,0.08); color: #d97706;">
                                 View <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
-                        <div class="kpi-value" style="color: #f59e0b;"><?= number_format($stats['unconfigured_onus']) ?></div>
+                        <div class="kpi-value"><?= number_format($stats['unconfigured_onus']) ?></div>
                         <div class="kpi-label">Pending Auth</div>
                     </div>
                 </div>
@@ -7937,21 +7922,21 @@ try {
                             </div>
                             <div class="row text-center mt-3 g-2">
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(16,185,129,0.08);">
-                                        <div class="fw-bold text-success" style="font-size: 1.1rem;"><?= number_format($stats['online_onus']) ?></div>
-                                        <small class="text-muted" style="font-size: 0.7rem;">Online</small>
+                                    <div class="p-2 rounded-3" style="background: rgba(52,211,153,0.08);">
+                                        <div class="fw-bold" style="color: #334155; font-size: 1rem;"><?= number_format($stats['online_onus']) ?></div>
+                                        <small style="color: #94a3b8; font-size: 0.7rem;">Online</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(100,116,139,0.08);">
-                                        <div class="fw-bold" style="color: #64748b; font-size: 1.1rem;"><?= number_format($stats['offline_onus']) ?></div>
-                                        <small class="text-muted" style="font-size: 0.7rem;">Offline</small>
+                                    <div class="p-2 rounded-3" style="background: rgba(148,163,184,0.08);">
+                                        <div class="fw-bold" style="color: #334155; font-size: 1rem;"><?= number_format($stats['offline_onus']) ?></div>
+                                        <small style="color: #94a3b8; font-size: 0.7rem;">Offline</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(239,68,68,0.08);">
-                                        <div class="fw-bold text-danger" style="font-size: 1.1rem;"><?= number_format($stats['los_onus']) ?></div>
-                                        <small class="text-muted" style="font-size: 0.7rem;">LOS</small>
+                                    <div class="p-2 rounded-3" style="background: rgba(248,113,113,0.06);">
+                                        <div class="fw-bold" style="color: #334155; font-size: 1rem;"><?= number_format($stats['los_onus']) ?></div>
+                                        <small style="color: #94a3b8; font-size: 0.7rem;">LOS</small>
                                     </div>
                                 </div>
                             </div>
@@ -7970,7 +7955,7 @@ try {
                             </div>
                             <div class="d-flex flex-wrap gap-2 mt-3 justify-content-center">
                                 <?php
-                                $sqColors = ['Excellent' => '#10b981', 'Good' => '#06b6d4', 'Fair' => '#f59e0b', 'Weak' => '#f97316', 'Critical' => '#ef4444', 'No Reading' => '#94a3b8'];
+                                $sqColors = ['Excellent' => '#34d399', 'Good' => '#60a5fa', 'Fair' => '#fbbf24', 'Weak' => '#fb923c', 'Critical' => '#f87171', 'No Reading' => '#cbd5e1'];
                                 foreach ($sqColors as $label => $color):
                                     $cnt = $signalData[$label] ?? 0;
                                     if ($cnt > 0):
@@ -8105,31 +8090,31 @@ try {
                             <div class="row g-2">
                                 <div class="col-6">
                                     <a href="?page=huawei-olt&view=onus&unconfigured=1" class="quick-btn">
-                                        <div class="qb-icon" style="background: rgba(16,185,129,0.1); color: #10b981;"><i class="bi bi-plus-circle-fill"></i></div>
+                                        <div class="qb-icon" style="background: rgba(52,211,153,0.08); color: #34d399;"><i class="bi bi-plus-circle-fill"></i></div>
                                         <div class="fw-semibold" style="font-size: 0.8rem;">Authorize</div>
                                     </a>
                                 </div>
                                 <div class="col-6">
                                     <a href="?page=huawei-olt&view=live_monitor" class="quick-btn">
-                                        <div class="qb-icon" style="background: rgba(59,130,246,0.1); color: #3b82f6;"><i class="bi bi-broadcast-pin"></i></div>
+                                        <div class="qb-icon" style="background: rgba(96,165,250,0.08); color: #60a5fa;"><i class="bi bi-broadcast-pin"></i></div>
                                         <div class="fw-semibold" style="font-size: 0.8rem;">Live Monitor</div>
                                     </a>
                                 </div>
                                 <div class="col-6">
                                     <a href="?page=huawei-olt&view=tr069" class="quick-btn">
-                                        <div class="qb-icon" style="background: rgba(6,182,212,0.1); color: #06b6d4;"><i class="bi bi-router-fill"></i></div>
+                                        <div class="qb-icon" style="background: rgba(148,163,184,0.08); color: #94a3b8;"><i class="bi bi-router-fill"></i></div>
                                         <div class="fw-semibold" style="font-size: 0.8rem;">TR-069</div>
                                     </a>
                                 </div>
                                 <div class="col-6">
                                     <a href="?page=huawei-olt&view=terminal" class="quick-btn">
-                                        <div class="qb-icon" style="background: rgba(30,41,59,0.1); color: #1e293b;"><i class="bi bi-terminal-fill"></i></div>
+                                        <div class="qb-icon" style="background: rgba(71,85,105,0.08); color: #64748b;"><i class="bi bi-terminal-fill"></i></div>
                                         <div class="fw-semibold" style="font-size: 0.8rem;">CLI Terminal</div>
                                     </a>
                                 </div>
                                 <div class="col-12">
                                     <button type="button" class="quick-btn w-100 border-1" onclick="showBulkBindTR069Modal()">
-                                        <div class="qb-icon mx-auto" style="background: rgba(99,102,241,0.1); color: #6366f1;"><i class="bi bi-gear-wide-connected"></i></div>
+                                        <div class="qb-icon mx-auto" style="background: rgba(129,140,248,0.08); color: #818cf8;"><i class="bi bi-gear-wide-connected"></i></div>
                                         <div class="fw-semibold" style="font-size: 0.8rem;">Setup TR-069 + GenieACS</div>
                                     </button>
                                 </div>
@@ -8232,7 +8217,7 @@ try {
                         labels: ['Online', 'Offline', 'LOS'],
                         datasets: [{
                             data: [<?= (int)$stats['online_onus'] ?>, <?= (int)$stats['offline_onus'] ?>, <?= (int)$stats['los_onus'] ?>],
-                            backgroundColor: ['#10b981', '#64748b', '#ef4444'],
+                            backgroundColor: ['#34d399', '#94a3b8', '#f87171'],
                             borderWidth: 0,
                             hoverOffset: 8,
                             spacing: 2,
@@ -8246,11 +8231,11 @@ try {
                         plugins: {
                             legend: { display: false },
                             tooltip: {
-                                backgroundColor: '#1e293b',
+                                backgroundColor: '#475569',
                                 titleFont: { size: 13, weight: '600' },
                                 bodyFont: { size: 12 },
                                 padding: 12,
-                                cornerRadius: 10,
+                                cornerRadius: 8,
                                 callbacks: {
                                     label: function(ctx) {
                                         let total = ctx.dataset.data.reduce((a,b) => a+b, 0);
@@ -8268,11 +8253,11 @@ try {
                             const cx = left + width / 2, cy = top + height / 2;
                             ctx.save();
                             ctx.textAlign = 'center';
-                            ctx.fillStyle = '#10b981';
-                            ctx.font = 'bold 28px ' + chartFont.family;
+                            ctx.fillStyle = '#475569';
+                            ctx.font = '600 26px ' + chartFont.family;
                             ctx.fillText('<?= $uptimePercent ?>%', cx, cy);
                             ctx.fillStyle = '#94a3b8';
-                            ctx.font = '500 11px ' + chartFont.family;
+                            ctx.font = '400 11px ' + chartFont.family;
                             ctx.fillText('Uptime', cx, cy + 18);
                             ctx.restore();
                         }
@@ -8293,11 +8278,11 @@ try {
                                 <?= $signalData['Critical'] ?? 0 ?>
                             ],
                             backgroundColor: [
-                                'rgba(16,185,129,0.8)',
-                                'rgba(6,182,212,0.8)',
-                                'rgba(245,158,11,0.8)',
-                                'rgba(249,115,22,0.8)',
-                                'rgba(239,68,68,0.8)'
+                                'rgba(52,211,153,0.7)',
+                                'rgba(96,165,250,0.7)',
+                                'rgba(251,191,36,0.7)',
+                                'rgba(251,146,60,0.7)',
+                                'rgba(248,113,113,0.7)'
                             ],
                             borderRadius: 8,
                             borderSkipped: false,
@@ -8311,9 +8296,9 @@ try {
                         plugins: {
                             legend: { display: false },
                             tooltip: {
-                                backgroundColor: '#1e293b',
+                                backgroundColor: '#475569',
                                 padding: 12,
-                                cornerRadius: 10,
+                                cornerRadius: 8,
                                 callbacks: {
                                     label: function(ctx) {
                                         let ranges = {'Excellent': '> -15 dBm', 'Good': '-20 to -15', 'Fair': '-25 to -20', 'Weak': '-28 to -25', 'Critical': '< -28 dBm'};
@@ -8346,14 +8331,14 @@ try {
                             {
                                 label: 'Online',
                                 data: ponData.map(p => parseInt(p.online)),
-                                backgroundColor: 'rgba(16,185,129,0.75)',
+                                backgroundColor: 'rgba(52,211,153,0.65)',
                                 borderRadius: { topLeft: 4, topRight: 4 },
                                 borderSkipped: false
                             },
                             {
                                 label: 'Offline',
                                 data: ponData.map(p => parseInt(p.offline)),
-                                backgroundColor: 'rgba(239,68,68,0.6)',
+                                backgroundColor: 'rgba(148,163,184,0.5)',
                                 borderRadius: { topLeft: 4, topRight: 4 },
                                 borderSkipped: false
                             }
@@ -8369,9 +8354,9 @@ try {
                                 labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true, padding: 16, font: { size: 11, weight: '500' } }
                             },
                             tooltip: {
-                                backgroundColor: '#1e293b',
+                                backgroundColor: '#475569',
                                 padding: 12,
-                                cornerRadius: 10,
+                                cornerRadius: 8,
                                 callbacks: {
                                     afterBody: function(ctx) {
                                         let idx = ctx[0].dataIndex;
