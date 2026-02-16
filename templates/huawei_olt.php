@@ -5945,6 +5945,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
 
                 if (!$oltId) {
                     if ($isAjaxPost) {
+                        ob_end_clean();
                         header('Content-Type: application/json');
                         echo json_encode(['success' => false, 'error' => 'Please select an OLT']);
                         exit;
@@ -5967,6 +5968,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 if (!$workerPath || !file_exists($workerPath)) {
                     $db->prepare("UPDATE background_jobs SET status = 'failed', message = 'Worker script not found' WHERE id = ?")->execute([$jobId]);
                     if ($isAjaxPost) {
+                        ob_end_clean();
                         header('Content-Type: application/json');
                         echo json_encode(['success' => false, 'error' => 'Worker script not found']);
                         exit;
@@ -5982,6 +5984,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $slotLabel = $targetSlot !== null ? " (Slot {$targetSlot})" : " (All slots)";
 
                 if ($isAjaxPost) {
+                    ob_end_clean();
                     header('Content-Type: application/json');
                     echo json_encode(['success' => true, 'job_id' => (int)$jobId, 'message' => "TR-069 bulk setup started{$slotLabel}"]);
                     exit;
@@ -6003,6 +6006,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
         }
     } catch (Exception $e) {
         if ($isAjaxPost) {
+            ob_end_clean();
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             exit;
