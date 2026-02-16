@@ -162,14 +162,32 @@ try {
             }
         }
         
-        // Send WhatsApp LOS notification per ONU using unified template
         $losTemplate = $settings->get('wa_template_oms_los_alert', 
-            "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site."
+            "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* {current_status}\n\n🔧 {action_message}"
+        );
+        $offlineTemplate = $settings->get('wa_template_oms_offline_alert',
+            "📴 *ONU OFFLINE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* {current_status}"
         );
         
         $messages = [];
         foreach ($faults as $f) {
             $onuPort = "0/{$f['slot']}/{$f['port']}:{$f['onu_id']}";
+            $newStatus = $f['new_status'] ?? 'offline';
+            
+            if ($newStatus === 'los') {
+                $template = $losTemplate;
+                $currentStatus = 'LOS (Loss of Signal)';
+                $actionMessage = 'Please check fiber connection and customer site.';
+            } elseif ($newStatus === 'dying-gasp') {
+                $template = $losTemplate;
+                $currentStatus = 'Dying Gasp (Power Failure)';
+                $actionMessage = 'Customer may have a power outage. Check power supply.';
+            } else {
+                $template = $offlineTemplate;
+                $currentStatus = 'Offline';
+                $actionMessage = '';
+            }
+            
             $message = str_replace([
                 '{olt_name}',
                 '{olt_ip}',
@@ -180,6 +198,8 @@ try {
                 '{onu_port}',
                 '{alert_time}',
                 '{previous_status}',
+                '{current_status}',
+                '{action_message}',
                 '{customer_name}',
                 '{customer_phone}'
             ], [
@@ -192,9 +212,11 @@ try {
                 $onuPort,
                 date('Y-m-d H:i:s'),
                 $f['prev_status'] ?? 'online',
+                $currentStatus,
+                $actionMessage,
                 $f['customer_name'] ?? 'Unknown',
                 $f['customer_phone'] ?? ''
-            ], $losTemplate);
+            ], $template);
             $messages[] = $message;
         }
         
