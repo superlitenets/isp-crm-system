@@ -11656,7 +11656,7 @@ try {
                                 
                                 <div class="alert alert-info small">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    This will ensure GenieACS auto-provision is ready, bind TR-069 profile to this ONU, and reboot it. The ONU will auto-register in GenieACS and receive CR credentials on first Inform.
+                                    This will bind the TR-069 profile to this ONU (no reboot). The ONU will auto-register in GenieACS and receive CR credentials on its next Inform cycle.
                                 </div>
                                 
                                 <div class="mb-3">
