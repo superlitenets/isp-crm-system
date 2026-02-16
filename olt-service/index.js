@@ -1201,13 +1201,16 @@ const PORT = process.env.OLT_SERVICE_PORT || 3002;
 const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '0 * * * * *'; // CLI autofind every 60s (for new ONUs only)
 const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 300; // SNMP polling every 5 minutes (reduced to prevent slowdowns)
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
     discoveryWorker.start(DISCOVERY_INTERVAL);
     snmpWorker.start(SNMP_INTERVAL);
     console.log(`[Discovery] CLI autofind started (every 60s - for new unconfigured ONUs)`);
     console.log(`[SNMP] Background polling started (every ${SNMP_INTERVAL}s - for status updates)`);
 });
+server.timeout = 300000;
+server.keepAliveTimeout = 300000;
+server.headersTimeout = 310000;
 
 process.on('SIGTERM', async () => {
     console.log('Shutting down OLT Session Manager...');

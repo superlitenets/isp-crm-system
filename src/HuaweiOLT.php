@@ -5001,7 +5001,7 @@ class HuaweiOLT {
     
     // ==================== ONU Operations ====================
     
-    public function executeCommand(int $oltId, string $command, bool $forceDirectConnection = false): array {
+    public function executeCommand(int $oltId, string $command, bool $forceDirectConnection = false, int $timeout = 120000): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'message' => 'OLT not found'];
@@ -5012,14 +5012,14 @@ class HuaweiOLT {
             if (!$this->isOLTServiceAvailable()) {
                 return ['success' => false, 'message' => 'OLT Session Service not available. Please ensure it is running.'];
             }
-            return $this->executeViaService($oltId, $command);
+            return $this->executeViaService($oltId, $command, $timeout);
         }
         
         // SSH connections - use OLT Session Service (Node.js has better SSH support)
         if ($olt['connection_type'] === 'ssh') {
             // Prefer OLT Session Service for SSH (more reliable, maintains sessions)
             if ($this->isOLTServiceAvailable()) {
-                return $this->executeViaService($oltId, $command);
+                return $this->executeViaService($oltId, $command, $timeout);
             }
             
             // Fallback to direct SSH only if service unavailable and PHP has ssh2
@@ -5586,7 +5586,8 @@ class HuaweiOLT {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        $requestTimeout = $data['timeout'] ?? 60000;
+        curl_setopt($ch, CURLOPT_TIMEOUT, max(60, (int)ceil($requestTimeout / 1000) + 30));
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
         
         if ($method === 'POST') {
@@ -5691,7 +5692,7 @@ class HuaweiOLT {
         return $this->callOLTService('/sessions', [], 'GET');
     }
     
-    public function executeViaService(int $oltId, string $command, int $timeout = 30000): array {
+    public function executeViaService(int $oltId, string $command, int $timeout = 120000): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'error' => 'OLT not found'];

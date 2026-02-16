@@ -5914,6 +5914,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 echo json_encode($result);
                 exit;
             case 'setup_tr069_full':
+                set_time_limit(300);
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
                 $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
@@ -5970,7 +5971,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         }
                         $scriptLines[] = "quit";
 
-                        $result = $huaweiOLT->executeCommand($oltId, implode("\r\n", $scriptLines));
+                        $slotTimeout = max(120000, count($slotOnus) * 3000);
+                        $result = $huaweiOLT->executeCommand($oltId, implode("\r\n", $scriptLines), false, $slotTimeout);
                         $out = $result['output'] ?? '';
 
                         if ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out)) {
