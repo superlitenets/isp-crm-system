@@ -201,10 +201,9 @@ class SNMPPollingWorker {
         }
         
         const onuResult = await this.pool.query(`
-            SELECT id, frame, slot, port, onu_id FROM huawei_onus 
+            SELECT id, frame, slot, port, onu_id, status FROM huawei_onus 
             WHERE olt_id = $1 AND is_authorized = true
             ORDER BY frame, slot, port, onu_id
-            LIMIT 100
         `, [olt.id]);
         
         if (onuResult.rows.length === 0) {
@@ -218,6 +217,32 @@ class SNMPPollingWorker {
         
         console.log(`[CLI] Polling ${onuResult.rows.length} ONUs for OLT ${olt.name} via CLI...`);
         
+        const oltKey = olt.id.toString();
+        const existingSession = this.sessionManager.sessions?.get(oltKey);
+        if (!existingSession || !existingSession.connected) {
+            try {
+                const configResult = await this.pool.query(`
+                    SELECT ip_address, telnet_port, ssh_port, username, password, protocol, enable_password
+                    FROM huawei_olts WHERE id = $1
+                `, [olt.id]);
+                if (configResult.rows.length > 0) {
+                    const cfg = configResult.rows[0];
+                    await this.sessionManager.connect(oltKey, {
+                        host: cfg.ip_address,
+                        port: cfg.protocol === 'ssh' ? (cfg.ssh_port || 22) : (cfg.telnet_port || 23),
+                        username: cfg.username,
+                        password: cfg.password,
+                        enablePassword: cfg.enable_password,
+                        protocol: cfg.protocol || 'telnet'
+                    });
+                    console.log(`[CLI] Connected to OLT ${olt.name} for polling`);
+                }
+            } catch (connErr) {
+                console.log(`[CLI] Cannot connect to OLT ${olt.name}: ${connErr.message} - preserving current status`);
+                return { onuCount: 0, method: 'cli', error: connErr.message };
+            }
+        }
+
         // Group by frame/slot/port for efficient batch querying
         const groupedByPort = {};
         for (const onu of onuResult.rows) {
@@ -227,7 +252,6 @@ class SNMPPollingWorker {
         }
         
         let updated = 0;
-        const oltKey = olt.id.toString();
         
         try {
             for (const [portKey, onus] of Object.entries(groupedByPort)) {
@@ -238,10 +262,7 @@ class SNMPPollingWorker {
                     const cmd = `display ont info ${frame} ${slot} ${port} all`;
                     const result = await this.sessionManager.execute(oltKey, cmd, { timeout: 30000 });
                     
-                    // Debug: log the first 500 chars of output for troubleshooting
-                    if (result) {
-                        console.log(`[CLI] Port ${portKey} output (${result.length} chars): ${result.substring(0, 300).replace(/\n/g, '\\n')}`);
-                    }
+                    if (!result) continue;
                     
                     // Parse results to get status for each ONU
                     // Huawei format varies, but typically:
@@ -271,13 +292,12 @@ class SNMPPollingWorker {
                                 else if (state.includes('los')) status = 'los';
                                 else if (state === 'offline') status = 'offline';
                                 found = true;
-                                console.log(`[CLI] ONU ${onu.onu_id} matched pattern, state: ${state}`);
                                 break;
                             }
                         }
                         
-                        if (!found) {
-                            console.log(`[CLI] ONU ${onu.onu_id} not matched in output, defaulting to offline`);
+                        if (!found && updated < 5) {
+                            console.log(`[CLI] ONU ${portKey}/${onu.onu_id} not matched in output, defaulting to offline`);
                         }
                         
                         // Handle online_since transition properly
@@ -300,21 +320,7 @@ class SNMPPollingWorker {
                         updated++;
                     }
                 } catch (e) {
-                    console.log(`[CLI] Error polling port ${portKey}: ${e.message}`);
-                    // Mark these ONUs as offline since we can't check them
-                    for (const onu of onus) {
-                        // Only clear online_since if ONU was online before
-                        if (onu.status === 'online') {
-                            await this.pool.query(`
-                                UPDATE huawei_onus SET status = 'offline', snmp_status = 'offline', online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1
-                            `, [onu.id]);
-                        } else {
-                            await this.pool.query(`
-                                UPDATE huawei_onus SET status = 'offline', snmp_status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = $1
-                            `, [onu.id]);
-                        }
-                        updated++;
-                    }
+                    console.log(`[CLI] Error polling port ${portKey}: ${e.message} - preserving current status for ${onus.length} ONUs`);
                 }
             }
         } catch (e) {
@@ -850,13 +856,13 @@ class SNMPPollingWorker {
             }
 
             const onusResult = await this.pool.query(
-                "SELECT id, serial_number FROM huawei_onus WHERE is_authorized = true AND serial_number IS NOT NULL"
+                "SELECT id, sn FROM huawei_onus WHERE is_authorized = true AND sn IS NOT NULL"
             );
             if (onusResult.rows.length === 0) return;
 
             const serialToOnu = {};
             for (const onu of onusResult.rows) {
-                const sn = onu.serial_number.replace(/[\s-]/g, '').toUpperCase();
+                const sn = onu.sn.replace(/[\s-]/g, '').toUpperCase();
                 serialToOnu[sn] = onu.id;
                 if (sn.length >= 12) {
                     serialToOnu[sn.substring(4)] = onu.id;
