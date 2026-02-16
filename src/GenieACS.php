@@ -211,25 +211,78 @@ class GenieACS {
     }
 
     public function syncCustomerTags(\PDO $db): array {
+        $results = ['success' => 0, 'failed' => 0, 'skipped' => 0, 'errors' => []];
+
+        $genieDevices = $this->fetchAllGenieACSDevices();
+        if (empty($genieDevices)) {
+            $results['errors'][] = 'Could not fetch devices from GenieACS';
+            return $results;
+        }
+
+        $genieMap = [];
+        foreach ($genieDevices as $dev) {
+            $id = $dev['_id'] ?? '';
+            if (empty($id)) continue;
+            $genieMap[$id] = $id;
+            $serial = $dev['_deviceId']['_SerialNumber'] ?? '';
+            if (!empty($serial)) {
+                $genieMap[strtoupper($serial)] = $id;
+            }
+            if (preg_match('/[0-9A-Fa-f]{8,}$/', $id, $m)) {
+                $suffix = strtoupper($m[0]);
+                if (!isset($genieMap[$suffix])) {
+                    $genieMap[$suffix] = $id;
+                }
+            }
+        }
+
         $stmt = $db->query("
             SELECT o.id, o.sn, o.name, o.customer_name, o.customer_id, o.tr069_device_id, o.genieacs_id
             FROM huawei_onus o
             WHERE o.is_authorized = true
-              AND ((o.genieacs_id IS NOT NULL AND o.genieacs_id != '')
-                OR (o.tr069_device_id IS NOT NULL AND o.tr069_device_id != ''))
         ");
-        
-        $results = ['success' => 0, 'failed' => 0, 'skipped' => 0, 'errors' => []];
-        
+
         $updateGenieId = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
-        
+
         while ($onu = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            $deviceId = !empty($onu['genieacs_id']) ? $onu['genieacs_id'] : $onu['tr069_device_id'];
-            if (empty($deviceId)) {
+            $deviceId = null;
+            if (!empty($onu['genieacs_id']) && isset($genieMap[$onu['genieacs_id']])) {
+                $deviceId = $onu['genieacs_id'];
+            } elseif (!empty($onu['tr069_device_id']) && isset($genieMap[$onu['tr069_device_id']])) {
+                $deviceId = $onu['tr069_device_id'];
+                $updateGenieId->execute([$deviceId, $onu['id']]);
+            }
+
+            if (!$deviceId) {
+                $sn = strtoupper(trim($onu['sn'] ?? ''));
+                if (!empty($sn)) {
+                    if (isset($genieMap[$sn])) {
+                        $deviceId = $genieMap[$sn];
+                        $updateGenieId->execute([$deviceId, $onu['id']]);
+                    } else {
+                        $snHex = preg_match('/^[A-Z]{4}(.+)$/i', $sn, $m) ? strtoupper($m[1]) : '';
+                        if (!empty($snHex) && isset($genieMap[$snHex])) {
+                            $deviceId = $genieMap[$snHex];
+                            $updateGenieId->execute([$deviceId, $onu['id']]);
+                        } else {
+                            $asciiSn = '';
+                            for ($i = 0; $i < strlen($sn); $i++) {
+                                $asciiSn .= strtoupper(dechex(ord($sn[$i])));
+                            }
+                            if (isset($genieMap[$asciiSn])) {
+                                $deviceId = $genieMap[$asciiSn];
+                                $updateGenieId->execute([$deviceId, $onu['id']]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!$deviceId) {
                 $results['skipped']++;
                 continue;
             }
-            
+
             $onuName = trim($onu['name'] ?? '');
             $customerName = '';
             if (!empty($onuName) && !preg_match('/^(HWTC|TDTC|ZTEG|[A-F0-9]{12,})/i', $onuName)) {
@@ -246,39 +299,45 @@ class GenieACS {
                     $customerName = $onuName;
                 }
             }
-            
+
             if (empty($customerName)) {
                 $results['skipped']++;
                 continue;
             }
-            
+
             $tag = $this->sanitizeTag($customerName);
             $result = $this->addTag($deviceId, $tag);
-            
+
             if ($result['success']) {
                 $results['success']++;
-            } else if (strpos($result['error'] ?? '', '404') !== false) {
-                $lookup = $this->getDeviceBySerial($onu['sn']);
-                if ($lookup['success'] && !empty($lookup['device']['_id'])) {
-                    $verifiedId = $lookup['device']['_id'];
-                    $updateGenieId->execute([$verifiedId, $onu['id']]);
-                    $retryResult = $this->addTag($verifiedId, $tag);
-                    if ($retryResult['success']) {
-                        $results['success']++;
-                    } else {
-                        $results['failed']++;
-                        $results['errors'][] = "ONU {$onu['sn']}: retry failed - {$retryResult['error']}";
-                    }
-                } else {
-                    $results['skipped']++;
-                }
             } else {
                 $results['failed']++;
-                $results['errors'][] = "ONU {$onu['sn']}: {$result['error']}";
+                if (count($results['errors']) < 10) {
+                    $results['errors'][] = "ONU {$onu['sn']}: {$result['error']}";
+                }
             }
         }
-        
+
         return $results;
+    }
+
+    private function fetchAllGenieACSDevices(): array {
+        $allDevices = [];
+        $skip = 0;
+        $limit = 500;
+        $maxPages = 20;
+
+        for ($page = 0; $page < $maxPages; $page++) {
+            $query = ['limit' => $limit, 'skip' => $skip];
+            $query['projection'] = '_id,_deviceId._SerialNumber';
+            $result = $this->request('GET', '/devices', null, $query);
+            if (!$result['success'] || empty($result['data'])) break;
+            $allDevices = array_merge($allDevices, $result['data']);
+            if (count($result['data']) < $limit) break;
+            $skip += $limit;
+        }
+
+        return $allDevices;
     }
 
     public function syncSingleOnuTag(string $deviceId, string $customerName): array {
