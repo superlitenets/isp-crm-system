@@ -365,19 +365,42 @@ class SNMPPollingWorker {
             ];
 
             const tryWalk = (oid) => {
+                const baseLen = oid.split('.').length;
                 return new Promise((res) => {
                     const results = [];
+                    let logCount = 0;
                     session.subtree(oid, 20, (varbinds) => {
                         varbinds.forEach(vb => {
                             if (snmp.isVarbindError(vb)) return;
                             
                             const oidParts = vb.oid.split('.');
-                            const onuIndex = oidParts.slice(-2).join('.');
+                            const indexParts = oidParts.slice(baseLen);
                             const statusCode = parseInt(vb.value);
                             const status = this.STATUS_MAP[statusCode] || 'unknown';
                             
+                            let frame = 0, slot = 0, port = 0, onuId = 0;
+                            
+                            if (indexParts.length >= 4) {
+                                frame = parseInt(indexParts[0]);
+                                slot = parseInt(indexParts[1]);
+                                port = parseInt(indexParts[2]);
+                                onuId = parseInt(indexParts[3]);
+                            } else if (indexParts.length >= 2) {
+                                const ifIndex = parseInt(indexParts[0]);
+                                onuId = parseInt(indexParts[1]);
+                                const ponIndex = ifIndex > 0xFFFFFF ? (ifIndex & 0xFFFFFF) : ifIndex;
+                                slot = (ponIndex >> 13) & 0x1F;
+                                port = (ponIndex >> 8) & 0x1F;
+                            }
+                            
+                            if (logCount < 3) {
+                                console.log(`[SNMP] ONU sample: index=${indexParts.join('.')}, decoded=f${frame}/s${slot}/p${port}/o${onuId}, status=${status}`);
+                                logCount++;
+                            }
+                            
                             results.push({
-                                index: onuIndex,
+                                index: indexParts.join('.'),
+                                frame, slot, port, onuId,
                                 statusCode,
                                 status
                             });
@@ -420,17 +443,34 @@ class SNMPPollingWorker {
             let completedWalks = 0;
 
             const walkOid = (oid, field) => {
+                const baseLen = oid.split('.').length;
                 session.subtree(oid, 20, (varbinds) => {
                     varbinds.forEach(vb => {
                         if (snmp.isVarbindError(vb)) return;
                         const oidParts = vb.oid.split('.');
-                        const index = oidParts.slice(-2).join('.');
+                        const indexParts = oidParts.slice(baseLen);
                         const rawValue = parseInt(vb.value);
                         if (isNaN(rawValue) || rawValue === 2147483647 || rawValue === -2147483648) return;
                         const dbm = rawValue / 100.0;
                         if (dbm < -50 || dbm > 10) return;
-                        if (!powerData[index]) powerData[index] = {};
-                        powerData[index][field] = dbm;
+                        
+                        let frame = 0, slot = 0, port = 0, onuId = 0;
+                        if (indexParts.length >= 4) {
+                            frame = parseInt(indexParts[0]);
+                            slot = parseInt(indexParts[1]);
+                            port = parseInt(indexParts[2]);
+                            onuId = parseInt(indexParts[3]);
+                        } else if (indexParts.length >= 2) {
+                            const ifIndex = parseInt(indexParts[0]);
+                            onuId = parseInt(indexParts[1]);
+                            const ponIndex = ifIndex > 0xFFFFFF ? (ifIndex & 0xFFFFFF) : ifIndex;
+                            slot = (ponIndex >> 13) & 0x1F;
+                            port = (ponIndex >> 8) & 0x1F;
+                        }
+                        
+                        const key = `${slot}.${port}.${onuId}`;
+                        if (!powerData[key]) powerData[key] = { slot, port, onuId };
+                        powerData[key][field] = dbm;
                     });
                 }, (error) => {
                     if (error) {
@@ -457,20 +497,9 @@ class SNMPPollingWorker {
         try {
             await client.query('BEGIN');
             let updated = 0;
-            const statusMap = {};
-            for (const s of statuses) {
-                statusMap[s.index] = s.status;
-            }
 
-            for (const [index, power] of Object.entries(powerData)) {
-                const parts = index.split('.');
-                if (parts.length < 2) continue;
-
-                const slotPortId = parseInt(parts[0]);
-                const onuId = parseInt(parts[1]);
-                const slot = Math.floor((slotPortId - 4294901760) / 256);
-                const port = (slotPortId - 4294901760) % 256;
-
+            for (const [key, power] of Object.entries(powerData)) {
+                const { slot, port, onuId } = power;
                 const rx = power.rx_power ?? null;
                 const tx = power.tx_power ?? null;
 
@@ -545,17 +574,10 @@ class SNMPPollingWorker {
             await client.query('BEGIN');
             
             let updated = 0;
+            let noMatch = 0;
             for (const s of statuses) {
-                const parts = s.index.split('.');
-                if (parts.length < 2) continue;
+                const { frame, slot, port, onuId } = s;
                 
-                const slotPortId = parseInt(parts[0]);
-                const onuId = parseInt(parts[1]);
-                
-                const slot = Math.floor((slotPortId - 4294901760) / 256);
-                const port = (slotPortId - 4294901760) % 256;
-                
-                // Check previous status to detect faults
                 const prevResult = await client.query(`
                     SELECT o.id, o.sn, o.status as prev_status, o.description, o.name,
                            c.name as customer_name, c.phone as customer_phone, c.id as customer_id
@@ -594,7 +616,6 @@ class SNMPPollingWorker {
                 
                 if (result.rowCount > 0) {
                     updated++;
-                    // Detect fault: was online, now offline/los/dying-gasp
                     if (prevOnu && prevStatus === 'online' && 
                         ['offline', 'los', 'dying-gasp'].includes(s.status)) {
                         faults.push({
@@ -609,13 +630,13 @@ class SNMPPollingWorker {
                             customer_id: prevOnu.customer_id
                         });
                     }
+                } else {
+                    noMatch++;
                 }
             }
 
             await client.query('COMMIT');
-            if (updated > 0) {
-                console.log(`[SNMP] Updated ${updated} ONU statuses for OLT ${oltId}`);
-            }
+            console.log(`[SNMP] OLT ${oltId}: updated ${updated}/${statuses.length} ONU statuses${noMatch > 0 ? ` (${noMatch} not matched in DB)` : ''}`);
             
             // Send fault notifications
             if (faults.length > 0) {
