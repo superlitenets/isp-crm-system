@@ -3158,6 +3158,21 @@ function initializeAccountingTables(\PDO $db) {
         setting_value TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS background_jobs (
+        id SERIAL PRIMARY KEY,
+        job_type VARCHAR(50) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        progress INTEGER DEFAULT 0,
+        total INTEGER DEFAULT 0,
+        message TEXT,
+        result JSONB,
+        params JSONB,
+        user_id INTEGER,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
     
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id);
