@@ -2166,7 +2166,7 @@ if ($page === 'login') {
 // OMS (ONU Management System) - standalone page with its own layout
 if ($page === 'huawei-olt') {
     \App\Auth::requireLogin();
-    if (!\App\Auth::can('settings.view')) {
+    if (!\App\Auth::canAny(['oms.view', 'oms.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
     }
@@ -2177,7 +2177,7 @@ if ($page === 'huawei-olt') {
 // Finance Module - standalone page with its own layout
 if ($page === 'finance') {
     \App\Auth::requireLogin();
-    if (!\App\Auth::can('settings.view')) {
+    if (!\App\Auth::canAny(['accounting.view', 'accounting.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
     }
@@ -2188,6 +2188,10 @@ if ($page === 'finance') {
 // Call Center Module - standalone page with its own layout
 if ($page === 'call_center') {
     \App\Auth::requireLogin();
+    if (!\App\Auth::canAny(['callcenter.view', 'callcenter.*'])) {
+        echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
+        exit;
+    }
     $action = $_GET['action'] ?? '';
     
     // Handle originate_call AJAX (works even for basic permission users for click-to-call)
@@ -2562,7 +2566,7 @@ if ($page === 'call_center') {
 // ISP RADIUS Billing - standalone page with its own layout
 if ($page === 'isp') {
     \App\Auth::requireLogin();
-    if (!\App\Auth::can('settings.view')) {
+    if (!\App\Auth::canAny(['isp.view', 'isp.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
     }
@@ -9059,7 +9063,7 @@ $csrfToken = \App\Auth::generateToken();
                             <i class="bi bi-grid-3x3-gap me-1"></i>CRM
                         </a>
                     </li>
-                    <?php if ($moduleIspEnabled && \App\Auth::can('settings.view')): ?>
+                    <?php if ($moduleIspEnabled && \App\Auth::canAny(['isp.view', 'isp.*'])): ?>
                     <li class="nav-item">
                         <a class="nav-link py-2 px-4 text-white <?= $isIspPage ? 'active' : '' ?>" href="?page=isp"
                            style="border-radius: 0; background: <?= $isIspPage ? '#198754' : 'transparent' ?>; font-weight: <?= $isIspPage ? '600' : '400' ?>;">
@@ -9067,7 +9071,7 @@ $csrfToken = \App\Auth::generateToken();
                         </a>
                     </li>
                     <?php endif; ?>
-                    <?php if ($moduleOmsEnabled && \App\Auth::can('settings.view')): ?>
+                    <?php if ($moduleOmsEnabled && \App\Auth::canAny(['oms.view', 'oms.*'])): ?>
                     <li class="nav-item">
                         <a class="nav-link py-2 px-4 text-white <?= $isOmsPage ? 'active' : '' ?>" href="?page=huawei-olt"
                            style="border-radius: 0; background: <?= $isOmsPage ? '#6f42c1' : 'transparent' ?>; font-weight: <?= $isOmsPage ? '600' : '400' ?>;">
@@ -9075,7 +9079,7 @@ $csrfToken = \App\Auth::generateToken();
                         </a>
                     </li>
                     <?php endif; ?>
-                    <?php if (\App\Auth::can('settings.view')): ?>
+                    <?php if (\App\Auth::canAny(['callcenter.view', 'callcenter.*'])): ?>
                     <li class="nav-item">
                         <a class="nav-link py-2 px-4 text-white <?= $isCallCenterPage ? 'active' : '' ?>" href="?page=call_center"
                            style="border-radius: 0; background: <?= $isCallCenterPage ? '#fd7e14' : 'transparent' ?>; font-weight: <?= $isCallCenterPage ? '600' : '400' ?>;">
@@ -9083,7 +9087,7 @@ $csrfToken = \App\Auth::generateToken();
                         </a>
                     </li>
                     <?php endif; ?>
-                    <?php if ($moduleAccountingEnabled && \App\Auth::can('settings.view')): ?>
+                    <?php if ($moduleAccountingEnabled && \App\Auth::canAny(['accounting.view', 'accounting.*'])): ?>
                     <li class="nav-item">
                         <a class="nav-link py-2 px-4 text-white <?= $isFinancePage ? 'active' : '' ?>" href="?page=finance"
                            style="border-radius: 0; background: <?= $isFinancePage ? '#20c997' : 'transparent' ?>; font-weight: <?= $isFinancePage ? '600' : '400' ?>;">
