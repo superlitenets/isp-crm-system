@@ -212,7 +212,7 @@ class GenieACS {
 
     public function syncCustomerTags(\PDO $db): array {
         $stmt = $db->query("
-            SELECT o.id, o.sn, o.customer_name, o.customer_id, o.tr069_device_id, o.genieacs_id
+            SELECT o.id, o.sn, o.name, o.customer_name, o.customer_id, o.tr069_device_id, o.genieacs_id
             FROM huawei_onus o
             WHERE o.is_authorized = true
               AND ((o.genieacs_id IS NOT NULL AND o.genieacs_id != '')
@@ -235,6 +235,12 @@ class GenieACS {
                     $custStmt->execute([$onu['customer_id']]);
                     $cust = $custStmt->fetch(\PDO::FETCH_ASSOC);
                     $customerName = $cust['name'] ?? '';
+                }
+            }
+            if (empty($customerName)) {
+                $onuName = trim($onu['name'] ?? '');
+                if (!empty($onuName) && !preg_match('/^(SNS|HWTC|TDTC|ZTEG|[A-F0-9]{12,})/i', $onuName)) {
+                    $customerName = $onuName;
                 }
             }
             
