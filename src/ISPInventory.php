@@ -1,0 +1,785 @@
+<?php
+
+namespace App;
+
+class ISPInventory {
+    private \PDO $db;
+
+    public function __construct(?\PDO $db = null) {
+        $this->db = $db ?? \Database::getConnection();
+    }
+
+    // ==================== NETWORK SITES ====================
+
+    public function getSites(array $filters = []): array {
+        $sql = "SELECT * FROM isp_network_sites WHERE 1=1";
+        $params = [];
+        if (!empty($filters['status'])) {
+            $sql .= " AND status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['site_type'])) {
+            $sql .= " AND site_type = ?";
+            $params[] = $filters['site_type'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (name ILIKE ? OR address ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getSite(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM isp_network_sites WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function saveSite(array $data, ?int $id = null): int {
+        $fields = ['name', 'site_type', 'address', 'gps_lat', 'gps_lng', 'contact_person', 'contact_phone', 'power_source', 'ups_capacity', 'ups_battery_health', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_network_sites SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $sql = "INSERT INTO isp_network_sites ($cols) VALUES ($placeholders) RETURNING id";
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteSite(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_network_sites WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== RACKS ====================
+
+    public function getRacks(?int $siteId = null): array {
+        $sql = "SELECT r.*, s.name as site_name FROM isp_racks r LEFT JOIN isp_network_sites s ON r.site_id = s.id WHERE 1=1";
+        $params = [];
+        if ($siteId) {
+            $sql .= " AND r.site_id = ?";
+            $params[] = $siteId;
+        }
+        $sql .= " ORDER BY s.name, r.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveRack(array $data, ?int $id = null): int {
+        if ($id) {
+            $this->db->prepare("UPDATE isp_racks SET site_id=?, name=?, rack_units=?, used_units=?, location_detail=?, status=? WHERE id=?")
+                ->execute([$data['site_id'] ?: null, $data['name'], $data['rack_units'] ?? 42, $data['used_units'] ?? 0, $data['location_detail'] ?? null, $data['status'] ?? 'active', $id]);
+            return $id;
+        } else {
+            $stmt = $this->db->prepare("INSERT INTO isp_racks (site_id, name, rack_units, used_units, location_detail, status) VALUES (?,?,?,?,?,?) RETURNING id");
+            $stmt->execute([$data['site_id'] ?: null, $data['name'], $data['rack_units'] ?? 42, $data['used_units'] ?? 0, $data['location_detail'] ?? null, $data['status'] ?? 'active']);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteRack(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_racks WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== CORE EQUIPMENT ====================
+
+    public function getCoreEquipment(array $filters = []): array {
+        $sql = "SELECT e.*, s.name as site_name, r.name as rack_name, o.name as olt_name
+                FROM isp_core_equipment e
+                LEFT JOIN isp_network_sites s ON e.site_id = s.id
+                LEFT JOIN isp_racks r ON e.rack_id = r.id
+                LEFT JOIN huawei_olts o ON e.olt_id = o.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['equipment_type'])) {
+            $sql .= " AND e.equipment_type = ?";
+            $params[] = $filters['equipment_type'];
+        }
+        if (!empty($filters['site_id'])) {
+            $sql .= " AND e.site_id = ?";
+            $params[] = $filters['site_id'];
+        }
+        if (!empty($filters['status'])) {
+            $sql .= " AND e.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (e.name ILIKE ? OR e.serial_number ILIKE ? OR e.model ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY e.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getCoreEquipmentItem(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT e.*, s.name as site_name, r.name as rack_name FROM isp_core_equipment e LEFT JOIN isp_network_sites s ON e.site_id = s.id LEFT JOIN isp_racks r ON e.rack_id = r.id WHERE e.id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function saveCoreEquipment(array $data, ?int $id = null): int {
+        $fields = ['site_id', 'rack_id', 'olt_id', 'equipment_type', 'name', 'manufacturer', 'model', 'serial_number', 'mac_address', 'management_ip', 'os_version', 'firmware_version', 'rack_position', 'capacity', 'purchase_date', 'warranty_expiry', 'supplier', 'purchase_price', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_core_equipment SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_core_equipment ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteCoreEquipment(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_core_equipment WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== SPLITTERS ====================
+
+    public function getSplitters(array $filters = []): array {
+        $sql = "SELECT sp.*, s.name as site_name, e.name as upstream_equipment_name
+                FROM isp_splitters sp
+                LEFT JOIN isp_network_sites s ON sp.site_id = s.id
+                LEFT JOIN isp_core_equipment e ON sp.upstream_equipment_id = e.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['site_id'])) {
+            $sql .= " AND sp.site_id = ?";
+            $params[] = $filters['site_id'];
+        }
+        if (!empty($filters['status'])) {
+            $sql .= " AND sp.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (sp.name ILIKE ? OR sp.pole_number ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY sp.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveSplitter(array $data, ?int $id = null): int {
+        $fields = ['site_id', 'name', 'splitter_type', 'ratio', 'total_ports', 'used_ports', 'location_description', 'pole_number', 'gps_lat', 'gps_lng', 'upstream_equipment_id', 'upstream_port', 'upstream_fiber_core_id', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_splitters SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_splitters ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteSplitter(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_splitters WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== FIBER CORES ====================
+
+    public function getFiberCores(array $filters = []): array {
+        $sql = "SELECT * FROM isp_fiber_cores WHERE 1=1";
+        $params = [];
+        if (!empty($filters['status'])) {
+            $sql .= " AND status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['cable_name'])) {
+            $sql .= " AND cable_name = ?";
+            $params[] = $filters['cable_name'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (cable_name ILIKE ? OR assigned_to ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY cable_name, core_number";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveFiberCore(array $data, ?int $id = null): int {
+        $fields = ['cable_name', 'core_number', 'core_color', 'tube_color', 'route_path', 'start_point', 'end_point', 'splice_points', 'distance_meters', 'attenuation_db', 'assigned_to', 'assignment_type', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_fiber_cores SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_fiber_cores ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteFiberCore(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_fiber_cores WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== DISTRIBUTION BOXES ====================
+
+    public function getDistributionBoxes(array $filters = []): array {
+        $sql = "SELECT d.*, s.name as site_name, sp.name as splitter_name
+                FROM isp_distribution_boxes d
+                LEFT JOIN isp_network_sites s ON d.site_id = s.id
+                LEFT JOIN isp_splitters sp ON d.splitter_id = sp.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['site_id'])) {
+            $sql .= " AND d.site_id = ?";
+            $params[] = $filters['site_id'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (d.name ILIKE ? OR d.pole_number ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY d.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveDistributionBox(array $data, ?int $id = null): int {
+        $fields = ['site_id', 'name', 'box_type', 'capacity', 'used_ports', 'pole_number', 'gps_lat', 'gps_lng', 'location_description', 'splitter_id', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_distribution_boxes SET $sets WHERE id = ?";
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_distribution_boxes ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteDistributionBox(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_distribution_boxes WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== SPLICE CLOSURES ====================
+
+    public function getSpliceClosures(array $filters = []): array {
+        $sql = "SELECT sc.*, fc.cable_name as fiber_cable_name
+                FROM isp_splice_closures sc
+                LEFT JOIN isp_fiber_cores fc ON sc.fiber_core_id = fc.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['search'])) {
+            $sql .= " AND (sc.name ILIKE ? OR sc.pole_number ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY sc.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveSpliceClosure(array $data, ?int $id = null): int {
+        $fields = ['name', 'closure_type', 'location_description', 'pole_number', 'gps_lat', 'gps_lng', 'splice_diagram', 'core_mapping', 'fiber_core_id', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_splice_closures SET $sets WHERE id = ?";
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_splice_closures ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteSpliceClosure(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_splice_closures WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== DROP CABLES ====================
+
+    public function getDropCables(array $filters = []): array {
+        $sql = "SELECT dc.*, db.name as box_name, c.name as customer_name
+                FROM isp_drop_cables dc
+                LEFT JOIN isp_distribution_boxes db ON dc.distribution_box_id = db.id
+                LEFT JOIN customers c ON dc.customer_id = c.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['distribution_box_id'])) {
+            $sql .= " AND dc.distribution_box_id = ?";
+            $params[] = $filters['distribution_box_id'];
+        }
+        if (!empty($filters['status'])) {
+            $sql .= " AND dc.status = ?";
+            $params[] = $filters['status'];
+        }
+        $sql .= " ORDER BY dc.id DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveDropCable(array $data, ?int $id = null): int {
+        $fields = ['distribution_box_id', 'box_port', 'customer_id', 'cable_type', 'length_meters', 'installation_date', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_drop_cables SET $sets WHERE id = ?";
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_drop_cables ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteDropCable(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_drop_cables WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== CPE DEVICES ====================
+
+    public function getCPEDevices(array $filters = []): array {
+        $sql = "SELECT cpe.*, o.name as olt_name, sp.name as splitter_name, c.name as customer_name
+                FROM isp_cpe_devices cpe
+                LEFT JOIN huawei_olts o ON cpe.olt_id = o.id
+                LEFT JOIN isp_splitters sp ON cpe.splitter_id = sp.id
+                LEFT JOIN customers c ON cpe.customer_id = c.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['status'])) {
+            $sql .= " AND cpe.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['olt_id'])) {
+            $sql .= " AND cpe.olt_id = ?";
+            $params[] = $filters['olt_id'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (cpe.serial_number ILIKE ? OR cpe.mac_address ILIKE ? OR cpe.model ILIKE ? OR c.name ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY cpe.id DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getCPEDevice(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT cpe.*, o.name as olt_name, c.name as customer_name FROM isp_cpe_devices cpe LEFT JOIN huawei_olts o ON cpe.olt_id = o.id LEFT JOIN customers c ON cpe.customer_id = c.id WHERE cpe.id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function saveCPEDevice(array $data, ?int $id = null): int {
+        $fields = ['serial_number', 'mac_address', 'model', 'manufacturer', 'firmware_version', 'olt_id', 'olt_port', 'splitter_id', 'splitter_port', 'customer_id', 'pppoe_account', 'installation_date', 'warranty_expiry', 'purchase_price', 'supplier', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_cpe_devices SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_cpe_devices ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteCPEDevice(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_cpe_devices WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== IP ADDRESSES ====================
+
+    public function getIPAddresses(array $filters = []): array {
+        $sql = "SELECT * FROM isp_ip_addresses WHERE 1=1";
+        $params = [];
+        if (!empty($filters['ip_type'])) {
+            $sql .= " AND ip_type = ?";
+            $params[] = $filters['ip_type'];
+        }
+        if (!empty($filters['status'])) {
+            $sql .= " AND status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (ip_address ILIKE ? OR assigned_to ILIKE ? OR block_name ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY ip_address";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveIPAddress(array $data, ?int $id = null): int {
+        $fields = ['ip_type', 'ip_address', 'subnet_mask', 'cidr', 'gateway', 'block_name', 'vlan_id', 'assigned_to', 'assignment_type', 'customer_id', 'device_id', 'reverse_dns', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_ip_addresses SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_ip_addresses ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteIPAddress(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_ip_addresses WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== VLANS ====================
+
+    public function getVLANs(array $filters = []): array {
+        $sql = "SELECT v.*, s.name as site_name, e.name as equipment_name
+                FROM isp_vlans v
+                LEFT JOIN isp_network_sites s ON v.site_id = s.id
+                LEFT JOIN isp_core_equipment e ON v.equipment_id = e.id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['site_id'])) {
+            $sql .= " AND v.site_id = ?";
+            $params[] = $filters['site_id'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (v.name ILIKE ? OR CAST(v.vlan_id AS TEXT) LIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY v.vlan_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveVLAN(array $data, ?int $id = null): int {
+        $fields = ['vlan_id', 'name', 'purpose', 'subnet', 'gateway', 'site_id', 'equipment_id', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_vlans SET $sets WHERE id = ?";
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_vlans ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => $data[$f] ?? null, $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteVLAN(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_vlans WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== WAREHOUSE STOCK ====================
+
+    public function getWarehouseStock(array $filters = []): array {
+        $sql = "SELECT ws.*, s.name as site_name FROM isp_warehouse_stock ws LEFT JOIN isp_network_sites s ON ws.site_id = s.id WHERE 1=1";
+        $params = [];
+        if (!empty($filters['category'])) {
+            $sql .= " AND ws.category = ?";
+            $params[] = $filters['category'];
+        }
+        if (!empty($filters['site_id'])) {
+            $sql .= " AND ws.site_id = ?";
+            $params[] = $filters['site_id'];
+        }
+        if (!empty($filters['low_stock'])) {
+            $sql .= " AND ws.quantity <= ws.min_threshold";
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (ws.item_name ILIKE ? OR ws.category ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY ws.category, ws.item_name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getWarehouseStockItem(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM isp_warehouse_stock WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function saveWarehouseStock(array $data, ?int $id = null): int {
+        $fields = ['site_id', 'item_name', 'category', 'unit', 'quantity', 'min_threshold', 'unit_cost', 'supplier', 'supplier_contact', 'storage_location', 'last_restocked', 'notes'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_warehouse_stock SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_warehouse_stock ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteWarehouseStock(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_warehouse_stock WHERE id = ?")->execute([$id]);
+    }
+
+    public function recordStockMovement(array $data): int {
+        $stmt = $this->db->prepare("INSERT INTO isp_stock_movements (stock_id, movement_type, quantity, reference_number, from_location, to_location, performed_by, reason, notes) VALUES (?,?,?,?,?,?,?,?,?) RETURNING id");
+        $stmt->execute([
+            $data['stock_id'], $data['movement_type'], $data['quantity'],
+            $data['reference_number'] ?? null, $data['from_location'] ?? null,
+            $data['to_location'] ?? null, $data['performed_by'] ?? null,
+            $data['reason'] ?? null, $data['notes'] ?? null
+        ]);
+        $movementType = $data['movement_type'];
+        $qty = (float) $data['quantity'];
+        if (in_array($movementType, ['intake', 'return', 'adjustment_add'])) {
+            $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$qty, $data['stock_id']]);
+        } elseif (in_array($movementType, ['dispatch', 'usage', 'loss', 'adjustment_remove'])) {
+            $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$qty, $data['stock_id']]);
+        }
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function getStockMovements(int $stockId, int $limit = 50): array {
+        $stmt = $this->db->prepare("SELECT * FROM isp_stock_movements WHERE stock_id = ? ORDER BY created_at DESC LIMIT ?");
+        $stmt->execute([$stockId, $limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getLowStockAlerts(): array {
+        $stmt = $this->db->query("SELECT ws.*, s.name as site_name FROM isp_warehouse_stock ws LEFT JOIN isp_network_sites s ON ws.site_id = s.id WHERE ws.quantity <= ws.min_threshold AND ws.min_threshold > 0 ORDER BY ws.quantity ASC");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    // ==================== FIELD ASSETS ====================
+
+    public function getFieldAssets(array $filters = []): array {
+        $sql = "SELECT fa.*, s.name as site_name FROM isp_field_assets fa LEFT JOIN isp_network_sites s ON fa.site_id = s.id WHERE 1=1";
+        $params = [];
+        if (!empty($filters['asset_type'])) {
+            $sql .= " AND fa.asset_type = ?";
+            $params[] = $filters['asset_type'];
+        }
+        if (!empty($filters['status'])) {
+            $sql .= " AND fa.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (fa.name ILIKE ? OR fa.serial_number ILIKE ? OR fa.assigned_to_name ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY fa.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveFieldAsset(array $data, ?int $id = null): int {
+        $fields = ['asset_type', 'name', 'serial_number', 'model', 'manufacturer', 'purchase_date', 'purchase_price', 'warranty_expiry', 'condition', 'assigned_to', 'assigned_to_name', 'assignment_date', 'site_id', 'next_maintenance', 'last_maintenance', 'notes', 'status'];
+        if ($id) {
+            $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
+            $sql = "UPDATE isp_field_assets SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params[] = $id;
+            $this->db->prepare($sql)->execute($params);
+            return $id;
+        } else {
+            $cols = implode(', ', $fields);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $stmt = $this->db->prepare("INSERT INTO isp_field_assets ($cols) VALUES ($placeholders) RETURNING id");
+            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        }
+    }
+
+    public function deleteFieldAsset(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_field_assets WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== MAINTENANCE LOGS ====================
+
+    public function getMaintenanceLogs(array $filters = []): array {
+        $sql = "SELECT * FROM isp_maintenance_logs WHERE 1=1";
+        $params = [];
+        if (!empty($filters['asset_type'])) {
+            $sql .= " AND asset_type = ?";
+            $params[] = $filters['asset_type'];
+        }
+        if (!empty($filters['asset_id'])) {
+            $sql .= " AND asset_id = ?";
+            $params[] = $filters['asset_id'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (asset_name ILIKE ? OR description ILIKE ?)";
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+        $sql .= " ORDER BY created_at DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function saveMaintenanceLog(array $data): int {
+        $stmt = $this->db->prepare("INSERT INTO isp_maintenance_logs (asset_type, asset_id, asset_name, maintenance_type, description, performed_by, performed_by_name, cost, next_due, notes, status) VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING id");
+        $stmt->execute([
+            $data['asset_type'], $data['asset_id'], $data['asset_name'] ?? null,
+            $data['maintenance_type'], $data['description'] ?? null,
+            $data['performed_by'] ?? null, $data['performed_by_name'] ?? null,
+            $data['cost'] ?? 0, $data['next_due'] ?? null,
+            $data['notes'] ?? null, $data['status'] ?? 'completed'
+        ]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function deleteMaintenanceLog(int $id): bool {
+        return $this->db->prepare("DELETE FROM isp_maintenance_logs WHERE id = ?")->execute([$id]);
+    }
+
+    // ==================== DASHBOARD STATS ====================
+
+    public function getDashboardStats(): array {
+        $stats = [];
+        $stats['total_sites'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_network_sites WHERE status = 'active'")->fetchColumn();
+        $stats['total_core_equipment'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_core_equipment WHERE status = 'active'")->fetchColumn();
+        $stats['total_splitters'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_splitters WHERE status = 'active'")->fetchColumn();
+        $stats['total_cpe_deployed'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_cpe_devices WHERE status = 'deployed'")->fetchColumn();
+        $stats['total_cpe_in_stock'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_cpe_devices WHERE status = 'in_stock'")->fetchColumn();
+        $stats['total_fiber_cores'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_fiber_cores")->fetchColumn();
+        $stats['fiber_cores_used'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_fiber_cores WHERE status = 'in_use'")->fetchColumn();
+        $stats['total_ips'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_ip_addresses")->fetchColumn();
+        $stats['ips_assigned'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_ip_addresses WHERE status = 'assigned'")->fetchColumn();
+        $stats['low_stock_count'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_warehouse_stock WHERE quantity <= min_threshold AND min_threshold > 0")->fetchColumn();
+        $stats['field_assets_total'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_field_assets")->fetchColumn();
+        $stats['pending_maintenance'] = (int) $this->db->query("SELECT COUNT(*) FROM isp_maintenance_logs WHERE status = 'pending'")->fetchColumn();
+        return $stats;
+    }
+
+    // ==================== NETWORK MAPPING ====================
+
+    public function getNetworkMap(): array {
+        $sites = $this->db->query("SELECT * FROM isp_network_sites WHERE status = 'active' ORDER BY name")->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($sites as &$site) {
+            $stmt = $this->db->prepare("SELECT * FROM isp_core_equipment WHERE site_id = ? AND status = 'active' ORDER BY equipment_type, name");
+            $stmt->execute([$site['id']]);
+            $site['equipment'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $stmt = $this->db->prepare("SELECT * FROM isp_splitters WHERE site_id = ? AND status = 'active' ORDER BY name");
+            $stmt->execute([$site['id']]);
+            $site['splitters'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $stmt = $this->db->prepare("SELECT * FROM isp_distribution_boxes WHERE site_id = ? AND status = 'active' ORDER BY name");
+            $stmt->execute([$site['id']]);
+            $site['distribution_boxes'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        }
+        return $sites;
+    }
+
+    // ==================== HELPERS ====================
+
+    public function getOLTs(): array {
+        $stmt = $this->db->query("SELECT id, name, ip_address, location FROM huawei_olts WHERE is_active = true ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getCustomers(string $search = ''): array {
+        $sql = "SELECT id, name, phone, email FROM customers WHERE 1=1";
+        $params = [];
+        if ($search) {
+            $sql .= " AND (name ILIKE ? OR phone ILIKE ?)";
+            $params[] = '%' . $search . '%';
+            $params[] = '%' . $search . '%';
+        }
+        $sql .= " ORDER BY name LIMIT 50";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getEmployees(): array {
+        $stmt = $this->db->query("SELECT id, COALESCE(first_name || ' ' || last_name, username) as name FROM users ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+}

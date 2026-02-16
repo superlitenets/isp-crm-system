@@ -7958,6 +7958,173 @@ if ($page === 'hr' && $action === 'sync_biometric') {
     }
 }
 
+if ($page === 'isp_inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $ispInv = new \App\ISPInventory($db);
+    $tab = $_GET['tab'] ?? 'overview';
+    $sub = $_GET['sub'] ?? '';
+    $ispAction = $_GET['action'] ?? '';
+    $ispId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+
+    try {
+        switch ($tab) {
+            case 'sites':
+                if ($ispAction === 'save') {
+                    $ispInv->saveSite($_POST, $ispId);
+                    $_SESSION['success_message'] = 'Site saved successfully.';
+                } elseif ($ispAction === 'delete') {
+                    $ispInv->deleteSite((int)$_POST['id']);
+                    $_SESSION['success_message'] = 'Site deleted.';
+                }
+                header('Location: ?page=isp_inventory&tab=sites');
+                exit;
+
+            case 'core':
+                if ($ispAction === 'save') {
+                    $ispInv->saveCoreEquipment($_POST, $ispId);
+                    $_SESSION['success_message'] = 'Equipment saved successfully.';
+                } elseif ($ispAction === 'delete') {
+                    $ispInv->deleteCoreEquipment((int)$_POST['id']);
+                    $_SESSION['success_message'] = 'Equipment deleted.';
+                }
+                header('Location: ?page=isp_inventory&tab=core');
+                exit;
+
+            case 'ftth':
+                $redirectSub = $sub ?: 'splitters';
+                if ($sub === 'splitters') {
+                    if ($ispAction === 'save') {
+                        $ispInv->saveSplitter($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Splitter saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteSplitter((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Splitter deleted.';
+                    }
+                } elseif ($sub === 'fiber') {
+                    if ($ispAction === 'save') {
+                        $ispInv->saveFiberCore($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Fiber core saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteFiberCore((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Fiber core deleted.';
+                    }
+                } elseif ($sub === 'fdb') {
+                    if ($ispAction === 'save') {
+                        $ispInv->saveDistributionBox($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Distribution box saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteDistributionBox((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Distribution box deleted.';
+                    }
+                } elseif ($sub === 'splice') {
+                    if ($ispAction === 'save') {
+                        $ispInv->saveSpliceClosure($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Splice closure saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteSpliceClosure((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Splice closure deleted.';
+                    }
+                } elseif ($sub === 'drop') {
+                    if ($ispAction === 'save') {
+                        $ispInv->saveDropCable($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Drop cable saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteDropCable((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Drop cable deleted.';
+                    }
+                }
+                header("Location: ?page=isp_inventory&tab=ftth&sub=$redirectSub");
+                exit;
+
+            case 'cpe':
+                if ($ispAction === 'save') {
+                    $ispInv->saveCPEDevice($_POST, $ispId);
+                    $_SESSION['success_message'] = 'CPE device saved.';
+                } elseif ($ispAction === 'delete') {
+                    $ispInv->deleteCPEDevice((int)$_POST['id']);
+                    $_SESSION['success_message'] = 'CPE device deleted.';
+                }
+                header('Location: ?page=isp_inventory&tab=cpe');
+                exit;
+
+            case 'ipam':
+                if ($sub === 'vlans') {
+                    if ($ispAction === 'save') {
+                        $ispInv->saveVLAN($_POST, $ispId);
+                        $_SESSION['success_message'] = 'VLAN saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteVLAN((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'VLAN deleted.';
+                    }
+                    header('Location: ?page=isp_inventory&tab=ipam&sub=vlans');
+                } else {
+                    if ($ispAction === 'save') {
+                        $ispInv->saveIPAddress($_POST, $ispId);
+                        $_SESSION['success_message'] = 'IP address saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteIPAddress((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'IP address deleted.';
+                    }
+                    header('Location: ?page=isp_inventory&tab=ipam&sub=ips');
+                }
+                exit;
+
+            case 'warehouse':
+                if ($ispAction === 'save') {
+                    $ispInv->saveWarehouseStock($_POST, $ispId);
+                    $_SESSION['success_message'] = 'Stock item saved.';
+                } elseif ($ispAction === 'delete') {
+                    $ispInv->deleteWarehouseStock((int)$_POST['id']);
+                    $_SESSION['success_message'] = 'Stock item deleted.';
+                } elseif ($ispAction === 'record_movement') {
+                    $_POST['performed_by'] = $_SESSION['user_id'] ?? null;
+                    $ispInv->recordStockMovement($_POST);
+                    $_SESSION['success_message'] = 'Stock movement recorded.';
+                    header('Location: ?page=isp_inventory&tab=warehouse&action=movement&id=' . ($ispId ?? $_POST['stock_id']));
+                    exit;
+                }
+                header('Location: ?page=isp_inventory&tab=warehouse');
+                exit;
+
+            case 'assets':
+                if ($ispAction === 'save') {
+                    if (!empty($_POST['assigned_to'])) {
+                        $empStmt = $db->prepare("SELECT COALESCE(first_name || ' ' || last_name, username) as name FROM users WHERE id = ?");
+                        $empStmt->execute([$_POST['assigned_to']]);
+                        $_POST['assigned_to_name'] = $empStmt->fetchColumn() ?: '';
+                        $_POST['assignment_date'] = date('Y-m-d');
+                    }
+                    $ispInv->saveFieldAsset($_POST, $ispId);
+                    $_SESSION['success_message'] = 'Asset saved.';
+                } elseif ($ispAction === 'delete') {
+                    $ispInv->deleteFieldAsset((int)$_POST['id']);
+                    $_SESSION['success_message'] = 'Asset deleted.';
+                }
+                header('Location: ?page=isp_inventory&tab=assets');
+                exit;
+
+            case 'maintenance':
+                if ($ispAction === 'save') {
+                    if (!empty($_POST['performed_by'])) {
+                        $empStmt = $db->prepare("SELECT COALESCE(first_name || ' ' || last_name, username) as name FROM users WHERE id = ?");
+                        $empStmt->execute([$_POST['performed_by']]);
+                        $_POST['performed_by_name'] = $empStmt->fetchColumn() ?: '';
+                    }
+                    $ispInv->saveMaintenanceLog($_POST);
+                    $_SESSION['success_message'] = 'Maintenance log saved.';
+                } elseif ($ispAction === 'delete') {
+                    $ispInv->deleteMaintenanceLog((int)$_POST['id']);
+                    $_SESSION['success_message'] = 'Maintenance log deleted.';
+                }
+                header('Location: ?page=isp_inventory&tab=maintenance');
+                exit;
+        }
+    } catch (\Exception $e) {
+        $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        header("Location: ?page=isp_inventory&tab=$tab" . ($sub ? "&sub=$sub" : ''));
+        exit;
+    }
+}
+
 if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $inventory = new \App\Inventory($db);
     $tab = $_GET['tab'] ?? 'equipment';
@@ -9169,8 +9336,8 @@ $csrfToken = \App\Auth::generateToken();
                 <?php endif; ?>
                 <?php if (\App\Auth::can('inventory.view') && $moduleInventoryEnabled): ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
-                        <i class="bi bi-box-seam"></i> Inventory
+                    <a class="nav-link <?= $page === 'isp_inventory' ? 'active' : '' ?>" href="?page=isp_inventory">
+                        <i class="bi bi-hdd-network"></i> ISP Inventory
                     </a>
                 </li>
                 <?php endif; ?>
@@ -9298,8 +9465,8 @@ $csrfToken = \App\Auth::generateToken();
             <?php endif; ?>
             <?php if (\App\Auth::can('inventory.view') && $moduleInventoryEnabled): ?>
             <li class="nav-item">
-                <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
-                    <i class="bi bi-box-seam"></i> Inventory
+                <a class="nav-link <?= $page === 'isp_inventory' ? 'active' : '' ?>" href="?page=isp_inventory">
+                    <i class="bi bi-hdd-network"></i> ISP Inventory
                 </a>
             </li>
             <?php endif; ?>
@@ -9512,6 +9679,13 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/hr.php';
+                }
+                break;
+            case 'isp_inventory':
+                if (!\App\Auth::can('inventory.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/isp_inventory.php';
                 }
                 break;
             case 'inventory':
