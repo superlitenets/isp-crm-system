@@ -860,18 +860,10 @@ class GenieACS {
 
         $provisionName = 'bootstrap-setup';
         $script = <<<JS
-const now = Date.now();
-
-let root = "InternetGatewayDevice";
-let val = declare("Device.DeviceInfo.Manufacturer", {value: 1});
-if (val && val.value && val.value[0]) {
-  root = "Device";
-}
-
-declare(root + ".ManagementServer.PeriodicInformEnable", {value: now}, {value: true});
-declare(root + ".ManagementServer.PeriodicInformInterval", {value: now}, {value: {$intervalSeconds}});
-declare(root + ".ManagementServer.ConnectionRequestUsername", {value: now}, {value: "{$this->crUsername}"});
-declare(root + ".ManagementServer.ConnectionRequestPassword", {value: now}, {value: "{$this->crPassword}"});
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", null, {value: "{$this->crUsername}"});
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", null, {value: "{$this->crPassword}"});
+declare("InternetGatewayDevice.ManagementServer.PeriodicInformEnable", null, {value: true});
+declare("InternetGatewayDevice.ManagementServer.PeriodicInformInterval", null, {value: {$intervalSeconds}});
 JS;
 
         $provResult = $this->createProvision($provisionName, $script);
