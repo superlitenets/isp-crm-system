@@ -558,16 +558,72 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'Failed to get ONU list via SNMP. No data returned from OID .43.1.9 or .43.1.3'];
         }
         
-        $statuses = @snmprealwalk($host, $community, $huaweiONTStatusBase, 10000000, 2);
-        $descriptions = @snmprealwalk($host, $community, $huaweiONTDescBase, 10000000, 2);
-        $equipIds = @snmprealwalk($host, $community, $huaweiONTEquipIdBase, 10000000, 2);
-        $rxPowers = @snmprealwalk($host, $community, $huaweiONTRxPowerBase, 10000000, 2);
-        $txPowers = @snmprealwalk($host, $community, $huaweiONTTxPowerBase, 10000000, 2);
-        $distances = @snmprealwalk($host, $community, $huaweiONTDistanceBase, 10000000, 2);
+        $statusesRaw = @snmprealwalk($host, $community, $huaweiONTStatusBase, 10000000, 2);
+        $descriptionsRaw = @snmprealwalk($host, $community, $huaweiONTDescBase, 10000000, 2);
+        $equipIdsRaw = @snmprealwalk($host, $community, $huaweiONTEquipIdBase, 10000000, 2);
+        $rxPowersRaw = @snmprealwalk($host, $community, $huaweiONTRxPowerBase, 10000000, 2);
+        $txPowersRaw = @snmprealwalk($host, $community, $huaweiONTTxPowerBase, 10000000, 2);
+        $distancesRaw = @snmprealwalk($host, $community, $huaweiONTDistanceBase, 10000000, 2);
         
-        error_log("SNMP Bulk Fetch: equipIds=" . ($equipIds !== false ? count($equipIds) : 'FAILED') . 
-                  ", rxPowers=" . ($rxPowers !== false ? count($rxPowers) : 'FAILED') .
-                  ", distances=" . ($distances !== false ? count($distances) : 'FAILED'));
+        error_log("SNMP Bulk Fetch: statuses=" . ($statusesRaw !== false ? count($statusesRaw) : 'FAILED') .
+                  ", equipIds=" . ($equipIdsRaw !== false ? count($equipIdsRaw) : 'FAILED') . 
+                  ", rxPowers=" . ($rxPowersRaw !== false ? count($rxPowersRaw) : 'FAILED') .
+                  ", distances=" . ($distancesRaw !== false ? count($distancesRaw) : 'FAILED'));
+        
+        $extractIndex = function(string $oid, string $tableCol) {
+            if (preg_match('/\.' . preg_quote($tableCol, '/') . '\.(.+)$/', $oid, $m)) {
+                return $m[1];
+            }
+            return null;
+        };
+        
+        $statuses = [];
+        if ($statusesRaw) {
+            foreach ($statusesRaw as $oid => $val) {
+                $idx = $extractIndex($oid, '46.1.15');
+                if ($idx !== null) $statuses[$idx] = $val;
+            }
+        }
+        $descriptions = [];
+        if ($descriptionsRaw) {
+            foreach ($descriptionsRaw as $oid => $val) {
+                $idx = $extractIndex($oid, '43.1.2');
+                if ($idx !== null) $descriptions[$idx] = $val;
+            }
+        }
+        $equipIds = [];
+        if ($equipIdsRaw) {
+            foreach ($equipIdsRaw as $oid => $val) {
+                $idx = $extractIndex($oid, '43.1.10');
+                if ($idx !== null) $equipIds[$idx] = $val;
+            }
+        }
+        $rxPowers = [];
+        if ($rxPowersRaw) {
+            foreach ($rxPowersRaw as $oid => $val) {
+                $idx = $extractIndex($oid, '51.1.4');
+                if ($idx !== null) $rxPowers[$idx] = $val;
+            }
+        }
+        $txPowers = [];
+        if ($txPowersRaw) {
+            foreach ($txPowersRaw as $oid => $val) {
+                $idx = $extractIndex($oid, '51.1.5');
+                if ($idx !== null) $txPowers[$idx] = $val;
+            }
+        }
+        $distances = [];
+        if ($distancesRaw) {
+            foreach ($distancesRaw as $oid => $val) {
+                $idx = $extractIndex($oid, '46.1.20');
+                if ($idx !== null) $distances[$idx] = $val;
+            }
+        }
+        
+        if (!empty($statuses)) {
+            $sampleIdx = array_key_first($statuses);
+            error_log("SNMP Index mapping sample - status index: {$sampleIdx} = " . $statuses[$sampleIdx]);
+        }
         
         $onus = [];
         $debugCount = 0;
@@ -582,9 +638,9 @@ class HuaweiOLT {
             }
             $parts = explode('.', $indexPart);
             
-            // Log first 5 entries for debugging
             if ($debugCount < 5) {
-                error_log("SNMP ONU #{$debugCount}: OID={$oid}, index={$indexPart}, parts=" . json_encode($parts) . ", serial=" . $this->cleanSnmpValue($serial));
+                $hasStatus = isset($statuses[$indexPart]);
+                error_log("SNMP ONU #{$debugCount}: OID={$oid}, index={$indexPart}, parts=" . json_encode($parts) . ", serial=" . $this->cleanSnmpValue($serial) . ", status_found=" . ($hasStatus ? 'YES(' . $statuses[$indexPart] . ')' : 'NO'));
                 $debugCount++;
             }
             
@@ -708,26 +764,13 @@ class HuaweiOLT {
                 continue; // Skip invalid entries
             }
             
-            $statusOid = $huaweiONTStatusBase . '.' . $indexPart;
-            $status = isset($statuses[$statusOid]) ? $this->parseONUStatus((int)$this->cleanSnmpValue($statuses[$statusOid])) : 'unknown';
+            $status = isset($statuses[$indexPart]) ? $this->parseONUStatus((int)$this->cleanSnmpValue($statuses[$indexPart])) : 'unknown';
+            $desc = isset($descriptions[$indexPart]) ? $this->cleanSnmpValue($descriptions[$indexPart]) : '';
+            $equipId = isset($equipIds[$indexPart]) ? $this->cleanSnmpValue($equipIds[$indexPart]) : '';
             
-            $descOid = $huaweiONTDescBase . '.' . $indexPart;
-            $desc = isset($descriptions[$descOid]) ? $this->cleanSnmpValue($descriptions[$descOid]) : '';
-            
-            // Equipment ID (model like "HG8546M")
-            $equipIdOid = $huaweiONTEquipIdBase . '.' . $indexPart;
-            $equipId = isset($equipIds[$equipIdOid]) ? $this->cleanSnmpValue($equipIds[$equipIdOid]) : '';
-            
-            // RX/TX Power (in 0.01 dBm units, need to divide by 100)
-            // Use status table index format for optical data (.46 instead of .43)
-            $statusIndex = $indexPart;
-            $rxPowerOid = $huaweiONTRxPowerBase . '.' . $statusIndex;
-            $txPowerOid = $huaweiONTTxPowerBase . '.' . $statusIndex;
-            $distanceOid = $huaweiONTDistanceBase . '.' . $statusIndex;
-            
-            $rxPowerRaw = isset($rxPowers[$rxPowerOid]) ? (int)$this->cleanSnmpValue($rxPowers[$rxPowerOid]) : null;
-            $txPowerRaw = isset($txPowers[$txPowerOid]) ? (int)$this->cleanSnmpValue($txPowers[$txPowerOid]) : null;
-            $distanceRaw = isset($distances[$distanceOid]) ? (int)$this->cleanSnmpValue($distances[$distanceOid]) : null;
+            $rxPowerRaw = isset($rxPowers[$indexPart]) ? (int)$this->cleanSnmpValue($rxPowers[$indexPart]) : null;
+            $txPowerRaw = isset($txPowers[$indexPart]) ? (int)$this->cleanSnmpValue($txPowers[$indexPart]) : null;
+            $distanceRaw = isset($distances[$indexPart]) ? (int)$this->cleanSnmpValue($distances[$indexPart]) : null;
             
             // Convert power from 0.01 dBm to dBm (divide by 100)
             $rxPower = ($rxPowerRaw !== null && $rxPowerRaw != 0 && $rxPowerRaw != 2147483647) ? round($rxPowerRaw / 100, 2) : null;
