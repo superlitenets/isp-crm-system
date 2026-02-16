@@ -231,7 +231,8 @@ class GenieACS {
             }
             
             $onuName = trim($onu['name'] ?? '');
-            if (!empty($onuName) && !preg_match('/^(SNS|HWTC|TDTC|ZTEG|[A-F0-9]{12,})/i', $onuName)) {
+            $customerName = '';
+            if (!empty($onuName) && !preg_match('/^(HWTC|TDTC|ZTEG|[A-F0-9]{12,})/i', $onuName)) {
                 $customerName = $onuName;
             } else {
                 $customerName = trim($onu['customer_name'] ?? '');
@@ -240,6 +241,9 @@ class GenieACS {
                     $custStmt->execute([$onu['customer_id']]);
                     $cust = $custStmt->fetch(\PDO::FETCH_ASSOC);
                     $customerName = $cust['name'] ?? '';
+                }
+                if (empty($customerName) && !empty($onuName)) {
+                    $customerName = $onuName;
                 }
             }
             
