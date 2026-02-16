@@ -7826,7 +7826,6 @@ try {
                         <div class="d-flex align-items-center gap-3 opacity-75 flex-wrap">
                             <span><span class="live-dot"></span> Live Monitoring</span>
                             <span><i class="bi bi-clock me-1"></i><?= date('M j, Y H:i:s') ?></span>
-                            <span id="autoRefreshTimer" class="small"></span>
                         </div>
                     </div>
                     <div class="d-flex gap-2">
@@ -7835,9 +7834,6 @@ try {
                             <i class="bi bi-hourglass-split me-1"></i> <?= $stats['unconfigured_onus'] ?> Pending
                         </a>
                         <?php endif; ?>
-                        <button class="btn btn-light btn-sm rounded-pill px-3" onclick="location.reload()" title="Refresh">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                        </button>
                     </div>
                 </div>
             </div>
@@ -8227,15 +8223,6 @@ try {
 
             <script>
             (function() {
-                let countdown = 60;
-                const timerEl = document.getElementById('autoRefreshTimer');
-                function updateTimer() {
-                    if (timerEl) timerEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-refresh in ' + countdown + 's';
-                    if (--countdown < 0) location.reload();
-                }
-                updateTimer();
-                setInterval(updateTimer, 1000);
-
                 const chartFont = { family: "'Inter', 'Segoe UI', sans-serif" };
                 Chart.defaults.font.family = chartFont.family;
 
