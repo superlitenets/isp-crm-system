@@ -5984,6 +5984,60 @@ if ($view === 'logs') {
 if ($view === 'alerts' || $view === 'dashboard') {
     $alerts = $huaweiOLT->getAlerts(false, 100);
 }
+if ($view === 'dashboard') {
+    $onusByOltData = $huaweiOLT->getONUsByOLT();
+    $onuCountMap = array_column($onusByOltData, null, 'id');
+
+    $signalQuery = $db->query("
+        SELECT 
+          CASE WHEN rx_power IS NULL THEN 'No Reading'
+               WHEN CAST(rx_power AS DECIMAL) > -15 THEN 'Excellent'
+               WHEN CAST(rx_power AS DECIMAL) > -20 THEN 'Good'
+               WHEN CAST(rx_power AS DECIMAL) > -25 THEN 'Fair'
+               WHEN CAST(rx_power AS DECIMAL) > -28 THEN 'Weak'
+               ELSE 'Critical'
+          END as signal_range,
+          COUNT(*) as cnt
+        FROM huawei_onus WHERE is_authorized = true GROUP BY signal_range
+    ");
+    $signalData = [];
+    while ($row = $signalQuery->fetch(PDO::FETCH_ASSOC)) {
+        $signalData[$row['signal_range']] = (int)$row['cnt'];
+    }
+
+    $ponQuery = $db->query("
+        SELECT CONCAT('0/', slot, '/', port) as pon_port, 
+               COUNT(*) as total,
+               COUNT(*) FILTER (WHERE LOWER(status) = 'online') as online,
+               COUNT(*) FILTER (WHERE LOWER(status) != 'online') as offline
+        FROM huawei_onus WHERE is_authorized = true AND slot IS NOT NULL AND port IS NOT NULL
+        GROUP BY slot, port ORDER BY slot, port
+    ");
+    $ponPortData = $ponQuery->fetchAll(PDO::FETCH_ASSOC);
+
+    $alertTimelineQuery = $db->query("
+        SELECT DATE(created_at) as alert_date, severity, COUNT(*) as cnt
+        FROM huawei_alerts 
+        WHERE created_at >= NOW() - INTERVAL '14 days'
+        GROUP BY DATE(created_at), severity
+        ORDER BY alert_date
+    ");
+    $alertTimeline = [];
+    while ($row = $alertTimelineQuery->fetch(PDO::FETCH_ASSOC)) {
+        $alertTimeline[$row['alert_date']][$row['severity']] = (int)$row['cnt'];
+    }
+
+    $topOfflineQuery = $db->query("
+        SELECT CONCAT('0/', slot, '/', port) as pon_port,
+               COUNT(*) FILTER (WHERE LOWER(status) != 'online') as offline_count,
+               COUNT(*) as total
+        FROM huawei_onus WHERE is_authorized = true AND slot IS NOT NULL AND port IS NOT NULL
+        GROUP BY slot, port
+        HAVING COUNT(*) FILTER (WHERE LOWER(status) != 'online') > 0
+        ORDER BY offline_count DESC LIMIT 10
+    ");
+    $topOfflinePorts = $topOfflineQuery->fetchAll(PDO::FETCH_ASSOC);
+}
 // Load location data only when needed (lazy load for performance)
 $zones = [];
 $subzones = [];
@@ -7560,356 +7614,431 @@ try {
             <?php endif; ?>
             
             <?php if ($view === 'dashboard'): ?>
-            <!-- Modern Network Dashboard -->
+            <!-- Enhanced Network Dashboard -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
             <style>
-                .dashboard-header {
-                    background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%);
-                    border-radius: 16px;
-                    padding: 24px 32px;
-                    margin-bottom: 24px;
+                .dash-header {
+                    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
+                    border-radius: 20px;
+                    padding: 28px 36px;
+                    margin-bottom: 28px;
                     color: white;
                     position: relative;
                     overflow: hidden;
                 }
-                .dashboard-header::before {
+                .dash-header::before {
                     content: '';
                     position: absolute;
-                    top: -50%;
-                    right: -20%;
-                    width: 400px;
-                    height: 400px;
-                    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+                    top: -60%;
+                    right: -15%;
+                    width: 500px;
+                    height: 500px;
+                    background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
                     border-radius: 50%;
                 }
-                .dashboard-header .live-pulse {
-                    width: 10px;
-                    height: 10px;
+                .dash-header::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -40%;
+                    left: 10%;
+                    width: 300px;
+                    height: 300px;
+                    background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+                    border-radius: 50%;
+                }
+                .live-dot {
+                    width: 10px; height: 10px;
                     background: #10b981;
                     border-radius: 50%;
-                    animation: pulse 2s infinite;
+                    animation: livePulse 2s infinite;
                     display: inline-block;
                     margin-right: 6px;
+                    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
                 }
-                @keyframes pulse {
-                    0%, 100% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.6; transform: scale(1.2); }
+                @keyframes livePulse {
+                    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px rgba(16, 185, 129, 0.6); }
+                    50% { opacity: 0.7; transform: scale(1.3); box-shadow: 0 0 16px rgba(16, 185, 129, 0.8); }
                 }
-                .mega-stat {
-                    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+                .kpi-card {
+                    background: white;
                     border-radius: 16px;
-                    padding: 24px;
-                    border: 1px solid rgba(0,0,0,0.05);
-                    transition: all 0.3s ease;
+                    padding: 20px 24px;
+                    border: 1px solid #f1f5f9;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     position: relative;
                     overflow: hidden;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
                 }
-                .mega-stat:hover {
-                    transform: translateY(-4px);
-                    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+                .kpi-card:hover {
+                    transform: translateY(-6px);
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
                 }
-                .mega-stat .stat-icon-lg {
-                    width: 56px;
-                    height: 56px;
+                .kpi-card .kpi-icon {
+                    width: 52px; height: 52px;
                     border-radius: 14px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.5rem;
+                    font-size: 1.4rem;
                 }
-                .mega-stat .stat-number {
-                    font-size: 2.5rem;
-                    font-weight: 700;
+                .kpi-card .kpi-value {
+                    font-size: 2rem;
+                    font-weight: 800;
                     line-height: 1;
-                    margin: 12px 0 4px;
+                    margin: 10px 0 2px;
+                    letter-spacing: -0.5px;
                 }
-                .mega-stat .stat-trend {
-                    font-size: 0.75rem;
-                    padding: 2px 8px;
+                .kpi-card .kpi-label {
+                    font-size: 0.8rem;
+                    color: #64748b;
+                    font-weight: 500;
+                }
+                .kpi-badge {
+                    font-size: 0.7rem;
+                    padding: 3px 10px;
                     border-radius: 20px;
+                    font-weight: 600;
                     display: inline-flex;
                     align-items: center;
                     gap: 4px;
                 }
-                .olt-card {
+                .dash-card {
                     background: white;
-                    border-radius: 12px;
-                    padding: 16px;
+                    border-radius: 16px;
+                    border: 1px solid #f1f5f9;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                    transition: box-shadow 0.3s ease;
+                    overflow: hidden;
+                }
+                .dash-card:hover {
+                    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+                }
+                .dash-card .card-hdr {
+                    padding: 20px 24px 12px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .dash-card .card-hdr h6 {
+                    font-weight: 700;
+                    font-size: 0.95rem;
+                    margin: 0;
+                    color: #1e293b;
+                }
+                .dash-card .card-inner {
+                    padding: 0 24px 24px;
+                }
+                .olt-card-v2 {
+                    background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
+                    border-radius: 14px;
+                    padding: 20px;
                     border: 1px solid #e2e8f0;
-                    transition: all 0.2s ease;
-                }
-                .olt-card:hover {
-                    border-color: #3b82f6;
-                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-                }
-                .olt-card .health-ring {
-                    width: 48px;
-                    height: 48px;
+                    transition: all 0.3s ease;
                     position: relative;
                 }
-                .olt-card .health-ring svg {
-                    transform: rotate(-90deg);
+                .olt-card-v2:hover {
+                    border-color: #3b82f6;
+                    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
+                    transform: translateY(-2px);
                 }
-                .olt-card .health-value {
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    font-size: 0.7rem;
-                    font-weight: 700;
+                .olt-card-v2 .olt-status-dot {
+                    width: 12px; height: 12px;
+                    border-radius: 50%;
+                    display: inline-block;
                 }
-                .quick-action-btn {
-                    background: white;
+                .olt-card-v2 .olt-status-dot.online { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+                .olt-card-v2 .mini-bar {
+                    height: 8px;
+                    border-radius: 4px;
+                    background: #f1f5f9;
+                    overflow: hidden;
+                    margin-top: 12px;
+                }
+                .olt-card-v2 .mini-bar .fill {
+                    height: 100%;
+                    border-radius: 4px;
+                    transition: width 1s ease;
+                }
+                .quick-btn {
+                    background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
                     border: 1px solid #e2e8f0;
-                    border-radius: 12px;
-                    padding: 16px;
+                    border-radius: 14px;
+                    padding: 18px 16px;
                     text-align: center;
-                    transition: all 0.2s ease;
+                    transition: all 0.3s ease;
                     text-decoration: none;
                     color: #334155;
                     display: block;
+                    cursor: pointer;
                 }
-                .quick-action-btn:hover {
+                .quick-btn:hover {
                     border-color: #3b82f6;
                     color: #3b82f6;
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+                    transform: translateY(-4px);
+                    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
+                    background: linear-gradient(135deg, #eff6ff 0%, #fff 100%);
                 }
-                .quick-action-btn i {
-                    font-size: 1.5rem;
-                    margin-bottom: 8px;
-                    display: block;
+                .quick-btn .qb-icon {
+                    width: 44px; height: 44px;
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.3rem;
+                    margin: 0 auto 10px;
                 }
-                .alert-item {
-                    padding: 12px 16px;
+                .alert-row {
+                    padding: 10px 14px;
                     border-left: 3px solid;
                     background: #f8fafc;
-                    border-radius: 0 8px 8px 0;
+                    border-radius: 0 10px 10px 0;
                     margin-bottom: 8px;
+                    transition: background 0.2s;
                 }
-                .alert-item.critical { border-left-color: #ef4444; background: #fef2f2; }
-                .alert-item.warning { border-left-color: #f59e0b; background: #fffbeb; }
-                .alert-item.info { border-left-color: #3b82f6; background: #eff6ff; }
-                .uptime-gauge {
-                    width: 180px;
-                    height: 180px;
-                    position: relative;
-                    margin: 0 auto;
-                }
-                .uptime-gauge .gauge-bg {
-                    stroke: #e2e8f0;
-                }
-                .uptime-gauge .gauge-fill {
-                    stroke: url(#gaugeGradient);
-                    stroke-linecap: round;
-                    transition: stroke-dasharray 1s ease;
-                }
-                .uptime-gauge .gauge-center {
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    text-align: center;
-                }
-                .uptime-gauge .gauge-value {
-                    font-size: 2.5rem;
-                    font-weight: 700;
-                    color: #10b981;
-                }
-                .issue-badge {
-                    font-size: 0.7rem;
-                    padding: 4px 8px;
+                .alert-row:hover { background: #f1f5f9; }
+                .alert-row.critical { border-left-color: #ef4444; background: #fef2f2; }
+                .alert-row.warning { border-left-color: #f59e0b; background: #fffbeb; }
+                .alert-row.info { border-left-color: #3b82f6; background: #eff6ff; }
+                .issue-pill {
+                    font-size: 0.65rem;
+                    padding: 3px 8px;
                     border-radius: 6px;
-                    font-weight: 600;
+                    font-weight: 700;
+                    letter-spacing: 0.3px;
                 }
+                .chart-container { position: relative; }
+                @keyframes fadeInUp {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-in { animation: fadeInUp 0.5s ease forwards; }
+                .animate-in:nth-child(2) { animation-delay: 0.1s; }
+                .animate-in:nth-child(3) { animation-delay: 0.15s; }
+                .animate-in:nth-child(4) { animation-delay: 0.2s; }
+                .animate-in:nth-child(5) { animation-delay: 0.25s; }
+                .animate-in:nth-child(6) { animation-delay: 0.3s; }
             </style>
-            
-            <!-- Dashboard Header -->
-            <div class="dashboard-header">
+
+            <div class="dash-header">
                 <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 1;">
                     <div>
-                        <h3 class="mb-1 fw-bold"><i class="bi bi-speedometer2 me-2"></i>Network Dashboard</h3>
-                        <div class="d-flex align-items-center gap-3 opacity-75">
-                            <span><span class="live-pulse"></span> Live Monitoring</span>
+                        <h3 class="mb-1 fw-bold" style="letter-spacing: -0.5px;"><i class="bi bi-speedometer2 me-2"></i>Network Dashboard</h3>
+                        <div class="d-flex align-items-center gap-3 opacity-75 flex-wrap">
+                            <span><span class="live-dot"></span> Live Monitoring</span>
                             <span><i class="bi bi-clock me-1"></i><?= date('M j, Y H:i:s') ?></span>
                             <span id="autoRefreshTimer" class="small"></span>
                         </div>
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-warning">
+                        <?php if ($stats['unconfigured_onus'] > 0): ?>
+                        <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-warning btn-sm rounded-pill px-3">
                             <i class="bi bi-hourglass-split me-1"></i> <?= $stats['unconfigured_onus'] ?> Pending
                         </a>
-                        <button class="btn btn-light" onclick="location.reload()" title="Refresh">
-                            <i class="bi bi-arrow-clockwise"></i>
+                        <?php endif; ?>
+                        <button class="btn btn-light btn-sm rounded-pill px-3" onclick="location.reload()" title="Refresh">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                         </button>
                     </div>
                 </div>
             </div>
-            
-            <!-- Primary Stats Row -->
-            <div class="row g-4 mb-4">
-                <div class="col-xl col-md-6">
-                    <div class="mega-stat h-100">
+
+            <div class="row g-3 mb-4">
+                <div class="col-xl-2 col-md-4 col-6 animate-in">
+                    <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="stat-icon-lg bg-info bg-opacity-10 text-info">
-                                <i class="bi bi-router"></i>
+                            <div class="kpi-icon" style="background: rgba(6,182,212,0.1); color: #06b6d4;">
+                                <i class="bi bi-router-fill"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus" class="stat-trend bg-info bg-opacity-10 text-info text-decoration-none">
-                                View All <i class="bi bi-arrow-right"></i>
+                            <a href="?page=huawei-olt&view=onus" class="kpi-badge" style="background: rgba(6,182,212,0.1); color: #06b6d4; text-decoration:none;">
+                                All <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
-                        <div class="stat-number text-info"><?= number_format($totalOnus) ?></div>
-                        <div class="text-muted mb-2">Total Authorized</div>
-                        <div class="progress" style="height: 6px; border-radius: 3px;">
-                            <?php $authPercent = ($totalOnus + $stats['unconfigured_onus']) > 0 ? ($totalOnus / ($totalOnus + $stats['unconfigured_onus']) * 100) : 0; ?>
-                            <div class="progress-bar bg-info" style="width: <?= $authPercent ?>%; border-radius: 3px;"></div>
-                        </div>
+                        <div class="kpi-value" style="color: #06b6d4;"><?= number_format($totalOnus) ?></div>
+                        <div class="kpi-label">Total Authorized</div>
                     </div>
                 </div>
-                <div class="col-xl col-md-6">
-                    <div class="mega-stat h-100">
+                <div class="col-xl-2 col-md-4 col-6 animate-in">
+                    <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="stat-icon-lg bg-primary bg-opacity-10 text-primary">
-                                <i class="bi bi-hdd-rack"></i>
+                            <div class="kpi-icon" style="background: rgba(99,102,241,0.1); color: #6366f1;">
+                                <i class="bi bi-hdd-rack-fill"></i>
                             </div>
-                            <span class="stat-trend bg-success bg-opacity-10 text-success">
-                                <i class="bi bi-circle-fill" style="font-size: 6px;"></i> <?= $stats['active_olts'] ?> Active
+                            <span class="kpi-badge" style="background: rgba(16,185,129,0.1); color: #10b981;">
+                                <i class="bi bi-circle-fill" style="font-size: 5px;"></i> <?= $stats['active_olts'] ?> Active
                             </span>
                         </div>
-                        <div class="stat-number text-primary"><?= $stats['total_olts'] ?></div>
-                        <div class="text-muted mb-2">OLT Devices</div>
-                        <div class="progress" style="height: 6px; border-radius: 3px;">
-                            <div class="progress-bar bg-primary" style="width: <?= $stats['total_olts'] > 0 ? ($stats['active_olts'] / $stats['total_olts'] * 100) : 0 ?>%; border-radius: 3px;"></div>
-                        </div>
+                        <div class="kpi-value" style="color: #6366f1;"><?= $stats['total_olts'] ?></div>
+                        <div class="kpi-label">OLT Devices</div>
                     </div>
                 </div>
-                <div class="col-xl col-md-6">
-                    <div class="mega-stat h-100">
+                <div class="col-xl-2 col-md-4 col-6 animate-in">
+                    <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="stat-icon-lg bg-success bg-opacity-10 text-success">
+                            <div class="kpi-icon" style="background: rgba(16,185,129,0.1); color: #10b981;">
                                 <i class="bi bi-wifi"></i>
                             </div>
-                            <span class="stat-trend bg-success bg-opacity-10 text-success">
+                            <span class="kpi-badge" style="background: rgba(16,185,129,0.1); color: #10b981;">
                                 <i class="bi bi-arrow-up"></i> <?= $uptimePercent ?>%
                             </span>
                         </div>
-                        <div class="stat-number text-success"><?= number_format($stats['online_onus']) ?></div>
-                        <div class="text-muted mb-2">Online ONUs</div>
-                        <div class="progress" style="height: 6px; border-radius: 3px;">
-                            <div class="progress-bar bg-success" style="width: <?= $uptimePercent ?>%; border-radius: 3px;"></div>
-                        </div>
+                        <div class="kpi-value" style="color: #10b981;"><?= number_format($stats['online_onus']) ?></div>
+                        <div class="kpi-label">Online ONUs</div>
                     </div>
                 </div>
-                <div class="col-xl col-md-6">
-                    <div class="mega-stat h-100">
+                <div class="col-xl-2 col-md-4 col-6 animate-in">
+                    <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="stat-icon-lg bg-secondary bg-opacity-10 text-secondary">
+                            <div class="kpi-icon" style="background: rgba(100,116,139,0.1); color: #64748b;">
                                 <i class="bi bi-wifi-off"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&status=offline" class="stat-trend <?= $stats['offline_onus'] > 0 ? 'bg-secondary bg-opacity-10 text-secondary' : 'bg-success bg-opacity-10 text-success' ?> text-decoration-none">
+                            <a href="?page=huawei-olt&view=onus&status=offline" class="kpi-badge text-decoration-none" style="background: <?= $stats['offline_onus'] > 0 ? 'rgba(100,116,139,0.1); color: #64748b;' : 'rgba(16,185,129,0.1); color: #10b981;' ?>">
                                 <?= $stats['offline_onus'] > 0 ? '<i class="bi bi-x-circle"></i> Down' : '<i class="bi bi-check-circle"></i> OK' ?>
                             </a>
                         </div>
-                        <div class="stat-number text-secondary"><?= $stats['offline_onus'] ?></div>
-                        <div class="text-muted mb-2">Offline</div>
-                        <div class="small text-muted">
-                            <i class="bi bi-power me-1"></i>Disconnected devices
-                        </div>
+                        <div class="kpi-value" style="color: #64748b;"><?= number_format($stats['offline_onus']) ?></div>
+                        <div class="kpi-label">Offline</div>
                     </div>
                 </div>
-                <div class="col-xl col-md-6">
-                    <div class="mega-stat h-100">
+                <div class="col-xl-2 col-md-4 col-6 animate-in">
+                    <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="stat-icon-lg bg-danger bg-opacity-10 text-danger">
-                                <i class="bi bi-exclamation-triangle"></i>
+                            <div class="kpi-icon" style="background: rgba(239,68,68,0.1); color: #ef4444;">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&status=los" class="stat-trend <?= $stats['los_onus'] > 0 ? 'bg-danger bg-opacity-10 text-danger' : 'bg-success bg-opacity-10 text-success' ?> text-decoration-none">
-                                <?= $stats['los_onus'] > 0 ? '<i class="bi bi-exclamation-circle"></i> Alert' : '<i class="bi bi-check-circle"></i> OK' ?>
+                            <a href="?page=huawei-olt&view=onus&status=los" class="kpi-badge text-decoration-none" style="background: <?= $stats['los_onus'] > 0 ? 'rgba(239,68,68,0.1); color: #ef4444;' : 'rgba(16,185,129,0.1); color: #10b981;' ?>">
+                                <?= $stats['los_onus'] > 0 ? '<i class="bi bi-exclamation-circle"></i>' : '<i class="bi bi-check-circle"></i> OK' ?>
                             </a>
                         </div>
-                        <div class="stat-number text-danger"><?= $stats['los_onus'] ?></div>
-                        <div class="text-muted mb-2">LOS (Loss of Signal)</div>
+                        <div class="kpi-value" style="color: #ef4444;"><?= number_format($stats['los_onus']) ?></div>
+                        <div class="kpi-label">LOS</div>
                     </div>
                 </div>
-                <div class="col-xl col-md-6">
-                    <div class="mega-stat h-100">
+                <div class="col-xl-2 col-md-4 col-6 animate-in">
+                    <div class="kpi-card h-100">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="stat-icon-lg bg-warning bg-opacity-10 text-warning">
+                            <div class="kpi-icon" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
                                 <i class="bi bi-hourglass-split"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="stat-trend bg-warning bg-opacity-10 text-warning text-decoration-none">
-                                View All <i class="bi bi-arrow-right"></i>
+                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="kpi-badge text-decoration-none" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
+                                View <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
-                        <div class="stat-number text-warning"><?= $stats['unconfigured_onus'] ?></div>
-                        <div class="text-muted mb-2">Pending Authorization</div>
+                        <div class="kpi-value" style="color: #f59e0b;"><?= number_format($stats['unconfigured_onus']) ?></div>
+                        <div class="kpi-label">Pending Auth</div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Main Content Row -->
+
             <div class="row g-4 mb-4">
-                <!-- OLT Status Cards -->
-                <div class="col-lg-8">
-                    <div class="card shadow-sm border-0" style="border-radius: 16px;">
-                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0 fw-bold"><i class="bi bi-hdd-rack me-2 text-primary"></i>OLT Status</h5>
-                                <a href="?page=huawei-olt&view=olts" class="btn btn-sm btn-outline-primary rounded-pill px-3">
-                                    <i class="bi bi-gear me-1"></i> Manage
-                                </a>
+                <div class="col-lg-4">
+                    <div class="dash-card h-100">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-pie-chart-fill me-2 text-primary"></i>ONU Status</h6>
+                        </div>
+                        <div class="card-inner">
+                            <div class="chart-container" style="height: 220px;">
+                                <canvas id="onuStatusChart"></canvas>
+                            </div>
+                            <div class="row text-center mt-3 g-2">
+                                <div class="col-4">
+                                    <div class="p-2 rounded-3" style="background: rgba(16,185,129,0.08);">
+                                        <div class="fw-bold text-success" style="font-size: 1.1rem;"><?= number_format($stats['online_onus']) ?></div>
+                                        <small class="text-muted" style="font-size: 0.7rem;">Online</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-2 rounded-3" style="background: rgba(100,116,139,0.08);">
+                                        <div class="fw-bold" style="color: #64748b; font-size: 1.1rem;"><?= number_format($stats['offline_onus']) ?></div>
+                                        <small class="text-muted" style="font-size: 0.7rem;">Offline</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-2 rounded-3" style="background: rgba(239,68,68,0.08);">
+                                        <div class="fw-bold text-danger" style="font-size: 1.1rem;"><?= number_format($stats['los_onus']) ?></div>
+                                        <small class="text-muted" style="font-size: 0.7rem;">LOS</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="card-body px-4 pb-4">
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="dash-card h-100">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-reception-4 me-2 text-info"></i>Signal Quality</h6>
+                        </div>
+                        <div class="card-inner">
+                            <div class="chart-container" style="height: 220px;">
+                                <canvas id="signalQualityChart"></canvas>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-3 justify-content-center">
+                                <?php
+                                $sqColors = ['Excellent' => '#10b981', 'Good' => '#06b6d4', 'Fair' => '#f59e0b', 'Weak' => '#f97316', 'Critical' => '#ef4444', 'No Reading' => '#94a3b8'];
+                                foreach ($sqColors as $label => $color):
+                                    $cnt = $signalData[$label] ?? 0;
+                                    if ($cnt > 0):
+                                ?>
+                                <span class="px-2 py-1 rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: <?= $color ?>15; color: <?= $color ?>;"><?= $cnt ?> <?= $label ?></span>
+                                <?php endif; endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="dash-card h-100">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-hdd-rack-fill me-2 text-primary"></i>OLT Devices</h6>
+                            <a href="?page=huawei-olt&view=olts" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size: 0.75rem;">
+                                <i class="bi bi-gear me-1"></i>Manage
+                            </a>
+                        </div>
+                        <div class="card-inner">
                             <?php if (empty($olts)): ?>
-                            <div class="text-center py-5">
-                                <div class="mb-3"><i class="bi bi-inbox display-4 text-muted"></i></div>
-                                <p class="text-muted mb-3">No OLTs configured yet</p>
-                                <a href="?page=huawei-olt&view=olts" class="btn btn-primary rounded-pill px-4">
-                                    <i class="bi bi-plus-circle me-1"></i> Add First OLT
+                            <div class="text-center py-4">
+                                <i class="bi bi-inbox display-4 text-muted mb-2 d-block"></i>
+                                <p class="text-muted mb-3">No OLTs configured</p>
+                                <a href="?page=huawei-olt&view=olts" class="btn btn-primary btn-sm rounded-pill px-4">
+                                    <i class="bi bi-plus-circle me-1"></i> Add OLT
                                 </a>
                             </div>
                             <?php else: ?>
-                            <div class="row g-3">
-                                <?php 
-                                $onusByOlt = $huaweiOLT->getONUsByOLT();
-                                $onuCountMap = array_column($onusByOlt, null, 'id');
-                                foreach ($olts as $olt): 
-                                    $oltId = $olt['id'];
-                                    $oltOnline = $onuCountMap[$oltId]['online_count'] ?? 0;
-                                    $oltTotal = $onuCountMap[$oltId]['total_count'] ?? 0;
-                                    $oltOffline = $oltTotal - $oltOnline;
-                                    $oltHealth = $oltTotal > 0 ? round($oltOnline / $oltTotal * 100) : 100;
-                                    $healthColor = $oltHealth >= 95 ? '#10b981' : ($oltHealth >= 80 ? '#f59e0b' : '#ef4444');
+                            <div class="d-flex flex-column gap-3">
+                                <?php foreach ($olts as $olt): 
+                                    $oId = $olt['id'];
+                                    $oOnline = $onuCountMap[$oId]['online_count'] ?? 0;
+                                    $oTotal = $onuCountMap[$oId]['total_count'] ?? 0;
+                                    $oOffline = $oTotal - $oOnline;
+                                    $oHealth = $oTotal > 0 ? round($oOnline / $oTotal * 100) : 100;
+                                    $hColor = $oHealth >= 90 ? '#10b981' : ($oHealth >= 70 ? '#f59e0b' : '#ef4444');
+                                    $oltUptime = $olt['uptime'] ?: ($olt['snmp_sys_uptime'] ?? null);
                                 ?>
-                                <div class="col-md-6">
-                                    <div class="olt-card">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="health-ring">
-                                                <svg viewBox="0 0 36 36" width="48" height="48">
-                                                    <circle cx="18" cy="18" r="15" fill="none" stroke="#e2e8f0" stroke-width="3"></circle>
-                                                    <circle cx="18" cy="18" r="15" fill="none" stroke="<?= $healthColor ?>" stroke-width="3" 
-                                                            stroke-dasharray="<?= $oltHealth * 0.94 ?> 100" stroke-linecap="round" 
-                                                            style="transform: rotate(-90deg); transform-origin: center;"></circle>
-                                                </svg>
-                                                <span class="health-value" style="color: <?= $healthColor ?>"><?= $oltHealth ?>%</span>
-                                            </div>
-                                            <div class="flex-grow-1">
-                                                <div class="fw-bold"><?= htmlspecialchars($olt['name']) ?></div>
-                                                <div class="small text-muted"><?= htmlspecialchars($olt['ip_address']) ?></div>
-                                                <?php $oltUptime = $olt['uptime'] ?: ($olt['snmp_sys_uptime'] ?? null); if ($oltUptime): ?>
-                                                <div class="small text-success"><i class="bi bi-clock-history me-1"></i><?= htmlspecialchars($oltUptime) ?></div>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="text-end">
-                                                <div class="d-flex gap-2 justify-content-end mb-1">
-                                                    <span class="badge bg-success bg-opacity-10 text-success"><?= $oltOnline ?> <i class="bi bi-wifi"></i></span>
-                                                    <?php if ($oltOffline > 0): ?>
-                                                    <span class="badge bg-danger bg-opacity-10 text-danger"><?= $oltOffline ?> <i class="bi bi-wifi-off"></i></span>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <small class="text-muted"><?= $oltTotal ?> total</small>
+                                <div class="olt-card-v2">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="olt-status-dot online"></span>
+                                            <div>
+                                                <div class="fw-bold" style="font-size: 0.9rem;"><?= htmlspecialchars($olt['name']) ?></div>
+                                                <div class="text-muted" style="font-size: 0.72rem;"><?= htmlspecialchars($olt['ip_address']) ?></div>
                                             </div>
                                         </div>
+                                        <span class="fw-bold" style="color: <?= $hColor ?>; font-size: 1.1rem;"><?= $oHealth ?>%</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center" style="font-size: 0.75rem;">
+                                        <div class="d-flex gap-2">
+                                            <span class="text-success fw-semibold"><i class="bi bi-wifi me-1"></i><?= $oOnline ?></span>
+                                            <?php if ($oOffline > 0): ?>
+                                            <span class="text-danger fw-semibold"><i class="bi bi-wifi-off me-1"></i><?= $oOffline ?></span>
+                                            <?php endif; ?>
+                                            <span class="text-muted"><?= $oTotal ?> total</span>
+                                        </div>
+                                        <?php if ($oltUptime): ?>
+                                        <span class="text-muted"><i class="bi bi-clock-history me-1"></i><?= htmlspecialchars($oltUptime) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="mini-bar">
+                                        <div class="fill" style="width: <?= $oHealth ?>%; background: linear-gradient(90deg, <?= $hColor ?>, <?= $hColor ?>cc);"></div>
                                     </div>
                                 </div>
                                 <?php endforeach; ?>
@@ -7918,126 +8047,48 @@ try {
                         </div>
                     </div>
                 </div>
-                
-                <!-- Network Uptime Gauge -->
-                <div class="col-lg-4">
-                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
-                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
-                            <h5 class="mb-0 fw-bold"><i class="bi bi-pie-chart me-2 text-success"></i>Network Health</h5>
-                        </div>
-                        <div class="card-body d-flex flex-column align-items-center justify-content-center">
-                            <div class="uptime-gauge">
-                                <svg viewBox="0 0 36 36" width="180" height="180">
-                                    <defs>
-                                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                            <stop offset="0%" stop-color="#10b981"/>
-                                            <stop offset="100%" stop-color="#059669"/>
-                                        </linearGradient>
-                                    </defs>
-                                    <circle class="gauge-bg" cx="18" cy="18" r="15" fill="none" stroke-width="3"></circle>
-                                    <circle class="gauge-fill" cx="18" cy="18" r="15" fill="none" stroke-width="3" 
-                                            stroke-dasharray="<?= $uptimePercent * 0.94 ?> 100"
-                                            style="transform: rotate(-90deg); transform-origin: center;"></circle>
-                                </svg>
-                                <div class="gauge-center">
-                                    <div class="gauge-value"><?= $uptimePercent ?>%</div>
-                                    <div class="text-muted small">Uptime</div>
-                                </div>
-                            </div>
-                            <div class="row w-100 text-center mt-4 g-2">
-                                <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(16, 185, 129, 0.1);">
-                                        <div class="fw-bold text-success"><?= number_format($stats['online_onus']) ?></div>
-                                        <small class="text-muted">Online</small>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(239, 68, 68, 0.1);">
-                                        <div class="fw-bold text-danger"><?= $offlineTotal ?></div>
-                                        <small class="text-muted">Down</small>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(59, 130, 246, 0.1);">
-                                        <div class="fw-bold text-primary"><?= number_format($totalOnus) ?></div>
-                                        <small class="text-muted">Total</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
-            
-            <!-- Quick Actions & Alerts Row -->
+
             <div class="row g-4 mb-4">
-                <!-- Quick Actions -->
-                <div class="col-lg-4">
-                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
-                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4">
-                            <h5 class="mb-0 fw-bold"><i class="bi bi-lightning me-2 text-warning"></i>Quick Actions</h5>
+                <div class="col-lg-8">
+                    <div class="dash-card">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-diagram-3-fill me-2 text-primary"></i>PON Port Utilization</h6>
+                            <span class="text-muted" style="font-size: 0.75rem;"><?= count($ponPortData) ?> active ports</span>
                         </div>
-                        <div class="card-body px-4 pb-4">
-                            <div class="row g-3">
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="quick-action-btn">
-                                        <i class="bi bi-plus-circle text-success"></i>
-                                        <div class="fw-medium">Authorize ONUs</div>
-                                    </a>
-                                </div>
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=live_monitor" class="quick-action-btn">
-                                        <i class="bi bi-broadcast text-primary"></i>
-                                        <div class="fw-medium">Live Monitor</div>
-                                    </a>
-                                </div>
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=tr069" class="quick-action-btn">
-                                        <i class="bi bi-router text-info"></i>
-                                        <div class="fw-medium">TR-069</div>
-                                    </a>
-                                </div>
-                                <div class="col-6">
-                                    <a href="?page=huawei-olt&view=terminal" class="quick-action-btn">
-                                        <i class="bi bi-terminal text-dark"></i>
-                                        <div class="fw-medium">CLI Terminal</div>
-                                    </a>
-                                </div>
-                                <div class="col-12">
-                                    <button type="button" class="quick-action-btn w-100 border-0" onclick="showBulkBindTR069Modal()" style="cursor:pointer;">
-                                        <i class="bi bi-gear-wide-connected text-primary"></i>
-                                        <div class="fw-medium">Setup TR-069 + GenieACS</div>
-                                    </button>
-                                </div>
+                        <div class="card-inner">
+                            <div class="chart-container" style="height: 280px;">
+                                <canvas id="ponPortChart"></canvas>
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Recent Alerts -->
+
                 <div class="col-lg-4">
-                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
-                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0 fw-bold"><i class="bi bi-bell me-2 text-danger"></i>Recent Alerts</h5>
-                            <a href="?page=huawei-olt&view=alerts" class="btn btn-sm btn-link text-primary p-0">View All</a>
+                    <div class="dash-card h-100">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-exclamation-diamond-fill me-2 text-warning"></i>Top Offline Ports</h6>
                         </div>
-                        <div class="card-body px-4 pb-4" style="max-height: 280px; overflow-y: auto;">
-                            <?php if (empty($alerts)): ?>
+                        <div class="card-inner" style="max-height: 310px; overflow-y: auto;">
+                            <?php if (empty($topOfflinePorts)): ?>
                             <div class="text-center py-4">
-                                <i class="bi bi-check-circle display-4 text-success mb-2"></i>
-                                <p class="text-muted mb-0">All systems operational</p>
+                                <i class="bi bi-check-circle-fill display-4 text-success mb-2 d-block"></i>
+                                <p class="text-muted mb-0 small">All ports healthy</p>
                             </div>
                             <?php else: ?>
-                            <?php foreach (array_slice($alerts, 0, 5) as $alert): ?>
-                            <div class="alert-item <?= $alert['severity'] ?>">
-                                <div class="d-flex align-items-center gap-2">
-                                    <?php
-                                    $severityIcon = ['info' => 'info-circle', 'warning' => 'exclamation-triangle', 'critical' => 'exclamation-circle'];
-                                    ?>
-                                    <i class="bi bi-<?= $severityIcon[$alert['severity']] ?? 'info-circle' ?>"></i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-medium small"><?= htmlspecialchars($alert['title']) ?></div>
-                                        <div class="text-muted" style="font-size: 0.7rem;"><?= date('M j, H:i', strtotime($alert['created_at'])) ?></div>
+                            <?php foreach ($topOfflinePorts as $idx => $tp): 
+                                $tpPercent = $tp['total'] > 0 ? round(($tp['total'] - $tp['offline_count']) / $tp['total'] * 100) : 100;
+                                $tpColor = $tpPercent >= 80 ? '#10b981' : ($tpPercent >= 50 ? '#f59e0b' : '#ef4444');
+                            ?>
+                            <div class="d-flex align-items-center gap-3 py-2 <?= $idx < count($topOfflinePorts)-1 ? 'border-bottom' : '' ?>">
+                                <div class="text-muted fw-bold" style="font-size: 0.75rem; min-width: 20px;">#<?= $idx+1 ?></div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-semibold" style="font-size: 0.8rem;">PON <?= htmlspecialchars($tp['pon_port']) ?></span>
+                                        <span class="fw-bold" style="font-size: 0.75rem; color: <?= $tpColor ?>;"><?= $tp['offline_count'] ?>/<?= $tp['total'] ?> down</span>
+                                    </div>
+                                    <div style="height: 5px; border-radius: 3px; background: #f1f5f9;">
+                                        <div style="height: 100%; border-radius: 3px; width: <?= 100 - $tpPercent ?>%; background: <?= $tpColor ?>; transition: width 1s;"></div>
                                     </div>
                                 </div>
                             </div>
@@ -8046,15 +8097,92 @@ try {
                         </div>
                     </div>
                 </div>
-                
-                <!-- Problem ONUs -->
+            </div>
+
+            <div class="row g-4 mb-4">
                 <div class="col-lg-4">
-                    <div class="card shadow-sm border-0 h-100" style="border-radius: 16px;">
-                        <div class="card-header bg-transparent border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-diamond me-2 text-warning"></i>Problem ONUs</h5>
-                            <a href="?page=huawei-olt&view=onus&status=offline" class="btn btn-sm btn-link text-primary p-0">View All</a>
+                    <div class="dash-card h-100">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-lightning-fill me-2 text-warning"></i>Quick Actions</h6>
                         </div>
-                        <div class="card-body px-4 pb-4" style="max-height: 280px; overflow-y: auto;">
+                        <div class="card-inner">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="quick-btn">
+                                        <div class="qb-icon" style="background: rgba(16,185,129,0.1); color: #10b981;"><i class="bi bi-plus-circle-fill"></i></div>
+                                        <div class="fw-semibold" style="font-size: 0.8rem;">Authorize</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=live_monitor" class="quick-btn">
+                                        <div class="qb-icon" style="background: rgba(59,130,246,0.1); color: #3b82f6;"><i class="bi bi-broadcast-pin"></i></div>
+                                        <div class="fw-semibold" style="font-size: 0.8rem;">Live Monitor</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=tr069" class="quick-btn">
+                                        <div class="qb-icon" style="background: rgba(6,182,212,0.1); color: #06b6d4;"><i class="bi bi-router-fill"></i></div>
+                                        <div class="fw-semibold" style="font-size: 0.8rem;">TR-069</div>
+                                    </a>
+                                </div>
+                                <div class="col-6">
+                                    <a href="?page=huawei-olt&view=terminal" class="quick-btn">
+                                        <div class="qb-icon" style="background: rgba(30,41,59,0.1); color: #1e293b;"><i class="bi bi-terminal-fill"></i></div>
+                                        <div class="fw-semibold" style="font-size: 0.8rem;">CLI Terminal</div>
+                                    </a>
+                                </div>
+                                <div class="col-12">
+                                    <button type="button" class="quick-btn w-100 border-1" onclick="showBulkBindTR069Modal()">
+                                        <div class="qb-icon mx-auto" style="background: rgba(99,102,241,0.1); color: #6366f1;"><i class="bi bi-gear-wide-connected"></i></div>
+                                        <div class="fw-semibold" style="font-size: 0.8rem;">Setup TR-069 + GenieACS</div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="dash-card h-100">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-bell-fill me-2 text-danger"></i>Recent Alerts</h6>
+                            <a href="?page=huawei-olt&view=alerts" class="text-primary" style="font-size: 0.75rem; text-decoration: none; font-weight: 600;">View All <i class="bi bi-arrow-right"></i></a>
+                        </div>
+                        <div class="card-inner" style="max-height: 310px; overflow-y: auto;">
+                            <?php if (empty($alerts)): ?>
+                            <div class="text-center py-4">
+                                <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(16,185,129,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                                    <i class="bi bi-check-lg" style="font-size: 1.5rem; color: #10b981;"></i>
+                                </div>
+                                <p class="text-muted mb-0 small">All systems operational</p>
+                            </div>
+                            <?php else: ?>
+                            <?php foreach (array_slice($alerts, 0, 6) as $alert): 
+                                $sIcon = ['info' => 'info-circle-fill', 'warning' => 'exclamation-triangle-fill', 'critical' => 'exclamation-circle-fill'];
+                                $sColor = ['info' => '#3b82f6', 'warning' => '#f59e0b', 'critical' => '#ef4444'];
+                            ?>
+                            <div class="alert-row <?= $alert['severity'] ?>">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-<?= $sIcon[$alert['severity']] ?? 'info-circle-fill' ?>" style="color: <?= $sColor[$alert['severity']] ?? '#3b82f6' ?>;"></i>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-semibold" style="font-size: 0.78rem;"><?= htmlspecialchars($alert['title']) ?></div>
+                                        <div class="text-muted" style="font-size: 0.65rem;"><?= date('M j, H:i', strtotime($alert['created_at'])) ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="dash-card h-100">
+                        <div class="card-hdr">
+                            <h6><i class="bi bi-exclamation-diamond-fill me-2 text-warning"></i>Problem ONUs</h6>
+                            <a href="?page=huawei-olt&view=onus&status=offline" class="text-primary" style="font-size: 0.75rem; text-decoration: none; font-weight: 600;">View All <i class="bi bi-arrow-right"></i></a>
+                        </div>
+                        <div class="card-inner" style="max-height: 310px; overflow-y: auto;">
                             <?php
                             $issueONUs = $db->query("
                                 SELECT o.id, o.sn, o.name as description, o.status, o.rx_power 
@@ -8069,25 +8197,26 @@ try {
                             ?>
                             <?php if (empty($issueONUs)): ?>
                             <div class="text-center py-4">
-                                <i class="bi bi-check-circle display-4 text-success mb-2"></i>
-                                <p class="text-muted mb-0">No issues detected</p>
+                                <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(16,185,129,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                                    <i class="bi bi-check-lg" style="font-size: 1.5rem; color: #10b981;"></i>
+                                </div>
+                                <p class="text-muted mb-0 small">No issues detected</p>
                             </div>
                             <?php else: ?>
-                            <?php foreach ($issueONUs as $issue): ?>
-                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                <div>
-                                    <div class="fw-medium small text-truncate" style="max-width: 150px;" title="<?= htmlspecialchars($issue['sn']) ?>">
-                                        <?= htmlspecialchars($issue['description'] ?: $issue['sn']) ?>
-                                    </div>
-                                    <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars($issue['sn']) ?></div>
-                                </div>
-                                <?php 
+                            <?php foreach ($issueONUs as $issue): 
                                 $isLos = strtolower($issue['status']) === 'los';
                                 $rxPower = floatval($issue['rx_power'] ?? 0);
-                                $badgeClass = $isLos ? 'bg-danger' : ($rxPower <= -28 ? 'bg-warning' : 'bg-secondary');
-                                $badgeText = $isLos ? 'LOS' : (isset($issue['rx_power']) ? number_format($rxPower, 1) . ' dBm' : 'Offline');
-                                ?>
-                                <span class="issue-badge <?= $badgeClass ?> text-white"><?= $badgeText ?></span>
+                                $pillBg = $isLos ? '#ef4444' : ($rxPower <= -28 ? '#f59e0b' : '#64748b');
+                                $pillText = $isLos ? 'LOS' : (isset($issue['rx_power']) ? number_format($rxPower, 1) . ' dBm' : 'Offline');
+                            ?>
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div style="min-width: 0;">
+                                    <div class="fw-semibold text-truncate" style="font-size: 0.8rem; max-width: 160px;" title="<?= htmlspecialchars($issue['sn']) ?>">
+                                        <?= htmlspecialchars($issue['description'] ?: $issue['sn']) ?>
+                                    </div>
+                                    <div class="text-muted text-truncate" style="font-size: 0.65rem;"><?= htmlspecialchars($issue['sn']) ?></div>
+                                </div>
+                                <span class="issue-pill text-white" style="background: <?= $pillBg ?>;"><?= $pillText ?></span>
                             </div>
                             <?php endforeach; ?>
                             <?php endif; ?>
@@ -8095,22 +8224,193 @@ try {
                     </div>
                 </div>
             </div>
-            <!-- Auto-refresh script -->
+
             <script>
             (function() {
                 let countdown = 60;
                 const timerEl = document.getElementById('autoRefreshTimer');
                 function updateTimer() {
-                    if (timerEl) {
-                        timerEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-refresh in ' + countdown + 's';
-                    }
-                    countdown--;
-                    if (countdown < 0) {
-                        location.reload();
-                    }
+                    if (timerEl) timerEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-refresh in ' + countdown + 's';
+                    if (--countdown < 0) location.reload();
                 }
                 updateTimer();
                 setInterval(updateTimer, 1000);
+
+                const chartFont = { family: "'Inter', 'Segoe UI', sans-serif" };
+                Chart.defaults.font.family = chartFont.family;
+
+                new Chart(document.getElementById('onuStatusChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Online', 'Offline', 'LOS'],
+                        datasets: [{
+                            data: [<?= (int)$stats['online_onus'] ?>, <?= (int)$stats['offline_onus'] ?>, <?= (int)$stats['los_onus'] ?>],
+                            backgroundColor: ['#10b981', '#64748b', '#ef4444'],
+                            borderWidth: 0,
+                            hoverOffset: 8,
+                            spacing: 2,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '72%',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1e293b',
+                                titleFont: { size: 13, weight: '600' },
+                                bodyFont: { size: 12 },
+                                padding: 12,
+                                cornerRadius: 10,
+                                callbacks: {
+                                    label: function(ctx) {
+                                        let total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+                                        let pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                                        return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    plugins: [{
+                        id: 'centerText',
+                        afterDraw(chart) {
+                            const { ctx, chartArea: { width, height, top, left } } = chart;
+                            const cx = left + width / 2, cy = top + height / 2;
+                            ctx.save();
+                            ctx.textAlign = 'center';
+                            ctx.fillStyle = '#10b981';
+                            ctx.font = 'bold 28px ' + chartFont.family;
+                            ctx.fillText('<?= $uptimePercent ?>%', cx, cy);
+                            ctx.fillStyle = '#94a3b8';
+                            ctx.font = '500 11px ' + chartFont.family;
+                            ctx.fillText('Uptime', cx, cy + 18);
+                            ctx.restore();
+                        }
+                    }]
+                });
+
+                new Chart(document.getElementById('signalQualityChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Excellent', 'Good', 'Fair', 'Weak', 'Critical'],
+                        datasets: [{
+                            label: 'ONUs',
+                            data: [
+                                <?= $signalData['Excellent'] ?? 0 ?>,
+                                <?= $signalData['Good'] ?? 0 ?>,
+                                <?= $signalData['Fair'] ?? 0 ?>,
+                                <?= $signalData['Weak'] ?? 0 ?>,
+                                <?= $signalData['Critical'] ?? 0 ?>
+                            ],
+                            backgroundColor: [
+                                'rgba(16,185,129,0.8)',
+                                'rgba(6,182,212,0.8)',
+                                'rgba(245,158,11,0.8)',
+                                'rgba(249,115,22,0.8)',
+                                'rgba(239,68,68,0.8)'
+                            ],
+                            borderRadius: 8,
+                            borderSkipped: false,
+                            barThickness: 28
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1e293b',
+                                padding: 12,
+                                cornerRadius: 10,
+                                callbacks: {
+                                    label: function(ctx) {
+                                        let ranges = {'Excellent': '> -15 dBm', 'Good': '-20 to -15', 'Fair': '-25 to -20', 'Weak': '-28 to -25', 'Critical': '< -28 dBm'};
+                                        return ctx.raw + ' ONUs (' + (ranges[ctx.label] || '') + ')';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                grid: { display: false }, 
+                                ticks: { font: { size: 11 } },
+                                border: { display: false }
+                            },
+                            y: { 
+                                grid: { display: false }, 
+                                ticks: { font: { size: 11, weight: '500' } },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
+
+                const ponData = <?= json_encode(array_values($ponPortData)) ?>;
+                new Chart(document.getElementById('ponPortChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: ponData.map(p => p.pon_port),
+                        datasets: [
+                            {
+                                label: 'Online',
+                                data: ponData.map(p => parseInt(p.online)),
+                                backgroundColor: 'rgba(16,185,129,0.75)',
+                                borderRadius: { topLeft: 4, topRight: 4 },
+                                borderSkipped: false
+                            },
+                            {
+                                label: 'Offline',
+                                data: ponData.map(p => parseInt(p.offline)),
+                                backgroundColor: 'rgba(239,68,68,0.6)',
+                                borderRadius: { topLeft: 4, topRight: 4 },
+                                borderSkipped: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                align: 'end',
+                                labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true, padding: 16, font: { size: 11, weight: '500' } }
+                            },
+                            tooltip: {
+                                backgroundColor: '#1e293b',
+                                padding: 12,
+                                cornerRadius: 10,
+                                callbacks: {
+                                    afterBody: function(ctx) {
+                                        let idx = ctx[0].dataIndex;
+                                        let total = parseInt(ponData[idx].total);
+                                        let online = parseInt(ponData[idx].online);
+                                        return 'Health: ' + (total > 0 ? ((online/total)*100).toFixed(0) : 100) + '%';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                grid: { display: false },
+                                ticks: { font: { size: 9 }, maxRotation: 90, minRotation: 45 },
+                                border: { display: false }
+                            },
+                            y: {
+                                stacked: true,
+                                grid: { color: 'rgba(0,0,0,0.04)' },
+                                ticks: { font: { size: 11 } },
+                                border: { display: false }
+                            }
+                        }
+                    }
+                });
             })();
             </script>
 
