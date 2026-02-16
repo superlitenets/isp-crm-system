@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SuperLite CRM</string>
+    <string name="crm_url">https://crm.superlite.co.ke</string>
+    <string name="loading_message">Loading SuperLite CRM…</string>
+    <string name="no_internet">No internet connection. Please check your network and try again.</string>
+    <string name="retry">Retry</string>
+</resources>
