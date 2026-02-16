@@ -125,7 +125,28 @@ class SNMPPollingWorker {
     isOltPaused(oltId) {
         return this.discoveryWorker && this.discoveryWorker.isOltPaused(oltId);
     }
-    
+
+    decryptPassword(encrypted) {
+        if (!encrypted) return '';
+        try {
+            const crypto = require('crypto');
+            const key = process.env.SESSION_SECRET || 'default-secret-key-change-me';
+            const combined = Buffer.from(encrypted, 'base64');
+            const iv = combined.slice(0, 16);
+            const ciphertextBase64 = combined.slice(16).toString('utf8');
+            const ciphertext = Buffer.from(ciphertextBase64, 'base64');
+            const keyBuffer = Buffer.alloc(32);
+            Buffer.from(key).copy(keyBuffer);
+            const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
+            let decrypted = decipher.update(ciphertext);
+            decrypted = Buffer.concat([decrypted, decipher.final()]);
+            return decrypted.toString('utf8');
+        } catch (e) {
+            console.error(`[SNMP] Password decryption failed:`, e.message);
+            return encrypted;
+        }
+    }
+
     async pollOlt(olt) {
         return new Promise(async (resolve, reject) => {
             const paused = this.isOltPaused(olt.id);
@@ -222,18 +243,22 @@ class SNMPPollingWorker {
         if (!existingSession || !existingSession.connected) {
             try {
                 const configResult = await this.pool.query(`
-                    SELECT ip_address, port, ssh_port, username, password, protocol, enable_password
+                    SELECT ip_address, port, ssh_port, username, password_encrypted, cli_protocol, connection_type
                     FROM huawei_olts WHERE id = $1
                 `, [olt.id]);
                 if (configResult.rows.length > 0) {
                     const cfg = configResult.rows[0];
+                    const proto = cfg.connection_type || cfg.cli_protocol || 'telnet';
+                    const password = this.decryptPassword(cfg.password_encrypted);
+                    const connectPort = proto === 'ssh' ? (cfg.ssh_port || cfg.port || 22) : (cfg.port || 23);
                     await this.sessionManager.connect(oltKey, {
                         host: cfg.ip_address,
-                        port: cfg.protocol === 'ssh' ? (cfg.ssh_port || 22) : (cfg.port || 23),
+                        port: connectPort,
+                        sshPort: connectPort,
                         username: cfg.username,
-                        password: cfg.password,
-                        enablePassword: cfg.enable_password,
-                        protocol: cfg.protocol || 'telnet'
+                        password: password,
+                        enablePassword: password,
+                        protocol: proto
                     });
                     console.log(`[CLI] Connected to OLT ${olt.name} for polling`);
                 }
