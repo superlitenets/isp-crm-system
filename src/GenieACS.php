@@ -230,19 +230,16 @@ class GenieACS {
                 continue;
             }
             
-            $customerName = trim($onu['customer_name'] ?? '');
-            if (empty($customerName)) {
-                if (!empty($onu['customer_id'])) {
+            $onuName = trim($onu['name'] ?? '');
+            if (!empty($onuName) && !preg_match('/^(SNS|HWTC|TDTC|ZTEG|[A-F0-9]{12,})/i', $onuName)) {
+                $customerName = $onuName;
+            } else {
+                $customerName = trim($onu['customer_name'] ?? '');
+                if (empty($customerName) && !empty($onu['customer_id'])) {
                     $custStmt = $db->prepare("SELECT name FROM customers WHERE id = ?");
                     $custStmt->execute([$onu['customer_id']]);
                     $cust = $custStmt->fetch(\PDO::FETCH_ASSOC);
                     $customerName = $cust['name'] ?? '';
-                }
-            }
-            if (empty($customerName)) {
-                $onuName = trim($onu['name'] ?? '');
-                if (!empty($onuName) && !preg_match('/^(SNS|HWTC|TDTC|ZTEG|[A-F0-9]{12,})/i', $onuName)) {
-                    $customerName = $onuName;
                 }
             }
             
