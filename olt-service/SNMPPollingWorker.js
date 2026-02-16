@@ -497,17 +497,38 @@ class SNMPPollingWorker {
         try {
             await client.query('BEGIN');
             let updated = 0;
+            
+            const dbResult = await client.query(`
+                SELECT id, slot, port, onu_id FROM huawei_onus WHERE olt_id = $1
+            `, [oltId]);
+            
+            const dbMap = {};
+            for (const row of dbResult.rows) {
+                const key = `${row.slot}.${row.port}.${row.onu_id}`;
+                if (!dbMap[key]) dbMap[key] = row;
+            }
 
             for (const [key, power] of Object.entries(powerData)) {
-                const { slot, port, onuId } = power;
+                let { slot, port, onuId } = power;
                 const rx = power.rx_power ?? null;
                 const tx = power.tx_power ?? null;
+                
+                let dbOnu = dbMap[`${slot}.${port}.${onuId}`];
+                
+                if (!dbOnu) {
+                    const methods = this.decodeIfIndex(slot * 8192 + port * 256);
+                    for (const m of methods) {
+                        dbOnu = dbMap[`${m.slot}.${m.port}.${onuId}`];
+                        if (dbOnu) break;
+                    }
+                }
+                
+                if (!dbOnu) continue;
 
                 const result = await client.query(`
                     UPDATE huawei_onus SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), updated_at = CURRENT_TIMESTAMP
-                    WHERE olt_id = $3 AND slot = $4 AND port = $5 AND onu_id = $6
-                    RETURNING id
-                `, [rx, tx, oltId, slot, port, onuId]);
+                    WHERE id = $3
+                `, [rx, tx, dbOnu.id]);
 
                 if (result.rowCount > 0) {
                     updated++;
@@ -565,6 +586,18 @@ class SNMPPollingWorker {
         }
     }
 
+    decodeIfIndex(ifIndex) {
+        const ponIndex = ifIndex > 0xFFFFFF ? (ifIndex & 0xFFFFFF) : ifIndex;
+        
+        const methods = [
+            { slot: (ponIndex >> 13) & 0x1F, port: (ponIndex >> 8) & 0x1F },
+            { slot: (ponIndex >> 8) & 0xFF, port: ponIndex & 0xFF },
+            { slot: Math.floor(ponIndex / 256), port: ponIndex % 256 },
+        ];
+        
+        return methods;
+    }
+
     async updateONUStatuses(oltId, statuses) {
         if (statuses.length === 0) return;
 
@@ -573,45 +606,105 @@ class SNMPPollingWorker {
         try {
             await client.query('BEGIN');
             
+            const dbResult = await client.query(`
+                SELECT o.id, o.sn, o.slot, o.port, o.onu_id, o.status as prev_status, o.description, o.name,
+                       c.name as customer_name, c.phone as customer_phone, c.id as customer_id
+                FROM huawei_onus o
+                LEFT JOIN customers c ON o.customer_id = c.id
+                WHERE o.olt_id = $1
+            `, [oltId]);
+            
+            const dbMap = {};
+            for (const row of dbResult.rows) {
+                const key = `${row.slot}.${row.port}.${row.onu_id}`;
+                if (!dbMap[key]) dbMap[key] = row;
+            }
+            
             let updated = 0;
             let noMatch = 0;
+            let correctedSlotPort = null;
+            
             for (const s of statuses) {
-                const { frame, slot, port, onuId } = s;
+                let { frame, slot, port, onuId } = s;
+                let key = `${slot}.${port}.${onuId}`;
+                let prevOnu = dbMap[key];
                 
-                const prevResult = await client.query(`
-                    SELECT o.id, o.sn, o.status as prev_status, o.description, o.name,
-                           c.name as customer_name, c.phone as customer_phone, c.id as customer_id
-                    FROM huawei_onus o
-                    LEFT JOIN customers c ON o.customer_id = c.id
-                    WHERE o.olt_id = $1 AND o.slot = $2 AND o.port = $3 AND o.onu_id = $4
-                `, [oltId, slot, port, onuId]);
+                if (!prevOnu && !correctedSlotPort) {
+                    const indexParts = s.index.split('.');
+                    if (indexParts.length >= 2) {
+                        const ifIndex = parseInt(indexParts[0]);
+                        const methods = this.decodeIfIndex(ifIndex);
+                        
+                        for (const m of methods) {
+                            const tryKey = `${m.slot}.${m.port}.${onuId}`;
+                            if (dbMap[tryKey]) {
+                                console.log(`[SNMP] OLT ${oltId}: ifIndex ${ifIndex} - method (s=${slot},p=${port}) failed, using (s=${m.slot},p=${m.port})`);
+                                correctedSlotPort = { 
+                                    calcSlot: (ifIdx) => {
+                                        const pi = ifIdx > 0xFFFFFF ? (ifIdx & 0xFFFFFF) : ifIdx;
+                                        if (m.slot === ((pi >> 13) & 0x1F)) return { slot: (pi >> 13) & 0x1F, port: (pi >> 8) & 0x1F };
+                                        if (m.slot === ((pi >> 8) & 0xFF)) return { slot: (pi >> 8) & 0xFF, port: pi & 0xFF };
+                                        return { slot: Math.floor(pi / 256), port: pi % 256 };
+                                    }
+                                };
+                                slot = m.slot;
+                                port = m.port;
+                                key = tryKey;
+                                prevOnu = dbMap[key];
+                                break;
+                            }
+                        }
+                        
+                        if (!prevOnu) {
+                            noMatch++;
+                            if (noMatch <= 3) {
+                                const dbSlots = [...new Set(dbResult.rows.map(r => `${r.slot}/${r.port}`))].slice(0, 5);
+                                console.log(`[SNMP] OLT ${oltId}: No match for ifIndex=${ifIndex}, decoded s=${slot}/p=${port}/o=${onuId}. DB slots: ${dbSlots.join(', ')}`);
+                            }
+                            continue;
+                        }
+                    } else {
+                        noMatch++;
+                        continue;
+                    }
+                } else if (!prevOnu && correctedSlotPort) {
+                    const indexParts = s.index.split('.');
+                    if (indexParts.length >= 2) {
+                        const ifIndex = parseInt(indexParts[0]);
+                        const corrected = correctedSlotPort.calcSlot(ifIndex);
+                        slot = corrected.slot;
+                        port = corrected.port;
+                        key = `${slot}.${port}.${onuId}`;
+                        prevOnu = dbMap[key];
+                    }
+                    if (!prevOnu) {
+                        noMatch++;
+                        continue;
+                    }
+                }
                 
-                const prevOnu = prevResult.rows[0];
                 const prevStatus = prevOnu?.prev_status;
+                const dbId = prevOnu?.id;
                 
-                // Handle online_since transition properly
                 let result;
                 if (s.status === 'online' && prevStatus !== 'online') {
-                    // ONU just came online - set online_since
                     result = await client.query(`
                         UPDATE huawei_onus 
                         SET status = $1, snmp_status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                        WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
-                    `, [s.status, oltId, slot, port, onuId]);
+                        WHERE id = $2
+                    `, [s.status, dbId]);
                 } else if (s.status !== 'online' && prevStatus === 'online') {
-                    // ONU went offline - clear online_since
                     result = await client.query(`
                         UPDATE huawei_onus 
                         SET status = $1, snmp_status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP
-                        WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
-                    `, [s.status, oltId, slot, port, onuId]);
+                        WHERE id = $2
+                    `, [s.status, dbId]);
                 } else {
-                    // No transition, just update status
                     result = await client.query(`
                         UPDATE huawei_onus 
                         SET status = $1, snmp_status = $1, updated_at = CURRENT_TIMESTAMP
-                        WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
-                    `, [s.status, oltId, slot, port, onuId]);
+                        WHERE id = $2
+                    `, [s.status, dbId]);
                 }
                 
                 if (result.rowCount > 0) {
