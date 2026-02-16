@@ -51,8 +51,10 @@ class SNMPPollingWorker {
         }
         
         this.signalHistoryInterval = setInterval(() => this.recordSignalHistory(), 5 * 60 * 1000);
+        this.mgmtIpInterval = setInterval(() => this.refreshManagementIPs(), 5 * 60 * 1000);
         
         setTimeout(() => this.runPolling(), 5000);
+        setTimeout(() => this.refreshManagementIPs(), 15000);
     }
 
     stop() {
@@ -67,6 +69,10 @@ class SNMPPollingWorker {
         if (this.signalHistoryInterval) {
             clearInterval(this.signalHistoryInterval);
             console.log('[SNMP] Stopped signal history recording');
+        }
+        if (this.mgmtIpInterval) {
+            clearInterval(this.mgmtIpInterval);
+            console.log('[SNMP] Stopped Management IP refresh');
         }
     }
 
@@ -829,6 +835,109 @@ class SNMPPollingWorker {
             console.log(`[SNMP] Updated OLT ${oltId} status via ${method}`);
         } catch (error) {
             console.error(`[SNMP] Failed to update polling stats for OLT ${oltId}:`, error.message);
+        }
+    }
+
+    async refreshManagementIPs() {
+        const startTime = Date.now();
+        try {
+            const settingsResult = await this.pool.query(
+                "SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'"
+            );
+            const genieUrl = settingsResult.rows[0]?.setting_value;
+            if (!genieUrl) {
+                return;
+            }
+
+            const onusResult = await this.pool.query(
+                "SELECT id, serial_number FROM huawei_onus WHERE is_authorized = true AND serial_number IS NOT NULL"
+            );
+            if (onusResult.rows.length === 0) return;
+
+            const serialToOnu = {};
+            for (const onu of onusResult.rows) {
+                const sn = onu.serial_number.replace(/[\s-]/g, '').toUpperCase();
+                serialToOnu[sn] = onu.id;
+                if (sn.length >= 12) {
+                    serialToOnu[sn.substring(4)] = onu.id;
+                    serialToOnu[sn.substring(0, 4) + '-' + sn.substring(4)] = onu.id;
+                }
+            }
+
+            let devices = [];
+            try {
+                const resp = await axios.get(`${genieUrl}/devices`, {
+                    params: { projection: '_id,InternetGatewayDevice.ManagementServer.ConnectionRequestURL._value,InternetGatewayDevice.DeviceInfo.SerialNumber._value,Device.ManagementServer.ConnectionRequestURL._value,Device.DeviceInfo.SerialNumber._value,_lastInform' },
+                    timeout: 30000
+                });
+                devices = resp.data || [];
+            } catch (e) {
+                console.log(`[MGMT-IP] GenieACS unreachable: ${e.message}`);
+                return;
+            }
+
+            let updated = 0;
+            for (const device of devices) {
+                try {
+                    let sn = device?.InternetGatewayDevice?.DeviceInfo?.SerialNumber?._value
+                          || device?.Device?.DeviceInfo?.SerialNumber?._value
+                          || '';
+                    sn = sn.replace(/[\s-]/g, '').toUpperCase();
+
+                    let onuId = serialToOnu[sn];
+                    if (!onuId && sn.length >= 8) {
+                        onuId = serialToOnu[sn.substring(sn.length - 8)];
+                    }
+                    if (!onuId) {
+                        const deviceId = device._id || '';
+                        const parts = deviceId.split('-');
+                        for (const part of parts) {
+                            const normalized = part.replace(/[\s-]/g, '').toUpperCase();
+                            if (serialToOnu[normalized]) {
+                                onuId = serialToOnu[normalized];
+                                break;
+                            }
+                        }
+                    }
+                    if (!onuId) continue;
+
+                    let ip = null;
+                    const connUrl = device?.InternetGatewayDevice?.ManagementServer?.ConnectionRequestURL?._value
+                                 || device?.Device?.ManagementServer?.ConnectionRequestURL?._value
+                                 || '';
+                    const ipMatch = connUrl.match(/https?:\/\/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/);
+                    if (ipMatch) ip = ipMatch[1];
+
+                    let tr069Status = 'offline';
+                    if (device._lastInform) {
+                        const lastInform = new Date(device._lastInform).getTime();
+                        const diff = (Date.now() - lastInform) / 1000;
+                        tr069Status = diff < 300 ? 'online' : 'offline';
+                    }
+
+                    if (ip) {
+                        await this.pool.query(
+                            "UPDATE huawei_onus SET tr069_ip = $1, tr069_status = $2, genieacs_id = $3, updated_at = NOW() WHERE id = $4",
+                            [ip, tr069Status, device._id, onuId]
+                        );
+                        updated++;
+                    } else {
+                        await this.pool.query(
+                            "UPDATE huawei_onus SET tr069_status = $1, genieacs_id = $2, updated_at = NOW() WHERE id = $3",
+                            [tr069Status, device._id, onuId]
+                        );
+                    }
+                } catch (e) {
+                    // Skip individual device errors
+                }
+            }
+
+            const elapsed = Date.now() - startTime;
+            if (updated > 0) {
+                console.log(`[MGMT-IP] Refreshed ${updated}/${devices.length} Management IPs in ${elapsed}ms`);
+            }
+        } catch (error) {
+            console.error('[MGMT-IP] Management IP refresh error:', error.message);
         }
     }
 
