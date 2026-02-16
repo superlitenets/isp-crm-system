@@ -90,7 +90,7 @@ services:
       - db
       - php
     network_mode: host
-    command: php /var/www/html/workers/job_runner.php 5
+    command: ["php", "-d", "disable_functions=", "/var/www/html/workers/job_runner.php", "5"]
     environment:
       - TZ=Africa/Nairobi
       - PGHOST=127.0.0.1
