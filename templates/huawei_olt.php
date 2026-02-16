@@ -692,6 +692,23 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
     }
     exit;
 }
+// AJAX endpoint for getting available slots for an OLT
+if (isset($_GET['action']) && $_GET['action'] === 'get_olt_slots') {
+    header('Content-Type: application/json');
+    $oltId = (int)($_GET['olt_id'] ?? 0);
+    if (!$oltId) {
+        echo json_encode(['slots' => []]);
+        exit;
+    }
+    try {
+        $stmt = $db->prepare("SELECT slot, COUNT(*) as onu_count FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL GROUP BY slot ORDER BY slot");
+        $stmt->execute([$oltId]);
+        echo json_encode(['slots' => $stmt->fetchAll(\PDO::FETCH_ASSOC)]);
+    } catch (Exception $e) {
+        echo json_encode(['slots' => []]);
+    }
+    exit;
+}
 // AJAX endpoint for ONU service VLANs
 if (isset($_GET['action']) && $_GET['action'] === 'get_onu_service_vlans') {
     header('Content-Type: application/json');
@@ -5901,6 +5918,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $genieacs = new \App\GenieACS($db);
                 $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $profileId = isset($_POST['tr069_profile_id']) ? (int)$_POST['tr069_profile_id'] : 3;
+                $targetSlot = isset($_POST['target_slot']) && $_POST['target_slot'] !== '' ? (int)$_POST['target_slot'] : null;
                 $steps = [];
 
                 if (!$oltId) {
@@ -5909,22 +5927,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     break;
                 }
 
-                $stmt = $db->prepare("SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL");
-                $stmt->execute([$oltId]);
+                $sql = "SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true AND onu_id IS NOT NULL";
+                $params = [$oltId];
+                if ($targetSlot !== null) {
+                    $sql .= " AND slot = ?";
+                    $params[] = $targetSlot;
+                }
+                $sql .= " ORDER BY slot, port, onu_id";
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
                 $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
                 if (empty($onus)) {
-                    $steps[] = 'No authorized ONUs found on this OLT';
+                    $slotLabel = $targetSlot !== null ? " on slot {$targetSlot}" : '';
+                    $steps[] = "No authorized ONUs found{$slotLabel}";
                     $message = implode(' | ', $steps);
                     $messageType = 'warning';
                     break;
                 }
 
                 $bound = 0;
-                $rebooted = 0;
                 $failed = 0;
                 $errors = [];
                 $batchSize = 20;
+                $currentSlot = null;
 
                 foreach ($onus as $idx => $onu) {
                     try {
@@ -5947,14 +5973,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $bindOk = ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out)) || ($result['success'] && preg_match('/already|repeatedly/i', $out));
                         if ($bindOk) {
                             $bound++;
-
-                            $cmdReboot = "interface gpon {$frame}/{$slot}\r\n";
-                            $cmdReboot .= "ont reset {$port} {$onuPortId}\r\n";
-                            $cmdReboot .= "quit";
-                            $rebootResult = $huaweiOLT->executeCommand($oltId, $cmdReboot);
-                            if ($rebootResult['success']) {
-                                $rebooted++;
-                            }
                         } else {
                             $failed++;
                             if (count($errors) < 10) {
@@ -5973,11 +5991,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
 
-                $steps[] = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs, {$rebooted} rebooted";
+                $slotLabel = $targetSlot !== null ? " (Slot {$targetSlot})" : " (All slots)";
+                $steps[] = "TR-069 profile {$profileId} bound to {$bound}/" . count($onus) . " ONUs{$slotLabel}";
                 if ($failed > 0) {
                     $steps[] = "{$failed} failed";
                 }
-                $steps[] = 'ONUs will auto-register in GenieACS on first Inform';
+                $steps[] = 'ONUs will auto-register in GenieACS on next Inform (no reboot)';
 
                 $message = implode(' | ', $steps);
                 if (!empty($errors)) {
@@ -8620,21 +8639,20 @@ try {
                             <div class="modal-body">
                                 <div class="alert alert-info mb-3">
                                     <i class="bi bi-info-circle me-2"></i>
-                                    <strong>One-click setup:</strong> This will perform the entire TR-069 setup in a single step.
+                                    <strong>One-click setup:</strong> This will bind the TR-069 profile without rebooting ONUs.
                                 </div>
                                 <div class="card mb-3">
                                     <div class="card-body p-2">
                                         <ol class="mb-0 small">
                                             <li>Create/verify GenieACS auto-provision for CR credentials</li>
-                                            <li>Bind TR-069 profile to all authorized ONUs on the OLT</li>
-                                            <li>Reboot each ONU to apply the new profile</li>
-                                            <li>ONUs bootstrap into GenieACS and auto-receive CR credentials</li>
+                                            <li>Bind TR-069 profile to authorized ONUs on the selected slot(s)</li>
+                                            <li>ONUs will auto-register in GenieACS on their next Inform cycle</li>
                                         </ol>
                                     </div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Select OLT</label>
-                                    <select name="olt_id" class="form-select" required>
+                                    <select name="olt_id" id="bulkTr069OltSelect" class="form-select" required onchange="loadSlotOptions(this.value)">
                                         <option value="">-- Select OLT --</option>
                                         <?php foreach ($olts as $olt): ?>
                                         <option value="<?= $olt['id'] ?>"><?= htmlspecialchars($olt['name']) ?> (<?= $olt['ip_address'] ?>)</option>
@@ -8642,19 +8660,26 @@ try {
                                     </select>
                                 </div>
                                 <div class="mb-3">
+                                    <label class="form-label fw-bold">Target Slot</label>
+                                    <select name="target_slot" id="bulkTr069SlotSelect" class="form-select">
+                                        <option value="">All Slots</option>
+                                    </select>
+                                    <div class="form-text">Process a specific slot or all slots at once.</div>
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label fw-bold">TR-069 Profile ID</label>
                                     <input type="number" name="tr069_profile_id" class="form-control" value="3" required>
                                     <div class="form-text">Profile configured on the OLT with ACS URL, username, and password.</div>
                                 </div>
-                                <div class="alert alert-warning mb-0 small">
-                                    <i class="bi bi-exclamation-triangle me-2"></i>
-                                    All authorized ONUs will be <strong>rebooted</strong>. They will reconnect within 1-2 minutes and automatically appear in GenieACS.
+                                <div class="alert alert-success mb-0 small">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    No reboot will occur. ONUs will pick up the TR-069 profile on their next Inform cycle and auto-register in GenieACS.
                                 </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary" onclick="return confirm('This will:\n1. Setup GenieACS auto-provision\n2. Bind TR-069 profile to ALL authorized ONUs\n3. Reboot all ONUs\n\nONUs will temporarily go offline during reboot. Continue?');">
-                                    <i class="bi bi-gear-wide-connected me-2"></i>Setup All
+                                <button type="submit" class="btn btn-primary" onclick="return confirm('This will bind the TR-069 profile to ONUs on the selected slot(s).\nNo reboot will occur.\n\nContinue?');">
+                                    <i class="bi bi-gear-wide-connected me-2"></i>Setup
                                 </button>
                             </div>
                         </form>
@@ -8664,6 +8689,23 @@ try {
             <script>
             function showBulkBindTR069Modal() {
                 new bootstrap.Modal(document.getElementById('bulkBindTR069Modal')).show();
+            }
+            function loadSlotOptions(oltId) {
+                const slotSelect = document.getElementById('bulkTr069SlotSelect');
+                slotSelect.innerHTML = '<option value="">All Slots</option>';
+                if (!oltId) return;
+                fetch('?page=huawei-olt&ajax=1&action=get_olt_slots&olt_id=' + oltId)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.slots) {
+                            data.slots.forEach(s => {
+                                const opt = document.createElement('option');
+                                opt.value = s.slot;
+                                opt.textContent = 'Slot ' + s.slot + ' (' + s.onu_count + ' ONUs)';
+                                slotSelect.appendChild(opt);
+                            });
+                        }
+                    }).catch(() => {});
             }
             </script>
 
