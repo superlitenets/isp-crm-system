@@ -6961,16 +6961,12 @@ class HuaweiOLT {
             $errors[] = "TR-069 profile binding failed";
         }
         
-        // Step 3: Restart ONU - on BOOTSTRAP, GenieACS provision will clear CR credentials via TR-069 and reboot
-        $cmd3 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd3 .= "ont reset {$port} {$onuId}\r\n";
-        $cmd3 .= "quit";
-        $result3 = $this->executeCommand($oltId, $cmd3);
-        $output .= "[Step 3: ONU Reboot]\n" . ($result3['output'] ?? '') . "\n";
+        // Step 3: Reboot disabled - TR-069 profile binding triggers ONU to contact ACS on next inform
+        $output .= "[Step 3: Reboot skipped - waiting for ONU to inform GenieACS]\n";
         
         $success = empty($errors);
         $message = $success 
-            ? "TR-069 profile {$tr069ProfileId} applied, ONU rebooted. GenieACS will clear CR credentials on BOOTSTRAP."
+            ? "TR-069 profile {$tr069ProfileId} applied. ONU will contact GenieACS on next periodic inform (no reboot)."
             : "TR-069 configuration failed: " . implode(', ', $errors);
         
         $this->addLog([
