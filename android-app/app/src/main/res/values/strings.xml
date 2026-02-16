@@ -2,7 +2,15 @@
 <resources>
     <string name="app_name">SuperLite CRM</string>
     <string name="crm_url">https://crm.superlite.co.ke</string>
-    <string name="loading_message">Loading SuperLite CRM…</string>
-    <string name="no_internet">No internet connection. Please check your network and try again.</string>
-    <string name="retry">Retry</string>
+    <string name="loading_message">Loading SuperLite CRM\u2026</string>
+    <string name="no_internet">Please check your Wi-Fi or mobile data connection and try again. The app will reconnect automatically when internet is available.</string>
+    <string name="error_title">No Connection</string>
+    <string name="retry">Try Again</string>
+    <string name="auto_reconnect_hint">Will reconnect automatically</string>
+    <string name="splash_tagline">ISP Management Made Simple</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_tickets">Tickets</string>
+    <string name="nav_customers">Customers</string>
+    <string name="nav_network">Network</string>
+    <string name="nav_more">Reports</string>
 </resources>

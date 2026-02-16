@@ -19,13 +19,7 @@ export ANDROID_HOME=~/Android/Sdk   # adjust to your SDK location
 cd android-app
 
 # Generate Gradle wrapper (first time only - requires Gradle installed)
-# Option A: If you have Gradle installed
 gradle wrapper --gradle-version 8.2
-
-# Option B: Download wrapper JAR manually
-mkdir -p gradle/wrapper
-curl -L https://github.com/nicmcd/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar \
-  -o gradle/wrapper/gradle-wrapper.jar
 
 # Accept Android SDK licenses
 yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
@@ -77,17 +71,24 @@ buildTypes {
 
 ## Features
 
+- Animated splash screen with logo, app name, and tagline
+- Bottom navigation bar (Home, Tickets, Customers, Network, Reports)
 - Full WebView with JavaScript, DOM storage, and cookies
-- Splash screen with app branding
 - Pull-to-refresh to reload page
-- File upload support (photos, documents)
-- File download with notification
+- Camera integration for direct photo capture uploads
+- Multi-file upload support (photos, documents)
+- File download with toast notification and quick-access to Downloads
 - GPS/location permission support
-- Offline error screen with retry button
-- Back button navigation (goes back in browser history)
-- External links (tel:, mailto:, whatsapp:) open native apps
+- Offline error screen with auto-reconnect when internet returns
+- Network state monitoring with live connection/disconnection alerts
+- Double-tap back to exit (prevents accidental exits)
+- Back button navigates browser history
+- External links (tel:, mailto:, whatsapp:, sms:) open native apps
+- Smooth loading overlay with fade animation
 - Progress bar during page loading
-- Session persistence across app restarts
+- Session and cookie persistence across app restarts
+- HTTPS-only security enforcement
+- Snackbar notifications instead of intrusive alerts
 
 ## Customization
 
@@ -95,3 +96,5 @@ buildTypes {
 - **Change colors**: Edit `res/values/colors.xml`
 - **Change icon**: Replace files in `res/mipmap-*/ic_launcher.png`
 - **Change app name**: Edit `app_name` in `res/values/strings.xml`
+- **Change tagline**: Edit `splash_tagline` in `res/values/strings.xml`
+- **Change nav items**: Edit `res/menu/bottom_nav_menu.xml` and update URLs in `MainActivity.java`
