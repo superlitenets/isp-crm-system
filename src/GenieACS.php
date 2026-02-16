@@ -221,6 +221,8 @@ class GenieACS {
         
         $results = ['success' => 0, 'failed' => 0, 'skipped' => 0, 'errors' => []];
         
+        $updateGenieId = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+        
         while ($onu = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             $deviceId = !empty($onu['genieacs_id']) ? $onu['genieacs_id'] : $onu['tr069_device_id'];
             if (empty($deviceId)) {
@@ -254,6 +256,21 @@ class GenieACS {
             
             if ($result['success']) {
                 $results['success']++;
+            } else if (strpos($result['error'] ?? '', '404') !== false) {
+                $lookup = $this->getDeviceBySerial($onu['sn']);
+                if ($lookup['success'] && !empty($lookup['device']['_id'])) {
+                    $verifiedId = $lookup['device']['_id'];
+                    $updateGenieId->execute([$verifiedId, $onu['id']]);
+                    $retryResult = $this->addTag($verifiedId, $tag);
+                    if ($retryResult['success']) {
+                        $results['success']++;
+                    } else {
+                        $results['failed']++;
+                        $results['errors'][] = "ONU {$onu['sn']}: retry failed - {$retryResult['error']}";
+                    }
+                } else {
+                    $results['skipped']++;
+                }
             } else {
                 $results['failed']++;
                 $results['errors'][] = "ONU {$onu['sn']}: {$result['error']}";
