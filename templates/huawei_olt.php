@@ -5963,47 +5963,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'profile_id' => $profileId,
                     'target_slot' => $targetSlot
                 ]);
-                $stmt = $db->prepare("INSERT INTO background_jobs (job_type, status, params, user_id) VALUES ('setup_tr069_full', 'pending', ?::jsonb, ?) RETURNING id");
+                $stmt = $db->prepare("INSERT INTO background_jobs (job_type, status, params, user_id, message) VALUES ('setup_tr069_full', 'pending', ?::jsonb, ?, 'Queued - OLT service will process') RETURNING id");
                 $stmt->execute([$jobParams, $_SESSION['user_id'] ?? null]);
                 $jobId = $stmt->fetchColumn();
-
-                $workerPath = realpath(__DIR__ . '/../workers/tr069_bulk_worker.php');
-                if (!$workerPath || !file_exists($workerPath)) {
-                    $db->prepare("UPDATE background_jobs SET status = 'failed', message = 'Worker script not found' WHERE id = ?")->execute([$jobId]);
-                    if ($isAjaxPost) {
-                        sendJsonResponse(['success' => false, 'error' => 'Worker script not found']);
-                    }
-                    $message = 'Background worker not found';
-                    $messageType = 'danger';
-                    break;
-                }
-
-                $logPath = '/tmp/tr069_job_' . $jobId . '.log';
-                $cmd = "php " . escapeshellarg($workerPath) . " " . (int)$jobId . " > " . escapeshellarg($logPath) . " 2>&1 &";
-                $execStarted = false;
-                $disabledFns = array_map('trim', explode(',', ini_get('disable_functions')));
-                if (function_exists('exec') && !in_array('exec', $disabledFns)) {
-                    @exec($cmd);
-                    $execStarted = true;
-                } elseif (function_exists('shell_exec') && !in_array('shell_exec', $disabledFns)) {
-                    @shell_exec($cmd);
-                    $execStarted = true;
-                } elseif (function_exists('proc_open') && !in_array('proc_open', $disabledFns)) {
-                    $proc = @proc_open($cmd, [['pipe','r'],['pipe','w'],['pipe','w']], $pipes);
-                    if (is_resource($proc)) {
-                        proc_close($proc);
-                        $execStarted = true;
-                    }
-                } elseif (function_exists('popen') && !in_array('popen', $disabledFns)) {
-                    $handle = @popen($cmd, 'r');
-                    if ($handle) {
-                        pclose($handle);
-                        $execStarted = true;
-                    }
-                }
-                if (!$execStarted) {
-                    $db->prepare("UPDATE background_jobs SET status = 'pending', message = 'Queued - waiting for worker process' WHERE id = ?")->execute([$jobId]);
-                }
 
                 $slotLabel = $targetSlot !== null ? " (Slot {$targetSlot})" : " (All slots)";
 

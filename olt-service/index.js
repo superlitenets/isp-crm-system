@@ -14,9 +14,12 @@ app.use(express.json());
 const { Pool } = require('pg');
 const sharedPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
 
+const BackgroundJobWorker = require('./BackgroundJobWorker');
+
 const sessionManager = new OLTSessionManager();
 const discoveryWorker = new DiscoveryWorker(sessionManager);
 const snmpWorker = new SNMPPollingWorker(sessionManager, discoveryWorker);
+const jobWorker = new BackgroundJobWorker(sessionManager, sharedPool);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', sessions: sessionManager.getSessionCount() });
@@ -1205,6 +1208,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
     discoveryWorker.start(DISCOVERY_INTERVAL);
     snmpWorker.start(SNMP_INTERVAL);
+    jobWorker.start();
     console.log(`[Discovery] CLI autofind started (every 60s - for new unconfigured ONUs)`);
     console.log(`[SNMP] Background polling started (every ${SNMP_INTERVAL}s - for status updates)`);
 });
@@ -1216,6 +1220,7 @@ process.on('SIGTERM', async () => {
     console.log('Shutting down OLT Session Manager...');
     discoveryWorker.stop();
     snmpWorker.stop();
+    jobWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
 });
@@ -1224,6 +1229,7 @@ process.on('SIGINT', async () => {
     console.log('Shutting down OLT Session Manager...');
     discoveryWorker.stop();
     snmpWorker.stop();
+    jobWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
 });

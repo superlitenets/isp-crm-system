@@ -82,27 +82,6 @@ services:
       - ./storage/wireguard:/var/www/html/storage/wireguard
       - /var/run/docker.sock:/var/run/docker.sock
 
-  job-worker:
-    build: .
-    container_name: isp_crm_job_worker
-    restart: unless-stopped
-    depends_on:
-      - db
-      - php
-    network_mode: host
-    command: ["php", "-d", "disable_functions=", "/var/www/html/workers/job_runner.php", "5"]
-    environment:
-      - TZ=Africa/Nairobi
-      - PGHOST=127.0.0.1
-      - PGPORT=5433
-      - PGDATABASE=${POSTGRES_DB}
-      - PGUSER=${POSTGRES_USER}
-      - PGPASSWORD=${POSTGRES_PASSWORD}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5433/${POSTGRES_DB}
-      - OLT_SERVICE_URL=http://localhost:3002
-    volumes:
-      - ./logs:/var/www/html/logs
-
   nginx:
     image: nginx:stable-alpine
     container_name: isp_crm_nginx
