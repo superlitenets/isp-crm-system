@@ -222,14 +222,14 @@ class SNMPPollingWorker {
         if (!existingSession || !existingSession.connected) {
             try {
                 const configResult = await this.pool.query(`
-                    SELECT ip_address, telnet_port, ssh_port, username, password, protocol, enable_password
+                    SELECT ip_address, port, ssh_port, username, password, protocol, enable_password
                     FROM huawei_olts WHERE id = $1
                 `, [olt.id]);
                 if (configResult.rows.length > 0) {
                     const cfg = configResult.rows[0];
                     await this.sessionManager.connect(oltKey, {
                         host: cfg.ip_address,
-                        port: cfg.protocol === 'ssh' ? (cfg.ssh_port || 22) : (cfg.telnet_port || 23),
+                        port: cfg.protocol === 'ssh' ? (cfg.ssh_port || 22) : (cfg.port || 23),
                         username: cfg.username,
                         password: cfg.password,
                         enablePassword: cfg.enable_password,
