@@ -6990,26 +6990,17 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'No TR-069 profile ID configured in settings'];
         }
         
-        // Step 1: Detach TR-069 profile
-        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont tr069-server-config {$port} {$onuId} profile-id 0\r\n";
-        $cmd1 .= "quit";
-        $result1 = $this->executeCommand($oltId, $cmd1);
-        $output .= "[Step 1: Detach TR-069 Profile]\n" . ($result1['output'] ?? '') . "\n";
-        
-        // Pause to let OLT process detach before rebinding
-        usleep(1500000);
-        
-        // Step 2: Reattach TR-069 profile
-        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd2 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
-        $cmd2 .= "quit";
-        $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[Step 2: Attach TR-069 Profile {$tr069ProfileId}]\n" . ($result2['output'] ?? '') . "\n";
+        // Detach + Reattach TR-069 profile in single interface session (no quit between)
+        $cmd = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd .= "ont tr069-server-config {$port} {$onuId} profile-id 0\r\n";
+        $cmd .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
+        $cmd .= "quit";
+        $result1 = $this->executeCommand($oltId, $cmd);
+        $out1 = $result1['output'] ?? '';
+        $output .= "[Detach + Attach TR-069 Profile {$tr069ProfileId}]\n" . $out1 . "\n";
         
         // Check for errors (ignore "already configured" messages)
-        $out2 = $result2['output'] ?? '';
-        if (!$result2['success'] || (preg_match('/Failure|Error:|failed|Invalid/i', $out2) && !preg_match('/already|repeatedly/i', $out2))) {
+        if (!$result1['success'] || (preg_match('/Failure|Error:|failed|Invalid/i', $out1) && !preg_match('/already|repeatedly/i', $out1))) {
             $errors[] = "TR-069 profile binding failed";
         }
         

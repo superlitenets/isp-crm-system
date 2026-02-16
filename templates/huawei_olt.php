@@ -5950,45 +5950,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $failed = 0;
                 $errors = [];
                 $batchSize = 20;
-                $currentSlot = null;
 
-                foreach ($onus as $idx => $onu) {
+                $slotGroups = [];
+                foreach ($onus as $onu) {
+                    $key = ($onu['frame'] ?? 0) . '/' . $onu['slot'];
+                    $slotGroups[$key][] = $onu;
+                }
+
+                $processed = 0;
+                foreach ($slotGroups as $slotKey => $slotOnus) {
                     try {
-                        $frame = $onu['frame'] ?? 0;
-                        $slot = $onu['slot'];
-                        $port = $onu['port'];
-                        $onuPortId = $onu['onu_id'];
+                        $scriptLines = [];
+                        $scriptLines[] = "interface gpon {$slotKey}";
+                        foreach ($slotOnus as $onu) {
+                            $port = $onu['port'];
+                            $onuPortId = $onu['onu_id'];
+                            $scriptLines[] = "ont tr069-server-config {$port} {$onuPortId} profile-id 0";
+                            $scriptLines[] = "ont tr069-server-config {$port} {$onuPortId} profile-id {$profileId}";
+                        }
+                        $scriptLines[] = "quit";
 
-                        $cmdDetach = "interface gpon {$frame}/{$slot}\r\n";
-                        $cmdDetach .= "ont tr069-server-config {$port} {$onuPortId} profile-id 0\r\n";
-                        $cmdDetach .= "quit";
-                        $huaweiOLT->executeCommand($oltId, $cmdDetach);
-
-                        usleep(1500000);
-
-                        $cmd = "interface gpon {$frame}/{$slot}\r\n";
-                        $cmd .= "ont tr069-server-config {$port} {$onuPortId} profile-id {$profileId}\r\n";
-                        $cmd .= "quit";
-                        $result = $huaweiOLT->executeCommand($oltId, $cmd);
-
+                        $result = $huaweiOLT->executeCommand($oltId, implode("\r\n", $scriptLines));
                         $out = $result['output'] ?? '';
-                        $bindOk = ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out)) || ($result['success'] && preg_match('/already|repeatedly/i', $out));
-                        if ($bindOk) {
-                            $bound++;
+
+                        if ($result['success'] && !preg_match('/Failure|Error:|failed|Invalid/i', $out)) {
+                            $bound += count($slotOnus);
+                        } elseif ($result['success'] && preg_match('/already|repeatedly/i', $out)) {
+                            $bound += count($slotOnus);
                         } else {
-                            $failed++;
-                            if (count($errors) < 10) {
-                                $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . substr($out, 0, 100);
+                            foreach ($slotOnus as $onu) {
+                                $failed++;
+                                if (count($errors) < 10) {
+                                    $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . substr($out, 0, 100);
+                                }
                             }
                         }
                     } catch (Exception $e) {
-                        $failed++;
-                        if (count($errors) < 10) {
-                            $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . $e->getMessage();
+                        foreach ($slotOnus as $onu) {
+                            $failed++;
+                            if (count($errors) < 10) {
+                                $errors[] = ($onu['name'] ?: $onu['sn']) . ": " . $e->getMessage();
+                            }
                         }
                     }
 
-                    if (($idx + 1) % $batchSize === 0) {
+                    $processed += count($slotOnus);
+                    if ($processed % $batchSize < count($slotOnus)) {
                         usleep(500000);
                     }
                 }
