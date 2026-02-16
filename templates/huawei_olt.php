@@ -1114,6 +1114,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'tr069_connection_request' && 
     exit;
 }
 $isAjaxPost = ($_SERVER['REQUEST_METHOD'] === 'POST') && (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) || (isset($_POST['ajax']) && $_POST['ajax'] === '1'));
+function sendJsonResponse($data) {
+    while (ob_get_level()) { ob_end_clean(); }
+    header('Content-Type: application/json');
+    echo json_encode($data);
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     try {
         switch ($action) {
@@ -5945,10 +5951,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
 
                 if (!$oltId) {
                     if ($isAjaxPost) {
-                        ob_end_clean();
-                        header('Content-Type: application/json');
-                        echo json_encode(['success' => false, 'error' => 'Please select an OLT']);
-                        exit;
+                        sendJsonResponse(['success' => false, 'error' => 'Please select an OLT']);
                     }
                     $message = 'Please select an OLT';
                     $messageType = 'danger';
@@ -5968,10 +5971,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 if (!$workerPath || !file_exists($workerPath)) {
                     $db->prepare("UPDATE background_jobs SET status = 'failed', message = 'Worker script not found' WHERE id = ?")->execute([$jobId]);
                     if ($isAjaxPost) {
-                        ob_end_clean();
-                        header('Content-Type: application/json');
-                        echo json_encode(['success' => false, 'error' => 'Worker script not found']);
-                        exit;
+                        sendJsonResponse(['success' => false, 'error' => 'Worker script not found']);
                     }
                     $message = 'Background worker not found';
                     $messageType = 'danger';
@@ -5984,10 +5984,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $slotLabel = $targetSlot !== null ? " (Slot {$targetSlot})" : " (All slots)";
 
                 if ($isAjaxPost) {
-                    ob_end_clean();
-                    header('Content-Type: application/json');
-                    echo json_encode(['success' => true, 'job_id' => (int)$jobId, 'message' => "TR-069 bulk setup started{$slotLabel}"]);
-                    exit;
+                    sendJsonResponse(['success' => true, 'job_id' => (int)$jobId, 'message' => "TR-069 bulk setup started{$slotLabel}"]);
                 }
 
                 $message = "TR-069 bulk setup started in background{$slotLabel}. Job #{$jobId} - you can continue using the system.";
@@ -6006,10 +6003,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
         }
     } catch (Exception $e) {
         if ($isAjaxPost) {
-            ob_end_clean();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-            exit;
+            sendJsonResponse(['success' => false, 'error' => $e->getMessage()]);
         }
         $message = 'Error: ' . $e->getMessage();
         $messageType = 'danger';
