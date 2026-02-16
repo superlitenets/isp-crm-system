@@ -7806,6 +7806,90 @@ try {
                 .animate-in:nth-child(4) { animation-delay: 0.15s; }
                 .animate-in:nth-child(5) { animation-delay: 0.2s; }
                 .animate-in:nth-child(6) { animation-delay: 0.25s; }
+
+                .theme-toggle {
+                    background: rgba(255,255,255,0.1);
+                    border: 1px solid rgba(255,255,255,0.15);
+                    border-radius: 20px;
+                    padding: 5px 12px;
+                    color: rgba(255,255,255,0.8);
+                    cursor: pointer;
+                    font-size: 0.78rem;
+                    font-weight: 500;
+                    transition: all 0.25s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                }
+                .theme-toggle:hover {
+                    background: rgba(255,255,255,0.18);
+                    color: #fff;
+                }
+
+                body.dash-light .dash-header {
+                    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+                    color: #1e293b;
+                    border-color: #e2e8f0;
+                }
+                body.dash-light .dash-header .opacity-75 { color: #64748b !important; }
+                body.dash-light .live-dot { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+                body.dash-light .theme-toggle {
+                    background: rgba(0,0,0,0.06);
+                    border-color: rgba(0,0,0,0.1);
+                    color: #475569;
+                }
+                body.dash-light .theme-toggle:hover { background: rgba(0,0,0,0.1); color: #1e293b; }
+                body.dash-light .kpi-card {
+                    background: #fff;
+                    border-color: #e2e8f0;
+                }
+                body.dash-light .kpi-card:hover {
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+                    border-color: #cbd5e1;
+                    background: #fff;
+                }
+                body.dash-light .kpi-card .kpi-value { color: #1e293b; }
+                body.dash-light .kpi-card .kpi-label { color: #94a3b8; }
+                body.dash-light .dash-card {
+                    background: #fff;
+                    border-color: #e2e8f0;
+                }
+                body.dash-light .dash-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+                body.dash-light .dash-card .card-hdr h6 { color: #334155; }
+                body.dash-light .olt-card-v2 {
+                    background: #f8fafc;
+                    border-color: #e2e8f0;
+                }
+                body.dash-light .olt-card-v2:hover { border-color: #cbd5e1; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+                body.dash-light .olt-card-v2 .olt-name { color: #1e293b !important; }
+                body.dash-light .olt-card-v2 .olt-ip { color: #94a3b8 !important; }
+                body.dash-light .olt-card-v2 .olt-meta { color: #94a3b8 !important; }
+                body.dash-light .quick-btn {
+                    background: #f8fafc;
+                    border-color: #e2e8f0;
+                    color: #475569;
+                }
+                body.dash-light .quick-btn:hover {
+                    border-color: #6366f1;
+                    color: #4f46e5;
+                    background: #f1f5f9;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+                }
+                body.dash-light .alert-row { background: #f8fafc; }
+                body.dash-light .alert-row:hover { background: #f1f5f9; }
+                body.dash-light .alert-row.critical { background: #fef2f2; }
+                body.dash-light .alert-row.warning { background: #fffbeb; }
+                body.dash-light .alert-row.info { background: #eff6ff; }
+                body.dash-light .mini-bar { background: #e2e8f0 !important; }
+                body.dash-light .stat-box-online { background: rgba(16,185,129,0.08) !important; }
+                body.dash-light .stat-box-online .fw-bold { color: #10b981 !important; }
+                body.dash-light .stat-box-online small { color: #94a3b8 !important; }
+                body.dash-light .stat-box-offline { background: rgba(100,116,139,0.06) !important; }
+                body.dash-light .stat-box-offline .fw-bold { color: #64748b !important; }
+                body.dash-light .stat-box-offline small { color: #94a3b8 !important; }
+                body.dash-light .stat-box-los { background: rgba(239,68,68,0.06) !important; }
+                body.dash-light .stat-box-los .fw-bold { color: #ef4444 !important; }
+                body.dash-light .stat-box-los small { color: #94a3b8 !important; }
             </style>
 
             <div class="dash-header">
@@ -7817,12 +7901,15 @@ try {
                             <span><i class="bi bi-clock me-1"></i><?= date('M j, Y H:i:s') ?></span>
                         </div>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 align-items-center">
                         <?php if ($stats['unconfigured_onus'] > 0): ?>
                         <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-warning btn-sm rounded-pill px-3">
                             <i class="bi bi-hourglass-split me-1"></i> <?= $stats['unconfigured_onus'] ?> Pending
                         </a>
                         <?php endif; ?>
+                        <button class="theme-toggle" onclick="toggleDashTheme()" id="themeToggleBtn">
+                            <i class="bi bi-sun-fill" id="themeIcon"></i> <span id="themeLabel">Light</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -7926,19 +8013,19 @@ try {
                             </div>
                             <div class="row text-center mt-3 g-2">
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(34,197,94,0.1);">
+                                    <div class="p-2 rounded-3 stat-box-online" style="background: rgba(34,197,94,0.1);">
                                         <div class="fw-bold" style="color: #22c55e; font-size: 1rem;"><?= number_format($stats['online_onus']) ?></div>
                                         <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">Online</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(255,255,255,0.04);">
+                                    <div class="p-2 rounded-3 stat-box-offline" style="background: rgba(255,255,255,0.04);">
                                         <div class="fw-bold" style="color: rgba(255,255,255,0.7); font-size: 1rem;"><?= number_format($stats['offline_onus']) ?></div>
                                         <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">Offline</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="p-2 rounded-3" style="background: rgba(239,68,68,0.1);">
+                                    <div class="p-2 rounded-3 stat-box-los" style="background: rgba(239,68,68,0.1);">
                                         <div class="fw-bold" style="color: #ef4444; font-size: 1rem;"><?= number_format($stats['los_onus']) ?></div>
                                         <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">LOS</small>
                                     </div>
@@ -8004,8 +8091,8 @@ try {
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="olt-status-dot online"></span>
                                             <div>
-                                                <div class="fw-bold" style="font-size: 0.9rem; color: rgba(255,255,255,0.9);"><?= htmlspecialchars($olt['name']) ?></div>
-                                                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.4);"><?= htmlspecialchars($olt['ip_address']) ?></div>
+                                                <div class="fw-bold olt-name" style="font-size: 0.9rem; color: rgba(255,255,255,0.9);"><?= htmlspecialchars($olt['name']) ?></div>
+                                                <div class="olt-ip" style="font-size: 0.72rem; color: rgba(255,255,255,0.4);"><?= htmlspecialchars($olt['ip_address']) ?></div>
                                             </div>
                                         </div>
                                         <span class="fw-bold" style="color: <?= $hColor ?>; font-size: 1.1rem;"><?= $oHealth ?>%</span>
@@ -8016,10 +8103,10 @@ try {
                                             <?php if ($oOffline > 0): ?>
                                             <span class="fw-semibold" style="color: #ef4444;"><i class="bi bi-wifi-off me-1"></i><?= $oOffline ?></span>
                                             <?php endif; ?>
-                                            <span style="color: rgba(255,255,255,0.4);"><?= $oTotal ?> total</span>
+                                            <span class="olt-meta" style="color: rgba(255,255,255,0.4);"><?= $oTotal ?> total</span>
                                         </div>
                                         <?php if ($oltUptime): ?>
-                                        <span style="color: rgba(255,255,255,0.4);"><i class="bi bi-clock-history me-1"></i><?= htmlspecialchars($oltUptime) ?></span>
+                                        <span class="olt-meta" style="color: rgba(255,255,255,0.4);"><i class="bi bi-clock-history me-1"></i><?= htmlspecialchars($oltUptime) ?></span>
                                         <?php endif; ?>
                                     </div>
                                     <div class="mini-bar">
@@ -8257,14 +8344,15 @@ try {
                     plugins: [{
                         id: 'centerText',
                         afterDraw(chart) {
+                            const isLight = document.body.classList.contains('dash-light');
                             const { ctx, chartArea: { width, height, top, left } } = chart;
                             const cx = left + width / 2, cy = top + height / 2;
                             ctx.save();
                             ctx.textAlign = 'center';
-                            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                            ctx.fillStyle = isLight ? '#1e293b' : 'rgba(255,255,255,0.9)';
                             ctx.font = '600 26px ' + chartFont.family;
                             ctx.fillText('<?= $uptimePercent ?>%', cx, cy);
-                            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                            ctx.fillStyle = isLight ? '#94a3b8' : 'rgba(255,255,255,0.4)';
                             ctx.font = '400 11px ' + chartFont.family;
                             ctx.fillText('Uptime', cx, cy + 18);
                             ctx.restore();
@@ -8399,6 +8487,63 @@ try {
                         }
                     }
                 });
+            })();
+            </script>
+
+            <script>
+            function toggleDashTheme() {
+                const isLight = document.body.classList.toggle('dash-light');
+                localStorage.setItem('dashTheme', isLight ? 'light' : 'dark');
+                document.getElementById('themeIcon').className = isLight ? 'bi bi-moon-fill' : 'bi bi-sun-fill';
+                document.getElementById('themeLabel').textContent = isLight ? 'Dark' : 'Light';
+                updateChartTheme(isLight);
+            }
+
+            function updateChartTheme(isLight) {
+                const tickColor = isLight ? '#94a3b8' : 'rgba(255,255,255,0.4)';
+                const tickColorBold = isLight ? '#64748b' : 'rgba(255,255,255,0.6)';
+                const gridColor = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)';
+                const tooltipBg = isLight ? 'rgba(255,255,255,0.96)' : 'rgba(15,16,25,0.95)';
+                const tooltipTitle = isLight ? '#1e293b' : 'rgba(255,255,255,0.9)';
+                const tooltipBody = isLight ? '#475569' : 'rgba(255,255,255,0.7)';
+                const tooltipBorder = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)';
+                const legendColor = isLight ? '#64748b' : 'rgba(255,255,255,0.6)';
+                const centerTextColor = isLight ? '#1e293b' : 'rgba(255,255,255,0.9)';
+                const centerSubColor = isLight ? '#94a3b8' : 'rgba(255,255,255,0.4)';
+
+                Chart.helpers.each(Chart.instances, function(chart) {
+                    const opts = chart.options;
+                    if (opts.plugins && opts.plugins.tooltip) {
+                        opts.plugins.tooltip.backgroundColor = tooltipBg;
+                        opts.plugins.tooltip.titleColor = tooltipTitle;
+                        opts.plugins.tooltip.bodyColor = tooltipBody;
+                        opts.plugins.tooltip.borderColor = tooltipBorder;
+                    }
+                    if (opts.plugins && opts.plugins.legend && opts.plugins.legend.labels) {
+                        opts.plugins.legend.labels.color = legendColor;
+                    }
+                    if (opts.scales) {
+                        Object.values(opts.scales).forEach(function(scale) {
+                            if (scale.ticks) scale.ticks.color = scale.ticks.weight === '500' ? tickColorBold : tickColor;
+                            if (scale.grid) scale.grid.color = gridColor;
+                        });
+                    }
+                    if (chart.options.plugins.centerText) {
+                        chart.options.plugins.centerText.color = centerTextColor;
+                        chart.options.plugins.centerText.subColor = centerSubColor;
+                    }
+                    chart.update('none');
+                });
+            }
+
+            (function() {
+                const saved = localStorage.getItem('dashTheme');
+                if (saved === 'light') {
+                    document.body.classList.add('dash-light');
+                    document.getElementById('themeIcon').className = 'bi bi-moon-fill';
+                    document.getElementById('themeLabel').textContent = 'Dark';
+                    setTimeout(function() { updateChartTheme(true); }, 100);
+                }
             })();
             </script>
 
