@@ -5533,6 +5533,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
+
+            case 'summon_all_devices':
+                header('Content-Type: application/json');
+                try {
+                    require_once __DIR__ . '/../src/GenieACS.php';
+                    $genieacs = new \App\GenieACS($db);
+                    $devicesResult = $genieacs->getDevices([], 2000);
+                    if (!$devicesResult['success'] || empty($devicesResult['data'])) {
+                        echo json_encode(['success' => false, 'error' => 'Could not fetch devices from GenieACS']);
+                        exit;
+                    }
+                    $devices = $devicesResult['data'];
+                    $total = count($devices);
+                    $summoned = 0;
+                    $failed = 0;
+                    $alreadyOnline = 0;
+                    $fiveMinAgo = strtotime('-5 minutes');
+                    foreach ($devices as $dev) {
+                        $devId = $dev['_id'] ?? '';
+                        if (empty($devId)) { $failed++; continue; }
+                        $lastInform = isset($dev['_lastInform']) ? strtotime($dev['_lastInform']) : 0;
+                        if ($lastInform >= $fiveMinAgo) {
+                            $alreadyOnline++;
+                            continue;
+                        }
+                        $result = $genieacs->sendFastConnectionRequest($devId);
+                        if ($result['success'] || $result['queued']) {
+                            $summoned++;
+                        } else {
+                            $failed++;
+                        }
+                    }
+                    echo json_encode([
+                        'success' => true,
+                        'total' => $total,
+                        'summoned' => $summoned,
+                        'already_online' => $alreadyOnline,
+                        'failed' => $failed
+                    ]);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
                 
             case 'refresh_tr069_ip':
                 header('Content-Type: application/json');
@@ -13230,6 +13273,9 @@ try {
                             <i class="bi bi-clock-history me-1"></i> Set Inform <?= round($informInterval / 60) ?>min
                         </button>
                     </form>
+                    <button type="button" class="btn btn-outline-warning" onclick="summonAllDevices()" id="btnSummonAll">
+                        <i class="bi bi-broadcast me-1"></i> Summon All
+                    </button>
                     <form method="post" class="d-inline">
                         <input type="hidden" name="action" value="sync_tr069_devices">
                         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i> Sync Devices</button>
@@ -13368,6 +13414,34 @@ try {
             </div>
             <?php endif; ?>
             <?php endif; ?>
+            <script>
+            function summonAllDevices() {
+                const btn = document.getElementById('btnSummonAll');
+                if (!confirm('This will send a connection request to all offline devices in GenieACS. Devices already online will be skipped.\n\nThis may take a few minutes for large deployments. Continue?')) return;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Summoning...';
+                fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=summon_all_devices&ajax=1'
+                })
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-broadcast me-1"></i> Summon All';
+                    if (data.success) {
+                        alert('Summon complete!\n\nTotal devices: ' + data.total + '\nSummoned: ' + data.summoned + '\nAlready online: ' + data.already_online + '\nFailed: ' + data.failed + '\n\nDevices will check in over the next few minutes. Refresh the page to see updated status.');
+                    } else {
+                        alert('Summon failed: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-broadcast me-1"></i> Summon All';
+                    alert('Request failed: ' + err.message);
+                });
+            }
+            </script>
             
             <?php elseif ($view === 'vpn'): ?>
             <?php
