@@ -5979,7 +5979,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
 
                 $logPath = '/tmp/tr069_job_' . $jobId . '.log';
-                exec("php " . escapeshellarg($workerPath) . " " . (int)$jobId . " > " . escapeshellarg($logPath) . " 2>&1 &");
+                $cmd = "php " . escapeshellarg($workerPath) . " " . (int)$jobId . " > " . escapeshellarg($logPath) . " 2>&1 &";
+                $execStarted = false;
+                if (function_exists('exec') && !in_array('exec', array_map('trim', explode(',', ini_get('disable_functions'))))) {
+                    exec($cmd);
+                    $execStarted = true;
+                } elseif (function_exists('shell_exec') && !in_array('shell_exec', array_map('trim', explode(',', ini_get('disable_functions'))))) {
+                    shell_exec($cmd);
+                    $execStarted = true;
+                } elseif (function_exists('proc_open')) {
+                    $proc = proc_open($cmd, [['pipe','r'],['pipe','w'],['pipe','w']], $pipes);
+                    if (is_resource($proc)) {
+                        proc_close($proc);
+                        $execStarted = true;
+                    }
+                } elseif (function_exists('popen')) {
+                    $handle = popen($cmd, 'r');
+                    if ($handle) {
+                        pclose($handle);
+                        $execStarted = true;
+                    }
+                }
+                if (!$execStarted) {
+                    $db->prepare("UPDATE background_jobs SET status = 'failed', message = 'No exec functions available on server' WHERE id = ?")->execute([$jobId]);
+                    if ($isAjaxPost) {
+                        sendJsonResponse(['success' => false, 'error' => 'Background execution not available. Check PHP disable_functions setting.']);
+                    }
+                    $message = 'Cannot start background worker - exec functions are disabled on this server';
+                    $messageType = 'danger';
+                    break;
+                }
 
                 $slotLabel = $targetSlot !== null ? " (Slot {$targetSlot})" : " (All slots)";
 
