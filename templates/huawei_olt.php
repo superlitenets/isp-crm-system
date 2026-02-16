@@ -13171,8 +13171,51 @@ try {
                 if ($informInterval < 60) $informInterval = 180;
                 
                 if ($genieacsEnabled) {
-                    $stmt = $db->query("SELECT t.*, o.name as onu_name, o.sn as onu_sn FROM tr069_devices t LEFT JOIN huawei_onus o ON t.onu_id = o.id ORDER BY t.last_inform DESC LIMIT 100");
-                    $tr069Devices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                    $liveResult = $genieacs->getDevices([], 1000);
+                    if ($liveResult['success'] && !empty($liveResult['data'])) {
+                        $onuLookup = [];
+                        $allOnus = $db->query("SELECT id, sn, name, tr069_device_id, genieacs_id FROM huawei_onus WHERE is_authorized = true")->fetchAll(\PDO::FETCH_ASSOC);
+                        foreach ($allOnus as $o) {
+                            if (!empty($o['genieacs_id'])) $onuLookup[$o['genieacs_id']] = $o;
+                            if (!empty($o['tr069_device_id'])) $onuLookup[$o['tr069_device_id']] = $o;
+                            if (!empty($o['sn'])) {
+                                $onuLookup[strtoupper($o['sn'])] = $o;
+                                $genieSn = $genieacs->convertOltSerialToGenieacs($o['sn']);
+                                $onuLookup[$genieSn] = $o;
+                            }
+                        }
+                        foreach ($liveResult['data'] as $dev) {
+                            $devId = $dev['_id'] ?? '';
+                            $serial = $dev['_deviceId']['_SerialNumber'] ?? '';
+                            $oltSn = $genieacs->convertGeniSerialToOlt($serial);
+                            $linked = $onuLookup[$devId] ?? $onuLookup[strtoupper($serial)] ?? $onuLookup[strtoupper($oltSn)] ?? null;
+                            if (!$linked && preg_match('/[0-9A-Fa-f]{8,}$/', $devId, $m)) {
+                                $suffix = strtoupper($m[0]);
+                                foreach ($allOnus as $o) {
+                                    $snUpper = strtoupper($o['sn'] ?? '');
+                                    if (!empty($snUpper) && str_contains(strtoupper($suffix), substr($snUpper, 4))) {
+                                        $linked = $o;
+                                        break;
+                                    }
+                                }
+                            }
+                            $lastInformRaw = $dev['_lastInform'] ?? null;
+                            $tr069Devices[] = [
+                                'device_id' => $devId,
+                                'serial_number' => $serial,
+                                'onu_name' => $linked ? ($linked['name'] ?? '') : '',
+                                'onu_sn' => $linked ? ($linked['sn'] ?? '') : '',
+                                'manufacturer' => $dev['_deviceId']['_Manufacturer'] ?? '',
+                                'model' => $dev['_deviceId']['_ProductClass'] ?? '',
+                                'last_inform' => $lastInformRaw,
+                                'last_inform_ts' => $lastInformRaw ? strtotime($lastInformRaw) : 0,
+                            ];
+                        }
+                        usort($tr069Devices, fn($a, $b) => ($b['last_inform_ts'] ?? 0) - ($a['last_inform_ts'] ?? 0));
+                    } else {
+                        $stmt = $db->query("SELECT t.*, o.name as onu_name, o.sn as onu_sn FROM tr069_devices t LEFT JOIN huawei_onus o ON t.onu_id = o.id ORDER BY t.last_inform DESC LIMIT 100");
+                        $tr069Devices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                    }
                 }
             } catch (Exception $e) {}
             ?>
@@ -13255,8 +13298,8 @@ try {
                             <tbody>
                                 <?php foreach ($tr069Devices as $device): ?>
                                 <?php
-                                $lastInform = $device['last_inform'] ? strtotime($device['last_inform']) : 0;
-                                $isOnline = (time() - $lastInform) < 300;
+                                $lastInform = isset($device['last_inform_ts']) ? $device['last_inform_ts'] : ($device['last_inform'] ? strtotime($device['last_inform']) : 0);
+                                $isOnline = $lastInform > 0 && (time() - $lastInform) < 300;
                                 ?>
                                 <tr>
                                     <td><code><?= htmlspecialchars($device['serial_number']) ?></code></td>

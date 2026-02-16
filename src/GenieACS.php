@@ -1827,10 +1827,18 @@ JS;
             
             $deviceId = $device['_id'] ?? '';
             
-            // Match by: sn, tr069_serial, or tr069_device_id (already linked)
-            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR tr069_serial = ? OR tr069_device_id = ?");
-            $stmt->execute([$serial, $serial, $deviceId]);
+            $oltSerial = $this->convertGeniSerialToOlt($serial);
+            
+            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR sn = ? OR tr069_serial = ? OR tr069_serial = ? OR tr069_device_id = ? OR genieacs_id = ?");
+            $stmt->execute([$serial, $oltSerial, $serial, $oltSerial, $deviceId, $deviceId]);
             $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$onu && preg_match('/[0-9A-Fa-f]{8,}$/', $deviceId, $m)) {
+                $hexSuffix = strtoupper($m[0]);
+                $stmt2 = $this->db->prepare("SELECT id FROM huawei_onus WHERE UPPER(SUBSTRING(sn FROM 5)) = ?");
+                $stmt2->execute([$hexSuffix]);
+                $onu = $stmt2->fetch(\PDO::FETCH_ASSOC);
+            }
             
             if (!$onu) {
                 $unlinked[] = ['serial' => $serial, 'device_id' => $deviceId];
