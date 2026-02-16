@@ -7658,6 +7658,7 @@ try {
                     transition: all 0.25s ease;
                     position: relative;
                     overflow: hidden;
+                    cursor: pointer;
                 }
                 .kpi-card:hover {
                     transform: translateY(-3px);
@@ -7827,21 +7828,21 @@ try {
 
             <div class="row g-3 mb-4">
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
-                    <div class="kpi-card h-100">
+                    <a href="?page=huawei-olt&view=onus" class="kpi-card h-100 d-block text-decoration-none">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="kpi-icon" style="background: rgba(96,165,250,0.1); color: #60a5fa;">
                                 <i class="bi bi-router-fill"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus" class="kpi-badge" style="background: rgba(96,165,250,0.1); color: #60a5fa; text-decoration:none;">
+                            <span class="kpi-badge" style="background: rgba(96,165,250,0.1); color: #60a5fa;">
                                 All <i class="bi bi-arrow-right"></i>
-                            </a>
+                            </span>
                         </div>
                         <div class="kpi-value"><?= number_format($totalOnus) ?></div>
                         <div class="kpi-label">Total Authorized</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
-                    <div class="kpi-card h-100">
+                    <a href="?page=huawei-olt&view=olts" class="kpi-card h-100 d-block text-decoration-none">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="kpi-icon" style="background: rgba(139,92,246,0.1); color: #a78bfa;">
                                 <i class="bi bi-hdd-rack-fill"></i>
@@ -7852,10 +7853,10 @@ try {
                         </div>
                         <div class="kpi-value"><?= $stats['total_olts'] ?></div>
                         <div class="kpi-label">OLT Devices</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
-                    <div class="kpi-card h-100">
+                    <a href="?page=huawei-olt&view=onus&status=online" class="kpi-card h-100 d-block text-decoration-none">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="kpi-icon" style="background: rgba(34,197,94,0.1); color: #22c55e;">
                                 <i class="bi bi-wifi"></i>
@@ -7866,49 +7867,49 @@ try {
                         </div>
                         <div class="kpi-value"><?= number_format($stats['online_onus']) ?></div>
                         <div class="kpi-label">Online ONUs</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
-                    <div class="kpi-card h-100">
+                    <a href="?page=huawei-olt&view=onus&status=offline" class="kpi-card h-100 d-block text-decoration-none">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="kpi-icon" style="background: rgba(148,163,184,0.1); color: #64748b;">
                                 <i class="bi bi-wifi-off"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&status=offline" class="kpi-badge text-decoration-none" style="background: <?= $stats['offline_onus'] > 0 ? 'rgba(148,163,184,0.1); color: #94a3b8;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
+                            <span class="kpi-badge" style="background: <?= $stats['offline_onus'] > 0 ? 'rgba(148,163,184,0.1); color: #94a3b8;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
                                 <?= $stats['offline_onus'] > 0 ? '<i class="bi bi-x-circle"></i> Down' : '<i class="bi bi-check-circle"></i> OK' ?>
-                            </a>
+                            </span>
                         </div>
                         <div class="kpi-value"><?= number_format($stats['offline_onus']) ?></div>
                         <div class="kpi-label">Offline</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
-                    <div class="kpi-card h-100">
+                    <a href="?page=huawei-olt&view=onus&status=los" class="kpi-card h-100 d-block text-decoration-none">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="kpi-icon" style="background: rgba(239,68,68,0.1); color: #ef4444;">
                                 <i class="bi bi-exclamation-triangle-fill"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&status=los" class="kpi-badge text-decoration-none" style="background: <?= $stats['los_onus'] > 0 ? 'rgba(239,68,68,0.1); color: #ef4444;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
+                            <span class="kpi-badge" style="background: <?= $stats['los_onus'] > 0 ? 'rgba(239,68,68,0.1); color: #ef4444;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
                                 <?= $stats['los_onus'] > 0 ? '<i class="bi bi-exclamation-circle"></i>' : '<i class="bi bi-check-circle"></i> OK' ?>
-                            </a>
+                            </span>
                         </div>
                         <div class="kpi-value"><?= number_format($stats['los_onus']) ?></div>
                         <div class="kpi-label">LOS</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
-                    <div class="kpi-card h-100">
+                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="kpi-card h-100 d-block text-decoration-none">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="kpi-icon" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
                                 <i class="bi bi-hourglass-split"></i>
                             </div>
-                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="kpi-badge text-decoration-none" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
+                            <span class="kpi-badge" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
                                 View <i class="bi bi-arrow-right"></i>
-                            </a>
+                            </span>
                         </div>
                         <div class="kpi-value"><?= number_format($stats['unconfigured_onus']) ?></div>
                         <div class="kpi-label">Pending Auth</div>
-                    </div>
+                    </a>
                 </div>
             </div>
 
