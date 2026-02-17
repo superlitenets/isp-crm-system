@@ -1079,7 +1079,7 @@ class ISPInventory {
     }
 
     public function getEmployees(): array {
-        $stmt = $this->db->query("SELECT id, COALESCE(first_name || ' ' || last_name, username, name) as name FROM users ORDER BY name");
+        $stmt = $this->db->query("SELECT id, name FROM users ORDER BY name");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
