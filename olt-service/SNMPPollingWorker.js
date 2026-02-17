@@ -222,9 +222,12 @@ class SNMPPollingWorker {
         }
         
         const onuResult = await this.pool.query(`
-            SELECT id, frame, slot, port, onu_id, status FROM huawei_onus 
-            WHERE olt_id = $1 AND is_authorized = true
-            ORDER BY frame, slot, port, onu_id
+            SELECT o.id, o.frame, o.slot, o.port, o.onu_id, o.status, o.sn, o.name, o.description,
+                   c.name as customer_name, c.phone as customer_phone, c.id as customer_id
+            FROM huawei_onus o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            WHERE o.olt_id = $1 AND o.is_authorized = true
+            ORDER BY o.frame, o.slot, o.port, o.onu_id
         `, [olt.id]);
         
         if (onuResult.rows.length === 0) {
@@ -277,32 +280,22 @@ class SNMPPollingWorker {
         }
         
         let updated = 0;
+        const faults = [];
         
         try {
             for (const [portKey, onus] of Object.entries(groupedByPort)) {
                 const [frame, slot, port] = portKey.split('/').map(Number);
                 
                 try {
-                    // Execute display ont info for each port to get all ONU statuses at once
                     const cmd = `display ont info ${frame} ${slot} ${port} all`;
                     const result = await this.sessionManager.execute(oltKey, cmd, { timeout: 30000 });
                     
                     if (!result) continue;
                     
-                    // Parse results to get status for each ONU
-                    // Huawei format varies, but typically:
-                    // ONT-ID  Control-flag  Run-state  Config-state  Match-state
-                    //   0       active       online      normal        match
                     for (const onu of onus) {
                         let status = 'offline';
                         
-                        // Look for the ONU ID in the output and check its run state
-                        // Try multiple patterns since OLT output format can vary
-                        // Pattern 1: "  0       active     online   normal    match"
-                        // Pattern 2: "0    HWTC-xxx    online  ..."
                         let found = false;
-                        
-                        // Pattern for tabular format with ONU ID at start of line
                         const patterns = [
                             new RegExp(`^\\s*${onu.onu_id}\\s+\\S+\\s+(online|offline|los)`, 'im'),
                             new RegExp(`\\b${onu.onu_id}\\s+\\S+\\s+\\S+\\s+(online|offline|los)`, 'im'),
@@ -325,24 +318,34 @@ class SNMPPollingWorker {
                             console.log(`[CLI] ONU ${portKey}/${onu.onu_id} not matched in output, defaulting to offline`);
                         }
                         
-                        // Handle online_since transition properly
                         if (status === 'online' && onu.status !== 'online') {
-                            // ONU just came online - set online_since
                             await this.pool.query(`
                                 UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         } else if (status !== 'online' && onu.status === 'online') {
-                            // ONU went offline - clear online_since
                             await this.pool.query(`
                                 UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         } else {
-                            // No transition, just update status
                             await this.pool.query(`
                                 UPDATE huawei_onus SET status = $1, snmp_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         }
                         updated++;
+                        
+                        if (onu.status === 'online' && (status === 'los' || status === 'offline')) {
+                            faults.push({
+                                onu_id: onu.id,
+                                sn: onu.sn,
+                                name: onu.name || onu.description || onu.sn,
+                                slot: onu.slot, port: onu.port, onu_id: onu.onu_id,
+                                prev_status: onu.status,
+                                new_status: status,
+                                customer_name: onu.customer_name,
+                                customer_phone: onu.customer_phone,
+                                customer_id: onu.customer_id
+                            });
+                        }
                     }
                 } catch (e) {
                     console.log(`[CLI] Error polling port ${portKey}: ${e.message} - preserving current status for ${onus.length} ONUs`);
@@ -353,6 +356,12 @@ class SNMPPollingWorker {
         }
         
         console.log(`[CLI] Updated ${updated} ONUs for OLT ${olt.name}`);
+        
+        if (faults.length > 0) {
+            console.log(`[CLI] Detected ${faults.length} fault(s) on OLT ${olt.name} - sending notifications`);
+            await this.sendFaultNotifications(olt.id, faults);
+        }
+        
         return { onuCount: updated, method: 'cli' };
     }
 
@@ -747,7 +756,7 @@ class SNMPPollingWorker {
                 if (result.rowCount > 0) {
                     updated++;
                     if (prevOnu && prevStatus === 'online' && 
-                        s.status === 'los') {
+                        (s.status === 'los' || s.status === 'offline' || s.status === 'dying-gasp')) {
                         faults.push({
                             onu_id: prevOnu.id,
                             sn: prevOnu.sn,
