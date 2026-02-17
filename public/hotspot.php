@@ -356,53 +356,53 @@ function formatValidity($days, $pkg = null) {
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        body{background:#050a18;min-height:100vh;font-family:'Inter',system-ui,-apple-system,sans-serif;color:#e2e8f0;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+        body{background:#f8f9fa;min-height:100vh;font-family:'Inter',system-ui,-apple-system,sans-serif;color:#1a1a2e;overflow-x:hidden;-webkit-font-smoothing:antialiased}
         .page-bg{min-height:100vh;position:relative;padding-bottom:40px}
-        .page-bg::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(99,102,241,0.15),transparent),radial-gradient(ellipse 60% 40% at 80% 60%,rgba(139,92,246,0.08),transparent);pointer-events:none;z-index:0}
+        .page-bg::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(99,102,241,0.06),transparent);pointer-events:none;z-index:0}
 
         .hero{padding:24px 20px 48px;text-align:center;position:relative;z-index:1}
         .brand-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px}
-        .brand-logo{width:32px;height:32px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.12)}
-        .brand-icon{width:32px;height:32px;background:rgba(99,102,241,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#a5b4fc;border:1px solid rgba(99,102,241,0.3)}
-        .brand-name{font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.02em}
-        .hero-sub{color:rgba(255,255,255,0.45);font-size:13px;font-weight:400}
+        .brand-logo{width:32px;height:32px;border-radius:8px;object-fit:cover;border:1px solid rgba(0,0,0,0.08)}
+        .brand-icon{width:32px;height:32px;background:rgba(99,102,241,0.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#6366f1;border:1px solid rgba(99,102,241,0.15)}
+        .brand-name{font-size:17px;font-weight:700;color:#1a1a2e;letter-spacing:-0.02em}
+        .hero-sub{color:#6b7280;font-size:13px;font-weight:400}
 
         .main-content{max-width:420px;margin:-20px auto 0;padding:0 16px;position:relative;z-index:2}
 
-        .glass-card{background:rgba(255,255,255,0.04);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.07);border-radius:20px;margin-bottom:14px;overflow:hidden}
+        .glass-card{background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
         .glass-card-body{padding:20px}
 
         .alert-banner{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.5}
-        .alert-warning-custom{background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.15)}
-        .alert-danger-custom{background:rgba(239,68,68,0.1);color:#fca5a5;border:1px solid rgba(239,68,68,0.15)}
-        .alert-success-custom{background:rgba(16,185,129,0.1);color:#6ee7b7;border:1px solid rgba(16,185,129,0.15)}
-        .alert-info-custom{background:rgba(99,102,241,0.1);color:#a5b4fc;border:1px solid rgba(99,102,241,0.15)}
+        .alert-warning-custom{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+        .alert-danger-custom{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+        .alert-success-custom{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+        .alert-info-custom{background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe}
         .alert-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px}
 
-        .section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.3);margin-bottom:14px}
+        .section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#9ca3af;margin-bottom:14px}
 
         .pkg-grid{display:flex;flex-direction:column;gap:10px}
-        .pkg-card{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;transition:all 0.2s ease;cursor:pointer;position:relative;overflow:hidden}
+        .pkg-card{background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:16px;transition:all 0.2s ease;cursor:pointer;position:relative;overflow:hidden}
         .pkg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#6366f1,#a855f7);opacity:0;transition:opacity 0.2s}
-        .pkg-card:hover{border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.06)}
+        .pkg-card:hover{border-color:#a5b4fc;background:#f5f3ff}
         .pkg-card:hover::before{opacity:1}
         .pkg-card:active{transform:scale(0.98)}
         .pkg-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-        .pkg-name{font-size:15px;font-weight:600;color:#f1f5f9}
-        .pkg-price{font-size:20px;font-weight:800;color:#34d399;white-space:nowrap;letter-spacing:-0.02em}
-        .pkg-price small{font-size:11px;font-weight:400;color:rgba(255,255,255,0.35)}
+        .pkg-name{font-size:15px;font-weight:600;color:#1a1a2e}
+        .pkg-price{font-size:20px;font-weight:800;color:#059669;white-space:nowrap;letter-spacing:-0.02em}
+        .pkg-price small{font-size:11px;font-weight:400;color:#9ca3af}
         .pkg-details{display:flex;gap:6px;flex-wrap:wrap}
-        .pkg-tag{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.55);padding:4px 8px;border-radius:6px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,0.05)}
-        .pkg-tag i{font-size:10px;color:#818cf8}
-        .pkg-multi-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.15));color:#c4b5fd;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;margin-bottom:8px;border:1px solid rgba(139,92,246,0.15)}
+        .pkg-tag{background:#f3f4f6;color:#4b5563;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:4px;border:1px solid #e5e7eb}
+        .pkg-tag i{font-size:10px;color:#6366f1}
+        .pkg-multi-badge{display:inline-flex;align-items:center;gap:4px;background:#ede9fe;color:#6d28d9;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;margin-bottom:8px;border:1px solid #ddd6fe}
         .pkg-multi-badge i{font-size:11px}
         .pkg-buy-btn{display:block;width:100%;margin-top:12px;padding:11px;background:linear-gradient(135deg,#6366f1,#7c3aed);color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:center;font-family:inherit;letter-spacing:-0.01em}
         .pkg-buy-btn:hover{box-shadow:0 8px 24px rgba(99,102,241,0.25);transform:translateY(-1px)}
         .pkg-card-faded{opacity:0.35;pointer-events:none}
 
-        .form-input{width:100%;padding:13px 16px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;font-size:15px;font-family:inherit;color:#f1f5f9;background:rgba(255,255,255,0.05);transition:all 0.2s;outline:none}
-        .form-input:focus{border-color:rgba(99,102,241,0.5);background:rgba(99,102,241,0.08);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
-        .form-input::placeholder{color:rgba(255,255,255,0.25)}
+        .form-input{width:100%;padding:13px 16px;border:1px solid #d1d5db;border-radius:12px;font-size:15px;font-family:inherit;color:#1a1a2e;background:#ffffff;transition:all 0.2s;outline:none}
+        .form-input:focus{border-color:#6366f1;background:#ffffff;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+        .form-input::placeholder{color:#9ca3af}
 
         .btn-main{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;color:white;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px}
         .btn-main:hover{transform:translateY(-1px)}
@@ -412,48 +412,48 @@ function formatValidity($days, $pkg = null) {
         .btn-voucher:hover{box-shadow:0 8px 20px rgba(217,119,6,0.3)}
         .btn-primary{background:linear-gradient(135deg,#6366f1,#7c3aed)}
         .btn-primary:hover{box-shadow:0 8px 20px rgba(99,102,241,0.3)}
-        .btn-outline{background:transparent;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);padding:13px}
-        .btn-outline:hover{border-color:rgba(99,102,241,0.4);color:#a5b4fc}
+        .btn-outline{background:transparent;border:1px solid #d1d5db;color:#6b7280;padding:13px}
+        .btn-outline:hover{border-color:#6366f1;color:#6366f1}
 
-        .divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:rgba(255,255,255,0.2);font-size:12px;font-weight:500}
-        .divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.08)}
+        .divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:#d1d5db;font-size:12px;font-weight:500}
+        .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e5e7eb}
 
         .success-state{text-align:center;padding:28px 20px}
         .success-glow{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:36px;color:white;position:relative;animation:popIn 0.5s ease-out}
-        .success-glow.green{background:linear-gradient(135deg,#059669,#10b981);box-shadow:0 0 40px rgba(16,185,129,0.3)}
-        .success-glow.blue{background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 0 40px rgba(99,102,241,0.3)}
+        .success-glow.green{background:linear-gradient(135deg,#059669,#10b981);box-shadow:0 0 40px rgba(16,185,129,0.2)}
+        .success-glow.blue{background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 0 40px rgba(99,102,241,0.2)}
         @keyframes popIn{0%{transform:scale(0)}70%{transform:scale(1.1)}100%{transform:scale(1)}}
-        .info-chip{background:rgba(255,255,255,0.06);padding:6px 14px;border-radius:100px;font-size:12px;color:rgba(255,255,255,0.6);display:inline-flex;align-items:center;gap:6px;margin:3px;border:1px solid rgba(255,255,255,0.06)}
-        .info-chip i{color:#818cf8;font-size:12px}
+        .info-chip{background:#f3f4f6;padding:6px 14px;border-radius:100px;font-size:12px;color:#4b5563;display:inline-flex;align-items:center;gap:6px;margin:3px;border:1px solid #e5e7eb}
+        .info-chip i{color:#6366f1;font-size:12px}
 
-        .expired-banner{background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(220,38,38,0.1));border:1px solid rgba(239,68,68,0.2);color:#fca5a5;padding:18px;border-radius:14px;text-align:center}
-        .expired-banner h3{font-size:16px;font-weight:700;margin-bottom:2px;color:#fca5a5}
+        .expired-banner{background:#fee2e2;border:1px solid #fecaca;color:#991b1b;padding:18px;border-radius:14px;text-align:center}
+        .expired-banner h3{font-size:16px;font-weight:700;margin-bottom:2px;color:#991b1b}
         .expired-banner p{font-size:12px;opacity:0.7;margin:0}
 
         .stk-waiting{text-align:center;padding:28px 20px}
         .spinner-ring{width:80px;height:80px;border-radius:50%;border:3px solid rgba(99,102,241,0.15);border-top-color:#6366f1;animation:spin 1s linear infinite;margin:0 auto 8px;display:flex;align-items:center;justify-content:center}
         .spinner-ring .inner{width:64px;height:64px;border-radius:50%;border:3px solid rgba(139,92,246,0.1);border-top-color:#a855f7;animation:spin 1.5s linear infinite reverse;display:flex;align-items:center;justify-content:center}
-        .spinner-ring .inner .phone-icon{font-size:24px;color:#a5b4fc;animation:noneSpin 1.5s linear infinite}
+        .spinner-ring .inner .phone-icon{font-size:24px;color:#6366f1;animation:noneSpin 1.5s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes noneSpin{to{transform:rotate(-360deg)}}
         .stk-dots{display:flex;justify-content:center;gap:6px;margin:16px 0}
-        .stk-dots span{width:8px;height:8px;border-radius:50%;background:rgba(99,102,241,0.3);animation:dotPulse 1.4s ease-in-out infinite}
+        .stk-dots span{width:8px;height:8px;border-radius:50%;background:rgba(99,102,241,0.2);animation:dotPulse 1.4s ease-in-out infinite}
         .stk-dots span:nth-child(2){animation-delay:0.2s}
         .stk-dots span:nth-child(3){animation-delay:0.4s}
-        @keyframes dotPulse{0%,80%,100%{background:rgba(99,102,241,0.2);transform:scale(0.8)}40%{background:#6366f1;transform:scale(1.2)}}
+        @keyframes dotPulse{0%,80%,100%{background:rgba(99,102,241,0.15);transform:scale(0.8)}40%{background:#6366f1;transform:scale(1.2)}}
         @keyframes progressPulse{0%,100%{opacity:1}50%{opacity:0.5}}
 
-        .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100;align-items:flex-end;justify-content:center}
+        .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:100;align-items:flex-end;justify-content:center}
         .modal-overlay.active{display:flex}
-        .modal-sheet{background:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:24px 24px 0 0;width:100%;max-width:420px;padding:24px;animation:slideUp 0.3s ease-out;max-height:90vh;overflow-y:auto}
+        .modal-sheet{background:#ffffff;border:1px solid #e5e7eb;border-radius:24px 24px 0 0;width:100%;max-width:420px;padding:24px;animation:slideUp 0.3s ease-out;max-height:90vh;overflow-y:auto}
         @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-        .modal-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:0 auto 20px}
-        .modal-pkg-summary{background:rgba(255,255,255,0.04);border-radius:14px;padding:16px;margin-bottom:20px;border:1px solid rgba(255,255,255,0.07)}
+        .modal-handle{width:36px;height:4px;background:#d1d5db;border-radius:2px;margin:0 auto 20px}
+        .modal-pkg-summary{background:#f9fafb;border-radius:14px;padding:16px;margin-bottom:20px;border:1px solid #e5e7eb}
 
-        .footer{text-align:center;padding:24px 20px;color:rgba(255,255,255,0.2);font-size:11px;position:relative;z-index:1}
-        .footer strong{color:rgba(255,255,255,0.35)}
+        .footer{text-align:center;padding:24px 20px;color:#9ca3af;font-size:11px;position:relative;z-index:1}
+        .footer strong{color:#6b7280}
 
-        .add-device-section{background:rgba(255,255,255,0.03);border-radius:14px;padding:16px;border:1px solid rgba(255,255,255,0.06)}
+        .add-device-section{background:#f9fafb;border-radius:14px;padding:16px;border:1px solid #e5e7eb}
 
         @media(max-width:380px){.hero{padding:20px 16px 44px}.brand-name{font-size:16px}.pkg-price{font-size:18px}}
     </style>
@@ -514,8 +514,8 @@ function formatValidity($days, $pkg = null) {
             <div class="glass-card">
                 <div class="success-state">
                     <div class="success-glow green"><i class="bi bi-wifi"></i></div>
-                    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px;color:#f1f5f9">You're Connected!</h2>
-                    <p style="color:rgba(255,255,255,0.45);margin-bottom:16px;font-size:13px">Enjoy browsing the internet</p>
+                    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px;color:#1a1a2e">You're Connected!</h2>
+                    <p style="color:#6b7280;margin-bottom:16px;font-size:13px">Enjoy browsing the internet</p>
                     
                     <?php if ($subscription): ?>
                     <div style="margin-bottom:18px">
@@ -530,7 +530,7 @@ function formatValidity($days, $pkg = null) {
                     <?php endif; ?>
                     
                     <?php if (!empty($mikrotikLoginUrl)): ?>
-                    <p style="color:rgba(255,255,255,0.35);font-size:12px;margin-bottom:12px">Redirecting to network...</p>
+                    <p style="color:#9ca3af;font-size:12px;margin-bottom:12px">Redirecting to network...</p>
                     <button type="button" onclick="document.getElementById('mikrotikLoginForm').submit();" class="btn-main btn-primary">
                         <i class="bi bi-arrow-right-circle"></i> Click Here if Not Redirected
                     </button>
@@ -546,43 +546,43 @@ function formatValidity($days, $pkg = null) {
             <div class="glass-card">
                 <div class="glass-card-body">
                     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-                        <div style="width:40px;height:40px;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.2));border:1px solid rgba(99,102,241,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                            <i class="bi bi-people-fill" style="color:#a5b4fc;font-size:18px"></i>
+                        <div style="width:40px;height:40px;background:#ede9fe;border:1px solid #ddd6fe;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <i class="bi bi-people-fill" style="color:#6366f1;font-size:18px"></i>
                         </div>
                         <div>
-                            <div style="font-size:14px;font-weight:700;color:#f1f5f9">Add More Devices</div>
-                            <div style="font-size:11px;color:rgba(255,255,255,0.4)"><?= $subMaxDevices ?> devices supported, <?= $subMaxDevices - $subDeviceCount ?> slots left</div>
+                            <div style="font-size:14px;font-weight:700;color:#1a1a2e">Add More Devices</div>
+                            <div style="font-size:11px;color:#9ca3af"><?= $subMaxDevices ?> devices supported, <?= $subMaxDevices - $subDeviceCount ?> slots left</div>
                         </div>
                     </div>
                     
-                    <div style="background:rgba(99,102,241,0.08);border-radius:10px;padding:10px 12px;margin-bottom:14px;border:1px solid rgba(99,102,241,0.12)">
-                        <p style="font-size:12px;color:#a5b4fc;margin:0">
+                    <div style="background:#e0e7ff;border-radius:10px;padding:10px 12px;margin-bottom:14px;border:1px solid #c7d2fe">
+                        <p style="font-size:12px;color:#3730a3;margin:0">
                             <i class="bi bi-info-circle"></i>
-                            Share your phone number <strong style="color:#c4b5fd"><?= htmlspecialchars($subscription['customer_phone'] ?? '') ?></strong> with others to connect their devices.
+                            Share your phone number <strong style="color:#6366f1"><?= htmlspecialchars($subscription['customer_phone'] ?? '') ?></strong> with others to connect their devices.
                         </p>
                     </div>
                     
                     <?php if (!empty($subDevices)): ?>
                     <div style="margin-bottom:14px">
-                        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Connected Devices</div>
+                        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Connected Devices</div>
                         <?php foreach ($subDevices as $dev): ?>
-                        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:5px;border:1px solid rgba(255,255,255,0.05)">
-                            <i class="bi bi-phone" style="color:#818cf8"></i>
+                        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f9fafb;border-radius:10px;margin-bottom:5px;border:1px solid #e5e7eb">
+                            <i class="bi bi-phone" style="color:#6366f1"></i>
                             <div style="flex:1">
-                                <div style="font-size:13px;font-weight:500;color:#e2e8f0"><?= htmlspecialchars($dev['device_name'] ?: 'Device') ?></div>
-                                <div style="font-size:10px;color:rgba(255,255,255,0.3)"><?= htmlspecialchars($dev['mac_address']) ?></div>
+                                <div style="font-size:13px;font-weight:500;color:#1a1a2e"><?= htmlspecialchars($dev['device_name'] ?: 'Device') ?></div>
+                                <div style="font-size:10px;color:#9ca3af"><?= htmlspecialchars($dev['mac_address']) ?></div>
                             </div>
                             <?php if ($dev['mac_address'] === strtoupper(preg_replace('/[^A-Fa-f0-9:]/', '', $clientMAC))): ?>
-                            <span style="font-size:10px;background:rgba(16,185,129,0.15);color:#6ee7b7;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.15)">This device</span>
+                            <span style="font-size:10px;background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;border:1px solid #a7f3d0">This device</span>
                             <?php endif; ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
                     <?php endif; ?>
                     
-                    <p style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:0">
-                        <i class="bi bi-lightbulb" style="color:#fbbf24"></i>
-                        Other devices can connect via this WiFi page using <strong style="color:rgba(255,255,255,0.5)">"Already have a plan?"</strong>
+                    <p style="font-size:11px;color:#9ca3af;margin-bottom:0">
+                        <i class="bi bi-lightbulb" style="color:#d97706"></i>
+                        Other devices can connect via this WiFi page using <strong style="color:#4b5563">"Already have a plan?"</strong>
                     </p>
                 </div>
             </div>
@@ -605,17 +605,17 @@ function formatValidity($days, $pkg = null) {
                             <span class="phone-icon"><i class="bi bi-phone"></i></span>
                         </div>
                     </div>
-                    <h2 style="font-size:20px;font-weight:700;margin:14px 0 6px;color:#f1f5f9">Check Your Phone</h2>
-                    <p style="color:rgba(255,255,255,0.45);font-size:13px;margin-bottom:6px">Enter your M-Pesa PIN to complete payment</p>
+                    <h2 style="font-size:20px;font-weight:700;margin:14px 0 6px;color:#1a1a2e">Check Your Phone</h2>
+                    <p style="color:#6b7280;font-size:13px;margin-bottom:6px">Enter your M-Pesa PIN to complete payment</p>
                     
                     <div class="stk-dots"><span></span><span></span><span></span></div>
                     
                     <div class="alert-banner alert-info-custom" style="margin-bottom:16px;text-align:left" id="stkStatusBanner">
-                        <div class="alert-icon" style="background:rgba(99,102,241,0.15)"><i class="bi bi-hourglass-split" id="stkStatusIcon"></i></div>
+                        <div class="alert-icon" style="background:#e0e7ff"><i class="bi bi-hourglass-split" id="stkStatusIcon"></i></div>
                         <div id="stkStatusText" style="font-size:12px">Waiting for payment confirmation...</div>
                     </div>
                     
-                    <div id="stkProgressBar" style="background:rgba(255,255,255,0.06);border-radius:100px;height:4px;margin-bottom:18px;overflow:hidden">
+                    <div id="stkProgressBar" style="background:#e5e7eb;border-radius:100px;height:4px;margin-bottom:18px;overflow:hidden">
                         <div id="stkProgressFill" style="background:linear-gradient(90deg,#6366f1,#a855f7);height:100%;width:0%;border-radius:100px;transition:width 3s linear"></div>
                     </div>
                     
@@ -639,11 +639,11 @@ function formatValidity($days, $pkg = null) {
             <div class="glass-card" id="stkSuccessCard" style="display:none">
                 <div class="success-state">
                     <div class="success-glow green"><i class="bi bi-check-lg"></i></div>
-                    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px;color:#f1f5f9">Payment Received!</h2>
-                    <p style="color:rgba(255,255,255,0.45);margin-bottom:16px;font-size:13px" id="stkSuccessPkg"></p>
+                    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px;color:#1a1a2e">Payment Received!</h2>
+                    <p style="color:#6b7280;margin-bottom:16px;font-size:13px" id="stkSuccessPkg"></p>
                     <div style="margin-bottom:18px" id="stkSuccessInfo"></div>
-                    <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-bottom:10px">Connecting you to the internet...</p>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:100px;height:3px;overflow:hidden">
+                    <p style="color:#9ca3af;font-size:12px;margin-bottom:10px">Connecting you to the internet...</p>
+                    <div style="background:#e5e7eb;border-radius:100px;height:3px;overflow:hidden">
                         <div style="background:linear-gradient(90deg,#059669,#10b981);height:100%;width:100%;animation:progressPulse 1.5s ease-in-out infinite"></div>
                     </div>
                 </div>
@@ -686,20 +686,18 @@ function formatValidity($days, $pkg = null) {
                 }
                 document.getElementById('stkSuccessInfo').innerHTML = infoHtml;
                 
-                setTimeout(function() {
-                    var dst = '<?= htmlspecialchars($linkOrig ?: "http://detectportal.firefox.com/") ?>';
-                    if (dst.indexOf('http://') === 0) {
-                        window.location.href = dst;
-                    } else {
-                        window.location.href = '<?= $_SERVER['REQUEST_URI'] ?>';
-                    }
-                }, 3000);
+                var dst = '<?= htmlspecialchars($linkOrig ?: "http://detectportal.firefox.com/") ?>';
+                if (dst.indexOf('http://') === 0) {
+                    window.location.href = dst;
+                } else {
+                    window.location.href = '<?= $_SERVER['REQUEST_URI'] ?>';
+                }
             }
             
             function showTimeout() {
                 var banner = document.getElementById('stkStatusBanner');
                 banner.className = 'alert-banner alert-warning-custom';
-                banner.querySelector('.alert-icon').style.background = 'rgba(251,191,36,0.15)';
+                banner.querySelector('.alert-icon').style.background = '#fef3c7';
                 document.getElementById('stkStatusIcon').className = 'bi bi-exclamation-triangle';
                 document.getElementById('stkStatusText').innerHTML = 'Payment not yet confirmed. Tap <strong>Refresh</strong> to check again.';
                 document.getElementById('stkRefreshBtn').style.display = 'flex';
@@ -756,7 +754,7 @@ function formatValidity($days, $pkg = null) {
             <?php if ($message): ?>
             <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-<?= $messageType === 'danger' ? 'danger' : ($messageType === 'success' ? 'success' : 'info') ?>-custom">
-                    <div class="alert-icon" style="background:<?= $messageType === 'danger' ? 'rgba(239,68,68,0.15)' : ($messageType === 'success' ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)') ?>">
+                    <div class="alert-icon" style="background:<?= $messageType === 'danger' ? '#fee2e2' : ($messageType === 'success' ? '#d1fae5' : '#e0e7ff') ?>">
                         <i class="bi bi-<?= $messageType === 'danger' ? 'x-circle' : ($messageType === 'success' ? 'check-circle' : 'info-circle') ?>"></i>
                     </div>
                     <div><?= htmlspecialchars($message) ?></div>
@@ -773,11 +771,11 @@ function formatValidity($days, $pkg = null) {
                     </div>
                     
                     <?php if ($subscription): ?>
-                    <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">
+                    <div style="background:#f9fafb;border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid #e5e7eb">
                         <div style="display:flex;justify-content:space-between;align-items:center">
                             <div>
-                                <div style="font-weight:600;color:#e2e8f0;font-size:14px">Previous: <?= htmlspecialchars($subscription['package_name']) ?></div>
-                                <div style="font-size:11px;color:rgba(255,255,255,0.35)"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : ($subscription['validity_days'] ?? '0') . ' days' ?></div>
+                                <div style="font-weight:600;color:#1a1a2e;font-size:14px">Previous: <?= htmlspecialchars($subscription['package_name']) ?></div>
+                                <div style="font-size:11px;color:#9ca3af"><?= htmlspecialchars($subscription['download_speed']) ?> / <?= !empty($subscription['session_duration_hours']) ? formatDuration($subscription['session_duration_hours']) : ($subscription['validity_days'] ?? '0') . ' days' ?></div>
                             </div>
                             <div class="pkg-price">KES <?= number_format($subscription['package_price'] ?? 0) ?></div>
                         </div>
@@ -797,7 +795,7 @@ function formatValidity($days, $pkg = null) {
                     ?>
                     <div class="pkg-card" onclick="openExpiredPayment(<?= $pkg['id'] ?>, '<?= htmlspecialchars(addslashes($pkg['name'])) ?>', <?= $pkg['price'] ?>, '<?= htmlspecialchars(addslashes($pkg['download_speed'] ?? '')) ?>', '<?= htmlspecialchars($validityText) ?>', '<?= htmlspecialchars($dataText) ?>', <?= $maxDevices ?>)">
                         <?php if ($isCurrentPkg): ?>
-                        <div style="position:absolute;top:8px;right:8px"><span class="pkg-tag" style="background:rgba(99,102,241,0.15);color:#a5b4fc;font-size:10px;border-color:rgba(99,102,241,0.2)">Previous Plan</span></div>
+                        <div style="position:absolute;top:8px;right:8px"><span class="pkg-tag" style="background:#ede9fe;color:#6d28d9;font-size:10px;border-color:#ddd6fe">Previous Plan</span></div>
                         <?php endif; ?>
                         <?php if ($maxDevices > 1): ?>
                         <div class="pkg-multi-badge"><i class="bi bi-people-fill"></i> <?= $maxDevices ?> Devices</div>
@@ -824,9 +822,9 @@ function formatValidity($days, $pkg = null) {
                     </div>
                     <?php endif; ?>
 
-                    <div id="expired-payment-modal" style="display:none;background:rgba(99,102,241,0.06);border-radius:14px;padding:16px;margin-top:14px;border:1px solid rgba(99,102,241,0.15)">
-                        <h5 style="margin-bottom:12px;color:#e2e8f0;font-size:15px"><i class="bi bi-bag-check" style="color:#818cf8"></i> <span id="exp-pkg-name"></span></h5>
-                        <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:12px">
+                    <div id="expired-payment-modal" style="display:none;background:#f5f3ff;border-radius:14px;padding:16px;margin-top:14px;border:1px solid #ddd6fe">
+                        <h5 style="margin-bottom:12px;color:#1a1a2e;font-size:15px"><i class="bi bi-bag-check" style="color:#6366f1"></i> <span id="exp-pkg-name"></span></h5>
+                        <div style="font-size:12px;color:#6b7280;margin-bottom:12px">
                             <span id="exp-pkg-speed"></span> | <span id="exp-pkg-validity"></span> | <span id="exp-pkg-data"></span>
                         </div>
                         <?php if ($mpesaEnabled): ?>
@@ -869,7 +867,7 @@ function formatValidity($days, $pkg = null) {
             <?php if ($message): ?>
             <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-<?= $messageType === 'danger' ? 'danger' : ($messageType === 'success' ? 'success' : ($messageType === 'warning' ? 'warning' : 'info')) ?>-custom">
-                    <div class="alert-icon" style="background:<?= $messageType === 'danger' ? 'rgba(239,68,68,0.15)' : ($messageType === 'success' ? 'rgba(16,185,129,0.15)' : ($messageType === 'warning' ? 'rgba(251,191,36,0.15)' : 'rgba(99,102,241,0.15)')) ?>">
+                    <div class="alert-icon" style="background:<?= $messageType === 'danger' ? '#fee2e2' : ($messageType === 'success' ? '#d1fae5' : ($messageType === 'warning' ? '#fef3c7' : '#e0e7ff')) ?>">
                         <i class="bi bi-<?= $messageType === 'danger' ? 'x-circle' : ($messageType === 'success' ? 'check-circle' : 'info-circle') ?>"></i>
                     </div>
                     <div><?= htmlspecialchars($message) ?></div>
@@ -880,7 +878,7 @@ function formatValidity($days, $pkg = null) {
             <?php if (empty($clientMAC)): ?>
             <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-warning-custom">
-                    <div class="alert-icon" style="background:rgba(251,191,36,0.15)"><i class="bi bi-wifi-off"></i></div>
+                    <div class="alert-icon" style="background:#fef3c7"><i class="bi bi-wifi-off"></i></div>
                     <div>
                         <strong>Device not detected</strong><br>
                         <span style="font-size:12px;opacity:0.8">Connect to <strong><?= htmlspecialchars($ispName) ?></strong> WiFi first, then this page loads automatically.</span>
@@ -935,7 +933,7 @@ function formatValidity($days, $pkg = null) {
             <?php else: ?>
             <div class="glass-card"><div class="glass-card-body">
                 <div class="alert-banner alert-info-custom">
-                    <div class="alert-icon" style="background:rgba(99,102,241,0.15)"><i class="bi bi-info-circle"></i></div>
+                    <div class="alert-icon" style="background:#e0e7ff"><i class="bi bi-info-circle"></i></div>
                     <div>No packages available for this hotspot.</div>
                 </div>
             </div></div>
@@ -960,16 +958,16 @@ function formatValidity($days, $pkg = null) {
                 <div class="glass-card-body">
                     <div class="add-device-section">
                         <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-                            <div style="width:38px;height:38px;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.2));border:1px solid rgba(99,102,241,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                                <i class="bi bi-phone-fill" style="color:#a5b4fc;font-size:16px"></i>
+                            <div style="width:38px;height:38px;background:#ede9fe;border:1px solid #ddd6fe;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="bi bi-phone-fill" style="color:#6366f1;font-size:16px"></i>
                             </div>
                             <div>
-                                <div style="font-size:14px;font-weight:700;color:#f1f5f9">Already have a plan?</div>
-                                <div style="font-size:11px;color:rgba(255,255,255,0.35)">Add this device to your existing subscription</div>
+                                <div style="font-size:14px;font-weight:700;color:#1a1a2e">Already have a plan?</div>
+                                <div style="font-size:11px;color:#9ca3af">Add this device to your existing subscription</div>
                             </div>
                         </div>
-                        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:12px;background:rgba(99,102,241,0.06);padding:10px 12px;border-radius:10px;border:1px solid rgba(99,102,241,0.1)">
-                            <i class="bi bi-info-circle" style="color:#818cf8"></i>
+                        <p style="font-size:11px;color:#6b7280;margin-bottom:12px;background:#e0e7ff;padding:10px 12px;border-radius:10px;border:1px solid #c7d2fe">
+                            <i class="bi bi-info-circle" style="color:#6366f1"></i>
                             If someone shared their plan with you, enter their registered phone number below to connect this device.
                         </p>
                         <form method="POST">
@@ -1001,22 +999,22 @@ function formatValidity($days, $pkg = null) {
     <div class="modal-overlay" id="paymentModal">
         <div class="modal-sheet">
             <div class="modal-handle"></div>
-            <h3 style="font-size:17px;font-weight:700;margin-bottom:16px;color:#f1f5f9">Complete Purchase</h3>
+            <h3 style="font-size:17px;font-weight:700;margin-bottom:16px;color:#1a1a2e">Complete Purchase</h3>
             
             <div class="modal-pkg-summary">
                 <div style="display:flex;justify-content:space-between;align-items:center">
                     <div>
-                        <div id="modalPkgName" style="font-weight:600;color:#e2e8f0;font-size:14px"></div>
-                        <div id="modalPkgDetails" style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px"></div>
+                        <div id="modalPkgName" style="font-weight:600;color:#1a1a2e;font-size:14px"></div>
+                        <div id="modalPkgDetails" style="font-size:11px;color:#6b7280;margin-top:4px"></div>
                     </div>
                     <div id="modalPkgPrice" class="pkg-price"></div>
                 </div>
-                <div id="modalMultiDevice" style="display:none;margin-top:12px;background:rgba(99,102,241,0.08);border-radius:10px;padding:10px 14px;border:1px solid rgba(99,102,241,0.12)">
+                <div id="modalMultiDevice" style="display:none;margin-top:12px;background:#e0e7ff;border-radius:10px;padding:10px 14px;border:1px solid #c7d2fe">
                     <div style="display:flex;align-items:center;gap:8px">
-                        <i class="bi bi-people-fill" style="color:#818cf8;font-size:15px"></i>
+                        <i class="bi bi-people-fill" style="color:#6366f1;font-size:15px"></i>
                         <div>
-                            <div style="font-size:12px;font-weight:600;color:#a5b4fc" id="modalDeviceText"></div>
-                            <div style="font-size:10px;color:rgba(255,255,255,0.35)">You can add more devices after purchase</div>
+                            <div style="font-size:12px;font-weight:600;color:#4338ca" id="modalDeviceText"></div>
+                            <div style="font-size:10px;color:#6b7280">You can add more devices after purchase</div>
                         </div>
                     </div>
                 </div>
@@ -1027,7 +1025,7 @@ function formatValidity($days, $pkg = null) {
                 <input type="hidden" name="mac" value="<?= htmlspecialchars($clientMAC) ?>">
                 <input type="hidden" name="package_id" id="modalPackageId">
                 
-                <label style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.5);display:block;margin-bottom:8px">M-Pesa Phone Number</label>
+                <label style="font-size:13px;font-weight:600;color:#6b7280;display:block;margin-bottom:8px">M-Pesa Phone Number</label>
                 <input type="tel" name="phone" class="form-input" id="phoneInput" placeholder="e.g., 0712345678" required style="margin-bottom:16px">
                 
                 <button type="submit" class="btn-main btn-mpesa" style="margin-bottom:10px">
