@@ -5912,6 +5912,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'Subzone deleted successfully' : ($result['message'] ?? 'Failed to delete subzone');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'save_port_zone':
+                $result = $huaweiOLT->savePortZoneMapping($_POST);
+                $message = $result['success'] ? 'Port-Zone mapping saved' : ($result['message'] ?? 'Failed to save mapping');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_port_zone':
+                $result = $huaweiOLT->deletePortZoneMapping((int)$_POST['id']);
+                $message = $result['success'] ? 'Port-Zone mapping deleted' : ($result['message'] ?? 'Failed to delete mapping');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'add_apartment':
                 $data = [
                     'zone_id' => (int)$_POST['zone_id'],
@@ -6138,6 +6148,11 @@ $zones = $huaweiOLT->getZones(false);
 $subzones = $huaweiOLT->getSubzones();
 $apartments = $huaweiOLT->getApartments();
 $odbs = $huaweiOLT->getODBs();
+$portZoneMappings = [];
+$portZoneOltId = isset($_GET['port_zone_olt']) ? (int)$_GET['port_zone_olt'] : 0;
+if ($portZoneOltId > 0) {
+    $portZoneMappings = $huaweiOLT->getPortZoneMappings($portZoneOltId);
+}
 }
 // Load ONU types for authorization modal
 $onuTypes = [];
@@ -12501,6 +12516,11 @@ try {
                         <i class="bi bi-box me-1"></i> ODB Units <span class="badge bg-secondary"><?= count($odbs) ?></span>
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="portzones-tab" data-bs-toggle="tab" data-bs-target="#portZonesTab" type="button">
+                        <i class="bi bi-signpost-2 me-1"></i> Port-Zone Mapping <span class="badge bg-secondary"><?= count($portZoneMappings ?? []) ?></span>
+                    </button>
+                </li>
             </ul>
             
             <div class="tab-content" id="locationTabContent">
@@ -12760,6 +12780,117 @@ try {
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Port-Zone Mapping Tab -->
+                <div class="tab-pane fade" id="portZonesTab" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-signpost-2 me-2"></i>Port-Zone Mapping</h5>
+                            <small class="text-muted">Map OLT ports to zones so ONU discovery notifications include the zone name</small>
+                        </div>
+                        <div class="card-body">
+                            <form method="get" class="row g-3 mb-4">
+                                <input type="hidden" name="page" value="huawei-olt">
+                                <input type="hidden" name="view" value="locations">
+                                <div class="col-md-4">
+                                    <label class="form-label">Select OLT</label>
+                                    <select name="port_zone_olt" class="form-select" onchange="this.form.submit()">
+                                        <option value="">-- Select OLT --</option>
+                                        <?php foreach ($olts as $o): ?>
+                                        <option value="<?= $o['id'] ?>" <?= ($portZoneOltId ?? 0) == $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </form>
+
+                            <?php if (!empty($portZoneOltId)): ?>
+                            <form method="post" class="row g-3 mb-4 border rounded p-3 bg-light">
+                                <input type="hidden" name="action" value="save_port_zone">
+                                <input type="hidden" name="csrf_token" value="<?= \App\Auth::generateToken() ?>">
+                                <input type="hidden" name="olt_id" value="<?= $portZoneOltId ?>">
+                                <div class="col-md-2">
+                                    <label class="form-label">Frame</label>
+                                    <input type="number" name="frame" class="form-control" value="0" min="0">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Slot</label>
+                                    <input type="number" name="slot" class="form-control" required min="0">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Port</label>
+                                    <input type="number" name="port" class="form-control" required min="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Zone</label>
+                                    <select name="zone_id" class="form-select">
+                                        <option value="">-- Or type name below --</option>
+                                        <?php foreach ($zones as $z): ?>
+                                        <option value="<?= $z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Zone Name (manual)</label>
+                                    <input type="text" name="zone_name" class="form-control" placeholder="Or type zone name">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Notes</label>
+                                    <input type="text" name="notes" class="form-control" placeholder="Optional notes">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Mapping</button>
+                                </div>
+                            </form>
+
+                            <?php if (empty($portZoneMappings)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-signpost-2 fs-1 mb-2 d-block"></i>
+                                No port-zone mappings for this OLT. Add mappings above.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Frame</th>
+                                            <th>Slot</th>
+                                            <th>Port</th>
+                                            <th>Zone</th>
+                                            <th>Notes</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($portZoneMappings as $pz): ?>
+                                        <tr>
+                                            <td><?= $pz['frame'] ?></td>
+                                            <td><?= $pz['slot'] ?></td>
+                                            <td><?= $pz['port'] ?></td>
+                                            <td><span class="badge bg-primary"><?= htmlspecialchars($pz['zone_name'] ?: ($pz['zone_name_ref'] ?? '-')) ?></span></td>
+                                            <td class="text-muted small"><?= htmlspecialchars($pz['notes'] ?? '-') ?></td>
+                                            <td>
+                                                <form method="post" style="display:inline;" onsubmit="return confirm('Delete this mapping?')">
+                                                    <input type="hidden" name="action" value="delete_port_zone">
+                                                    <input type="hidden" name="csrf_token" value="<?= \App\Auth::generateToken() ?>">
+                                                    <input type="hidden" name="id" value="<?= $pz['id'] ?>">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                            <?php else: ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-arrow-up fs-3 mb-2 d-block"></i>
+                                Select an OLT above to manage port-zone mappings.
                             </div>
                             <?php endif; ?>
                         </div>
@@ -15582,9 +15713,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 }
             } catch (Exception $e) {}
             
-            $defaultDiscoveryTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel.";
+            $defaultDiscoveryTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n⏰ *Time:* {discovery_time}\n\n🔢 *Serial:* {onu_serials}\n🔧 *Type:* {onu_type}\n\n💡 Please authorize this ONU in the OMS panel.";
             $defaultLosTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
-            $defaultAuthorizedTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
+            $defaultAuthorizedTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n👤 *Customer:* {customer_name}\n👷 *By:* {authorized_by}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
             $defaultWifiChangedTemplate = "📶 *WiFi Credentials Updated*\n\nHello {customer_name},\n\nYour WiFi settings have been updated:\n\n📡 *Network Name (SSID):* {ssid}\n🔑 *Password:* {password}\n📻 *Band:* {band}\n\n🔌 *ONU:* {onu_name}\n⏰ *Time:* {change_time}\n\nPlease reconnect your devices using the new credentials.\n\nThank you!";
             
             $waGroups = [];
@@ -15782,7 +15913,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                 New ONU Discovery Template
                                             </label>
                                             <textarea name="wa_template_oms_new_onu" class="form-control font-monospace" rows="8" placeholder="Enter discovery notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_new_onu'] ?? $defaultDiscoveryTemplate) ?></textarea>
-                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_count}, {discovery_time}, {onu_locations}, {onu_serials}</small>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_port}, {zone_name}, {inventory_status}, {onu_type}, {discovery_time}, {onu_serials}</small>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_new_onu]').value = <?= htmlspecialchars(json_encode($defaultDiscoveryTemplate)) ?>">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
@@ -15808,7 +15939,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                 ONU Authorization Successful Template
                                             </label>
                                             <textarea name="wa_template_oms_onu_authorized" class="form-control font-monospace" rows="8" placeholder="Enter authorization notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_onu_authorized'] ?? $defaultAuthorizedTemplate) ?></textarea>
-                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {auth_time}, {customer_name}, {customer_phone}, {service_profile}</small>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {zone_name}, {inventory_status}, {auth_time}, {customer_name}, {customer_phone}, {service_profile}, {authorized_by}</small>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_onu_authorized]').value = <?= htmlspecialchars(json_encode($defaultAuthorizedTemplate)) ?>">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default

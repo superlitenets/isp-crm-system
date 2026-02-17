@@ -4347,7 +4347,91 @@ class HuaweiOLT {
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
-    
+
+    public function getPortZoneMappings(int $oltId): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT pz.*, z.name as zone_name_ref
+                FROM olt_port_zones pz
+                LEFT JOIN huawei_zones z ON pz.zone_id = z.id
+                WHERE pz.olt_id = ?
+                ORDER BY pz.frame, pz.slot, pz.port
+            ");
+            $stmt->execute([$oltId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function savePortZoneMapping(array $data): array {
+        try {
+            $zoneName = $data['zone_name'] ?? '';
+            if (!empty($data['zone_id'])) {
+                $z = $this->getZone((int)$data['zone_id']);
+                if ($z) $zoneName = $z['name'];
+            }
+
+            $stmt = $this->db->prepare("
+                INSERT INTO olt_port_zones (olt_id, frame, slot, port, zone_id, zone_name, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (olt_id, frame, slot, port)
+                DO UPDATE SET zone_id = EXCLUDED.zone_id, zone_name = EXCLUDED.zone_name, 
+                              notes = EXCLUDED.notes, updated_at = CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([
+                $data['olt_id'],
+                $data['frame'] ?? 0,
+                $data['slot'],
+                $data['port'],
+                !empty($data['zone_id']) ? $data['zone_id'] : null,
+                $zoneName,
+                $data['notes'] ?? null
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function deletePortZoneMapping(int $id): array {
+        try {
+            $this->db->prepare("DELETE FROM olt_port_zones WHERE id = ?")->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function getZoneForPort(int $oltId, int $frame, int $slot, int $port): ?string {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT COALESCE(zone_name, (SELECT name FROM huawei_zones WHERE id = pz.zone_id)) as zone
+                FROM olt_port_zones pz
+                WHERE olt_id = ? AND frame = ? AND slot = ? AND port = ?
+            ");
+            $stmt->execute([$oltId, $frame, $slot, $port]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $row ? $row['zone'] : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    public function getInventoryStatusBySN(string $sn): string {
+        try {
+            $stmt = $this->db->prepare("SELECT status FROM isp_warehouse_serials WHERE serial_number = ? LIMIT 1");
+            $stmt->execute([$sn]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) return 'Customer-Owned';
+            if ($row['status'] === 'in_stock') return 'Available';
+            if ($row['status'] === 'deployed') return 'Deployed';
+            return ucfirst($row['status']);
+        } catch (\Exception $e) {
+            return 'Unknown';
+        }
+    }
+
     public function getSubzones(?int $zoneId = null, bool $activeOnly = false): array {
         $sql = "SELECT s.*, z.name as zone_name,
                 (SELECT COUNT(*) FROM huawei_apartments WHERE subzone_id = s.id) as apartment_count,
@@ -11365,7 +11449,6 @@ class HuaweiOLT {
             $whatsapp = new \App\WhatsApp($this->db);
             $settings = new \App\Settings();
             
-            // New ONU notifications go to provisioning group (separate from branch groups)
             $provisioningGroup = $settings->get('wa_provisioning_group', '');
             if (empty($provisioningGroup)) {
                 error_log("OMS Notification: No provisioning group configured (wa_provisioning_group)");
@@ -11376,7 +11459,17 @@ class HuaweiOLT {
             $branchCode = $olt['branch_code'] ?? '';
             $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}";
             
-            $defaultTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel.";
+            $zoneName = $this->getZoneForPort(
+                (int)($onu['olt_id'] ?? $olt['id']),
+                (int)($onu['frame'] ?? 0),
+                (int)($onu['slot'] ?? 0),
+                (int)($onu['port'] ?? 0)
+            ) ?? 'Unmapped';
+            
+            $sn = $onu['sn'] ?? '';
+            $inventoryStatus = $this->getInventoryStatusBySN($sn);
+            
+            $defaultTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n⏰ *Time:* {discovery_time}\n\n🔢 *Serial:* {onu_serials}\n🔧 *Type:* {onu_type}\n\n💡 Please authorize this ONU in the OMS panel.";
             $template = $settings->get('wa_template_oms_new_onu', $defaultTemplate);
             
             $placeholders = [
@@ -11387,7 +11480,11 @@ class HuaweiOLT {
                 '{onu_count}' => '1',
                 '{discovery_time}' => date('Y-m-d H:i:s'),
                 '{onu_locations}' => "• {$onuPort}",
-                '{onu_serials}' => "• {$onu['sn']}"
+                '{onu_port}' => $onuPort,
+                '{onu_serials}' => $sn,
+                '{zone_name}' => $zoneName,
+                '{inventory_status}' => $inventoryStatus,
+                '{onu_type}' => $onu['onu_type'] ?? $onu['eqid'] ?? $onu['product_id'] ?? 'Unknown'
             ];
             
             $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
@@ -11465,7 +11562,17 @@ class HuaweiOLT {
             $customerPhone = !empty($onu['phone']) ? $onu['phone'] : (!empty($onu['customer_phone']) ? $onu['customer_phone'] : '');
             $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             
-            $defaultTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
+            $zoneName = $this->getZoneForPort(
+                (int)($onu['olt_id'] ?? $olt['id']),
+                (int)($onu['frame'] ?? 0),
+                (int)($onu['slot'] ?? 0),
+                (int)($onu['port'] ?? 0)
+            ) ?? $onu['zone'] ?? 'Unmapped';
+            
+            $sn = $onu['sn'] ?? '';
+            $inventoryStatus = $this->getInventoryStatusBySN($sn);
+            
+            $defaultTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n👤 *Customer:* {customer_name}\n👷 *By:* {authorized_by}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
             $template = $settings->get('wa_template_oms_onu_authorized', $defaultTemplate);
             
             $placeholders = [
@@ -11474,13 +11581,15 @@ class HuaweiOLT {
                 '{branch_name}' => $branchName,
                 '{branch_code}' => $branchCode,
                 '{onu_name}' => $onu['name'] ?? 'N/A',
-                '{onu_sn}' => $onu['sn'],
+                '{onu_sn}' => $sn,
                 '{onu_port}' => $onuPort,
                 '{auth_time}' => date('Y-m-d H:i:s'),
                 '{customer_name}' => $customerName,
                 '{customer_phone}' => $customerPhone,
                 '{service_profile}' => $onu['srv_profile'] ?? $onu['service_profile'] ?? '',
-                '{authorized_by}' => $authorizedBy
+                '{authorized_by}' => $authorizedBy,
+                '{zone_name}' => $zoneName,
+                '{inventory_status}' => $inventoryStatus
             ];
             
             $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);

@@ -363,3 +363,20 @@ DO $$ BEGIN
     ALTER TABLE huawei_olts ADD COLUMN board_info TEXT;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
+
+-- ============================================================
+-- 18. OLT Port-Zone Mapping
+-- ============================================================
+CREATE TABLE IF NOT EXISTS olt_port_zones (
+    id SERIAL PRIMARY KEY,
+    olt_id INTEGER NOT NULL REFERENCES huawei_olts(id) ON DELETE CASCADE,
+    frame INTEGER NOT NULL DEFAULT 0,
+    slot INTEGER NOT NULL,
+    port INTEGER NOT NULL,
+    zone_id INTEGER REFERENCES huawei_zones(id) ON DELETE SET NULL,
+    zone_name VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(olt_id, frame, slot, port)
+);
