@@ -485,10 +485,10 @@ function checkAndSendScheduledSummaries(\PDO $db, \App\Settings $settings): void
     $shouldSend = false;
     $summaryType = '';
     
-    if ($currentHour === $morningHour && $currentMinute < 5) {
+    if ($currentHour === $morningHour && $currentMinute < 15) {
         $shouldSend = true;
         $summaryType = 'morning';
-    } elseif ($currentHour === $eveningHour && $currentMinute < 5) {
+    } elseif ($currentHour === $eveningHour && $currentMinute < 15) {
         $shouldSend = true;
         $summaryType = 'evening';
     }
@@ -518,7 +518,7 @@ function checkAndSendScheduledSummaries(\PDO $db, \App\Settings $settings): void
     }
 
     $attendanceReminderHour = (int)$settings->get('attendance_reminder_hour', '7');
-    if ($currentHour === $attendanceReminderHour && $currentMinute < 5) {
+    if ($currentHour === $attendanceReminderHour && $currentMinute < 15) {
         $lastReminder = $settings->get('last_attendance_reminder', '');
         if ($lastReminder !== $today) {
             ob_start();
