@@ -1279,6 +1279,8 @@ $olts = $ispInv->getOLTs();
         $serialStatus = $_GET['serial_status'] ?? '';
         $serialItems = $ispInv->getSerializedItems($id, ['status' => $serialStatus, 'search' => $search]);
         $serialCounts = $ispInv->getSerializedItemCounts($id);
+        $employees = $ispInv->getEmployees();
+        $teams = $ispInv->getTeams();
     ?>
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
@@ -1293,6 +1295,7 @@ $olts = $ispInv->getOLTs();
             </div>
         </div>
         <div class="d-flex gap-2">
+            <button class="btn btn-info btn-sm" id="bulkAssignBtn" data-bs-toggle="modal" data-bs-target="#bulkAssignModal" style="display:none;"><i class="bi bi-people"></i> Bulk Assign (<span id="bulkAssignCount">0</span>)</button>
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkAddModal"><i class="bi bi-plus-lg"></i> Bulk Add Serials</button>
             <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#importModal"><i class="bi bi-file-earmark-spreadsheet"></i> Import Excel/CSV</button>
             <a href="?page=isp_inventory&tab=warehouse" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
@@ -1330,6 +1333,7 @@ $olts = $ispInv->getOLTs();
         <table class="table table-striped table-hover table-sm">
             <thead class="table-dark">
                 <tr>
+                    <th style="width:30px;"><input type="checkbox" id="selectAllSerials" title="Select All"></th>
                     <th>Serial Number</th>
                     <th>Status</th>
                     <th>Site</th>
@@ -1341,9 +1345,10 @@ $olts = $ispInv->getOLTs();
             </thead>
             <tbody>
             <?php if (empty($serialItems)): ?>
-                <tr><td colspan="7" class="text-center text-muted py-4">No serial numbers found. Use "Bulk Add Serials" or "Import Excel/CSV" to add items.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-4">No serial numbers found. Use "Bulk Add Serials" or "Import Excel/CSV" to add items.</td></tr>
             <?php else: foreach ($serialItems as $si): ?>
                 <tr>
+                    <td><input type="checkbox" class="serial-checkbox" value="<?= $si['id'] ?>"></td>
                     <td><strong><code><?= htmlspecialchars($si['serial_number']) ?></code></strong></td>
                     <td>
                         <?php
@@ -1366,7 +1371,7 @@ $olts = $ispInv->getOLTs();
                             </form>
                         </div>
                         <div class="modal fade" id="statusModal<?= $si['id'] ?>" tabindex="-1">
-                            <div class="modal-dialog modal-sm">
+                            <div class="modal-dialog">
                                 <div class="modal-content">
                                     <form method="POST" action="?page=isp_inventory&tab=warehouse&action=update_serial_status">
                                         <div class="modal-header py-2"><h6 class="modal-title">Update: <?= htmlspecialchars($si['serial_number']) ?></h6><button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
@@ -1384,8 +1389,25 @@ $olts = $ispInv->getOLTs();
                                                 </select>
                                             </div>
                                             <div class="mb-2">
-                                                <label class="form-label form-label-sm">Assigned To</label>
-                                                <input type="text" name="assigned_to" class="form-control form-control-sm" value="<?= htmlspecialchars($si['assigned_to'] ?? '') ?>" placeholder="Customer, technician, etc.">
+                                                <label class="form-label form-label-sm">Assign To</label>
+                                                <select name="assign_type" class="form-select form-select-sm mb-1 assign-type-select" data-modal="<?= $si['id'] ?>">
+                                                    <option value="manual" <?= !empty($si['assigned_to']) && !preg_match('/^(Employee|Team):/', $si['assigned_to'] ?? '') ? 'selected' : '' ?>>Manual Entry</option>
+                                                    <option value="employee" <?= str_starts_with($si['assigned_to'] ?? '', 'Employee:') ? 'selected' : '' ?>>Employee</option>
+                                                    <option value="team" <?= str_starts_with($si['assigned_to'] ?? '', 'Team:') ? 'selected' : '' ?>>Team</option>
+                                                </select>
+                                                <input type="text" name="assigned_to" class="form-control form-control-sm assign-manual assign-field-<?= $si['id'] ?>" value="<?= htmlspecialchars($si['assigned_to'] ?? '') ?>" placeholder="Customer name, technician, etc.">
+                                                <select name="assigned_to_employee" class="form-select form-select-sm assign-employee assign-field-<?= $si['id'] ?>" style="display:none;">
+                                                    <option value="">-- Select Employee --</option>
+                                                    <?php foreach ($employees as $emp): ?>
+                                                    <option value="Employee: <?= htmlspecialchars($emp['name']) ?>" <?= ($si['assigned_to'] ?? '') === 'Employee: '.$emp['name'] ? 'selected' : '' ?>><?= htmlspecialchars($emp['name']) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <select name="assigned_to_team" class="form-select form-select-sm assign-team assign-field-<?= $si['id'] ?>" style="display:none;">
+                                                    <option value="">-- Select Team --</option>
+                                                    <?php foreach ($teams as $t): ?>
+                                                    <option value="Team: <?= htmlspecialchars($t['name']) ?>" <?= ($si['assigned_to'] ?? '') === 'Team: '.$t['name'] ? 'selected' : '' ?>><?= htmlspecialchars($t['name']) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
                                             </div>
                                         </div>
                                         <div class="modal-footer py-1"><button type="submit" class="btn btn-primary btn-sm">Save</button></div>
@@ -1398,6 +1420,56 @@ $olts = $ispInv->getOLTs();
             <?php endforeach; endif; ?>
             </tbody>
         </table>
+    </div>
+
+    <div class="modal fade" id="bulkAssignModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="?page=isp_inventory&tab=warehouse&action=bulk_assign_serials">
+                    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-people"></i> Bulk Assign Serial Numbers</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" name="stock_id" value="<?= $id ?>">
+                        <div id="bulkAssignIds"></div>
+                        <div class="alert alert-info small"><strong><span id="bulkAssignSelectedCount">0</span></strong> serial number(s) selected for assignment.</div>
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <select name="new_status" class="form-select form-select-sm">
+                                <option value="deployed" selected>Deployed</option>
+                                <option value="in_stock">In Stock</option>
+                                <option value="faulty">Faulty</option>
+                                <option value="returned">Returned</option>
+                                <option value="lost">Lost</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Assign To</label>
+                            <select id="bulkAssignType" class="form-select form-select-sm mb-2">
+                                <option value="employee">Employee</option>
+                                <option value="team">Team</option>
+                                <option value="manual">Manual Entry</option>
+                            </select>
+                            <select name="assigned_to_employee" id="bulkAssignEmployee" class="form-select form-select-sm">
+                                <option value="">-- Select Employee --</option>
+                                <?php foreach ($employees as $emp): ?>
+                                <option value="Employee: <?= htmlspecialchars($emp['name']) ?>"><?= htmlspecialchars($emp['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select name="assigned_to_team" id="bulkAssignTeam" class="form-select form-select-sm" style="display:none;">
+                                <option value="">-- Select Team --</option>
+                                <?php foreach ($teams as $t): ?>
+                                <option value="Team: <?= htmlspecialchars($t['name']) ?>"><?= htmlspecialchars($t['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <input type="text" name="assigned_to_manual" id="bulkAssignManual" class="form-control form-control-sm" style="display:none;" placeholder="Enter name...">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-info btn-sm"><i class="bi bi-people"></i> Assign Selected</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <div class="modal fade" id="bulkAddModal" tabindex="-1">
@@ -1841,6 +1913,79 @@ document.querySelectorAll('#invSidebar .sidebar-nav a').forEach(link => {
         }
     });
 });
+
+(function() {
+    const selectAll = document.getElementById('selectAllSerials');
+    const bulkBtn = document.getElementById('bulkAssignBtn');
+    const bulkCount = document.getElementById('bulkAssignCount');
+    const bulkSelectedCount = document.getElementById('bulkAssignSelectedCount');
+    const bulkIdsContainer = document.getElementById('bulkAssignIds');
+
+    function updateBulkState() {
+        const checked = document.querySelectorAll('.serial-checkbox:checked');
+        const count = checked.length;
+        if (bulkBtn) bulkBtn.style.display = count > 0 ? '' : 'none';
+        if (bulkCount) bulkCount.textContent = count;
+        if (bulkSelectedCount) bulkSelectedCount.textContent = count;
+        if (bulkIdsContainer) {
+            bulkIdsContainer.innerHTML = '';
+            checked.forEach(cb => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'serial_ids[]';
+                input.value = cb.value;
+                bulkIdsContainer.appendChild(input);
+            });
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.serial-checkbox').forEach(cb => cb.checked = this.checked);
+            updateBulkState();
+        });
+    }
+
+    document.querySelectorAll('.serial-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateBulkState);
+    });
+
+    document.querySelectorAll('.assign-type-select').forEach(sel => {
+        sel.addEventListener('change', function() {
+            const modalId = this.dataset.modal;
+            const fields = document.querySelectorAll('.assign-field-' + modalId);
+            fields.forEach(f => f.style.display = 'none');
+            fields.forEach(f => f.removeAttribute('name'));
+            if (this.value === 'manual') {
+                const el = document.querySelector('.assign-field-' + modalId + '.assign-manual');
+                if (el) { el.style.display = ''; el.name = 'assigned_to'; }
+            } else if (this.value === 'employee') {
+                const el = document.querySelector('.assign-field-' + modalId + '.assign-employee');
+                if (el) { el.style.display = ''; el.name = 'assigned_to'; }
+            } else if (this.value === 'team') {
+                const el = document.querySelector('.assign-field-' + modalId + '.assign-team');
+                if (el) { el.style.display = ''; el.name = 'assigned_to'; }
+            }
+        });
+        sel.dispatchEvent(new Event('change'));
+    });
+
+    const bulkAssignType = document.getElementById('bulkAssignType');
+    if (bulkAssignType) {
+        bulkAssignType.addEventListener('change', function() {
+            const emp = document.getElementById('bulkAssignEmployee');
+            const team = document.getElementById('bulkAssignTeam');
+            const manual = document.getElementById('bulkAssignManual');
+            emp.style.display = 'none'; emp.removeAttribute('name');
+            team.style.display = 'none'; team.removeAttribute('name');
+            manual.style.display = 'none'; manual.removeAttribute('name');
+            if (this.value === 'employee') { emp.style.display = ''; emp.name = 'assigned_to'; }
+            else if (this.value === 'team') { team.style.display = ''; team.name = 'assigned_to'; }
+            else { manual.style.display = ''; manual.name = 'assigned_to'; }
+        });
+        bulkAssignType.dispatchEvent(new Event('change'));
+    }
+})();
 </script>
 </body>
 </html>

@@ -1079,7 +1079,46 @@ class ISPInventory {
     }
 
     public function getEmployees(): array {
-        $stmt = $this->db->query("SELECT id, name FROM users ORDER BY name");
+        $stmt = $this->db->query("SELECT id, COALESCE(first_name || ' ' || last_name, username, name) as name FROM users ORDER BY name");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getTeams(): array {
+        $stmt = $this->db->query("SELECT id, name FROM teams WHERE is_active = true ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function bulkAssignSerials(array $serialIds, string $assignTo, string $status = 'deployed', int $stockId = 0): array {
+        $updated = 0;
+        $this->db->beginTransaction();
+        try {
+            foreach ($serialIds as $serialId) {
+                $serialId = (int) $serialId;
+                $sql = "SELECT stock_id, status FROM isp_warehouse_serials WHERE id = ?";
+                $params = [$serialId];
+                if ($stockId > 0) {
+                    $sql .= " AND stock_id = ?";
+                    $params[] = $stockId;
+                }
+                $oldStmt = $this->db->prepare($sql);
+                $oldStmt->execute($params);
+                $old = $oldStmt->fetch(\PDO::FETCH_ASSOC);
+                if (!$old) continue;
+
+                $this->db->prepare("UPDATE isp_warehouse_serials SET status = ?, assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$status, $assignTo, $serialId]);
+
+                if ($old['status'] === 'in_stock' && $status !== 'in_stock') {
+                    $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = GREATEST(quantity - 1, 0), updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$old['stock_id']]);
+                } elseif ($old['status'] !== 'in_stock' && $status === 'in_stock') {
+                    $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$old['stock_id']]);
+                }
+                $updated++;
+            }
+            $this->db->commit();
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+        return ['updated' => $updated];
     }
 }

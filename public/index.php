@@ -2288,7 +2288,7 @@ if ($page === 'isp_inventory') {
                     } elseif ($ispAction === 'update_serial_status') {
                         $serialId = (int) $_POST['serial_id'];
                         $newStatus = $_POST['new_status'] ?? '';
-                        $assignedTo = $_POST['assigned_to'] ?? null;
+                        $assignedTo = $_POST['assigned_to'] ?? $_POST['assigned_to_employee'] ?? $_POST['assigned_to_team'] ?? $_POST['assigned_to_manual'] ?? null;
                         $ispInv->updateSerialStatus($serialId, $newStatus, $assignedTo);
                         $_SESSION['success_message'] = 'Serial status updated.';
                         $stockId = (int) $_POST['stock_id'];
@@ -2299,6 +2299,19 @@ if ($page === 'isp_inventory') {
                         $stockId = (int) $_POST['stock_id'];
                         $ispInv->deleteSerial($serialId);
                         $_SESSION['success_message'] = 'Serial number deleted.';
+                        header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                        exit;
+                    } elseif ($ispAction === 'bulk_assign_serials') {
+                        $stockId = (int) $_POST['stock_id'];
+                        $serialIds = $_POST['serial_ids'] ?? [];
+                        $assignedTo = $_POST['assigned_to'] ?? $_POST['assigned_to_employee'] ?? $_POST['assigned_to_team'] ?? $_POST['assigned_to_manual'] ?? '';
+                        $newStatus = $_POST['new_status'] ?? 'deployed';
+                        if (!empty($serialIds) && !empty($assignedTo)) {
+                            $result = $ispInv->bulkAssignSerials($serialIds, $assignedTo, $newStatus, $stockId);
+                            $_SESSION['success_message'] = $result['updated'] . ' serial(s) assigned to ' . $assignedTo . '.';
+                        } else {
+                            $_SESSION['error_message'] = 'Please select serials and an assignee.';
+                        }
                         header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
                         exit;
                     }
