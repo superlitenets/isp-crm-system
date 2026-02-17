@@ -4464,12 +4464,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Content-Type: application/json');
                 try {
                     $onuId = (int)($_GET['onu_id'] ?? 0);
+                    $refresh = ($_GET['refresh'] ?? '0') === '1';
                     if (!$onuId) {
                         echo json_encode(['success' => false, 'error' => 'ONU ID required']);
                         exit;
                     }
                     
-                    // Get ONU details to find serial number
                     $stmt = $db->prepare("SELECT sn, tr069_serial FROM huawei_onus WHERE id = ?");
                     $stmt->execute([$onuId]);
                     $onu = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -4479,7 +4479,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         exit;
                     }
                     
-                    // Query GenieACS for device - try multiple serial formats
                     $genieACS = new GenieACS($db);
                     $serial = !empty($onu['tr069_serial']) ? $onu['tr069_serial'] : $onu['sn'];
                     
@@ -4490,24 +4489,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     $device = null;
+                    $deviceId = null;
                     foreach ($searchFormats as $sn) {
                         if (empty($sn)) continue;
                         $result = $genieACS->getDeviceBySerial($sn);
                         if ($result['success'] && !empty($result['device'])) {
                             $device = $result['device'];
+                            $deviceId = $device['_id'] ?? null;
                             break;
                         }
                     }
                     
-                    if ($device) {
-                        // Return full device object for status display
-                        echo json_encode([
-                            'success' => true, 
-                            'device' => $device
-                        ]);
-                    } else {
+                    if (!$device || !$deviceId) {
                         echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS', 'tried' => $searchFormats]);
+                        exit;
                     }
+                    
+                    $refreshed = false;
+                    $lastInform = isset($device['_lastInform']) ? strtotime($device['_lastInform']) : 0;
+                    $isStale = !$lastInform || (time() - $lastInform) > 300;
+                    $hasMinimalData = !isset($device['InternetGatewayDevice']) && !isset($device['Device']);
+                    
+                    if ($refresh || $isStale || $hasMinimalData) {
+                        $encodedId = rawurlencode($deviceId);
+                        $connResult = $genieACS->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+                            'name' => 'getParameterValues',
+                            'parameterNames' => [
+                                'InternetGatewayDevice.',
+                                'Device.'
+                            ]
+                        ]);
+                        
+                        if (($connResult['http_code'] ?? 0) == 200) {
+                            $refreshed = true;
+                        } else {
+                            $genieACS->request('POST', "/devices/{$encodedId}/tasks", [
+                                'name' => 'getParameterValues',
+                                'parameterNames' => [
+                                    'InternetGatewayDevice.',
+                                    'Device.'
+                                ]
+                            ]);
+                        }
+                        
+                        if ($refreshed) {
+                            usleep(500000);
+                        }
+                        
+                        $freshResult = $genieACS->getDeviceBySerial($sn ?? $serial);
+                        if ($freshResult['success'] && !empty($freshResult['device'])) {
+                            $device = $freshResult['device'];
+                        }
+                    }
+                    
+                    echo json_encode([
+                        'success' => true, 
+                        'device' => $device,
+                        'refreshed' => $refreshed
+                    ]);
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
