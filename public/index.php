@@ -2179,6 +2179,169 @@ if ($page === 'isp_inventory') {
         echo "TDTC99999999,Batch B\n";
         exit;
     }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $ispInv = new \App\ISPInventory($db);
+        $tab = $_GET['tab'] ?? 'overview';
+        $sub = $_GET['sub'] ?? '';
+        $ispAction = $_GET['action'] ?? '';
+        $ispId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+        try {
+            switch ($tab) {
+                case 'sites':
+                    if ($ispAction === 'save') {
+                        $ispInv->saveSite($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Site saved successfully.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteSite((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Site deleted.';
+                    }
+                    header('Location: ?page=isp_inventory&tab=sites');
+                    exit;
+                case 'core':
+                    if ($ispAction === 'save') {
+                        $ispInv->saveCoreEquipment($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Equipment saved successfully.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteCoreEquipment((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Equipment deleted.';
+                    }
+                    header('Location: ?page=isp_inventory&tab=core');
+                    exit;
+                case 'ipam':
+                    if ($sub === 'vlans') {
+                        if ($ispAction === 'save') {
+                            $ispInv->saveVLAN($_POST, $ispId);
+                            $_SESSION['success_message'] = 'VLAN saved.';
+                        } elseif ($ispAction === 'delete') {
+                            $ispInv->deleteVLAN((int)$_POST['id']);
+                            $_SESSION['success_message'] = 'VLAN deleted.';
+                        }
+                        header('Location: ?page=isp_inventory&tab=ipam&sub=vlans');
+                    } else {
+                        if ($ispAction === 'save') {
+                            $ispInv->saveIPAddress($_POST, $ispId);
+                            $_SESSION['success_message'] = 'IP address saved.';
+                        } elseif ($ispAction === 'delete') {
+                            $ispInv->deleteIPAddress((int)$_POST['id']);
+                            $_SESSION['success_message'] = 'IP address deleted.';
+                        }
+                        header('Location: ?page=isp_inventory&tab=ipam&sub=ips');
+                    }
+                    exit;
+                case 'warehouse':
+                    if ($ispAction === 'save') {
+                        $ispInv->saveWarehouseStock($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Stock item saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteWarehouseStock((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Stock item deleted.';
+                    } elseif ($ispAction === 'record_movement') {
+                        $_POST['performed_by'] = $_SESSION['user_id'] ?? null;
+                        $ispInv->recordStockMovement($_POST);
+                        $_SESSION['success_message'] = 'Stock movement recorded.';
+                        header('Location: ?page=isp_inventory&tab=warehouse&action=movement&id=' . ($ispId ?? $_POST['stock_id']));
+                        exit;
+                    } elseif ($ispAction === 'add_serials') {
+                        $stockId = (int) $_POST['stock_id'];
+                        $serialsText = $_POST['serials'] ?? '';
+                        $serials = array_filter(array_map('trim', preg_split('/[\r\n,;]+/', $serialsText)));
+                        $meta = [
+                            'site_id' => $_POST['site_id'] ?? null,
+                            'received_date' => $_POST['received_date'] ?? date('Y-m-d'),
+                            'notes' => $_POST['notes'] ?? null,
+                        ];
+                        $result = $ispInv->addSerialsBulk($stockId, $serials, $meta);
+                        $msg = $result['added'] . ' serial(s) added.';
+                        if (!empty($result['duplicates'])) {
+                            $msg .= ' ' . count($result['duplicates']) . ' duplicate(s) skipped: ' . implode(', ', array_slice($result['duplicates'], 0, 5));
+                        }
+                        $_SESSION['success_message'] = $msg;
+                        header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                        exit;
+                    } elseif ($ispAction === 'import_serials') {
+                        $stockId = (int) $_POST['stock_id'];
+                        if (!empty($_FILES['import_file']['tmp_name'])) {
+                            $tmpFile = $_FILES['import_file']['tmp_name'];
+                            $origName = $_FILES['import_file']['name'];
+                            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+                            if (!in_array($ext, ['csv', 'xlsx', 'xls'])) {
+                                $_SESSION['error_message'] = 'Invalid file type. Please upload CSV, XLSX, or XLS.';
+                            } else {
+                                $destPath = sys_get_temp_dir() . '/import_' . uniqid() . '.' . $ext;
+                                move_uploaded_file($tmpFile, $destPath);
+                                $result = $ispInv->importSerialsFromFile($destPath, $stockId);
+                                @unlink($destPath);
+                                $msg = $result['added'] . ' serial(s) imported.';
+                                if (!empty($result['duplicates'])) {
+                                    $msg .= ' ' . count($result['duplicates']) . ' duplicate(s) skipped.';
+                                }
+                                if (!empty($result['errors'])) {
+                                    $msg .= ' Errors: ' . implode('; ', $result['errors']);
+                                }
+                                $_SESSION['success_message'] = $msg;
+                            }
+                        } else {
+                            $_SESSION['error_message'] = 'No file uploaded.';
+                        }
+                        header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                        exit;
+                    } elseif ($ispAction === 'update_serial_status') {
+                        $serialId = (int) $_POST['serial_id'];
+                        $newStatus = $_POST['new_status'] ?? '';
+                        $assignedTo = $_POST['assigned_to'] ?? null;
+                        $ispInv->updateSerialStatus($serialId, $newStatus, $assignedTo);
+                        $_SESSION['success_message'] = 'Serial status updated.';
+                        $stockId = (int) $_POST['stock_id'];
+                        header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                        exit;
+                    } elseif ($ispAction === 'delete_serial') {
+                        $serialId = (int) $_POST['serial_id'];
+                        $stockId = (int) $_POST['stock_id'];
+                        $ispInv->deleteSerial($serialId);
+                        $_SESSION['success_message'] = 'Serial number deleted.';
+                        header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                        exit;
+                    }
+                    header('Location: ?page=isp_inventory&tab=warehouse');
+                    exit;
+                case 'assets':
+                    if ($ispAction === 'save') {
+                        if (!empty($_POST['assigned_to'])) {
+                            $empStmt = $db->prepare("SELECT COALESCE(first_name || ' ' || last_name, username) as name FROM users WHERE id = ?");
+                            $empStmt->execute([$_POST['assigned_to']]);
+                            $_POST['assigned_to_name'] = $empStmt->fetchColumn() ?: '';
+                            $_POST['assignment_date'] = date('Y-m-d');
+                        }
+                        $ispInv->saveFieldAsset($_POST, $ispId);
+                        $_SESSION['success_message'] = 'Asset saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteFieldAsset((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Asset deleted.';
+                    }
+                    header('Location: ?page=isp_inventory&tab=assets');
+                    exit;
+                case 'maintenance':
+                    if ($ispAction === 'save') {
+                        if (!empty($_POST['performed_by'])) {
+                            $empStmt = $db->prepare("SELECT COALESCE(first_name || ' ' || last_name, username) as name FROM users WHERE id = ?");
+                            $empStmt->execute([$_POST['performed_by']]);
+                            $_POST['performed_by_name'] = $empStmt->fetchColumn() ?: '';
+                        }
+                        $ispInv->saveMaintenanceLog($_POST);
+                        $_SESSION['success_message'] = 'Maintenance log saved.';
+                    } elseif ($ispAction === 'delete') {
+                        $ispInv->deleteMaintenanceLog((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Maintenance log deleted.';
+                    }
+                    header('Location: ?page=isp_inventory&tab=maintenance');
+                    exit;
+            }
+        } catch (\Exception $e) {
+            $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+            header("Location: ?page=isp_inventory&tab=$tab" . ($sub ? "&sub=$sub" : ''));
+            exit;
+        }
+    }
     include __DIR__ . '/../templates/isp_inventory.php';
     exit;
 }
@@ -7978,175 +8141,6 @@ if ($page === 'hr' && $action === 'sync_biometric') {
     }
 }
 
-if ($page === 'isp_inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $ispInv = new \App\ISPInventory($db);
-    $tab = $_GET['tab'] ?? 'overview';
-    $sub = $_GET['sub'] ?? '';
-    $ispAction = $_GET['action'] ?? '';
-    $ispId = isset($_GET['id']) ? (int)$_GET['id'] : null;
-
-    try {
-        switch ($tab) {
-            case 'sites':
-                if ($ispAction === 'save') {
-                    $ispInv->saveSite($_POST, $ispId);
-                    $_SESSION['success_message'] = 'Site saved successfully.';
-                } elseif ($ispAction === 'delete') {
-                    $ispInv->deleteSite((int)$_POST['id']);
-                    $_SESSION['success_message'] = 'Site deleted.';
-                }
-                header('Location: ?page=isp_inventory&tab=sites');
-                exit;
-
-            case 'core':
-                if ($ispAction === 'save') {
-                    $ispInv->saveCoreEquipment($_POST, $ispId);
-                    $_SESSION['success_message'] = 'Equipment saved successfully.';
-                } elseif ($ispAction === 'delete') {
-                    $ispInv->deleteCoreEquipment((int)$_POST['id']);
-                    $_SESSION['success_message'] = 'Equipment deleted.';
-                }
-                header('Location: ?page=isp_inventory&tab=core');
-                exit;
-
-            case 'ipam':
-                if ($sub === 'vlans') {
-                    if ($ispAction === 'save') {
-                        $ispInv->saveVLAN($_POST, $ispId);
-                        $_SESSION['success_message'] = 'VLAN saved.';
-                    } elseif ($ispAction === 'delete') {
-                        $ispInv->deleteVLAN((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'VLAN deleted.';
-                    }
-                    header('Location: ?page=isp_inventory&tab=ipam&sub=vlans');
-                } else {
-                    if ($ispAction === 'save') {
-                        $ispInv->saveIPAddress($_POST, $ispId);
-                        $_SESSION['success_message'] = 'IP address saved.';
-                    } elseif ($ispAction === 'delete') {
-                        $ispInv->deleteIPAddress((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'IP address deleted.';
-                    }
-                    header('Location: ?page=isp_inventory&tab=ipam&sub=ips');
-                }
-                exit;
-
-            case 'warehouse':
-                if ($ispAction === 'save') {
-                    $ispInv->saveWarehouseStock($_POST, $ispId);
-                    $_SESSION['success_message'] = 'Stock item saved.';
-                } elseif ($ispAction === 'delete') {
-                    $ispInv->deleteWarehouseStock((int)$_POST['id']);
-                    $_SESSION['success_message'] = 'Stock item deleted.';
-                } elseif ($ispAction === 'record_movement') {
-                    $_POST['performed_by'] = $_SESSION['user_id'] ?? null;
-                    $ispInv->recordStockMovement($_POST);
-                    $_SESSION['success_message'] = 'Stock movement recorded.';
-                    header('Location: ?page=isp_inventory&tab=warehouse&action=movement&id=' . ($ispId ?? $_POST['stock_id']));
-                    exit;
-                } elseif ($ispAction === 'add_serials') {
-                    $stockId = (int) $_POST['stock_id'];
-                    $serialsText = $_POST['serials'] ?? '';
-                    $serials = array_filter(array_map('trim', preg_split('/[\r\n,;]+/', $serialsText)));
-                    $meta = [
-                        'site_id' => $_POST['site_id'] ?? null,
-                        'received_date' => $_POST['received_date'] ?? date('Y-m-d'),
-                        'notes' => $_POST['notes'] ?? null,
-                    ];
-                    $result = $ispInv->addSerialsBulk($stockId, $serials, $meta);
-                    $msg = $result['added'] . ' serial(s) added.';
-                    if (!empty($result['duplicates'])) {
-                        $msg .= ' ' . count($result['duplicates']) . ' duplicate(s) skipped: ' . implode(', ', array_slice($result['duplicates'], 0, 5));
-                    }
-                    $_SESSION['success_message'] = $msg;
-                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
-                    exit;
-                } elseif ($ispAction === 'import_serials') {
-                    $stockId = (int) $_POST['stock_id'];
-                    if (!empty($_FILES['import_file']['tmp_name'])) {
-                        $tmpFile = $_FILES['import_file']['tmp_name'];
-                        $origName = $_FILES['import_file']['name'];
-                        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
-                        if (!in_array($ext, ['csv', 'xlsx', 'xls'])) {
-                            $_SESSION['error_message'] = 'Invalid file type. Please upload CSV, XLSX, or XLS.';
-                        } else {
-                            $destPath = sys_get_temp_dir() . '/import_' . uniqid() . '.' . $ext;
-                            move_uploaded_file($tmpFile, $destPath);
-                            $result = $ispInv->importSerialsFromFile($destPath, $stockId);
-                            @unlink($destPath);
-                            $msg = $result['added'] . ' serial(s) imported.';
-                            if (!empty($result['duplicates'])) {
-                                $msg .= ' ' . count($result['duplicates']) . ' duplicate(s) skipped.';
-                            }
-                            if (!empty($result['errors'])) {
-                                $msg .= ' Errors: ' . implode('; ', $result['errors']);
-                            }
-                            $_SESSION['success_message'] = $msg;
-                        }
-                    } else {
-                        $_SESSION['error_message'] = 'No file uploaded.';
-                    }
-                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
-                    exit;
-                } elseif ($ispAction === 'update_serial_status') {
-                    $serialId = (int) $_POST['serial_id'];
-                    $newStatus = $_POST['new_status'] ?? '';
-                    $assignedTo = $_POST['assigned_to'] ?? null;
-                    $ispInv->updateSerialStatus($serialId, $newStatus, $assignedTo);
-                    $_SESSION['success_message'] = 'Serial status updated.';
-                    $stockId = (int) $_POST['stock_id'];
-                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
-                    exit;
-                } elseif ($ispAction === 'delete_serial') {
-                    $serialId = (int) $_POST['serial_id'];
-                    $stockId = (int) $_POST['stock_id'];
-                    $ispInv->deleteSerial($serialId);
-                    $_SESSION['success_message'] = 'Serial number deleted.';
-                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
-                    exit;
-                }
-                header('Location: ?page=isp_inventory&tab=warehouse');
-                exit;
-
-            case 'assets':
-                if ($ispAction === 'save') {
-                    if (!empty($_POST['assigned_to'])) {
-                        $empStmt = $db->prepare("SELECT COALESCE(first_name || ' ' || last_name, username) as name FROM users WHERE id = ?");
-                        $empStmt->execute([$_POST['assigned_to']]);
-                        $_POST['assigned_to_name'] = $empStmt->fetchColumn() ?: '';
-                        $_POST['assignment_date'] = date('Y-m-d');
-                    }
-                    $ispInv->saveFieldAsset($_POST, $ispId);
-                    $_SESSION['success_message'] = 'Asset saved.';
-                } elseif ($ispAction === 'delete') {
-                    $ispInv->deleteFieldAsset((int)$_POST['id']);
-                    $_SESSION['success_message'] = 'Asset deleted.';
-                }
-                header('Location: ?page=isp_inventory&tab=assets');
-                exit;
-
-            case 'maintenance':
-                if ($ispAction === 'save') {
-                    if (!empty($_POST['performed_by'])) {
-                        $empStmt = $db->prepare("SELECT COALESCE(first_name || ' ' || last_name, username) as name FROM users WHERE id = ?");
-                        $empStmt->execute([$_POST['performed_by']]);
-                        $_POST['performed_by_name'] = $empStmt->fetchColumn() ?: '';
-                    }
-                    $ispInv->saveMaintenanceLog($_POST);
-                    $_SESSION['success_message'] = 'Maintenance log saved.';
-                } elseif ($ispAction === 'delete') {
-                    $ispInv->deleteMaintenanceLog((int)$_POST['id']);
-                    $_SESSION['success_message'] = 'Maintenance log deleted.';
-                }
-                header('Location: ?page=isp_inventory&tab=maintenance');
-                exit;
-        }
-    } catch (\Exception $e) {
-        $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
-        header("Location: ?page=isp_inventory&tab=$tab" . ($sub ? "&sub=$sub" : ''));
-        exit;
-    }
-}
 
 if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $inventory = new \App\Inventory($db);
