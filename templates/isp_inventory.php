@@ -1248,6 +1248,205 @@ $olts = $ispInv->getOLTs();
     </div>
     <?php endif; ?>
 
+    <?php elseif ($action === 'serials' && $id):
+        $stockItem = $ispInv->getWarehouseStockItem($id);
+        $serialStatus = $_GET['serial_status'] ?? '';
+        $serialItems = $ispInv->getSerializedItems($id, ['status' => $serialStatus, 'search' => $search]);
+        $serialCounts = $ispInv->getSerializedItemCounts($id);
+    ?>
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h5 class="mb-1"><i class="bi bi-upc-scan"></i> Serial Numbers: <strong><?= htmlspecialchars($stockItem['item_name'] ?? '') ?></strong></h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <span class="badge bg-primary"><?= $serialCounts['total'] ?> Total</span>
+                <span class="badge bg-success"><?= $serialCounts['in_stock'] ?> In Stock</span>
+                <span class="badge bg-info"><?= $serialCounts['deployed'] ?> Deployed</span>
+                <span class="badge bg-warning"><?= $serialCounts['faulty'] ?> Faulty</span>
+                <span class="badge bg-secondary"><?= $serialCounts['returned'] ?> Returned</span>
+                <span class="badge bg-danger"><?= $serialCounts['lost'] ?> Lost</span>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkAddModal"><i class="bi bi-plus-lg"></i> Bulk Add Serials</button>
+            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#importModal"><i class="bi bi-file-earmark-spreadsheet"></i> Import Excel/CSV</button>
+            <a href="?page=isp_inventory&tab=warehouse" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form class="row g-2 align-items-end" method="GET">
+                <input type="hidden" name="page" value="isp_inventory">
+                <input type="hidden" name="tab" value="warehouse">
+                <input type="hidden" name="action" value="serials">
+                <input type="hidden" name="id" value="<?= $id ?>">
+                <div class="col-md-4">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search serial, assigned to..." value="<?= htmlspecialchars($search) ?>">
+                </div>
+                <div class="col-md-3">
+                    <select name="serial_status" class="form-select form-select-sm">
+                        <option value="">All Status</option>
+                        <option value="in_stock" <?= $serialStatus === 'in_stock' ? 'selected' : '' ?>>In Stock</option>
+                        <option value="deployed" <?= $serialStatus === 'deployed' ? 'selected' : '' ?>>Deployed</option>
+                        <option value="faulty" <?= $serialStatus === 'faulty' ? 'selected' : '' ?>>Faulty</option>
+                        <option value="returned" <?= $serialStatus === 'returned' ? 'selected' : '' ?>>Returned</option>
+                        <option value="lost" <?= $serialStatus === 'lost' ? 'selected' : '' ?>>Lost</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-primary btn-sm w-100"><i class="bi bi-search"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>Serial Number</th>
+                    <th>Status</th>
+                    <th>Site</th>
+                    <th>Assigned To</th>
+                    <th>Received</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php if (empty($serialItems)): ?>
+                <tr><td colspan="7" class="text-center text-muted py-4">No serial numbers found. Use "Bulk Add Serials" or "Import Excel/CSV" to add items.</td></tr>
+            <?php else: foreach ($serialItems as $si): ?>
+                <tr>
+                    <td><strong><code><?= htmlspecialchars($si['serial_number']) ?></code></strong></td>
+                    <td>
+                        <?php
+                        $statusColors = ['in_stock'=>'success','deployed'=>'info','faulty'=>'warning','returned'=>'secondary','lost'=>'danger'];
+                        $statusLabels = ['in_stock'=>'In Stock','deployed'=>'Deployed','faulty'=>'Faulty','returned'=>'Returned','lost'=>'Lost'];
+                        ?>
+                        <span class="badge bg-<?= $statusColors[$si['status']] ?? 'secondary' ?>"><?= $statusLabels[$si['status']] ?? $si['status'] ?></span>
+                    </td>
+                    <td><?= htmlspecialchars($si['site_name'] ?? 'Main') ?></td>
+                    <td><?= htmlspecialchars($si['assigned_to'] ?? '') ?></td>
+                    <td><?= $si['received_date'] ? date('Y-m-d', strtotime($si['received_date'])) : '' ?></td>
+                    <td><small><?= htmlspecialchars(mb_strimwidth($si['notes'] ?? '', 0, 50, '...')) ?></small></td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#statusModal<?= $si['id'] ?>" title="Change Status"><i class="bi bi-pencil"></i></button>
+                            <form method="POST" action="?page=isp_inventory&tab=warehouse&action=delete_serial" class="d-inline" onsubmit="return confirm('Delete this serial number?')">
+                                <input type="hidden" name="serial_id" value="<?= $si['id'] ?>">
+                                <input type="hidden" name="stock_id" value="<?= $id ?>">
+                                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </div>
+                        <div class="modal fade" id="statusModal<?= $si['id'] ?>" tabindex="-1">
+                            <div class="modal-dialog modal-sm">
+                                <div class="modal-content">
+                                    <form method="POST" action="?page=isp_inventory&tab=warehouse&action=update_serial_status">
+                                        <div class="modal-header py-2"><h6 class="modal-title">Update: <?= htmlspecialchars($si['serial_number']) ?></h6><button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+                                        <div class="modal-body">
+                                            <input type="hidden" name="serial_id" value="<?= $si['id'] ?>">
+                                            <input type="hidden" name="stock_id" value="<?= $id ?>">
+                                            <div class="mb-2">
+                                                <label class="form-label form-label-sm">Status</label>
+                                                <select name="new_status" class="form-select form-select-sm">
+                                                    <option value="in_stock" <?= $si['status'] === 'in_stock' ? 'selected' : '' ?>>In Stock</option>
+                                                    <option value="deployed" <?= $si['status'] === 'deployed' ? 'selected' : '' ?>>Deployed</option>
+                                                    <option value="faulty" <?= $si['status'] === 'faulty' ? 'selected' : '' ?>>Faulty</option>
+                                                    <option value="returned" <?= $si['status'] === 'returned' ? 'selected' : '' ?>>Returned</option>
+                                                    <option value="lost" <?= $si['status'] === 'lost' ? 'selected' : '' ?>>Lost</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label form-label-sm">Assigned To</label>
+                                                <input type="text" name="assigned_to" class="form-control form-control-sm" value="<?= htmlspecialchars($si['assigned_to'] ?? '') ?>" placeholder="Customer, technician, etc.">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer py-1"><button type="submit" class="btn btn-primary btn-sm">Save</button></div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            <?php endforeach; endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="modal fade" id="bulkAddModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="?page=isp_inventory&tab=warehouse&action=add_serials">
+                    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-plus-lg"></i> Bulk Add Serial Numbers</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" name="stock_id" value="<?= $id ?>">
+                        <div class="mb-3">
+                            <label class="form-label">Serial Numbers <small class="text-muted">(one per line, or separated by commas)</small></label>
+                            <textarea name="serials" class="form-control font-monospace" rows="8" placeholder="SN001&#10;SN002&#10;SN003&#10;or: SN001, SN002, SN003" required></textarea>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label">Warehouse / Site</label>
+                                <select name="site_id" class="form-select form-select-sm"><option value="">Main Warehouse</option>
+                                    <?php foreach ($sites as $s): ?><option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option><?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Received Date</label>
+                                <input type="date" name="received_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <input type="text" name="notes" class="form-control form-control-sm" placeholder="Optional batch notes">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Serials</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="?page=isp_inventory&tab=warehouse&action=import_serials" enctype="multipart/form-data">
+                    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-file-earmark-spreadsheet"></i> Import from Excel/CSV</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" name="stock_id" value="<?= $id ?>">
+                        <div class="mb-3">
+                            <label class="form-label">Upload File</label>
+                            <input type="file" name="import_file" class="form-control" accept=".csv,.xlsx,.xls" required>
+                            <small class="text-muted">Supported: CSV, XLSX, XLS</small>
+                        </div>
+                        <div class="alert alert-info small mb-0">
+                            <strong>File Format:</strong> Your file should have a header row with at least a <code>serial_number</code> (or <code>serial</code>, <code>sn</code>) column.
+                            Optional columns: <code>notes</code>, <code>received_date</code>.
+                            <hr class="my-2">
+                            <strong>Example:</strong>
+                            <table class="table table-sm table-bordered mb-0 mt-1" style="font-size: 0.8em;">
+                                <thead><tr><th>serial_number</th><th>notes</th></tr></thead>
+                                <tbody>
+                                    <tr><td>HWTC12345678</td><td>Batch A</td></tr>
+                                    <tr><td>HWTC87654321</td><td>Batch A</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="?page=isp_inventory&tab=warehouse&action=download_sample_csv" class="btn btn-outline-info btn-sm me-auto"><i class="bi bi-download"></i> Download Sample CSV</a>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-upload"></i> Import</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <?php else:
         $stockCat = $_GET['stock_cat'] ?? '';
         $lowOnly = !empty($_GET['low_stock']);
@@ -1291,6 +1490,7 @@ $olts = $ispInv->getOLTs();
                     <td><?= $st['unit_cost'] ? number_format($st['quantity'] * $st['unit_cost'],2) : '' ?></td>
                     <td><small><?= htmlspecialchars($st['supplier'] ?? '') ?></small></td>
                     <td>
+                        <a href="?page=isp_inventory&tab=warehouse&action=serials&id=<?= $st['id'] ?>" class="btn btn-sm btn-outline-info" title="Serial Numbers"><i class="bi bi-upc-scan"></i></a>
                         <a href="?page=isp_inventory&tab=warehouse&action=movement&id=<?= $st['id'] ?>" class="btn btn-sm btn-outline-success" title="Stock Movement"><i class="bi bi-arrow-left-right"></i></a>
                         <a href="?page=isp_inventory&tab=warehouse&action=form&id=<?= $st['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
                         <form method="POST" action="?page=isp_inventory&tab=warehouse&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">

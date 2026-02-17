@@ -711,6 +711,186 @@ class ISPInventory {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
+    // ==================== SERIALIZED ITEMS ====================
+
+    public function getSerializedItems(int $stockId, array $filters = []): array {
+        $sql = "SELECT si.*, s.name as site_name, ws.item_name, ws.category
+                FROM isp_warehouse_serials si
+                LEFT JOIN isp_network_sites s ON si.site_id = s.id
+                LEFT JOIN isp_warehouse_stock ws ON si.stock_id = ws.id
+                WHERE si.stock_id = ?";
+        $params = [$stockId];
+        if (!empty($filters['status'])) {
+            $sql .= " AND si.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['search'])) {
+            $search = '%' . $filters['search'] . '%';
+            $sql .= " AND (si.serial_number ILIKE ? OR si.assigned_to ILIKE ? OR si.notes ILIKE ?)";
+            $params = array_merge($params, [$search, $search, $search]);
+        }
+        $sql .= " ORDER BY si.created_at DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getSerializedItemCounts(int $stockId): array {
+        $stmt = $this->db->prepare("SELECT status, COUNT(*) as cnt FROM isp_warehouse_serials WHERE stock_id = ? GROUP BY status");
+        $stmt->execute([$stockId]);
+        $result = ['total' => 0, 'in_stock' => 0, 'deployed' => 0, 'faulty' => 0, 'returned' => 0, 'lost' => 0];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $result[$row['status']] = (int) $row['cnt'];
+            $result['total'] += (int) $row['cnt'];
+        }
+        return $result;
+    }
+
+    public function addSerialsBulk(int $stockId, array $serials, array $meta = []): array {
+        $added = 0;
+        $duplicates = [];
+        $siteId = !empty($meta['site_id']) ? $meta['site_id'] : null;
+        $receivedDate = !empty($meta['received_date']) ? $meta['received_date'] : date('Y-m-d');
+        $notes = $meta['notes'] ?? null;
+
+        $checkStmt = $this->db->prepare("SELECT COUNT(*) FROM isp_warehouse_serials WHERE serial_number = ?");
+        $insertStmt = $this->db->prepare("INSERT INTO isp_warehouse_serials (stock_id, serial_number, status, site_id, received_date, notes) VALUES (?, ?, 'in_stock', ?, ?, ?)");
+
+        $this->db->beginTransaction();
+        try {
+            foreach ($serials as $sn) {
+                $sn = trim($sn);
+                if (empty($sn)) continue;
+                $checkStmt->execute([$sn]);
+                if ((int) $checkStmt->fetchColumn() > 0) {
+                    $duplicates[] = $sn;
+                    continue;
+                }
+                $insertStmt->execute([$stockId, $sn, $siteId, $receivedDate, $notes]);
+                $added++;
+            }
+            if ($added > 0) {
+                $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$added, $stockId]);
+            }
+            $this->db->commit();
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+        return ['added' => $added, 'duplicates' => $duplicates];
+    }
+
+    public function updateSerialStatus(int $serialId, string $status, ?string $assignedTo = null): void {
+        $oldStmt = $this->db->prepare("SELECT stock_id, status FROM isp_warehouse_serials WHERE id = ?");
+        $oldStmt->execute([$serialId]);
+        $old = $oldStmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$old) return;
+
+        $this->db->prepare("UPDATE isp_warehouse_serials SET status = ?, assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$status, $assignedTo, $serialId]);
+
+        if ($old['status'] === 'in_stock' && $status !== 'in_stock') {
+            $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = GREATEST(quantity - 1, 0), updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$old['stock_id']]);
+        } elseif ($old['status'] !== 'in_stock' && $status === 'in_stock') {
+            $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$old['stock_id']]);
+        }
+    }
+
+    public function deleteSerial(int $serialId): void {
+        $stmt = $this->db->prepare("SELECT stock_id, status FROM isp_warehouse_serials WHERE id = ?");
+        $stmt->execute([$serialId]);
+        $item = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$item) return;
+
+        $this->db->prepare("DELETE FROM isp_warehouse_serials WHERE id = ?")->execute([$serialId]);
+        if ($item['status'] === 'in_stock') {
+            $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = GREATEST(quantity - 1, 0), updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$item['stock_id']]);
+        }
+    }
+
+    public function importSerialsFromFile(string $filePath, int $stockId, array $columnMap = []): array {
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $rows = [];
+
+        if ($ext === 'csv') {
+            $handle = fopen($filePath, 'r');
+            $header = fgetcsv($handle, 0, ',', '"', '');
+            $header = array_map('trim', array_map('strtolower', $header));
+            while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
+                $assoc = array_combine($header, array_pad($row, count($header), ''));
+                $rows[] = $assoc;
+            }
+            fclose($handle);
+        } else {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+            $sheet = $spreadsheet->getActiveSheet();
+            $data = $sheet->toArray(null, true, true, false);
+            if (empty($data)) return ['added' => 0, 'duplicates' => [], 'errors' => ['Empty file']];
+            $header = array_map('trim', array_map('strtolower', array_shift($data)));
+            foreach ($data as $row) {
+                if (empty(array_filter($row))) continue;
+                $assoc = array_combine($header, array_pad($row, count($header), ''));
+                $rows[] = $assoc;
+            }
+        }
+
+        $snCol = $columnMap['serial_number'] ?? $this->detectColumn($header ?? [], ['serial_number', 'serial', 'sn', 'serial no', 'serialno', 'serial_no', 'imei', 'mac', 'mac_address']);
+        if (!$snCol) return ['added' => 0, 'duplicates' => [], 'errors' => ['Could not find serial number column. Expected: serial_number, serial, sn, imei, or mac']];
+
+        $notesCol = $columnMap['notes'] ?? $this->detectColumn($header ?? [], ['notes', 'note', 'description', 'remarks']);
+        $dateCol = $columnMap['received_date'] ?? $this->detectColumn($header ?? [], ['received_date', 'date', 'purchase_date', 'date_received']);
+
+        $serials = [];
+        $meta = [];
+        foreach ($rows as $row) {
+            $sn = trim($row[$snCol] ?? '');
+            if (empty($sn)) continue;
+            $serials[] = $sn;
+            $meta[$sn] = [
+                'notes' => trim($row[$notesCol] ?? ''),
+                'received_date' => !empty($row[$dateCol]) ? $row[$dateCol] : date('Y-m-d'),
+            ];
+        }
+
+        $added = 0;
+        $duplicates = [];
+        $checkStmt = $this->db->prepare("SELECT COUNT(*) FROM isp_warehouse_serials WHERE serial_number = ?");
+        $insertStmt = $this->db->prepare("INSERT INTO isp_warehouse_serials (stock_id, serial_number, status, received_date, notes) VALUES (?, ?, 'in_stock', ?, ?)");
+
+        $this->db->beginTransaction();
+        try {
+            foreach ($serials as $sn) {
+                $checkStmt->execute([$sn]);
+                if ((int) $checkStmt->fetchColumn() > 0) {
+                    $duplicates[] = $sn;
+                    continue;
+                }
+                $insertStmt->execute([$stockId, $sn, $meta[$sn]['received_date'] ?? date('Y-m-d'), $meta[$sn]['notes'] ?? null]);
+                $added++;
+            }
+            if ($added > 0) {
+                $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$added, $stockId]);
+            }
+            $this->db->commit();
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return ['added' => 0, 'duplicates' => $duplicates, 'errors' => [$e->getMessage()]];
+        }
+
+        return ['added' => $added, 'duplicates' => $duplicates, 'errors' => []];
+    }
+
+    private function detectColumn(array $headers, array $candidates): ?string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $headers)) return $c;
+        }
+        foreach ($headers as $h) {
+            foreach ($candidates as $c) {
+                if (strpos($h, $c) !== false) return $h;
+            }
+        }
+        return null;
+    }
+
     // ==================== FIELD ASSETS ====================
 
     public function getFieldAssets(array $filters = []): array {

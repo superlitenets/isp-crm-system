@@ -2170,6 +2170,15 @@ if ($page === 'isp_inventory') {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
     }
+    if (($_GET['action'] ?? '') === 'download_sample_csv') {
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="serial_import_sample.csv"');
+        echo "serial_number,notes\n";
+        echo "HWTC12345678,Batch A\n";
+        echo "HWTC87654321,Batch A\n";
+        echo "TDTC99999999,Batch B\n";
+        exit;
+    }
     include __DIR__ . '/../templates/isp_inventory.php';
     exit;
 }
@@ -8034,6 +8043,66 @@ if ($page === 'isp_inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ispInv->recordStockMovement($_POST);
                     $_SESSION['success_message'] = 'Stock movement recorded.';
                     header('Location: ?page=isp_inventory&tab=warehouse&action=movement&id=' . ($ispId ?? $_POST['stock_id']));
+                    exit;
+                } elseif ($ispAction === 'add_serials') {
+                    $stockId = (int) $_POST['stock_id'];
+                    $serialsText = $_POST['serials'] ?? '';
+                    $serials = array_filter(array_map('trim', preg_split('/[\r\n,;]+/', $serialsText)));
+                    $meta = [
+                        'site_id' => $_POST['site_id'] ?? null,
+                        'received_date' => $_POST['received_date'] ?? date('Y-m-d'),
+                        'notes' => $_POST['notes'] ?? null,
+                    ];
+                    $result = $ispInv->addSerialsBulk($stockId, $serials, $meta);
+                    $msg = $result['added'] . ' serial(s) added.';
+                    if (!empty($result['duplicates'])) {
+                        $msg .= ' ' . count($result['duplicates']) . ' duplicate(s) skipped: ' . implode(', ', array_slice($result['duplicates'], 0, 5));
+                    }
+                    $_SESSION['success_message'] = $msg;
+                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                    exit;
+                } elseif ($ispAction === 'import_serials') {
+                    $stockId = (int) $_POST['stock_id'];
+                    if (!empty($_FILES['import_file']['tmp_name'])) {
+                        $tmpFile = $_FILES['import_file']['tmp_name'];
+                        $origName = $_FILES['import_file']['name'];
+                        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+                        if (!in_array($ext, ['csv', 'xlsx', 'xls'])) {
+                            $_SESSION['error_message'] = 'Invalid file type. Please upload CSV, XLSX, or XLS.';
+                        } else {
+                            $destPath = sys_get_temp_dir() . '/import_' . uniqid() . '.' . $ext;
+                            move_uploaded_file($tmpFile, $destPath);
+                            $result = $ispInv->importSerialsFromFile($destPath, $stockId);
+                            @unlink($destPath);
+                            $msg = $result['added'] . ' serial(s) imported.';
+                            if (!empty($result['duplicates'])) {
+                                $msg .= ' ' . count($result['duplicates']) . ' duplicate(s) skipped.';
+                            }
+                            if (!empty($result['errors'])) {
+                                $msg .= ' Errors: ' . implode('; ', $result['errors']);
+                            }
+                            $_SESSION['success_message'] = $msg;
+                        }
+                    } else {
+                        $_SESSION['error_message'] = 'No file uploaded.';
+                    }
+                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                    exit;
+                } elseif ($ispAction === 'update_serial_status') {
+                    $serialId = (int) $_POST['serial_id'];
+                    $newStatus = $_POST['new_status'] ?? '';
+                    $assignedTo = $_POST['assigned_to'] ?? null;
+                    $ispInv->updateSerialStatus($serialId, $newStatus, $assignedTo);
+                    $_SESSION['success_message'] = 'Serial status updated.';
+                    $stockId = (int) $_POST['stock_id'];
+                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
+                    exit;
+                } elseif ($ispAction === 'delete_serial') {
+                    $serialId = (int) $_POST['serial_id'];
+                    $stockId = (int) $_POST['stock_id'];
+                    $ispInv->deleteSerial($serialId);
+                    $_SESSION['success_message'] = 'Serial number deleted.';
+                    header('Location: ?page=isp_inventory&tab=warehouse&action=serials&id=' . $stockId);
                     exit;
                 }
                 header('Location: ?page=isp_inventory&tab=warehouse');
