@@ -272,11 +272,11 @@ CREATE TABLE IF NOT EXISTS isp_vlans (
     id SERIAL PRIMARY KEY,
     vlan_id INTEGER NOT NULL,
     name VARCHAR(100) NOT NULL,
-    description TEXT,
-    site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
-    ip_range VARCHAR(45),
-    gateway VARCHAR(45),
     purpose VARCHAR(100),
+    subnet VARCHAR(45),
+    gateway VARCHAR(45),
+    site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+    equipment_id INTEGER,
     notes TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -341,3 +341,25 @@ CREATE TABLE IF NOT EXISTS isp_warehouse_serials (
 CREATE INDEX IF NOT EXISTS idx_warehouse_serials_stock_id ON isp_warehouse_serials(stock_id);
 CREATE INDEX IF NOT EXISTS idx_warehouse_serials_serial ON isp_warehouse_serials(serial_number);
 CREATE INDEX IF NOT EXISTS idx_warehouse_serials_status ON isp_warehouse_serials(status);
+
+-- ============================================================
+-- 17. Add missing columns to existing tables (safe to re-run)
+-- ============================================================
+
+-- Add equipment_id to isp_vlans if missing
+DO $$ BEGIN
+    ALTER TABLE isp_vlans ADD COLUMN equipment_id INTEGER;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Add subnet to isp_vlans if missing
+DO $$ BEGIN
+    ALTER TABLE isp_vlans ADD COLUMN subnet VARCHAR(45);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Add board_info to huawei_olts if missing
+DO $$ BEGIN
+    ALTER TABLE huawei_olts ADD COLUMN board_info TEXT;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
