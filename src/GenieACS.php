@@ -1918,7 +1918,6 @@ JS;
         if ($refresh) {
             $refreshResult = $this->refreshDevice($deviceId);
             if ($refreshResult['success'] ?? false) {
-                // Wait for values to populate (refresh has 10s timeout, device may take a moment)
                 sleep(2);
             }
         }
@@ -1931,22 +1930,53 @@ JS;
         $device = $result['data'];
         $categories = [];
         
-        // Check if device has actual values (not just parameter structure)
-        $hasValues = false;
+        // Count actual parameter values to detect sparse/incomplete data
+        $valueCount = 0;
+        $lastInformTime = null;
         foreach ($device as $key => $val) {
             if (is_array($val) && isset($val['_value'])) {
-                $hasValues = true;
-                break;
+                $valueCount++;
+            }
+            if ($key === '_lastInform' && is_array($val) && isset($val['_value'])) {
+                $lastInformTime = $val['_value'];
             }
         }
         
-        // If no values and not already refreshing, suggest refresh
-        if (!$hasValues && !$refresh) {
+        // If no values at all and not already refreshing, suggest refresh
+        if ($valueCount === 0 && !$refresh) {
             return [
                 'success' => false,
                 'error' => 'Device parameters not yet fetched. Click Refresh to load data from device.',
                 'needs_refresh' => true
             ];
+        }
+        
+        // Auto-refresh if data is sparse (newly onboarded device with minimal params)
+        // or if last inform was stale (>5 minutes ago)
+        if (!$refresh) {
+            $needsAutoRefresh = false;
+            
+            if ($valueCount < 20) {
+                $needsAutoRefresh = true;
+                error_log("[GenieACS] Auto-refresh: sparse data ({$valueCount} params) for device {$deviceId}");
+            } elseif ($lastInformTime) {
+                $informTs = is_string($lastInformTime) ? strtotime($lastInformTime) : (int)($lastInformTime / 1000);
+                if ($informTs && (time() - $informTs) > 300) {
+                    $needsAutoRefresh = true;
+                    error_log("[GenieACS] Auto-refresh: stale data (last inform " . date('Y-m-d H:i:s', $informTs) . ") for device {$deviceId}");
+                }
+            }
+            
+            if ($needsAutoRefresh) {
+                $refreshResult = $this->refreshDevice($deviceId);
+                if ($refreshResult['success'] ?? false) {
+                    sleep(3);
+                    $result = $this->getDevice($deviceId);
+                    if (($result['success'] ?? false) && !empty($result['data'])) {
+                        $device = $result['data'];
+                    }
+                }
+            }
         }
         
         // Helper to extract parameter value - checks for _value in array or direct value
