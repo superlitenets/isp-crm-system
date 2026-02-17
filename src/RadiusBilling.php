@@ -3395,6 +3395,10 @@ class RadiusBilling {
         $stmt->execute([$subscriptionId]);
         $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
+        if (empty($sessions)) {
+            return ['success' => true, 'disconnected' => 0, 'total_sessions' => 0, 'message' => 'No active sessions found'];
+        }
+        
         foreach ($sessions as &$session) {
             $session['nas_ip'] = !empty($session['nas_ip_address']) ? $session['nas_ip_address'] : ($nas['ip_address'] ?? null);
             $session['nas_secret'] = $nas['secret'] ?? null;
@@ -3404,15 +3408,21 @@ class RadiusBilling {
         $disconnected = 0;
         $errors = [];
         foreach ($sessions as $session) {
-            $result = $this->sendCoADisconnect($session);
-            if ($result['success']) {
-                $disconnected++;
-                // Mark session as ended in database so dashboard updates immediately
-                if (!empty($session['id'])) {
-                    $this->markSessionEnded($session['id'], 'coa_disconnect');
+            $coaSent = false;
+            if (!empty($session['nas_ip']) && !empty($session['nas_secret'])) {
+                $result = $this->sendCoADisconnect($session);
+                if ($result['success']) {
+                    $disconnected++;
+                    $coaSent = true;
+                } else {
+                    $errors[] = $result['error'];
                 }
             } else {
-                $errors[] = $result['error'];
+                $errors[] = 'Missing NAS IP or secret for session ' . ($session['acct_session_id'] ?? $session['id']);
+            }
+            
+            if (!empty($session['id'])) {
+                $this->markSessionEnded($session['id'], $coaSent ? 'Admin-Disconnect' : 'Admin-Reset');
             }
         }
         

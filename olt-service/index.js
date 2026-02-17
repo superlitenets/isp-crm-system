@@ -1203,6 +1203,26 @@ app.post('/radius/coa', async (req, res) => {
 const PORT = process.env.OLT_SERVICE_PORT || 3002;
 const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '0 * * * * *'; // CLI autofind every 60s (for new ONUs only)
 const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 300; // SNMP polling every 5 minutes (reduced to prevent slowdowns)
+const SESSION_SYNC_INTERVAL = parseInt(process.env.SESSION_SYNC_INTERVAL) || 180; // Session sync every 3 minutes
+
+let sessionSyncTimer = null;
+
+async function periodicSessionSync() {
+    try {
+        const phpUrl = process.env.PHP_API_URL || 'http://localhost:5000';
+        const response = await axios.get(`${phpUrl}/api/session-sync.php`, { timeout: 30000 });
+        const data = response.data;
+        if (data.success) {
+            const closed = data.sync?.closed || 0;
+            const stale = data.stale_cleaned || 0;
+            if (closed > 0 || stale > 0) {
+                console.log(`[SessionSync] Closed ${closed} inactive sessions, cleaned ${stale} stale sessions`);
+            }
+        }
+    } catch (error) {
+        // Silently ignore - PHP server may not be ready
+    }
+}
 
 const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
@@ -1211,6 +1231,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     jobWorker.start();
     console.log(`[Discovery] CLI autofind started (every 60s - for new unconfigured ONUs)`);
     console.log(`[SNMP] Background polling started (every ${SNMP_INTERVAL}s - for status updates)`);
+    
+    sessionSyncTimer = setInterval(periodicSessionSync, SESSION_SYNC_INTERVAL * 1000);
+    console.log(`[SessionSync] RADIUS session sync started (every ${SESSION_SYNC_INTERVAL}s)`);
 });
 server.timeout = 300000;
 server.keepAliveTimeout = 300000;
@@ -1218,6 +1241,7 @@ server.headersTimeout = 310000;
 
 process.on('SIGTERM', async () => {
     console.log('Shutting down OLT Session Manager...');
+    if (sessionSyncTimer) clearInterval(sessionSyncTimer);
     discoveryWorker.stop();
     snmpWorker.stop();
     jobWorker.stop();
@@ -1227,6 +1251,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
     console.log('Shutting down OLT Session Manager...');
+    if (sessionSyncTimer) clearInterval(sessionSyncTimer);
     discoveryWorker.stop();
     snmpWorker.stop();
     jobWorker.stop();
