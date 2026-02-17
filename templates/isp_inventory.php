@@ -1494,7 +1494,10 @@ $olts = $ispInv->getOLTs();
             </div>
             <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
         </form>
-        <a href="?page=isp_inventory&tab=warehouse&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Stock Item</a>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#importStockModal"><i class="bi bi-file-earmark-spreadsheet"></i> Import Excel/CSV</button>
+            <a href="?page=isp_inventory&tab=warehouse&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Stock Item</a>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table table-striped table-hover">
@@ -1528,6 +1531,49 @@ $olts = $ispInv->getOLTs();
             <?php endforeach; endif; ?>
             </tbody>
         </table>
+    </div>
+    <div class="modal fade" id="importStockModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="?page=isp_inventory&tab=warehouse&action=import_serials" enctype="multipart/form-data">
+                    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-file-earmark-spreadsheet"></i> Import Serial Numbers from Excel/CSV</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Stock Item *</label>
+                            <select name="stock_id" class="form-select" required>
+                                <option value="">-- Select Stock Item --</option>
+                                <?php foreach ($stockList as $st): ?>
+                                <option value="<?= $st['id'] ?>"><?= htmlspecialchars($st['item_name']) ?> (<?= htmlspecialchars($st['category']) ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Upload File *</label>
+                            <input type="file" name="import_file" class="form-control" accept=".csv,.xlsx,.xls" required>
+                            <small class="text-muted">Supported: CSV, XLSX, XLS</small>
+                        </div>
+                        <div class="alert alert-info small mb-0">
+                            <strong>File Format:</strong> Header row with at least a <code>serial_number</code> (or <code>serial</code>, <code>sn</code>) column.
+                            Optional columns: <code>notes</code>, <code>received_date</code>.
+                            <hr class="my-2">
+                            <strong>Example:</strong>
+                            <table class="table table-sm table-bordered mb-0 mt-1" style="font-size: 0.8em;">
+                                <thead><tr><th>serial_number</th><th>notes</th></tr></thead>
+                                <tbody>
+                                    <tr><td>HWTC12345678</td><td>Batch A</td></tr>
+                                    <tr><td>HWTC87654321</td><td>Batch A</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="?page=isp_inventory&tab=warehouse&action=download_sample_csv" class="btn btn-outline-info btn-sm me-auto"><i class="bi bi-download"></i> Sample CSV</a>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-upload"></i> Import</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
     <?php endif; ?>
 
