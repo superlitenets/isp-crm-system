@@ -664,7 +664,7 @@ class ISPInventory {
         if ($id) {
             $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
             $sql = "UPDATE isp_warehouse_stock SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params = array_map(fn($f) => (isset($data[$f]) && $data[$f] !== '' ? $data[$f] : null), $fields);
             $params[] = $id;
             $this->db->prepare($sql)->execute($params);
             return $id;
@@ -672,7 +672,7 @@ class ISPInventory {
             $cols = implode(', ', $fields);
             $placeholders = implode(', ', array_fill(0, count($fields), '?'));
             $stmt = $this->db->prepare("INSERT INTO isp_warehouse_stock ($cols) VALUES ($placeholders) RETURNING id");
-            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params = array_map(fn($f) => (isset($data[$f]) && $data[$f] !== '' ? $data[$f] : null), $fields);
             $stmt->execute($params);
             return (int) $stmt->fetchColumn();
         }
@@ -709,6 +709,21 @@ class ISPInventory {
     public function getLowStockAlerts(): array {
         $stmt = $this->db->query("SELECT ws.*, s.name as site_name FROM isp_warehouse_stock ws LEFT JOIN isp_network_sites s ON ws.site_id = s.id WHERE ws.quantity <= ws.min_threshold AND ws.min_threshold > 0 ORDER BY ws.quantity ASC");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getSerialStatusMap(array $serialNumbers): array {
+        if (empty($serialNumbers)) return [];
+        $placeholders = implode(',', array_fill(0, count($serialNumbers), '?'));
+        $stmt = $this->db->prepare("SELECT ws.serial_number, ws.status, ws.assigned_to, wst.item_name 
+            FROM isp_warehouse_serials ws 
+            JOIN isp_warehouse_stock wst ON ws.stock_id = wst.id 
+            WHERE ws.serial_number IN ($placeholders)");
+        $stmt->execute(array_values($serialNumbers));
+        $map = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $map[$row['serial_number']] = $row;
+        }
+        return $map;
     }
 
     // ==================== SERIALIZED ITEMS ====================
@@ -793,6 +808,31 @@ class ISPInventory {
         } elseif ($old['status'] !== 'in_stock' && $status === 'in_stock') {
             $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$old['stock_id']]);
         }
+    }
+
+    public function deploySerialBySN(string $serialNumber, ?string $assignedTo = null): bool {
+        $stmt = $this->db->prepare("SELECT id, stock_id, status FROM isp_warehouse_serials WHERE serial_number = ? LIMIT 1");
+        $stmt->execute([$serialNumber]);
+        $serial = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$serial) return false;
+        if ($serial['status'] === 'deployed') return true;
+
+        $this->db->prepare("UPDATE isp_warehouse_serials SET status = 'deployed', assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$assignedTo, $serial['id']]);
+        if ($serial['status'] === 'in_stock') {
+            $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = GREATEST(quantity - 1, 0), updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$serial['stock_id']]);
+        }
+        return true;
+    }
+
+    public function returnSerialBySN(string $serialNumber): bool {
+        $stmt = $this->db->prepare("SELECT id, stock_id, status FROM isp_warehouse_serials WHERE serial_number = ? LIMIT 1");
+        $stmt->execute([$serialNumber]);
+        $serial = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$serial || $serial['status'] === 'in_stock') return false;
+
+        $this->db->prepare("UPDATE isp_warehouse_serials SET status = 'in_stock', assigned_to = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$serial['id']]);
+        $this->db->prepare("UPDATE isp_warehouse_stock SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$serial['stock_id']]);
+        return true;
     }
 
     public function deleteSerial(int $serialId): void {

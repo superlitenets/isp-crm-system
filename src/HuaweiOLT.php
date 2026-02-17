@@ -3654,7 +3654,19 @@ class HuaweiOLT {
             $data['customer_name'] ?? null,
             $data['auth_date'] ?? null
         ]);
-        return (int)$stmt->fetchColumn();
+        $onuDbId = (int)$stmt->fetchColumn();
+
+        $sn = trim($data['sn'] ?? '');
+        if (!empty($sn)) {
+            try {
+                $inventory = new ISPInventory($this->db);
+                $customerName = $data['customer_name'] ?? $data['name'] ?? null;
+                $inventory->deploySerialBySN($sn, $customerName);
+            } catch (\Exception $e) {
+            }
+        }
+
+        return $onuDbId;
     }
     
     public function parseONUDescription(string $description): array {

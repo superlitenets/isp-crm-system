@@ -813,6 +813,10 @@ $olts = $ispInv->getOLTs();
         $olts = $ispInv->getOLTs();
         $zones = $ispInv->getZones();
         $ontOverview = $ispInv->getOntStats();
+        $ontSerials = array_filter(array_column($ontList, 'sn'));
+        $serialStatusMap = $ispInv->getSerialStatusMap($ontSerials);
+        $trackedCount = count($serialStatusMap);
+        $untrackedCount = count($ontList) - $trackedCount;
     ?>
 
     <div class="row g-3 mb-3">
@@ -820,6 +824,10 @@ $olts = $ispInv->getOLTs();
         <div class="col-auto"><span class="badge bg-success fs-6"><?= $ontOverview['online_onts'] ?> Online</span></div>
         <div class="col-auto"><span class="badge bg-danger fs-6"><?= $ontOverview['offline_onts'] ?> Offline</span></div>
         <div class="col-auto"><span class="badge bg-warning fs-6"><?= $ontOverview['low_signal'] ?> Low Signal</span></div>
+        <div class="col-auto"><span class="badge bg-info fs-6"><i class="bi bi-box-seam"></i> <?= $trackedCount ?> Tracked</span></div>
+        <?php if ($untrackedCount > 0): ?>
+        <div class="col-auto"><span class="badge bg-secondary fs-6"><?= $untrackedCount ?> Untracked</span></div>
+        <?php endif; ?>
     </div>
 
     <div class="card mb-3">
@@ -872,6 +880,7 @@ $olts = $ispInv->getOLTs();
     <div class="mb-2 text-muted small">
         <i class="bi bi-info-circle"></i> Showing <?= count($ontList) ?> provisioned ONTs from OMS.
         ONTs are automatically tracked here once provisioned on the OLT.
+        When an ONT serial number matches a warehouse item, it is automatically marked as deployed and inventory is reduced.
     </div>
 
     <div class="table-responsive">
@@ -886,13 +895,14 @@ $olts = $ispInv->getOLTs();
                     <th>Zone</th>
                     <th>Status</th>
                     <th>Rx Power</th>
+                    <th>Inventory</th>
                     <th>PPPoE</th>
                     <th>Uptime</th>
                 </tr>
             </thead>
             <tbody>
             <?php if (empty($ontList)): ?>
-                <tr><td colspan="10" class="text-center text-muted py-4">No provisioned ONTs found matching your filters.</td></tr>
+                <tr><td colspan="11" class="text-center text-muted py-4">No provisioned ONTs found matching your filters.</td></tr>
             <?php else: foreach ($ontList as $ont): ?>
                 <tr>
                     <td><strong><code><?= htmlspecialchars($ont['sn']) ?></code></strong>
@@ -931,6 +941,22 @@ $olts = $ispInv->getOLTs();
                             </span>
                         <?php else: ?>
                             <span class="text-muted">--</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php 
+                        $invInfo = $serialStatusMap[$ont['sn']] ?? null;
+                        if ($invInfo): ?>
+                            <?php if ($invInfo['status'] === 'deployed'): ?>
+                                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Deployed</span>
+                            <?php elseif ($invInfo['status'] === 'in_stock'): ?>
+                                <span class="badge bg-info">In Stock</span>
+                            <?php else: ?>
+                                <span class="badge bg-warning"><?= ucfirst($invInfo['status']) ?></span>
+                            <?php endif; ?>
+                            <br><small class="text-muted"><?= htmlspecialchars($invInfo['item_name']) ?></small>
+                        <?php else: ?>
+                            <span class="badge bg-secondary"><i class="bi bi-question-circle"></i> Untracked</span>
                         <?php endif; ?>
                     </td>
                     <td><small><?= htmlspecialchars($ont['pppoe_username'] ?? '') ?></small></td>
