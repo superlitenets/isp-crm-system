@@ -2474,7 +2474,6 @@ JS;
         
         // AUTO-CATEGORIZE ALL REMAINING PARAMETERS by path prefix
         $autoCats = [
-            'ppp_interface' => ['label' => 'PPP Interface (WAN)', 'icon' => 'bi-globe', 'prefix' => 'WANDevice', 'match' => ['PPPConnection', 'WANPPPConnection'], 'editable' => true],
             'port_forward' => ['label' => 'Port Forward', 'icon' => 'bi-arrow-left-right', 'prefix' => 'WANDevice', 'match' => ['PortMapping', 'NAT'], 'editable' => true],
             'ip_interface' => ['label' => 'IP Interface', 'icon' => 'bi-diagram-3', 'prefix' => 'WANDevice', 'match' => ['IPConnection', 'WANIPConnection', 'ExternalIP', 'DefaultGateway'], 'editable' => true],
             'lan_dhcp' => ['label' => 'LAN DHCP Server', 'icon' => 'bi-hdd-network', 'prefix' => 'LANDevice', 'match' => ['DHCPServer', 'DHCP'], 'editable' => true],
