@@ -826,7 +826,7 @@ $olts = $ispInv->getOLTs();
         <div class="col-auto"><span class="badge bg-warning fs-6"><?= $ontOverview['low_signal'] ?> Low Signal</span></div>
         <div class="col-auto"><span class="badge bg-info fs-6"><i class="bi bi-box-seam"></i> <?= $trackedCount ?> Tracked</span></div>
         <?php if ($untrackedCount > 0): ?>
-        <div class="col-auto"><span class="badge bg-secondary fs-6"><?= $untrackedCount ?> Untracked</span></div>
+        <div class="col-auto"><span class="badge bg-secondary fs-6"><?= $untrackedCount ?> Customer-Owned</span></div>
         <?php endif; ?>
     </div>
 
@@ -956,7 +956,7 @@ $olts = $ispInv->getOLTs();
                             <?php endif; ?>
                             <br><small class="text-muted"><?= htmlspecialchars($invInfo['item_name']) ?></small>
                         <?php else: ?>
-                            <span class="badge bg-secondary"><i class="bi bi-question-circle"></i> Untracked</span>
+                            <span class="badge bg-secondary"><i class="bi bi-person"></i> Customer-Owned</span>
                         <?php endif; ?>
                     </td>
                     <td><small><?= htmlspecialchars($ont['pppoe_username'] ?? '') ?></small></td>
