@@ -1,9 +1,31 @@
 -- ISP Inventory Module - Database Migration
--- Warehouse Stock, Stock Movements, and Serial Number Tracking
+-- Network Sites, Warehouse Stock, Stock Movements, and Serial Number Tracking
 -- Run: docker exec -i isp_crm_db psql -U crm -d isp_crm < migration.sql
 
 -- ============================================================
--- 1. Warehouse Stock Table
+-- 1. Network Sites Table
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS isp_network_sites (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    site_type VARCHAR(50) NOT NULL DEFAULT 'pop',
+    address TEXT,
+    gps_lat NUMERIC,
+    gps_lng NUMERIC,
+    contact_person VARCHAR(255),
+    contact_phone VARCHAR(50),
+    power_source VARCHAR(100),
+    ups_capacity VARCHAR(100),
+    ups_battery_health VARCHAR(50),
+    notes TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- 2. Warehouse Stock Table
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS isp_warehouse_stock (
@@ -27,7 +49,7 @@ CREATE TABLE IF NOT EXISTS isp_warehouse_stock (
 CREATE INDEX IF NOT EXISTS idx_isp_stock_category ON isp_warehouse_stock(category);
 
 -- ============================================================
--- 2. Stock Movements Table
+-- 3. Stock Movements Table
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS isp_stock_movements (
@@ -48,7 +70,7 @@ CREATE TABLE IF NOT EXISTS isp_stock_movements (
 --                             'adjustment_add', 'adjustment_remove'
 
 -- ============================================================
--- 3. Warehouse Serial Number Tracking Table
+-- 4. Warehouse Serial Number Tracking Table
 -- ============================================================
 -- Tracks individual items by serial number, linked to aggregate warehouse stock.
 -- When an ONU is provisioned on the OLT, its serial is automatically marked
