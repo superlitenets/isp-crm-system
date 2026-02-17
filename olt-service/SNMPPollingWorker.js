@@ -333,7 +333,7 @@ class SNMPPollingWorker {
                         }
                         updated++;
                         
-                        if (onu.status === 'online' && (status === 'los' || status === 'offline')) {
+                        if (onu.status === 'online' && status === 'los') {
                             faults.push({
                                 onu_id: onu.id,
                                 sn: onu.sn,
@@ -755,8 +755,7 @@ class SNMPPollingWorker {
                 
                 if (result.rowCount > 0) {
                     updated++;
-                    if (prevOnu && prevStatus === 'online' && 
-                        (s.status === 'los' || s.status === 'offline' || s.status === 'dying-gasp')) {
+                    if (prevOnu && prevStatus === 'online' && s.status === 'los') {
                         faults.push({
                             onu_id: prevOnu.id,
                             sn: prevOnu.sn,
