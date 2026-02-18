@@ -10995,9 +10995,11 @@ try {
                 const encValue = encryptionMap[encryption] || 'AESEncryption';
                 
                 try {
-                    // For Open, also set BeaconType to Basic
+                    // For Open, set BeaconType=Basic and BasicEncryptionModes=None
                     if (encryption === 'Open') {
                         await saveWiFiSettingAsync(wlanIndex, 'BeaconType', 'Basic');
+                        await saveWiFiSettingAsync(wlanIndex, 'BasicEncryptionModes', 'None');
+                        await saveWiFiSettingAsync(wlanIndex, 'BasicAuthenticationMode', 'None');
                     } else {
                         await saveWiFiSettingAsync(wlanIndex, 'BeaconType', '11i');
                         await saveWiFiSettingAsync(wlanIndex, 'WPAEncryptionModes', encValue);
@@ -24238,10 +24240,8 @@ function saveDeviceStatus() {
 
             if (encryption === 'Open') {
                 params[basePath + 'BeaconType'] = 'Basic';
+                params[basePath + 'BasicEncryptionModes'] = 'None';
                 params[basePath + 'BasicAuthenticationMode'] = 'None';
-                params[basePath + 'WPAAuthenticationMode'] = '';
-                params[basePath + 'IEEE11iAuthenticationMode'] = '';
-                params[basePath + 'WPAEncryptionModes'] = '';
             } else {
                 params[basePath + 'BeaconType'] = '11i';
                 params[basePath + 'IEEE11iAuthenticationMode'] = 'PSKAuthentication';
