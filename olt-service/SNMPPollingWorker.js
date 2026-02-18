@@ -52,9 +52,11 @@ class SNMPPollingWorker {
         
         this.signalHistoryInterval = setInterval(() => this.recordSignalHistory(), 5 * 60 * 1000);
         this.mgmtIpInterval = setInterval(() => this.refreshManagementIPs(), 5 * 60 * 1000);
+        this.losBackfillInterval = setInterval(() => this.backfillOfflineDownCause(), 10 * 60 * 1000);
         
         setTimeout(() => this.runPolling(), 5000);
         setTimeout(() => this.refreshManagementIPs(), 15000);
+        setTimeout(() => this.backfillOfflineDownCause(), 60000);
     }
 
     stop() {
@@ -73,6 +75,10 @@ class SNMPPollingWorker {
         if (this.mgmtIpInterval) {
             clearInterval(this.mgmtIpInterval);
             console.log('[SNMP] Stopped Management IP refresh');
+        }
+        if (this.losBackfillInterval) {
+            clearInterval(this.losBackfillInterval);
+            console.log('[SNMP] Stopped LOS backfill');
         }
     }
 
@@ -223,6 +229,7 @@ class SNMPPollingWorker {
         
         const onuResult = await this.pool.query(`
             SELECT o.id, o.frame, o.slot, o.port, o.onu_id, o.status, o.sn, o.name, o.description,
+                   o.last_down_cause,
                    c.name as customer_name, c.phone as customer_phone, c.id as customer_id
             FROM huawei_onus o
             LEFT JOIN customers c ON o.customer_id = c.id
@@ -292,6 +299,8 @@ class SNMPPollingWorker {
                     
                     if (!result) continue;
                     
+                    const offlineOnus = [];
+                    
                     for (const onu of onus) {
                         let status = 'offline';
                         
@@ -318,13 +327,14 @@ class SNMPPollingWorker {
                             console.log(`[CLI] ONU ${portKey}/${onu.onu_id} not matched in output, defaulting to offline`);
                         }
                         
+                        if (status === 'offline') {
+                            offlineOnus.push({ onu, found });
+                            continue;
+                        }
+                        
                         if (status === 'online' && onu.status !== 'online') {
                             await this.pool.query(`
                                 UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2
-                            `, [status, onu.id]);
-                        } else if (status !== 'online' && onu.status === 'online') {
-                            await this.pool.query(`
-                                UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         } else {
                             await this.pool.query(`
@@ -332,19 +342,63 @@ class SNMPPollingWorker {
                             `, [status, onu.id]);
                         }
                         updated++;
+                    }
+                    
+                    // For offline ONUs, check last_down_cause to distinguish LOS vs normal offline
+                    if (offlineOnus.length > 0) {
+                        // For ONUs newly going offline (were online), query OLT for down cause
+                        const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online');
+                        for (const { onu } of newlyOffline) {
+                            try {
+                                const infoCmd = `display ont info ${port} ${onu.onu_id}`;
+                                const infoResult = await this.sessionManager.execute(oltKey, infoCmd, { timeout: 8000 });
+                                if (infoResult) {
+                                    const causeMatch = infoResult.match(/Last down cause\s*:\s*(.+)/i);
+                                    if (causeMatch) {
+                                        const cause = causeMatch[1].trim();
+                                        await this.pool.query(`UPDATE huawei_onus SET last_down_cause = $1 WHERE id = $2`, [cause, onu.id]);
+                                        onu.last_down_cause = cause;
+                                    }
+                                }
+                            } catch (e) { /* ignore individual query failures */ }
+                        }
                         
-                        if (onu.status === 'online' && status === 'los') {
-                            faults.push({
-                                onu_id: onu.id,
-                                sn: onu.sn,
-                                name: onu.name || onu.description || onu.sn,
-                                slot: onu.slot, port: onu.port, onu_id: onu.onu_id,
-                                prev_status: onu.status,
-                                new_status: status,
-                                customer_name: onu.customer_name,
-                                customer_phone: onu.customer_phone,
-                                customer_id: onu.customer_id
-                            });
+                        // For already offline ONUs, last_down_cause is already loaded from the initial query
+                        
+                        // Now determine final status based on last_down_cause
+                        for (const { onu } of offlineOnus) {
+                            let finalStatus = 'offline';
+                            const cause = (onu.last_down_cause || '').toLowerCase();
+                            if (cause.includes('los') || cause.includes('lob') || cause.includes('losi') || cause.includes('lobi') || cause.includes('lofi')) {
+                                finalStatus = 'los';
+                            } else if (cause.includes('dying') || cause.includes('power')) {
+                                finalStatus = 'dying-gasp';
+                            }
+                            
+                            if (onu.status === 'online') {
+                                await this.pool.query(`
+                                    UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                                `, [finalStatus, onu.id]);
+                                
+                                if (finalStatus === 'los') {
+                                    faults.push({
+                                        onu_id: onu.id,
+                                        sn: onu.sn,
+                                        name: onu.name || onu.description || onu.sn,
+                                        slot: onu.slot, port: onu.port, onu_id: onu.onu_id,
+                                        prev_status: onu.status,
+                                        new_status: finalStatus,
+                                        customer_name: onu.customer_name,
+                                        customer_phone: onu.customer_phone,
+                                        customer_id: onu.customer_id
+                                    });
+                                }
+                            } else {
+                                await this.pool.query(`
+                                    UPDATE huawei_onus SET status = $1, snmp_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                                `, [finalStatus, onu.id]);
+                            }
+                            updated++;
                         }
                     }
                 } catch (e) {
@@ -874,6 +928,73 @@ class SNMPPollingWorker {
             console.log(`[SNMP] Updated OLT ${oltId} status via ${method}`);
         } catch (error) {
             console.error(`[SNMP] Failed to update polling stats for OLT ${oltId}:`, error.message);
+        }
+    }
+
+    async backfillOfflineDownCause() {
+        if (!this.sessionManager) return;
+        
+        try {
+            const olts = await this.pool.query(`
+                SELECT id, name, ip_address FROM huawei_olts WHERE is_active = true
+            `);
+            
+            for (const olt of olts.rows) {
+                const oltKey = olt.id.toString();
+                const session = this.sessionManager.sessions?.get(oltKey);
+                if (!session || !session.connected) continue;
+                
+                const offlineOnus = await this.pool.query(`
+                    SELECT id, frame, slot, port, onu_id, sn, status
+                    FROM huawei_onus 
+                    WHERE olt_id = $1 
+                      AND is_authorized = true 
+                      AND status IN ('offline') 
+                      AND (last_down_cause IS NULL OR last_down_cause = '')
+                    ORDER BY slot, port, onu_id
+                    LIMIT 30
+                `, [olt.id]);
+                
+                if (offlineOnus.rows.length === 0) {
+                    console.log(`[LOS-Backfill] No offline ONUs without down_cause on ${olt.name}`);
+                    continue;
+                }
+                
+                console.log(`[LOS-Backfill] Checking ${offlineOnus.rows.length} offline ONUs on ${olt.name}...`);
+                let updated = 0;
+                let losFound = 0;
+                
+                // Query each ONU individually using atomic raw script to avoid session interleaving
+                for (const onu of offlineOnus.rows) {
+                    try {
+                        const script = `config\ninterface gpon ${onu.frame}/${onu.slot}\ndisplay ont info ${onu.port} ${onu.onu_id}\nquit\nquit\n`;
+                        const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
+                        if (!result) continue;
+                        
+                        const causeMatch = result.match(/Last down cause\s*:\s*(.+)/i);
+                        if (causeMatch) {
+                            const cause = causeMatch[1].trim();
+                            const causeLower = cause.toLowerCase();
+                            let newStatus = 'offline';
+                            if (causeLower.includes('los') || causeLower.includes('lob') || causeLower.includes('losi') || causeLower.includes('lobi') || causeLower.includes('lofi')) {
+                                newStatus = 'los';
+                                losFound++;
+                            } else if (causeLower.includes('dying') || causeLower.includes('power')) {
+                                newStatus = 'dying-gasp';
+                            }
+                            
+                            await this.pool.query(`
+                                UPDATE huawei_onus SET last_down_cause = $1, status = $2, snmp_status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3
+                            `, [cause, newStatus, onu.id]);
+                            updated++;
+                        }
+                    } catch (e) { /* skip individual failures */ }
+                }
+                
+                console.log(`[LOS-Backfill] Updated ${updated} ONUs on ${olt.name} (${losFound} LOS detected)`);
+            }
+        } catch (e) {
+            console.log(`[LOS-Backfill] Error: ${e.message}`);
         }
     }
 

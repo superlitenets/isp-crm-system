@@ -274,6 +274,20 @@ async function refreshSingleONU(oltId, onuDbId) {
             if (state === 'online') status = 'online';
             else if (state.includes('los')) status = 'los';
         }
+        
+        // Check last_down_cause to distinguish LOS from normal offline
+        if (status === 'offline') {
+            const downCauseMatch = cleanInfo.match(/Last down cause\s*:\s*(.+)/i);
+            if (downCauseMatch) {
+                const cause = downCauseMatch[1].trim().toLowerCase();
+                if (cause.includes('los') || cause.includes('lob') || cause.includes('losi') || cause.includes('lobi') || cause.includes('lofi')) {
+                    status = 'los';
+                } else if (cause.includes('dying') || cause.includes('power')) {
+                    status = 'dying-gasp';
+                }
+            }
+        }
+        
         if (status === 'offline' && rxPower !== null && rxPower > -35) {
             status = 'online';
         }
@@ -360,6 +374,16 @@ app.post('/poll-onu', async (req, res) => {
         
         const downCauseMatch = cleanInfo.match(/Last down cause\s*:\s*(.+)/i);
         if (downCauseMatch) lastDownCause = downCauseMatch[1].trim();
+        
+        // If Run state is offline but last_down_cause indicates LOS, mark as LOS
+        if (status === 'offline' && lastDownCause) {
+            const cause = lastDownCause.toLowerCase();
+            if (cause.includes('los') || cause.includes('lob') || cause.includes('losi') || cause.includes('lobi') || cause.includes('lofi')) {
+                status = 'los';
+            } else if (cause.includes('dying') || cause.includes('power')) {
+                status = 'dying-gasp';
+            }
+        }
         
         const downTimeMatch = cleanInfo.match(/Last down time\s*:\s*(.+)/i);
         if (downTimeMatch) lastDownTime = downTimeMatch[1].trim();

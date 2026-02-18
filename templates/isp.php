@@ -3376,11 +3376,7 @@ try {
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
-                                            <?php if ($isOnline): ?>
-                                            <span class="badge bg-success rounded-circle p-1" title="Online"><i class="bi bi-wifi"></i></span>
-                                            <?php else: ?>
-                                            <span class="badge bg-secondary-subtle text-secondary rounded-circle p-1" title="Offline"><i class="bi bi-wifi-off"></i></span>
-                                            <?php endif; ?>
+                                            <span class="online-indicator badge <?= $isOnline ? 'bg-success' : 'bg-secondary-subtle text-secondary' ?> rounded-circle p-1" title="<?= $isOnline ? 'Online' : 'Offline' ?>"><i class="bi bi-<?= $isOnline ? 'wifi' : 'wifi-off' ?>"></i></span>
                                             <div>
                                                 <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="fw-bold text-decoration-none"><?= htmlspecialchars($sub['username']) ?></a>
                                                 <button class="btn btn-link btn-sm p-0 text-muted ms-1" onclick="copyToClipboard('<?= htmlspecialchars($sub['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
@@ -12255,21 +12251,16 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
                     document.querySelectorAll('.sub-row').forEach(row => {
                         const subId = row.dataset.subId;
                         const isOnline = data.online_ids.includes(parseInt(subId));
-                        const statusDiv = row.querySelector('.me-2.position-relative');
-                        if (statusDiv) {
+                        const indicator = row.querySelector('.online-indicator');
+                        if (indicator) {
                             if (isOnline) {
-                                statusDiv.innerHTML = `
-                                    <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                        <i class="bi bi-wifi text-white"></i>
-                                    </div>
-                                    <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 12px; height: 12px;"></span>
-                                `;
+                                indicator.className = 'online-indicator badge bg-success rounded-circle p-1';
+                                indicator.title = 'Online';
+                                indicator.innerHTML = '<i class="bi bi-wifi"></i>';
                             } else {
-                                statusDiv.innerHTML = `
-                                    <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                        <i class="bi bi-wifi-off text-secondary"></i>
-                                    </div>
-                                `;
+                                indicator.className = 'online-indicator badge bg-secondary-subtle text-secondary rounded-circle p-1';
+                                indicator.title = 'Offline';
+                                indicator.innerHTML = '<i class="bi bi-wifi-off"></i>';
                             }
                         }
                     });
@@ -12361,21 +12352,23 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
         
         eventSource.onopen = function() {
             console.log('[SSE] Connected to real-time session updates');
+            sseConnected = true;
             const indicator = document.getElementById('realTimeIndicator');
             if (indicator) {
-                indicator.classList.remove('bg-danger');
+                indicator.classList.remove('bg-danger', 'bg-secondary-subtle', 'text-secondary');
                 indicator.classList.add('bg-success');
                 indicator.title = 'Real-time updates active';
             }
         };
         
         eventSource.onerror = function(e) {
-            console.log('[SSE] Connection error, will retry...');
+            console.log('[SSE] Connection error, falling back to polling...');
+            sseConnected = false;
             const indicator = document.getElementById('realTimeIndicator');
             if (indicator) {
                 indicator.classList.remove('bg-success');
-                indicator.classList.add('bg-danger');
-                indicator.title = 'Real-time updates disconnected';
+                indicator.classList.add('bg-warning');
+                indicator.title = 'Using polling (every 30s)';
             }
             eventSource.close();
             // Retry connection after 5 seconds
@@ -12410,13 +12403,11 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
             if (data.subscriptionId) {
                 const subRow = document.querySelector(`.sub-row[data-sub-id="${data.subscriptionId}"]`);
                 if (subRow) {
-                    const statusDiv = subRow.querySelector('.me-2.position-relative');
-                    if (statusDiv) {
-                        statusDiv.innerHTML = `
-                            <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                <i class="bi bi-wifi-off text-secondary"></i>
-                            </div>
-                        `;
+                    const indicator = subRow.querySelector('.online-indicator');
+                    if (indicator) {
+                        indicator.className = 'online-indicator badge bg-secondary-subtle text-secondary rounded-circle p-1';
+                        indicator.title = 'Offline';
+                        indicator.innerHTML = '<i class="bi bi-wifi-off"></i>';
                     }
                     
                     // Update live timer from Online to Offline
@@ -12449,6 +12440,49 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
             }
         });
     }
+    
+    // Fallback polling when SSE is unavailable - refresh online status every 30 seconds
+    let sseConnected = false;
+    let pollInterval = null;
+    
+    function startPollingFallback() {
+        if (pollInterval) return;
+        pollInterval = setInterval(function() {
+            if (!sseConnected) {
+                silentRefreshOnlineStatus();
+            }
+        }, 30000);
+    }
+    
+    function silentRefreshOnlineStatus() {
+        fetch('/index.php?page=isp&action=get_online_subscribers')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('onlineCountNum').textContent = data.count;
+                    document.querySelectorAll('.sub-row').forEach(row => {
+                        const subId = row.dataset.subId;
+                        const isOnline = data.online_ids.includes(parseInt(subId));
+                        const indicator = row.querySelector('.online-indicator');
+                        if (indicator) {
+                            if (isOnline) {
+                                indicator.className = 'online-indicator badge bg-success rounded-circle p-1';
+                                indicator.title = 'Online';
+                                indicator.innerHTML = '<i class="bi bi-wifi"></i>';
+                            } else {
+                                indicator.className = 'online-indicator badge bg-secondary-subtle text-secondary rounded-circle p-1';
+                                indicator.title = 'Offline';
+                                indicator.innerHTML = '<i class="bi bi-wifi-off"></i>';
+                            }
+                        }
+                    });
+                }
+            })
+            .catch(() => {});
+    }
+    
+    // Start polling fallback immediately (SSE may not be available)
+    startPollingFallback();
     
     // Live timer update function - updates uptime/offline every second like a watch
     // Server time offset to sync with server timezone (Africa/Nairobi)
