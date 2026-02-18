@@ -875,6 +875,25 @@ if ($page === 'api' && $action === 'poll_onu_live') {
         $stmt->execute([$onuDbId, $oltId]);
         $onu = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($onu) {
+            $onlineDuration = null;
+            $downSince = null;
+            if ($onu['status'] === 'online' && !empty($onu['online_since'])) {
+                $since = strtotime($onu['online_since']);
+                if ($since) {
+                    $diff = time() - $since;
+                    if ($diff < 3600) $onlineDuration = floor($diff / 60) . 'm';
+                    elseif ($diff < 86400) $onlineDuration = floor($diff / 3600) . 'h ' . floor(($diff % 3600) / 60) . 'm';
+                    else $onlineDuration = floor($diff / 86400) . 'd ' . floor(($diff % 86400) / 3600) . 'h';
+                }
+            } elseif ($onu['status'] !== 'online' && !empty($onu['updated_at'])) {
+                $since = strtotime($onu['updated_at']);
+                if ($since) {
+                    $diff = time() - $since;
+                    if ($diff < 3600) $downSince = floor($diff / 60) . 'm ago';
+                    elseif ($diff < 86400) $downSince = floor($diff / 3600) . 'h ago';
+                    else $downSince = floor($diff / 86400) . 'd ago';
+                }
+            }
             echo json_encode(['success' => true, 'fromCache' => true, 'onu' => [
                 'id' => (int)$onu['id'],
                 'status' => $onu['status'],
@@ -883,6 +902,8 @@ if ($page === 'api' && $action === 'poll_onu_live') {
                 'distance' => $onu['distance'] !== null ? (int)$onu['distance'] : null,
                 'last_down_cause' => $onu['last_down_cause'],
                 'online_since' => $onu['online_since'],
+                'online_duration' => $onlineDuration,
+                'down_since' => $downSince,
             ]]);
         } else {
             echo json_encode(['success' => false, 'error' => 'ONU not found']);

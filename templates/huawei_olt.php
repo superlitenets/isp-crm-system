@@ -4218,6 +4218,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             case 'refresh_onu_optical':
                 $result = $huaweiOLT->refreshONUOptical((int)$_POST['onu_id']);
+                if ($isAjaxPost || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode($result);
+                    exit;
+                }
                 if ($result['success']) {
                     $message = "Optical: RX={$result['rx_power']}dBm, TX={$result['tx_power']}dBm";
                     $messageType = 'success';
@@ -11392,8 +11397,23 @@ try {
                 }
             }
             
-            // Do NOT auto-start live polling - page shows cached DB data on load
-            // User can enable live monitoring manually when needed
+            // Auto-poll status from DB every 30 seconds (lightweight, no OLT CLI call)
+            let autoStatusInterval = null;
+            async function autoStatusPoll() {
+                if (!onuOltId || !onuDbId) return;
+                try {
+                    const resp = await fetch(`?page=api&action=poll_onu_live&olt_id=${onuOltId}&onu_id=${onuDbId}&t=${Date.now()}`);
+                    const data = await resp.json();
+                    if (data.success && data.onu) {
+                        updateLiveDisplay(data.onu, data.fromCache || false);
+                    }
+                } catch (e) {
+                    console.log('Auto status poll error:', e);
+                }
+            }
+            // Start auto-polling on page load
+            autoStatusPoll();
+            autoStatusInterval = setInterval(autoStatusPoll, 30000);
             
             function updateLiveDisplay(onu, fromCache) {
                 const statusMap = {
@@ -11539,10 +11559,12 @@ try {
                     const formData = new FormData();
                     formData.append('action', 'refresh_onu_optical');
                     formData.append('onu_id', onuId);
+                    formData.append('ajax', '1');
                     
                     const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
                     const data = await resp.json();
                     
@@ -11551,22 +11573,74 @@ try {
                     if (data.success) {
                         const rxEl = document.querySelector('[data-live-rx]');
                         const txEl = document.querySelector('[data-live-tx]');
+                        const distEl = document.getElementById('liveDistanceDisplay');
+                        const rxMeter = document.getElementById('liveRxMeter');
+                        const rxLabel = document.getElementById('liveRxLabel');
                         
-                        if (rxEl && data.rx_power !== undefined) {
-                            rxEl.textContent = data.rx_power !== null ? parseFloat(data.rx_power).toFixed(1) : '-';
+                        const rx = data.rx_power !== null && data.rx_power !== undefined ? parseFloat(data.rx_power) : null;
+                        const tx = data.tx_power !== null && data.tx_power !== undefined ? parseFloat(data.tx_power) : null;
+                        
+                        if (rxEl) {
+                            rxEl.textContent = rx !== null ? rx.toFixed(1) : '-';
+                            let rxCls = 'secondary';
+                            if (rx !== null) {
+                                if (rx <= -28) rxCls = 'danger';
+                                else if (rx <= -25) rxCls = 'warning';
+                                else rxCls = 'success';
+                                rxEl.className = `h4 text-${rxCls} fw-bold mb-0`;
+                            }
+                            if (rxMeter && rx !== null) {
+                                rxMeter.className = `signal-meter-fill bg-${rxCls}`;
+                                rxMeter.style.width = Math.min(100, Math.max(0, ((rx + 30) / 20) * 100)) + '%';
+                            }
+                            if (rxLabel && rx !== null) {
+                                let rxLbl = 'Good';
+                                if (rx <= -28) rxLbl = 'Critical';
+                                else if (rx <= -25) rxLbl = 'Fair';
+                                else if (rx <= -20) rxLbl = 'Good';
+                                else rxLbl = 'Excellent';
+                                rxLabel.className = `badge bg-${rxCls} mt-1`;
+                                rxLabel.style.fontSize = '0.65rem';
+                                rxLabel.textContent = rxLbl;
+                            }
                         }
-                        if (txEl && data.tx_power !== undefined) {
-                            txEl.textContent = data.tx_power !== null ? parseFloat(data.tx_power).toFixed(1) : '-';
+                        if (txEl) {
+                            txEl.textContent = tx !== null ? tx.toFixed(1) : '-';
+                        }
+                        if (distEl && data.distance !== null && data.distance !== undefined) {
+                            const d = parseInt(data.distance);
+                            distEl.textContent = d >= 1000 ? (d / 1000).toFixed(2) + ' km' : d + ' m';
                         }
                         
-                        showToast('Optical data refreshed', 'success', 2000);
+                        if (data.status) {
+                            updateStatusBadge(data.status);
+                        }
+                        
+                        let msg = 'RX: ' + (rx !== null ? rx.toFixed(1) + ' dBm' : '-');
+                        msg += ', TX: ' + (tx !== null ? tx.toFixed(1) + ' dBm' : '-');
+                        if (data.distance) msg += ', Distance: ' + data.distance + 'm';
+                        showToast(msg, 'success', 3000);
                     } else {
-                        showToast('Failed to refresh: ' + (data.message || 'Unknown error'), 'warning');
+                        showToast('Failed to refresh: ' + (data.error || data.message || 'Unknown error'), 'warning');
                     }
                 } catch (err) {
                     if (icon) icon.classList.remove('spin-animation');
                     showToast('Refresh failed: ' + err.message, 'error');
                 }
+            }
+            
+            function updateStatusBadge(status) {
+                const badge = document.getElementById('onuStatusBadge');
+                if (!badge) return;
+                const statusMap = {
+                    'online': { cls: 'success', icon: 'check-circle-fill', label: 'Online' },
+                    'offline': { cls: 'secondary', icon: 'x-circle', label: 'Offline' },
+                    'los': { cls: 'danger', icon: 'exclamation-triangle-fill', label: 'LOS' },
+                    'dying-gasp': { cls: 'warning', icon: 'lightning-fill', label: 'Dying Gasp' }
+                };
+                const st = statusMap[status] || statusMap.offline;
+                badge.className = `badge bg-${st.cls} fs-6`;
+                badge.innerHTML = `<i class="bi bi-${st.icon} me-1"></i>${st.label}`;
             }
             
             async function refreshTR069IP(silent = false) {
