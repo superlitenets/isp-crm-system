@@ -875,6 +875,7 @@ if ($page === 'api' && $action === 'poll_onu_live') {
                 o.last_down_cause, o.online_since, o.updated_at, o.name, o.sn,
                 o.frame, o.slot, o.port, o.onu_id, o.vlan_id, o.tr069_ip, o.ip_mode,
                 o.customer_name, o.customer_id, o.zone_id, o.mgmt_ip,
+                o.tr069_status, o.genieacs_id,
                 c.name as linked_customer_name, z.name as zone_name
                 FROM huawei_onus o
                 LEFT JOIN customers c ON o.customer_id = c.id
@@ -916,6 +917,7 @@ if ($page === 'api' && $action === 'poll_onu_live') {
                 'sn' => $onu['sn'],
                 'vlan_id' => $onu['vlan_id'],
                 'tr069_ip' => $onu['tr069_ip'],
+                'tr069_status' => $onu['tr069_status'],
                 'mgmt_ip' => $onu['mgmt_ip'],
                 'zone_name' => $onu['zone_name'],
                 'customer_name' => $onu['linked_customer_name'] ?? $onu['customer_name'],

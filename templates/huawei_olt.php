@@ -11399,6 +11399,7 @@ try {
             
             let autoStatusInterval = null;
             let initialOpticalDone = false;
+            let tr069CheckInFlight = false;
             async function autoStatusPoll() {
                 if (!onuOltId || !onuDbId) return;
                 try {
@@ -11411,6 +11412,10 @@ try {
                             refreshOpticalData(data.onu.id);
                         } else {
                             initialOpticalDone = true;
+                        }
+                        if (data.onu.status === 'online' && data.onu.tr069_status !== 'online' && !tr069CheckInFlight) {
+                            tr069CheckInFlight = true;
+                            refreshTR069IP(true).finally(() => { tr069CheckInFlight = false; });
                         }
                     }
                 } catch (e) {
@@ -11551,6 +11556,17 @@ try {
                 const tr069Ip = document.getElementById('tr069IpDisplay');
                 if (tr069Ip && onu.tr069_ip) {
                     tr069Ip.textContent = onu.tr069_ip;
+                }
+                
+                const tr069Badge = document.getElementById('tr069StatusBadge');
+                if (tr069Badge && onu.tr069_status) {
+                    const ts = onu.tr069_status;
+                    let bCls = 'bg-warning';
+                    if (ts === 'online') bCls = 'bg-success';
+                    else if (ts === 'configured') bCls = 'bg-info';
+                    else if (ts === 'offline') bCls = 'bg-secondary';
+                    tr069Badge.className = 'badge ' + bCls;
+                    tr069Badge.textContent = ts.charAt(0).toUpperCase() + ts.slice(1);
                 }
                 
                 const lastPoll = document.getElementById('liveLastPolled');
