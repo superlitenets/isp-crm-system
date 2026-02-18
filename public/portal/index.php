@@ -68,16 +68,111 @@ function normalizePhone($phone) {
 
 if (!isset($_SESSION['portal_subscription_id'])) {
     $clientIp = getClientIp();
-    
+    $allClientIps = [];
+    $allClientIps[] = $clientIp;
+    if (!empty($_SERVER['REMOTE_ADDR']) && !in_array($_SERVER['REMOTE_ADDR'], $allClientIps)) {
+        $allClientIps[] = $_SERVER['REMOTE_ADDR'];
+    }
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        foreach (explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']) as $fwdIp) {
+            $fwdIp = trim($fwdIp);
+            if (filter_var($fwdIp, FILTER_VALIDATE_IP) && !in_array($fwdIp, $allClientIps)) {
+                $allClientIps[] = $fwdIp;
+            }
+        }
+    }
+    if (!empty($_SERVER['HTTP_X_REAL_IP']) && !in_array($_SERVER['HTTP_X_REAL_IP'], $allClientIps)) {
+        $allClientIps[] = $_SERVER['HTTP_X_REAL_IP'];
+    }
+
+    $autoLogin = null;
+    $placeholders = implode(',', array_fill(0, count($allClientIps), '?'));
     $stmt = $db->prepare("
         SELECT rs.id as subscription_id 
         FROM radius_sessions rsess
         JOIN radius_subscriptions rs ON rs.id = rsess.subscription_id
-        WHERE rsess.framed_ip_address = ? AND rsess.session_end IS NULL
+        WHERE rsess.framed_ip_address IN ($placeholders) AND rsess.session_end IS NULL
         ORDER BY rsess.session_start DESC LIMIT 1
     ");
-    $stmt->execute([$clientIp]);
+    $stmt->execute($allClientIps);
     $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$autoLogin) {
+        $encKey = getenv('ENCRYPTION_KEY');
+        if (empty($encKey)) {
+            $encKey = $_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me';
+        }
+        
+        $nasDevices = $db->query("
+            SELECT id, ip_address, api_port, api_username, api_password_encrypted, api_enabled
+            FROM radius_nas WHERE api_enabled = TRUE AND is_active = TRUE
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($nasDevices as $nas) {
+            if ($autoLogin) break;
+            
+            try {
+                $apiPassword = '';
+                if (!empty($nas['api_password_encrypted'])) {
+                    $decoded = base64_decode($nas['api_password_encrypted']);
+                    if ($decoded !== false && strlen($decoded) > 16) {
+                        $iv = substr($decoded, 0, 16);
+                        $encrypted = substr($decoded, 16);
+                        $apiPassword = openssl_decrypt($encrypted, 'AES-256-CBC', $encKey, 0, $iv) ?: '';
+                    }
+                }
+                
+                require_once __DIR__ . '/../../src/MikroTikAPI.php';
+                $api = new \App\MikroTikAPI(
+                    $nas['ip_address'],
+                    (int)($nas['api_port'] ?? 8728),
+                    $nas['api_username'] ?? 'admin',
+                    $apiPassword
+                );
+                $api->connect();
+                
+                $foundUsername = null;
+                
+                try {
+                    $pppActive = $api->command('/ppp/active/print');
+                    foreach ($pppActive as $p) {
+                        $pppAddress = $p['address'] ?? '';
+                        $pppCallerId = $p['caller-id'] ?? '';
+                        if ($pppAddress && in_array($pppAddress, $allClientIps)) {
+                            $foundUsername = $p['name'] ?? '';
+                            break;
+                        }
+                    }
+                } catch (\Exception $e) {}
+                
+                if (!$foundUsername) {
+                    try {
+                        $hotspotActive = $api->command('/ip/hotspot/active/print');
+                        foreach ($hotspotActive as $h) {
+                            $hsAddress = $h['address'] ?? '';
+                            if ($hsAddress && in_array($hsAddress, $allClientIps)) {
+                                $foundUsername = $h['user'] ?? '';
+                                break;
+                            }
+                        }
+                    } catch (\Exception $e) {}
+                }
+                
+                $api->disconnect();
+                
+                if ($foundUsername) {
+                    $stmt = $db->prepare("
+                        SELECT id as subscription_id FROM radius_subscriptions 
+                        WHERE username = ? AND status IN ('active', 'suspended')
+                        ORDER BY created_at DESC LIMIT 1
+                    ");
+                    $stmt->execute([$foundUsername]);
+                    $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
+                }
+            } catch (\Exception $e) {
+            }
+        }
+    }
     
     if ($autoLogin) {
         $_SESSION['portal_subscription_id'] = $autoLogin['subscription_id'];
