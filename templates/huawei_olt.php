@@ -20260,7 +20260,7 @@ function renderInlineStatus(categories) {
                 // Group by host number - table with hosts as rows
                 const hosts = {};
                 sortedParams.forEach(param => {
-                    const match = param.path.match(/Host\.(d+)\./);
+                    const match = param.path.match(/Host\.(\d+)\./);
                     const hostNum = match ? match[1] : '1';
                     if (!hosts[hostNum]) hosts[hostNum] = {};
                     // Get field name from path
