@@ -27,7 +27,8 @@ class SNMPPollingWorker {
             onuStatusBase: '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15',
             onuSerialBase: '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3',
             onuRxPowerBase: '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4',
-            onuTxPowerBase: '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6'
+            onuTxPowerBase: '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6',
+            onuDistanceBase: '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20'
         };
 
         this.STATUS_MAP = {
@@ -540,34 +541,38 @@ class SNMPPollingWorker {
             const powerData = {};
             const rxOid = this.OIDs.onuRxPowerBase;
             const txOid = this.OIDs.onuTxPowerBase;
+            const distOid = this.OIDs.onuDistanceBase;
+            const totalWalks = 3;
             let completedWalks = 0;
 
-            const walkOid = (oid, field) => {
+            const parseIndex = (oid, baseLen) => {
+                const oidParts = oid.split('.');
+                const indexParts = oidParts.slice(baseLen);
+                let slot = 0, port = 0, onuId = 0;
+                if (indexParts.length >= 4) {
+                    slot = parseInt(indexParts[1]);
+                    port = parseInt(indexParts[2]);
+                    onuId = parseInt(indexParts[3]);
+                } else if (indexParts.length >= 2) {
+                    const ifIndex = parseInt(indexParts[0]);
+                    onuId = parseInt(indexParts[1]);
+                    const ponIndex = ifIndex > 0xFFFFFF ? (ifIndex & 0xFFFFFF) : ifIndex;
+                    slot = (ponIndex >> 13) & 0x1F;
+                    port = (ponIndex >> 8) & 0x1F;
+                }
+                return { slot, port, onuId };
+            };
+
+            const walkOptical = (oid, field) => {
                 const baseLen = oid.split('.').length;
                 session.subtree(oid, 20, (varbinds) => {
                     varbinds.forEach(vb => {
                         if (snmp.isVarbindError(vb)) return;
-                        const oidParts = vb.oid.split('.');
-                        const indexParts = oidParts.slice(baseLen);
                         const rawValue = parseInt(vb.value);
                         if (isNaN(rawValue) || rawValue === 2147483647 || rawValue === -2147483648) return;
                         const dbm = rawValue / 100.0;
                         if (dbm < -50 || dbm > 10) return;
-                        
-                        let frame = 0, slot = 0, port = 0, onuId = 0;
-                        if (indexParts.length >= 4) {
-                            frame = parseInt(indexParts[0]);
-                            slot = parseInt(indexParts[1]);
-                            port = parseInt(indexParts[2]);
-                            onuId = parseInt(indexParts[3]);
-                        } else if (indexParts.length >= 2) {
-                            const ifIndex = parseInt(indexParts[0]);
-                            onuId = parseInt(indexParts[1]);
-                            const ponIndex = ifIndex > 0xFFFFFF ? (ifIndex & 0xFFFFFF) : ifIndex;
-                            slot = (ponIndex >> 13) & 0x1F;
-                            port = (ponIndex >> 8) & 0x1F;
-                        }
-                        
+                        const { slot, port, onuId } = parseIndex(vb.oid, baseLen);
                         const key = `${slot}.${port}.${onuId}`;
                         if (!powerData[key]) powerData[key] = { slot, port, onuId };
                         powerData[key][field] = dbm;
@@ -577,7 +582,7 @@ class SNMPPollingWorker {
                         console.log(`[SNMP] Optical ${field} walk error for OLT ${oltId}: ${error.message || error}`);
                     }
                     completedWalks++;
-                    if (completedWalks >= 2) {
+                    if (completedWalks >= totalWalks) {
                         const count = Object.keys(powerData).length;
                         if (count > 0) {
                             console.log(`[SNMP] Optical power collected for OLT ${oltId}: ${count} ONUs`);
@@ -587,8 +592,36 @@ class SNMPPollingWorker {
                 });
             };
 
-            walkOid(rxOid, 'rx_power');
-            walkOid(txOid, 'tx_power');
+            const walkDistance = () => {
+                const baseLen = distOid.split('.').length;
+                session.subtree(distOid, 20, (varbinds) => {
+                    varbinds.forEach(vb => {
+                        if (snmp.isVarbindError(vb)) return;
+                        const rawValue = parseInt(vb.value);
+                        if (isNaN(rawValue) || rawValue < 0 || rawValue > 100000) return;
+                        const { slot, port, onuId } = parseIndex(vb.oid, baseLen);
+                        const key = `${slot}.${port}.${onuId}`;
+                        if (!powerData[key]) powerData[key] = { slot, port, onuId };
+                        powerData[key].distance = rawValue;
+                    });
+                }, (error) => {
+                    if (error) {
+                        console.log(`[SNMP] Distance walk error for OLT ${oltId}: ${error.message || error}`);
+                    }
+                    completedWalks++;
+                    if (completedWalks >= totalWalks) {
+                        const count = Object.keys(powerData).length;
+                        if (count > 0) {
+                            console.log(`[SNMP] Optical power collected for OLT ${oltId}: ${count} ONUs`);
+                        }
+                        resolve(powerData);
+                    }
+                });
+            };
+
+            walkOptical(rxOid, 'rx_power');
+            walkOptical(txOid, 'tx_power');
+            walkDistance();
         });
     }
 
@@ -612,6 +645,7 @@ class SNMPPollingWorker {
                 let { slot, port, onuId } = power;
                 const rx = power.rx_power ?? null;
                 const tx = power.tx_power ?? null;
+                const dist = power.distance ?? null;
                 
                 let dbOnu = dbMap[`${slot}.${port}.${onuId}`];
                 
@@ -626,9 +660,9 @@ class SNMPPollingWorker {
                 if (!dbOnu) continue;
 
                 const result = await client.query(`
-                    UPDATE huawei_onus SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $3
-                `, [rx, tx, dbOnu.id]);
+                    UPDATE huawei_onus SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), distance = COALESCE($3, distance), updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $4
+                `, [rx, tx, dist, dbOnu.id]);
 
                 if (result.rowCount > 0) {
                     updated++;

@@ -871,7 +871,15 @@ if ($page === 'api' && $action === 'poll_onu_live') {
     }
     
     try {
-        $stmt = $db->prepare("SELECT id, status, snmp_status, rx_power, tx_power, distance, last_down_cause, online_since, updated_at FROM huawei_onus WHERE id = ? AND olt_id = ?");
+        $stmt = $db->prepare("SELECT o.id, o.status, o.snmp_status, o.rx_power, o.tx_power, o.distance, 
+                o.last_down_cause, o.online_since, o.updated_at, o.name, o.sn,
+                o.frame, o.slot, o.port, o.onu_id, o.vlan_id, o.tr069_ip, o.ip_mode,
+                o.customer_name, o.customer_id, o.zone_id, o.mgmt_ip,
+                c.name as linked_customer_name, z.name as zone_name
+                FROM huawei_onus o
+                LEFT JOIN customers c ON o.customer_id = c.id
+                LEFT JOIN huawei_zones z ON o.zone_id = z.id
+                WHERE o.id = ? AND o.olt_id = ?");
         $stmt->execute([$onuDbId, $oltId]);
         $onu = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($onu) {
@@ -904,6 +912,14 @@ if ($page === 'api' && $action === 'poll_onu_live') {
                 'online_since' => $onu['online_since'],
                 'online_duration' => $onlineDuration,
                 'down_since' => $downSince,
+                'name' => $onu['name'],
+                'sn' => $onu['sn'],
+                'vlan_id' => $onu['vlan_id'],
+                'tr069_ip' => $onu['tr069_ip'],
+                'mgmt_ip' => $onu['mgmt_ip'],
+                'zone_name' => $onu['zone_name'],
+                'customer_name' => $onu['linked_customer_name'] ?? $onu['customer_name'],
+                'position' => $onu['frame'] . '/' . $onu['slot'] . '/' . $onu['port'] . ' ONU ' . $onu['onu_id'],
             ]]);
         } else {
             echo json_encode(['success' => false, 'error' => 'ONU not found']);

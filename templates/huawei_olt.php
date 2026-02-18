@@ -10146,7 +10146,7 @@ try {
                                 }
                                 ?>
                                 <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
-                                <?php if ($hasTr069Ip): ?><small class="text-muted ms-1"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></small><?php endif; ?>
+                                <small id="tr069IpDisplay" class="text-muted ms-1"><?= $hasTr069Ip ? htmlspecialchars($currentOnu['tr069_ip']) : '' ?></small>
                                 <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshTR069IP()" title="Refresh TR-069 status">
                                     <i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i>
                                 </button>
@@ -11397,8 +11397,8 @@ try {
                 }
             }
             
-            // Auto-poll status from DB every 30 seconds (lightweight, no OLT CLI call)
             let autoStatusInterval = null;
+            let initialOpticalDone = false;
             async function autoStatusPoll() {
                 if (!onuOltId || !onuDbId) return;
                 try {
@@ -11406,14 +11406,19 @@ try {
                     const data = await resp.json();
                     if (data.success && data.onu) {
                         updateLiveDisplay(data.onu, data.fromCache || false);
+                        if (!initialOpticalDone && data.onu.status === 'online' && (data.onu.tx_power === null || data.onu.distance === null)) {
+                            initialOpticalDone = true;
+                            refreshOpticalData(data.onu.id);
+                        } else {
+                            initialOpticalDone = true;
+                        }
                     }
                 } catch (e) {
                     console.log('Auto status poll error:', e);
                 }
             }
-            // Start auto-polling on page load
             autoStatusPoll();
-            autoStatusInterval = setInterval(autoStatusPoll, 30000);
+            autoStatusInterval = setInterval(autoStatusPoll, 15000);
             
             function updateLiveDisplay(onu, fromCache) {
                 const statusMap = {
@@ -11541,6 +11546,11 @@ try {
                     }
                 } else if (!isOnline) {
                     if (distEl) distEl.textContent = '-';
+                }
+                
+                const tr069Ip = document.getElementById('tr069IpDisplay');
+                if (tr069Ip && onu.tr069_ip) {
+                    tr069Ip.textContent = onu.tr069_ip;
                 }
                 
                 const lastPoll = document.getElementById('liveLastPolled');
