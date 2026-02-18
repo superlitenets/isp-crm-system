@@ -1778,6 +1778,7 @@ $statusFilter = $_GET['status'] ?? '';
 $priorityFilter = $_GET['priority'] ?? '';
 $slaFilter = $_GET['sla'] ?? '';
 $search = $_GET['search'] ?? '';
+$ticketTab = $_GET['tab'] ?? 'active';
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-ticket"></i> Tickets</h2>
@@ -1844,24 +1845,41 @@ $search = $_GET['search'] ?? '';
     <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
     <div>
         <strong><?= count($overdueTickets) ?> overdue ticket(s) require immediate attention!</strong>
-        <a href="?page=tickets&sla_breached=1" class="alert-link ms-2">View all</a>
+        <a href="?page=tickets&tab=active&sla=breached" class="alert-link ms-2">View all</a>
     </div>
 </div>
 <?php endif; ?>
 
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link <?= $ticketTab === 'active' ? 'active' : '' ?>" href="?page=tickets&tab=active">
+            <i class="bi bi-ticket-perforated"></i> Active Tickets
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $ticketTab === 'resolved' ? 'active' : '' ?>" href="?page=tickets&tab=resolved">
+            <i class="bi bi-check-circle"></i> Resolved Tickets
+            <span class="badge bg-success ms-1"><?= $dashboardStats['completed_tickets'] ?? 0 ?></span>
+        </a>
+    </li>
+</ul>
+
+<?php if ($ticketTab === 'active'): ?>
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
             <input type="hidden" name="page" value="tickets">
+            <input type="hidden" name="tab" value="active">
             <div class="col-md-3">
                 <input type="text" class="form-control" name="search" placeholder="Search tickets..." value="<?= htmlspecialchars($search) ?>">
             </div>
             <div class="col-md-2">
                 <select class="form-select" name="status">
-                    <option value="">All Status</option>
-                    <?php foreach ($ticketStatuses as $key => $label): ?>
-                    <option value="<?= $key ?>" <?= $statusFilter === $key ? 'selected' : '' ?>><?= $label ?></option>
-                    <?php endforeach; ?>
+                    <option value="">All Active</option>
+                    <option value="open" <?= $statusFilter === 'open' ? 'selected' : '' ?>>Open</option>
+                    <option value="in_progress" <?= $statusFilter === 'in_progress' ? 'selected' : '' ?>>In Progress</option>
+                    <option value="pending" <?= $statusFilter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                    <option value="on_hold" <?= $statusFilter === 'on_hold' ? 'selected' : '' ?>>On Hold</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -1883,7 +1901,7 @@ $search = $_GET['search'] ?? '';
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-search"></i> Filter
                 </button>
-                <a href="?page=tickets" class="btn btn-outline-secondary">Clear</a>
+                <a href="?page=tickets&tab=active" class="btn btn-outline-secondary">Clear</a>
             </div>
         </form>
     </div>
@@ -1917,6 +1935,9 @@ $search = $_GET['search'] ?? '';
                     if ($slaFilter === 'at_risk') $filters['sla_at_risk'] = true;
                     if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
                         $filters['user_id'] = $_SESSION['user_id'];
+                    }
+                    if (!$statusFilter) {
+                        $filters['exclude_resolved'] = true;
                     }
                     try {
                         $tickets = $ticket->getAll($filters);
@@ -1992,7 +2013,7 @@ $search = $_GET['search'] ?? '';
                     <?php if (empty($tickets)): ?>
                     <tr>
                         <td colspan="9" class="text-center text-muted py-4">
-                            No tickets found. <a href="?page=tickets&action=create">Create your first ticket</a>
+                            No active tickets found. <a href="?page=tickets&action=create">Create your first ticket</a>
                         </td>
                     </tr>
                     <?php endif; ?>
@@ -2001,6 +2022,114 @@ $search = $_GET['search'] ?? '';
         </div>
     </div>
 </div>
+
+<?php else: ?>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <input type="hidden" name="page" value="tickets">
+            <input type="hidden" name="tab" value="resolved">
+            <div class="col-md-4">
+                <input type="text" class="form-control" name="search" placeholder="Search resolved tickets..." value="<?= htmlspecialchars($search) ?>">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="priority">
+                    <option value="">All Priority</option>
+                    <?php foreach ($priorities as $key => $label): ?>
+                    <option value="<?= $key ?>" <?= $priorityFilter === $key ? 'selected' : '' ?>><?= $label ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="?page=tickets&tab=resolved" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ticket #</th>
+                        <th>Customer</th>
+                        <th>Subject</th>
+                        <th>Priority</th>
+                        <th>Assigned</th>
+                        <th>Rating</th>
+                        <th>Resolved At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $resolvedFilters = ['only_resolved' => true];
+                    if ($priorityFilter) $resolvedFilters['priority'] = $priorityFilter;
+                    if ($search) $resolvedFilters['search'] = $search;
+                    if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
+                        $resolvedFilters['user_id'] = $_SESSION['user_id'];
+                    }
+                    try {
+                        $resolvedTickets = $ticket->getAll($resolvedFilters, 100);
+                    } catch (\Throwable $e) {
+                        $resolvedTickets = [];
+                    }
+                    foreach ($resolvedTickets as $t):
+                    ?>
+                    <tr>
+                        <td>
+                            <a href="?page=tickets&action=view&id=<?= $t['id'] ?>"><?= htmlspecialchars($t['ticket_number']) ?></a>
+                        </td>
+                        <td><?= htmlspecialchars($t['customer_name'] ?? 'N/A') ?></td>
+                        <td><?= htmlspecialchars(mb_substr($t['subject'], 0, 50)) ?><?= mb_strlen($t['subject']) > 50 ? '...' : '' ?></td>
+                        <td>
+                            <span class="badge bg-<?= $t['priority'] === 'critical' ? 'danger' : ($t['priority'] === 'high' ? 'warning' : ($t['priority'] === 'medium' ? 'info' : 'secondary')) ?>">
+                                <?= ucfirst($t['priority']) ?>
+                            </span>
+                        </td>
+                        <td><?= htmlspecialchars($t['assigned_name'] ?? 'Unassigned') ?></td>
+                        <td>
+                            <?php if ($t['satisfaction_rating'] ?? null): ?>
+                            <span class="badge bg-<?= $t['satisfaction_rating'] >= 4 ? 'success' : ($t['satisfaction_rating'] >= 3 ? 'warning' : 'danger') ?>">
+                                <i class="bi bi-star-fill"></i> <?= $t['satisfaction_rating'] ?>/5
+                            </span>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php 
+                            $resolvedAt = $t['resolved_at'] ?? $t['updated_at'] ?? $t['created_at'];
+                            echo date('M d, Y', strtotime($resolvedAt));
+                            ?>
+                        </td>
+                        <td>
+                            <a href="?page=tickets&action=view&id=<?= $t['id'] ?>" class="btn btn-sm btn-outline-primary" title="View">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($resolvedTickets)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No resolved tickets found.
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<?php endif; ?>
 
 <div class="modal fade" id="deleteTicketModal" tabindex="-1">
     <div class="modal-dialog">

@@ -694,6 +694,14 @@ class Ticket {
             $sql .= " AND t.status NOT IN ('resolved') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
         }
         
+        if (!empty($filters['exclude_resolved'])) {
+            $sql .= " AND t.status NOT IN ('resolved', 'closed')";
+        }
+        
+        if (!empty($filters['only_resolved'])) {
+            $sql .= " AND t.status IN ('resolved', 'closed')";
+        }
+        
         $sql .= " ORDER BY 
             CASE t.priority 
                 WHEN 'critical' THEN 1 
@@ -756,6 +764,14 @@ class Ticket {
         
         if (!empty($filters['sla_breached'])) {
             $sql .= " AND t.status NOT IN ('resolved') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
+        }
+        
+        if (!empty($filters['exclude_resolved'])) {
+            $sql .= " AND t.status NOT IN ('resolved', 'closed')";
+        }
+        
+        if (!empty($filters['only_resolved'])) {
+            $sql .= " AND t.status IN ('resolved', 'closed')";
         }
         
         $stmt = $this->db->prepare($sql);
