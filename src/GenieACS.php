@@ -2968,7 +2968,11 @@ JS;
                 if ($ssidName) {
                     $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
                 }
-                if ($password && strlen($password) >= 8) {
+                if (strcasecmp($encryption, 'Open') === 0) {
+                    $wlanParams[] = ["{$wlanPath}.BeaconType", 'Basic', 'xsd:string'];
+                    $wlanParams[] = ["{$wlanPath}.BasicEncryptionModes", 'None', 'xsd:string'];
+                    $wlanParams[] = ["{$wlanPath}.BasicAuthenticationMode", 'None', 'xsd:string'];
+                } elseif ($password && strlen($password) >= 8) {
                     $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
                     $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
                     $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
@@ -2987,7 +2991,7 @@ JS;
                     ]
                 );
                 $results[] = ['step' => 'set_wlan_config', 'result' => $setWlanResult];
-                error_log("[configureWifiAccessVlan] Existing bridge: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged'));
+                error_log("[configureWifiAccessVlan] Existing bridge: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged') . ", encryption={$encryption}");
                 
                 return [
                     'success' => true,
@@ -3026,7 +3030,11 @@ JS;
             if ($ssidName) {
                 $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
             }
-            if ($password && strlen($password) >= 8) {
+            if (strcasecmp($encryption, 'Open') === 0) {
+                $wlanParams[] = ["{$wlanPath}.BeaconType", 'Basic', 'xsd:string'];
+                $wlanParams[] = ["{$wlanPath}.BasicEncryptionModes", 'None', 'xsd:string'];
+                $wlanParams[] = ["{$wlanPath}.BasicAuthenticationMode", 'None', 'xsd:string'];
+            } elseif ($password && strlen($password) >= 8) {
                 $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
                 $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
                 $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
