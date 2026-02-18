@@ -3456,8 +3456,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $wifiIndex = (int)($_POST['wifi_index'] ?? 0);
                 $vlanId = (int)($_POST['vlan_id'] ?? 0);
                 $ssidName = $_POST['ssid'] ?? '';
+                $password = $_POST['password'] ?? '';
+                $encryption = $_POST['encryption'] ?? 'AES';
 
-                error_log("[configure_wifi_bridge] Serial: {$serial}, WiFi Index: {$wifiIndex}, VLAN: {$vlanId}, SSID: {$ssidName}");
+                error_log("[configure_wifi_bridge] Serial: {$serial}, WiFi Index: {$wifiIndex}, VLAN: {$vlanId}, SSID: {$ssidName}, Password: " . ($password ? 'set' : 'empty') . ", Encryption: {$encryption}");
 
                 if (empty($serial) || $wifiIndex < 1 || $vlanId < 1) {
                     echo json_encode(['success' => false, 'error' => 'Serial, WiFi index, and VLAN ID are required']);
@@ -3474,7 +3476,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $deviceId = $deviceResult['device']['_id'];
                 error_log("[configure_wifi_bridge] Found device: {$deviceId}, calling configureWifiAccessVlan");
 
-                $bridgeResult = $genieacs->configureWifiAccessVlan($deviceId, $wifiIndex, $vlanId, $ssidName);
+                $bridgeResult = $genieacs->configureWifiAccessVlan($deviceId, $wifiIndex, $vlanId, $ssidName, $password, $encryption);
                 error_log("[configure_wifi_bridge] Result: " . json_encode(['success' => $bridgeResult['success'] ?? false, 'message' => $bridgeResult['message'] ?? '', 'errors' => $bridgeResult['errors'] ?? []]));
                 echo json_encode($bridgeResult);
                 exit;
@@ -3510,8 +3512,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $path = preg_replace('/\.KeyPassphrase$/', '.PreSharedKey.1.KeyPassphrase', $path);
                     }
                     
-                    // Skip problematic parameters that cause cwmp.9007 errors
-                    $skipParams = ['WPAEncryptionModes', 'X_HW_WlanAccessType', 'X_HW_VlanMappingEnable', 'BeaconType', 'WEPEncryptionLevel'];
+                    // Skip parameters that cause cwmp.9007 errors (not WiFi-critical ones)
+                    $skipParams = ['X_HW_WlanAccessType', 'X_HW_VlanMappingEnable', 'WEPEncryptionLevel'];
                     $skip = false;
                     foreach ($skipParams as $skipParam) {
                         if (strpos($path, $skipParam) !== false) {
@@ -24195,21 +24197,16 @@ function saveDeviceStatus() {
         saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
 
         try {
-            if (mode === 'Access') {
-                if (!vlan) {
-                    showToast('VLAN ID is required for Access (Bridge) mode', 'warning');
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Configuration';
-                    return;
-                }
-
-                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating bridge...';
+            if (vlan) {
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating bridge & configuring WiFi...';
 
                 const bridgeBody = 'action=configure_wifi_bridge'
                     + '&serial=' + encodeURIComponent(serial)
                     + '&wifi_index=' + encodeURIComponent(portIndex)
                     + '&vlan_id=' + encodeURIComponent(vlan)
-                    + '&ssid=' + encodeURIComponent(ssid);
+                    + '&ssid=' + encodeURIComponent(ssid)
+                    + '&password=' + encodeURIComponent(password)
+                    + '&encryption=' + encodeURIComponent(encryption);
 
                 const bridgeResp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                     method: 'POST',
@@ -24218,14 +24215,19 @@ function saveDeviceStatus() {
                 });
                 const bridgeData = await bridgeResp.json();
 
-                if (!bridgeData.success) {
-                    showToast('Bridge creation failed: ' + (bridgeData.error || 'Unknown error'), 'danger');
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Configuration';
-                    return;
+                if (bridgeData.success) {
+                    showToast(bridgeData.message || 'WiFi configured with bridge on VLAN ' + vlan, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('wifiPortConfigModal')).hide();
+                    if (typeof loadWiFiFromTR069 === 'function') {
+                        setTimeout(() => loadWiFiFromTR069(), 2000);
+                    }
+                } else {
+                    showToast('Configuration failed: ' + (bridgeData.error || 'Unknown error'), 'danger');
                 }
 
-                showToast(bridgeData.message || 'Bridge created for wifi_0/' + portIndex + ' on VLAN ' + vlan, 'success');
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Configuration';
+                return;
             }
 
             const params = {};
@@ -24246,13 +24248,10 @@ function saveDeviceStatus() {
                 params[basePath + 'WPAAuthenticationMode'] = 'PSKAuthentication';
                 const encMap = { 'AES': 'AESEncryption', 'TKIP': 'TKIPEncryption', 'TKIP+AES': 'TKIPandAESEncryption' };
                 params[basePath + 'WPAEncryptionModes'] = encMap[encryption] || 'AESEncryption';
+                params[basePath + 'IEEE11iEncryptionModes'] = encMap[encryption] || 'AESEncryption';
                 if (password && password.length >= 8) {
                     params[basePath + 'PreSharedKey.1.KeyPassphrase'] = password;
                 }
-            }
-
-            if (mode !== 'Access' && vlan) {
-                params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
             }
 
             saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving WiFi settings...';
@@ -24265,9 +24264,8 @@ function saveDeviceStatus() {
             const data = await response.json();
 
             if (data.success) {
-                showToast('WiFi configuration saved' + (mode === 'Access' ? ' with bridge on VLAN ' + vlan : ''), 'success');
+                showToast('WiFi configuration saved', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('wifiPortConfigModal')).hide();
-
                 if (typeof loadWiFiFromTR069 === 'function') {
                     setTimeout(() => loadWiFiFromTR069(), 2000);
                 }

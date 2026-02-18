@@ -8367,7 +8367,9 @@ class HuaweiOLT {
         if ($connMode === 'bridge' && $vlanMode === 'access' && $accessVlan > 0) {
             // Use the proper sequence: Add WAN objects + Policy Routes
             // This matches the Huawei ONU log sequence for WiFi VLAN
-            $vlanResult = $genieacs->configureWifiAccessVlan($genieacsId, $wlanIndex, $accessVlan, $ssid);
+            $password = $config['password'] ?? '';
+            $encryption = $config['encryption'] ?? 'AES';
+            $vlanResult = $genieacs->configureWifiAccessVlan($genieacsId, $wlanIndex, $accessVlan, $ssid, $password, $encryption);
             
             if (!$vlanResult['success']) {
                 return ['success' => false, 'error' => 'VLAN config failed: ' . ($vlanResult['error'] ?? 'Unknown error')];
