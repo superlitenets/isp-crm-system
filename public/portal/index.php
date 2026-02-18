@@ -88,14 +88,25 @@ if (!isset($_SESSION['portal_subscription_id'])) {
     $autoLogin = null;
     $placeholders = implode(',', array_fill(0, count($allClientIps), '?'));
     $stmt = $db->prepare("
-        SELECT rs.id as subscription_id 
-        FROM radius_sessions rsess
-        JOIN radius_subscriptions rs ON rs.id = rsess.subscription_id
-        WHERE rsess.framed_ip_address IN ($placeholders) AND rsess.session_end IS NULL
-        ORDER BY rsess.session_start DESC LIMIT 1
+        SELECT id as subscription_id 
+        FROM radius_subscriptions
+        WHERE online_status = 'online' AND framed_ip_address IN ($placeholders)
+        ORDER BY last_seen DESC LIMIT 1
     ");
     $stmt->execute($allClientIps);
     $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$autoLogin) {
+        $stmt = $db->prepare("
+            SELECT rs.id as subscription_id 
+            FROM radius_sessions rsess
+            JOIN radius_subscriptions rs ON rs.id = rsess.subscription_id
+            WHERE rsess.framed_ip_address IN ($placeholders) AND rsess.session_end IS NULL
+            ORDER BY rsess.session_start DESC LIMIT 1
+        ");
+        $stmt->execute($allClientIps);
+        $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     
     if (!$autoLogin) {
         $encKey = getenv('ENCRYPTION_KEY');

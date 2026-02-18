@@ -66,7 +66,6 @@ switch (strtolower($acctStatusType)) {
                 $framedIP, $macAddress, $username
             ]);
             
-            // Auto-capture MAC if subscription doesn't have one yet
             if (!empty($macAddress)) {
                 $stmt = $db->prepare("SELECT mac_address FROM radius_subscriptions WHERE id = ?");
                 $stmt->execute([$subscriptionId]);
@@ -78,8 +77,15 @@ switch (strtolower($acctStatusType)) {
             }
         }
         
-        $db->prepare("UPDATE radius_subscriptions SET last_session_start = NOW() WHERE id = ?")
-           ->execute([$subscriptionId]);
+        $db->prepare("
+            UPDATE radius_subscriptions SET 
+                online_status = 'online',
+                framed_ip_address = ?,
+                last_nas_ip = ?,
+                last_seen = NOW(),
+                last_session_start = NOW()
+            WHERE id = ?
+        ")->execute([$framedIP, $nasIP, $subscriptionId]);
         
         echo json_encode(['success' => true, 'action' => 'session_started']);
         break;
@@ -102,12 +108,23 @@ switch (strtolower($acctStatusType)) {
         ]);
         
         $totalMB = ($inputOctets + $outputOctets) / 1048576;
+        
+        $remainingSessions = $db->prepare("
+            SELECT COUNT(*) FROM radius_sessions 
+            WHERE subscription_id = ? AND session_end IS NULL AND status = 'active'
+        ");
+        $remainingSessions->execute([$subscriptionId]);
+        $activeCount = (int)$remainingSessions->fetchColumn();
+        
         $db->prepare("
             UPDATE radius_subscriptions SET 
                 data_used_mb = data_used_mb + ?,
-                last_session_end = NOW()
+                last_session_end = NOW(),
+                last_seen = NOW(),
+                online_status = CASE WHEN ? = 0 THEN 'offline' ELSE online_status END,
+                framed_ip_address = CASE WHEN ? = 0 THEN NULL ELSE framed_ip_address END
             WHERE id = ?
-        ")->execute([$totalMB, $subscriptionId]);
+        ")->execute([$totalMB, $activeCount, $activeCount, $subscriptionId]);
         
         $stmt = $db->prepare("
             INSERT INTO radius_usage_logs (subscription_id, log_date, download_mb, upload_mb, session_count, session_time_seconds)
@@ -141,6 +158,14 @@ switch (strtolower($acctStatusType)) {
             $sessionTime, $inputOctets, $outputOctets,
             $sessionId, $subscriptionId
         ]);
+        
+        $db->prepare("
+            UPDATE radius_subscriptions SET 
+                last_seen = NOW(),
+                online_status = 'online',
+                framed_ip_address = COALESCE(NULLIF(?, ''), framed_ip_address)
+            WHERE id = ?
+        ")->execute([$framedIP, $subscriptionId]);
         
         echo json_encode(['success' => true, 'action' => 'session_updated']);
         break;

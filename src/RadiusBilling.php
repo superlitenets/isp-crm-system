@@ -1462,8 +1462,16 @@ class RadiusBilling {
                     ->execute([$sessionMac, $sub['id']]);
             }
             
-            // Update subscription last session
-            $this->db->prepare("UPDATE radius_subscriptions SET last_session_start = CURRENT_TIMESTAMP WHERE id = ?")->execute([$sub['id']]);
+            $framedIp = $data['framed_ip_address'] ?? '';
+            $this->db->prepare("
+                UPDATE radius_subscriptions SET 
+                    online_status = 'online',
+                    framed_ip_address = ?,
+                    last_nas_ip = ?,
+                    last_seen = CURRENT_TIMESTAMP,
+                    last_session_start = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ")->execute([$framedIp, $nasIp, $sub['id']]);
             
             return ['success' => true, 'session_id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -1495,12 +1503,27 @@ class RadiusBilling {
                 $acctSessionId
             ]);
             
-            // Update subscription data usage
-            $session = $this->db->prepare("SELECT subscription_id, input_octets, output_octets FROM radius_sessions WHERE acct_session_id = ?")->fetch(\PDO::FETCH_ASSOC);
+            $stmtSess = $this->db->prepare("SELECT subscription_id, input_octets, output_octets FROM radius_sessions WHERE acct_session_id = ?");
+            $stmtSess->execute([$acctSessionId]);
+            $session = $stmtSess->fetch(\PDO::FETCH_ASSOC);
             if ($session) {
                 $usageMb = (($session['input_octets'] + $session['output_octets']) / 1024 / 1024);
-                $this->db->prepare("UPDATE radius_subscriptions SET data_used_mb = data_used_mb + ?, last_session_end = CURRENT_TIMESTAMP WHERE id = ?")
-                    ->execute([$usageMb, $session['subscription_id']]);
+                $remaining = $this->db->prepare("
+                    SELECT COUNT(*) FROM radius_sessions 
+                    WHERE subscription_id = ? AND session_end IS NULL AND status = 'active'
+                ");
+                $remaining->execute([$session['subscription_id']]);
+                $remainingCount = (int)$remaining->fetchColumn();
+                
+                $this->db->prepare("
+                    UPDATE radius_subscriptions SET 
+                        data_used_mb = data_used_mb + ?, 
+                        last_session_end = CURRENT_TIMESTAMP,
+                        last_seen = CURRENT_TIMESTAMP,
+                        online_status = CASE WHEN ? = 0 THEN 'offline' ELSE online_status END,
+                        framed_ip_address = CASE WHEN ? = 0 THEN NULL ELSE framed_ip_address END
+                    WHERE id = ?
+                ")->execute([$usageMb, $remainingCount, $remainingCount, $session['subscription_id']]);
             }
             
             return ['success' => true];
@@ -2962,24 +2985,48 @@ class RadiusBilling {
     
     public function getOnlineSubscribers(): array {
         $stmt = $this->db->query("
-            SELECT subscription_id, framed_ip_address, mac_address, session_start
-            FROM radius_sessions 
-            WHERE session_end IS NULL AND status = 'active'
-            ORDER BY session_start DESC
+            SELECT id as subscription_id, framed_ip_address, mac_address, last_session_start as session_start
+            FROM radius_subscriptions 
+            WHERE online_status = 'online'
+            ORDER BY last_session_start DESC
         ");
-        $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $subs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         $result = [];
-        foreach ($sessions as $s) {
+        foreach ($subs as $s) {
             $result[$s['subscription_id']] = [
                 'ip' => $s['framed_ip_address'],
                 'mac' => $s['mac_address'],
                 'start' => $s['session_start']
             ];
         }
+        if (empty($result)) {
+            $stmt = $this->db->query("
+                SELECT subscription_id, framed_ip_address, mac_address, session_start
+                FROM radius_sessions 
+                WHERE session_end IS NULL AND status = 'active'
+                ORDER BY session_start DESC
+            ");
+            $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            foreach ($sessions as $s) {
+                $result[$s['subscription_id']] = [
+                    'ip' => $s['framed_ip_address'],
+                    'mac' => $s['mac_address'],
+                    'start' => $s['session_start']
+                ];
+            }
+        }
         return $result;
     }
     
     public function cleanStaleSessions(int $maxHours = 6): int {
+        $staleSubIds = $this->db->prepare("
+            SELECT DISTINCT subscription_id FROM radius_sessions
+            WHERE status = 'active' AND session_end IS NULL
+            AND session_start < NOW() - INTERVAL '1 hour' * ?
+        ");
+        $staleSubIds->execute([$maxHours]);
+        $subIds = $staleSubIds->fetchAll(\PDO::FETCH_COLUMN);
+        
         $stmt = $this->db->prepare("
             UPDATE radius_sessions SET 
                 status = 'closed',
@@ -2990,7 +3037,24 @@ class RadiusBilling {
             AND session_start < NOW() - INTERVAL '1 hour' * ?
         ");
         $stmt->execute([$maxHours]);
-        return $stmt->rowCount();
+        $closedCount = $stmt->rowCount();
+        
+        if (!empty($subIds)) {
+            $placeholders = implode(',', array_fill(0, count($subIds), '?'));
+            $this->db->prepare("
+                UPDATE radius_subscriptions SET 
+                    online_status = 'offline',
+                    last_seen = CURRENT_TIMESTAMP,
+                    framed_ip_address = NULL
+                WHERE id IN ($placeholders)
+                AND id NOT IN (
+                    SELECT DISTINCT subscription_id FROM radius_sessions
+                    WHERE session_end IS NULL AND status = 'active'
+                )
+            ")->execute($subIds);
+        }
+        
+        return $closedCount;
     }
     
     public function syncSessionsWithRouter(): array {
@@ -3094,6 +3158,21 @@ class RadiusBilling {
                         ");
                         $stmt->execute([$session['id']]);
                         $closed++;
+                        
+                        $remainCheck = $this->db->prepare("
+                            SELECT COUNT(*) FROM radius_sessions 
+                            WHERE subscription_id = ? AND session_end IS NULL AND status = 'active'
+                        ");
+                        $remainCheck->execute([$session['subscription_id']]);
+                        if ((int)$remainCheck->fetchColumn() === 0) {
+                            $this->db->prepare("
+                                UPDATE radius_subscriptions SET 
+                                    online_status = 'offline',
+                                    last_seen = CURRENT_TIMESTAMP,
+                                    framed_ip_address = NULL
+                                WHERE id = ?
+                            ")->execute([$session['subscription_id']]);
+                        }
                     }
                 }
             } catch (\Exception $e) {
