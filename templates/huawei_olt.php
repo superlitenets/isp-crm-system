@@ -497,7 +497,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
                 LEFT JOIN huawei_olts ol ON o.olt_id = ol.id
                 LEFT JOIN customers c ON o.customer_id = c.id
                 $whereClause
-                ORDER BY o.created_at DESC
+                ORDER BY COALESCE(o.authorized_at, o.created_at) DESC
                 LIMIT 100";
         
         $stmt = $db->prepare($sql);
@@ -1797,7 +1797,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             
             case 'quick_authorize':
                 $onuId = (int)$_POST['id'];
-                $huaweiOLT->updateONU($onuId, ['is_authorized' => true]);
+                $huaweiOLT->updateONU($onuId, ['is_authorized' => true, 'authorized_at' => date('Y-m-d H:i:s')]);
                 $message = 'ONU authorized successfully. You can now configure it.';
                 $messageType = 'success';
                 header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId);
@@ -1989,7 +1989,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Only mark discovery log and queue TR-069 if authorization succeeded
                 if ($messageType === 'success') {
-                    // Mark discovery log entry as authorized (remove from pending list)
+                    $db->prepare("UPDATE huawei_onus SET authorized_at = NOW() WHERE id = ? AND authorized_at IS NULL")->execute([$onuId]);
                     $onuSn = $onu['sn'] ?? $sn;
                     if (!empty($onuSn)) {
                         $db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = NOW() WHERE serial_number = ?")->execute([$onuSn]);
@@ -2505,7 +2505,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                         vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?,
                                         distance = ?, is_authorized = true, latitude = ?, longitude = ?,
                                         wan_mode = ?, pppoe_username = ?, pppoe_password = ?, auth_date = ?,
-                                        tr069_device_id = ?, address = ?, updated_at = NOW()
+                                        tr069_device_id = ?, address = ?, updated_at = NOW(),
+                                        authorized_at = COALESCE(authorized_at, NOW())
                                         WHERE id = ?");
                                     $stmt->execute([
                                         $name ?: $sn, $address, $board, $port, $allocatedOnu,
