@@ -2959,6 +2959,35 @@ JS;
                     ]
                 );
                 $results[] = ['step' => 'update_existing_vlan', 'result' => $setVlanResult];
+                usleep(500000);
+                
+                $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
+                $wlanParams = [
+                    ["{$wlanPath}.Enable", true, 'xsd:boolean'],
+                ];
+                if ($ssidName) {
+                    $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
+                }
+                if ($password && strlen($password) >= 8) {
+                    $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
+                    $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
+                    $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
+                    $encMap = ['AES' => 'AESEncryption', 'TKIP' => 'TKIPEncryption', 'TKIP+AES' => 'TKIPandAESEncryption'];
+                    $encValue = $encMap[$encryption] ?? 'AESEncryption';
+                    $wlanParams[] = ["{$wlanPath}.WPAEncryptionModes", $encValue, 'xsd:string'];
+                    $wlanParams[] = ["{$wlanPath}.IEEE11iEncryptionModes", $encValue, 'xsd:string'];
+                    $wlanParams[] = ["{$wlanPath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
+                }
+                $setWlanResult = $this->request(
+                    "POST",
+                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                    [
+                        'name' => 'setParameterValues',
+                        'parameterValues' => $wlanParams
+                    ]
+                );
+                $results[] = ['step' => 'set_wlan_config', 'result' => $setWlanResult];
+                error_log("[configureWifiAccessVlan] Existing bridge: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged'));
                 
                 return [
                     'success' => true,
@@ -2989,37 +3018,35 @@ JS;
                 usleep(500000);
             }
             
-            // Step 0b: Set SSID, password, and encryption
-            if ($ssidName || $password) {
-                $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
-                $wlanParams = [
-                    ["{$wlanPath}.Enable", true, 'xsd:boolean'],
-                ];
-                if ($ssidName) {
-                    $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
-                }
-                if ($password && strlen($password) >= 8) {
-                    $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                    $encMap = ['AES' => 'AESEncryption', 'TKIP' => 'TKIPEncryption', 'TKIP+AES' => 'TKIPandAESEncryption'];
-                    $encValue = $encMap[$encryption] ?? 'AESEncryption';
-                    $wlanParams[] = ["{$wlanPath}.WPAEncryptionModes", $encValue, 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.IEEE11iEncryptionModes", $encValue, 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
-                }
-                $setWlanResult = $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    [
-                        'name' => 'setParameterValues',
-                        'parameterValues' => $wlanParams
-                    ]
-                );
-                $results[] = ['step' => 'set_wlan_config', 'result' => $setWlanResult];
-                error_log("[configureWifiAccessVlan] Step 0b: Set WLAN config (SSID=" . ($ssidName ?: 'unchanged') . ", password=" . ($password ? 'set' : 'unchanged') . ", encryption={$encryption})");
-                usleep(500000);
+            // Step 0b: Enable WLAN and set SSID, password, encryption
+            $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
+            $wlanParams = [
+                ["{$wlanPath}.Enable", true, 'xsd:boolean'],
+            ];
+            if ($ssidName) {
+                $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
             }
+            if ($password && strlen($password) >= 8) {
+                $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
+                $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
+                $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
+                $encMap = ['AES' => 'AESEncryption', 'TKIP' => 'TKIPEncryption', 'TKIP+AES' => 'TKIPandAESEncryption'];
+                $encValue = $encMap[$encryption] ?? 'AESEncryption';
+                $wlanParams[] = ["{$wlanPath}.WPAEncryptionModes", $encValue, 'xsd:string'];
+                $wlanParams[] = ["{$wlanPath}.IEEE11iEncryptionModes", $encValue, 'xsd:string'];
+                $wlanParams[] = ["{$wlanPath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
+            }
+            $setWlanResult = $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                [
+                    'name' => 'setParameterValues',
+                    'parameterValues' => $wlanParams
+                ]
+            );
+            $results[] = ['step' => 'set_wlan_config', 'result' => $setWlanResult];
+            error_log("[configureWifiAccessVlan] Step 0b: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged') . ", password=" . ($password ? 'set' : 'unchanged') . ", encryption={$encryption}");
+            usleep(500000);
             
             // Step 1: Add WANConnectionDevice under WANDevice.1
             error_log("[configureWifiAccessVlan] Step 1: Adding WANConnectionDevice");
