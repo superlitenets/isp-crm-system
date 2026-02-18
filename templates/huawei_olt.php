@@ -497,7 +497,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
                 LEFT JOIN huawei_olts ol ON o.olt_id = ol.id
                 LEFT JOIN customers c ON o.customer_id = c.id
                 $whereClause
-                ORDER BY o.updated_at DESC
+                ORDER BY o.created_at DESC
                 LIMIT 100";
         
         $stmt = $db->prepare($sql);
