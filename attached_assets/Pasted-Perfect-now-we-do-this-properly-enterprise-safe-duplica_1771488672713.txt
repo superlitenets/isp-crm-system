@@ -1,0 +1,135 @@
+Perfect 👌 now we do this properly — enterprise-safe, duplicate-safe, production-ready.
+
+Goal:
+
+✔ Add guest bridge
+✔ VLAN 660
+✔ Bind to WLAN 4
+✔ Do NOT create duplicates
+✔ Do NOT predict instance numbers
+✔ Safe for 5000 ONUs
+
+🧠 What This Script Will Do
+
+Check if VLAN 660 bridge already exists
+
+If exists → do nothing
+
+If not → create new WANConnectionDevice
+
+Create WANIPConnection dynamically
+
+Configure it as bridge
+
+Bind WLAN 4 to VLAN 660
+
+No hardcoded instance numbers.
+
+✅ Production-Safe GenieACS Provision
+
+Create new provision:
+
+Name:
+
+guest_vlan_660_bridge
+
+
+Paste this:
+
+// ==============================
+// CHECK IF VLAN 660 ALREADY EXISTS
+// ==============================
+
+var existing = false;
+
+var wans = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.*.X_HW_VLAN", {value: 1});
+
+for (var i in wans) {
+  if (wans[i].value[0] == 660) {
+    existing = true;
+    break;
+  }
+}
+
+// ==============================
+// CREATE BRIDGE ONLY IF MISSING
+// ==============================
+
+if (!existing) {
+
+  // Create WANConnectionDevice dynamically
+  var wan = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", null, {path: 1});
+
+  // Create WANIPConnection dynamically
+  var ip = declare(wan.path + "WANIPConnection.", null, {path: 1});
+
+  // Configure bridge
+  declare(ip.path + "Enable", null, {value: true});
+  declare(ip.path + "ConnectionType", null, {value: "IP_Bridged"});
+  declare(ip.path + "NATEnabled", null, {value: false});
+  declare(ip.path + "X_HW_VLAN", null, {value: 660});
+  declare(ip.path + "X_HW_ServiceList", null, {value: "INTERNET"});
+  declare(ip.path + "Name", null, {value: "WIFI_GUEST_VLAN_660"});
+}
+
+// ==============================
+// CONFIGURE WLAN 4 (SAFE TO REAPPLY)
+// ==============================
+
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Enable", null, {value: true});
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_HW_VLANID", null, {value: 660});
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_HW_APIsolation", null, {value: true});
+
+🧠 Why This Is Safe
+
+✔ No predicted instance numbers
+✔ No duplicate WAN creation
+✔ Can run multiple times safely
+✔ Works whether device online or offline
+✔ Handles dynamic indexing
+
+🎯 Preset Settings
+
+Name:
+
+Guest VLAN 660
+
+
+Precondition:
+
+DeviceID.ProductClass == "HG8546M"
+
+
+Events:
+Leave empty (recommended)
+
+Weight:
+15
+
+🚀 How It Behaves
+
+First run:
+
+Creates guest bridge
+
+Configures WLAN 4
+
+Second run:
+
+Detects VLAN 660 already exists
+
+Does NOT create duplicate
+
+Just ensures WLAN is correct
+
+🏆 Production Level Result
+
+On ONT you will see:
+
+Name               : WIFI_GUEST_VLAN_660
+Connection type    : IP bridged
+Manage VLAN        : 660
+Service type       : Internet
+
+
+Main WAN untouched.

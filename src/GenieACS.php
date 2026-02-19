@@ -3074,103 +3074,105 @@ JS;
     /**
      * Build the GenieACS provision script for WiFi bridge configuration.
      * 
-     * This script runs atomically on the device in a single CWMP session.
-     * It uses GenieACS declare() with dynamic path resolution - NO hardcoded instance numbers.
+     * Production-safe, duplicate-safe, idempotent.
+     * Uses declare() with dynamic path chaining (wan.path, ip.path).
+     * NO hardcoded instance numbers. NO predicted indexes.
      * 
-     * Key patterns used:
-     * - declare("path.*", null) to count existing instances
-     * - declare("path.*", null, {path: N}) to ensure N instances exist
-     * - Wildcard * to configure all matching instances
-     * - Args passed as strings from PHP
+     * Behavior:
+     * - Checks if VLAN bridge already exists → skips creation if so
+     * - Creates WANConnectionDevice + WANIPConnection dynamically
+     * - Configures bridge with VLAN
+     * - Binds WiFi interface to VLAN
+     * - Safe to run multiple times (idempotent)
      */
     private function buildWifiBridgeProvisionScript(): string {
         return <<<'PROVISION'
-let wifiIndex = args[0];
-let vlanId = parseInt(args[1]);
-let ssidName = args[2] || "";
-let password = args[3] || "";
-let wanConnectionName = args[4] || ("WIFI_Bridge_VLAN_" + vlanId);
-let encParamsJson = args[5] || "{}";
+var wifiIndex = args[0];
+var vlanId = parseInt(args[1]);
+var ssidName = args[2] || "";
+var password = args[3] || "";
+var wanConnectionName = args[4] || ("WIFI_Bridge_VLAN_" + vlanId);
+var encParamsJson = args[5] || "{}";
 
-let encParams = {};
+var encParams = {};
 try { encParams = JSON.parse(encParamsJson); } catch(e) {}
 
 log("wifi_bridge_config: Starting - SSID" + wifiIndex + " VLAN=" + vlanId + " name=" + wanConnectionName);
 
-// Step 1: Count existing WANConnectionDevice instances
-let existingWanDevs = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", null);
-let wanDevCount = 0;
-for (let d of existingWanDevs) {
-  wanDevCount++;
-}
-log("wifi_bridge_config: Existing WANConnectionDevice count = " + wanDevCount);
+// ==============================
+// CHECK IF VLAN BRIDGE ALREADY EXISTS
+// ==============================
+var existing = false;
 
-// Step 2: Create one additional WANConnectionDevice (count + 1)
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", null, {path: wanDevCount + 1});
+var wans = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.*.X_HW_VLAN", {value: 1});
 
-// Step 3: Find the newly created instance (highest index)
-let refreshedWanDevs = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: 1});
-let maxWanIdx = 0;
-let newWanPath = "";
-for (let d of refreshedWanDevs) {
-  let parts = d.path.split(".");
-  let idx = parseInt(parts[4]);
-  if (idx > maxWanIdx) {
-    maxWanIdx = idx;
-    newWanPath = d.path;
+for (var w of wans) {
+  if (w.value && w.value[0] == vlanId) {
+    existing = true;
+    log("wifi_bridge_config: VLAN " + vlanId + " bridge already exists at " + w.path + " - skipping creation");
+    break;
   }
 }
-log("wifi_bridge_config: New WANConnectionDevice path = " + newWanPath + " (index " + maxWanIdx + ")");
 
-// Step 4: Create WANIPConnection under the new WANConnectionDevice
-declare(newWanPath + "WANIPConnection.*", null, {path: 1});
+// ==============================
+// CREATE BRIDGE ONLY IF MISSING
+// ==============================
+if (!existing) {
+  log("wifi_bridge_config: No existing VLAN " + vlanId + " bridge found, creating new one");
 
-// Step 5: Configure the WANIPConnection as a bridge with VLAN
-// Use wildcard * so GenieACS resolves the actual instance number
-declare(newWanPath + "WANIPConnection.*.Enable", {value: 1}, {value: true});
-declare(newWanPath + "WANIPConnection.*.ConnectionType", {value: 1}, {value: "IP_Bridged"});
-declare(newWanPath + "WANIPConnection.*.X_HW_VLAN", {value: 1}, {value: vlanId});
-declare(newWanPath + "WANIPConnection.*.X_HW_ServiceList", {value: 1}, {value: "INTERNET"});
-declare(newWanPath + "WANIPConnection.*.Name", {value: 1}, {value: wanConnectionName});
+  var wan = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", null, {path: 1});
 
-// Step 6: Configure WiFi interface
-let wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
-declare(wlanBase + "Enable", {value: 1}, {value: true});
-declare(wlanBase + "SSIDAdvertisementEnabled", {value: 1}, {value: true});
-declare(wlanBase + "X_HW_VLANID", {value: 1}, {value: vlanId});
-declare(wlanBase + "X_HW_APIsolation", {value: 1}, {value: true});
+  var ip = declare(wan.path + "WANIPConnection.", null, {path: 1});
+
+  declare(ip.path + "Enable", null, {value: true});
+  declare(ip.path + "ConnectionType", null, {value: "IP_Bridged"});
+  declare(ip.path + "NATEnabled", null, {value: false});
+  declare(ip.path + "X_HW_VLAN", null, {value: vlanId});
+  declare(ip.path + "X_HW_ServiceList", null, {value: "INTERNET"});
+  declare(ip.path + "Name", null, {value: wanConnectionName});
+
+  log("wifi_bridge_config: Bridge created at " + ip.path);
+}
+
+// ==============================
+// CONFIGURE WLAN (SAFE TO REAPPLY)
+// ==============================
+var wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
+
+declare(wlanBase + "Enable", null, {value: true});
+declare(wlanBase + "X_HW_VLANID", null, {value: vlanId});
+declare(wlanBase + "X_HW_APIsolation", null, {value: true});
 
 if (ssidName) {
-  declare(wlanBase + "SSID", {value: 1}, {value: ssidName});
+  declare(wlanBase + "SSID", null, {value: ssidName});
 }
 
-// Step 7: Apply encryption settings
 if (encParams.BeaconType) {
-  declare(wlanBase + "BeaconType", {value: 1}, {value: encParams.BeaconType});
+  declare(wlanBase + "BeaconType", null, {value: encParams.BeaconType});
 }
 if (encParams.BasicEncryptionModes) {
-  declare(wlanBase + "BasicEncryptionModes", {value: 1}, {value: encParams.BasicEncryptionModes});
+  declare(wlanBase + "BasicEncryptionModes", null, {value: encParams.BasicEncryptionModes});
 }
 if (encParams.BasicAuthenticationMode) {
-  declare(wlanBase + "BasicAuthenticationMode", {value: 1}, {value: encParams.BasicAuthenticationMode});
+  declare(wlanBase + "BasicAuthenticationMode", null, {value: encParams.BasicAuthenticationMode});
 }
 if (encParams.IEEE11iAuthenticationMode) {
-  declare(wlanBase + "IEEE11iAuthenticationMode", {value: 1}, {value: encParams.IEEE11iAuthenticationMode});
+  declare(wlanBase + "IEEE11iAuthenticationMode", null, {value: encParams.IEEE11iAuthenticationMode});
 }
 if (encParams.WPAAuthenticationMode) {
-  declare(wlanBase + "WPAAuthenticationMode", {value: 1}, {value: encParams.WPAAuthenticationMode});
+  declare(wlanBase + "WPAAuthenticationMode", null, {value: encParams.WPAAuthenticationMode});
 }
 if (encParams.WPAEncryptionModes) {
-  declare(wlanBase + "WPAEncryptionModes", {value: 1}, {value: encParams.WPAEncryptionModes});
+  declare(wlanBase + "WPAEncryptionModes", null, {value: encParams.WPAEncryptionModes});
 }
 if (encParams.IEEE11iEncryptionModes) {
-  declare(wlanBase + "IEEE11iEncryptionModes", {value: 1}, {value: encParams.IEEE11iEncryptionModes});
+  declare(wlanBase + "IEEE11iEncryptionModes", null, {value: encParams.IEEE11iEncryptionModes});
 }
 if (encParams.KeyPassphrase) {
-  declare(wlanBase + "PreSharedKey.1.KeyPassphrase", {value: 1}, {value: encParams.KeyPassphrase});
+  declare(wlanBase + "PreSharedKey.1.KeyPassphrase", null, {value: encParams.KeyPassphrase});
 }
 
-log("wifi_bridge_config: Complete - SSID" + wifiIndex + " -> VLAN " + vlanId + " via " + newWanPath);
+log("wifi_bridge_config: Complete - SSID" + wifiIndex + " -> VLAN " + vlanId);
 PROVISION;
     }
 
