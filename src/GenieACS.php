@@ -3008,20 +3008,6 @@ JS;
             
             error_log("[configureWifiAccessVlan] Creating new bridge: WAN device={$wanDeviceIndex}, route={$routeIndex}, existingWAN=" . json_encode($existingWanIndices));
             
-            // Step 0: Ensure WLAN configuration exists (secondary SSIDs may need creation)
-            if ($wifiIndex > 1 && $wifiIndex != 5) {
-                $addWlanResult = $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    [
-                        'name' => 'addObject',
-                        'objectName' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.'
-                    ]
-                );
-                $results[] = ['step' => 'add_wlan_config', 'result' => $addWlanResult];
-                usleep(500000);
-            }
-            
             // Step 0b: Enable WLAN and set SSID, password, encryption
             $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
             $wlanParams = [
@@ -3057,7 +3043,7 @@ JS;
             usleep(500000);
             
             // Step 1: Add WANConnectionDevice under WANDevice.1
-            error_log("[configureWifiAccessVlan] Step 1: Adding WANConnectionDevice");
+            error_log("[configureWifiAccessVlan] Step 1: Adding WANConnectionDevice. Existing WAN indices: " . json_encode($existingWanIndices));
             $addWanDevResult = $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
@@ -3067,16 +3053,23 @@ JS;
                 ]
             );
             $results[] = ['step' => 'add_wan_device', 'result' => $addWanDevResult];
-            error_log("[configureWifiAccessVlan] Step 1 result: " . json_encode(['success' => $addWanDevResult['success'] ?? false, 'http_code' => $addWanDevResult['http_code'] ?? 0]));
+            $addWanData = $addWanDevResult['data'] ?? null;
+            $addWanInstanceNumber = null;
+            if (is_array($addWanData) && isset($addWanData['instanceNumber'])) {
+                $addWanInstanceNumber = (int)$addWanData['instanceNumber'];
+            }
+            error_log("[configureWifiAccessVlan] Step 1 result: success=" . json_encode($addWanDevResult['success'] ?? false) . ", http_code=" . ($addWanDevResult['http_code'] ?? 0) . ", instanceNumber=" . json_encode($addWanInstanceNumber));
             usleep(1000000);
             
             // Refresh device to discover actual WAN device index created
+            // Wait for task to complete, then refresh device tree
+            usleep(2000000);
             $refreshResult = $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
                 ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']]
             );
-            usleep(1000000);
+            usleep(2000000);
             
             $refreshedDevice = $this->getDevice($deviceId, false);
             if ($refreshedDevice['success'] && !empty($refreshedDevice['data'])) {
@@ -3086,11 +3079,17 @@ JS;
                     if (is_numeric($idx)) $newIndices[] = (int)$idx;
                 }
                 $addedIndices = array_diff($newIndices, $existingWanIndices);
+                error_log("[configureWifiAccessVlan] Refresh found WAN indices: " . json_encode($newIndices) . ", new: " . json_encode(array_values($addedIndices)));
                 if (!empty($addedIndices)) {
                     $wanDeviceIndex = max($addedIndices);
                     $wanName = "wan1.{$wanDeviceIndex}.ip1";
+                } else {
+                    error_log("[configureWifiAccessVlan] WARNING: No new WAN device found after addObject. Using predicted index: {$wanDeviceIndex}");
                 }
+            } else {
+                error_log("[configureWifiAccessVlan] WARNING: Device refresh failed. Using predicted index: {$wanDeviceIndex}");
             }
+            error_log("[configureWifiAccessVlan] Final WAN device index: {$wanDeviceIndex}, WAN name: {$wanName}");
             
             // Step 2: Add WANIPConnection under the new WANConnectionDevice
             $addWanIpResult = $this->request(
