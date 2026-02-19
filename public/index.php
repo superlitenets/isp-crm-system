@@ -2402,7 +2402,8 @@ if ($page === 'isp_inventory') {
                             'color' => $_POST['color'] ?? null,
                             'assigned_employee_id' => $_POST['assigned_employee_id'] ?? null,
                             'status' => $_POST['status'] ?? 'active',
-                            'notes' => $_POST['notes'] ?? null
+                            'notes' => $_POST['notes'] ?? null,
+                            'fuel_rate' => $_POST['fuel_rate'] ?? 0
                         ];
                         $vid = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : (!empty($_POST['id']) ? (int)$_POST['id'] : null);
                         if ($vid) {
@@ -8629,7 +8630,8 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                             'color' => $_POST['color'] ?? null,
                             'assigned_employee_id' => $_POST['assigned_employee_id'] ?? null,
                             'status' => $_POST['status'] ?? 'active',
-                            'notes' => $_POST['notes'] ?? null
+                            'notes' => $_POST['notes'] ?? null,
+                            'fuel_rate' => $_POST['fuel_rate'] ?? 0
                         ];
                         $vid = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : (!empty($_POST['id']) ? (int)$_POST['id'] : null);
                         if ($vid) {

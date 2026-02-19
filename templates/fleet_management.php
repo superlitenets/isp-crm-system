@@ -73,6 +73,11 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
             <i class="bi bi-terminal"></i> Commands
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $fleetTab === 'reports' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports">
+            <i class="bi bi-file-earmark-bar-graph"></i> Reports
+        </a>
+    </li>
 </ul>
 
 <?php if ($fleetTab === 'overview'): ?>
@@ -353,9 +358,16 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Notes</label>
-                        <textarea class="form-control" name="notes" id="v_notes" rows="2"></textarea>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Fuel Rate (L/100km)</label>
+                            <input type="number" step="0.1" min="0" class="form-control" name="fuel_rate" id="v_fuel_rate" placeholder="e.g. 8.5">
+                            <small class="text-muted">Liters per 100 km for fuel consumption estimates</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" id="v_notes" rows="2"></textarea>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -404,6 +416,7 @@ function openVehicleForm() {
     document.getElementById('v_color').value = '';
     document.getElementById('v_assigned_employee_id').value = '';
     document.getElementById('v_status').value = 'active';
+    document.getElementById('v_fuel_rate').value = '';
     document.getElementById('v_notes').value = '';
 }
 
@@ -420,6 +433,7 @@ function editVehicle(v) {
     document.getElementById('v_color').value = v.color || '';
     document.getElementById('v_assigned_employee_id').value = v.assigned_employee_id || '';
     document.getElementById('v_status').value = v.status || 'active';
+    document.getElementById('v_fuel_rate').value = v.fuel_rate || '';
     document.getElementById('v_notes').value = v.notes || '';
     new bootstrap.Modal(document.getElementById('vehicleModal')).show();
 }
@@ -1075,5 +1089,360 @@ if ($cmdVehicleId > 0) {
         </div>
     </div>
 </div>
+
+<?php elseif ($fleetTab === 'reports'): ?>
+<?php
+$reportType = $_GET['report'] ?? 'daily';
+$reportDate = $_GET['report_date'] ?? date('Y-m-d');
+$reportStart = $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days'));
+$reportEnd = $_GET['end_date'] ?? date('Y-m-d');
+$reportVehicle = !empty($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : null;
+?>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="btn-group flex-wrap" role="group">
+            <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports&report=daily" class="btn btn-<?= $reportType === 'daily' ? 'primary' : 'outline-primary' ?>">
+                <i class="bi bi-calendar-day"></i> Daily Report
+            </a>
+            <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports&report=fuel" class="btn btn-<?= $reportType === 'fuel' ? 'primary' : 'outline-primary' ?>">
+                <i class="bi bi-fuel-pump"></i> Fuel Consumption
+            </a>
+            <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports&report=swaps" class="btn btn-<?= $reportType === 'swaps' ? 'primary' : 'outline-primary' ?>">
+                <i class="bi bi-arrow-left-right"></i> Vehicle Swaps
+            </a>
+            <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports&report=mileage" class="btn btn-<?= $reportType === 'mileage' ? 'primary' : 'outline-primary' ?>">
+                <i class="bi bi-speedometer"></i> Mileage Trend
+            </a>
+        </div>
+    </div>
+</div>
+
+<?php if ($reportType === 'daily'): ?>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-calendar-day"></i> Daily Vehicle Report</h5>
+        <form class="d-flex gap-2 align-items-center flex-wrap" method="GET">
+            <input type="hidden" name="page" value="<?= $fleetPage ?>">
+            <input type="hidden" name="tab" value="fleet">
+            <input type="hidden" name="fleet_tab" value="reports">
+            <input type="hidden" name="report" value="daily">
+            <select name="vehicle_id" class="form-select form-select-sm" style="width:auto;">
+                <option value="">All Vehicles</option>
+                <?php foreach ($vehicles as $v): ?>
+                <option value="<?= $v['id'] ?>" <?= $reportVehicle == $v['id'] ? 'selected' : '' ?>><?= htmlspecialchars($v['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <input type="date" name="report_date" class="form-control form-control-sm" style="width:auto;" value="<?= htmlspecialchars($reportDate) ?>">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> View</button>
+        </form>
+    </div>
+    <div class="card-body">
+        <?php $dailyReport = $fleet->getDailyReport($reportDate, $reportVehicle); ?>
+        <?php if (empty($dailyReport)): ?>
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> No vehicles with IMEI found for this date.</div>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Vehicle</th>
+                        <th>Plate</th>
+                        <th>Type</th>
+                        <th>Assigned To</th>
+                        <th class="text-end">Distance (km)</th>
+                        <th class="text-end">Fuel Est. (L)</th>
+                        <th class="text-center">Alarms</th>
+                        <th class="text-center">Commands</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $totalKm = 0; $totalFuel = 0; $totalAlarms = 0;
+                    foreach ($dailyReport as $dr):
+                        $totalKm += $dr['daily_mileage'];
+                        $totalFuel += $dr['fuel_consumed'];
+                        $totalAlarms += $dr['alarm_count'];
+                    ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($dr['name']) ?></strong><br><small class="text-muted"><?= htmlspecialchars(($dr['make'] ?? '') . ' ' . ($dr['model'] ?? '')) ?></small></td>
+                        <td><?= htmlspecialchars($dr['plate_number'] ?? '-') ?></td>
+                        <td><span class="badge bg-secondary"><?= ucfirst($dr['vehicle_type']) ?></span></td>
+                        <td><?= htmlspecialchars($dr['assigned_to'] ?? 'Unassigned') ?></td>
+                        <td class="text-end"><strong><?= number_format($dr['daily_mileage'], 2) ?></strong></td>
+                        <td class="text-end">
+                            <?php if ($dr['fuel_consumed'] > 0): ?>
+                            <?= number_format($dr['fuel_consumed'], 2) ?>
+                            <?php elseif (($dr['fuel_rate'] ?? 0) == 0): ?>
+                            <small class="text-muted">No rate set</small>
+                            <?php else: ?>
+                            -
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-center"><?= $dr['alarm_count'] > 0 ? '<span class="badge bg-danger">'.$dr['alarm_count'].'</span>' : '0' ?></td>
+                        <td class="text-center"><?= $dr['command_count'] ?></td>
+                        <td><span class="badge bg-<?= $dr['status'] === 'active' ? 'success' : ($dr['status'] === 'maintenance' ? 'warning' : 'secondary') ?>"><?= ucfirst($dr['status']) ?></span></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot class="table-dark">
+                    <tr>
+                        <th colspan="4">Totals (<?= count($dailyReport) ?> vehicles)</th>
+                        <th class="text-end"><?= number_format($totalKm, 2) ?> km</th>
+                        <th class="text-end"><?= number_format($totalFuel, 2) ?> L</th>
+                        <th class="text-center"><?= $totalAlarms ?></th>
+                        <th colspan="2"></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php elseif ($reportType === 'fuel'): ?>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-fuel-pump"></i> Fuel Consumption Report</h5>
+        <form class="d-flex gap-2 align-items-center flex-wrap" method="GET">
+            <input type="hidden" name="page" value="<?= $fleetPage ?>">
+            <input type="hidden" name="tab" value="fleet">
+            <input type="hidden" name="fleet_tab" value="reports">
+            <input type="hidden" name="report" value="fuel">
+            <select name="vehicle_id" class="form-select form-select-sm" style="width:auto;">
+                <option value="">All Vehicles</option>
+                <?php foreach ($vehicles as $v): ?>
+                <option value="<?= $v['id'] ?>" <?= $reportVehicle == $v['id'] ? 'selected' : '' ?>><?= htmlspecialchars($v['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <input type="date" name="start_date" class="form-control form-control-sm" style="width:auto;" value="<?= htmlspecialchars($reportStart) ?>">
+            <span class="text-muted">to</span>
+            <input type="date" name="end_date" class="form-control form-control-sm" style="width:auto;" value="<?= htmlspecialchars($reportEnd) ?>">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> View</button>
+        </form>
+    </div>
+    <div class="card-body">
+        <?php $fuelReport = $fleet->getFuelReport($reportStart, $reportEnd, $reportVehicle); ?>
+        <?php if (empty($fuelReport)): ?>
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> No data available for this period.</div>
+        <?php else: ?>
+        <div class="alert alert-light border mb-3">
+            <i class="bi bi-info-circle"></i> Fuel consumption is estimated based on each vehicle's configured fuel rate (L/100km) and total distance traveled. Set fuel rates in the Vehicles tab when adding or editing a vehicle.
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Vehicle</th>
+                        <th>Plate</th>
+                        <th>Type</th>
+                        <th>Assigned To</th>
+                        <th class="text-end">Fuel Rate (L/100km)</th>
+                        <th class="text-end">Total Distance (km)</th>
+                        <th class="text-end">Est. Fuel (L)</th>
+                        <th class="text-center">Days Reported</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $grandKm = 0; $grandFuel = 0;
+                    foreach ($fuelReport as $fr):
+                        $grandKm += (float)$fr['total_mileage'];
+                        $grandFuel += $fr['fuel_consumed'];
+                    ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($fr['name']) ?></strong><br><small class="text-muted"><?= htmlspecialchars(($fr['make'] ?? '') . ' ' . ($fr['model'] ?? '')) ?></small></td>
+                        <td><?= htmlspecialchars($fr['plate_number'] ?? '-') ?></td>
+                        <td><span class="badge bg-secondary"><?= ucfirst($fr['vehicle_type'] ?? '') ?></span></td>
+                        <td><?= htmlspecialchars($fr['assigned_to'] ?? 'Unassigned') ?></td>
+                        <td class="text-end">
+                            <?php if (($fr['fuel_rate'] ?? 0) > 0): ?>
+                            <?= number_format((float)$fr['fuel_rate'], 1) ?>
+                            <?php else: ?>
+                            <span class="text-danger">Not set</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-end"><?= number_format((float)$fr['total_mileage'], 2) ?></td>
+                        <td class="text-end">
+                            <?php if ($fr['fuel_consumed'] > 0): ?>
+                            <strong><?= number_format($fr['fuel_consumed'], 2) ?></strong>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-center"><?= $fr['days_reported'] ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot class="table-dark">
+                    <tr>
+                        <th colspan="5">Totals</th>
+                        <th class="text-end"><?= number_format($grandKm, 2) ?> km</th>
+                        <th class="text-end"><?= number_format($grandFuel, 2) ?> L</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php elseif ($reportType === 'swaps'): ?>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Vehicle Assignment / Swap History</h5>
+        <form class="d-flex gap-2 align-items-center flex-wrap" method="GET">
+            <input type="hidden" name="page" value="<?= $fleetPage ?>">
+            <input type="hidden" name="tab" value="fleet">
+            <input type="hidden" name="fleet_tab" value="reports">
+            <input type="hidden" name="report" value="swaps">
+            <select name="vehicle_id" class="form-select form-select-sm" style="width:auto;">
+                <option value="">All Vehicles</option>
+                <?php foreach ($vehicles as $v): ?>
+                <option value="<?= $v['id'] ?>" <?= $reportVehicle == $v['id'] ? 'selected' : '' ?>><?= htmlspecialchars($v['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <input type="date" name="start_date" class="form-control form-control-sm" style="width:auto;" value="<?= htmlspecialchars($reportStart) ?>">
+            <span class="text-muted">to</span>
+            <input type="date" name="end_date" class="form-control form-control-sm" style="width:auto;" value="<?= htmlspecialchars($reportEnd) ?>">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> View</button>
+        </form>
+    </div>
+    <div class="card-body">
+        <?php $swapHistory = $fleet->getSwapHistory($reportStart, $reportEnd, $reportVehicle); ?>
+        <?php if (empty($swapHistory)): ?>
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> No vehicle swaps/assignments found in this period.</div>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Vehicle</th>
+                        <th>Plate</th>
+                        <th>Employee</th>
+                        <th>Assigned Date</th>
+                        <th>Returned Date</th>
+                        <th>Duration</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($swapHistory as $swap): ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($swap['vehicle_name']) ?></strong></td>
+                        <td><?= htmlspecialchars($swap['plate_number'] ?? '-') ?></td>
+                        <td><i class="bi bi-person"></i> <?= htmlspecialchars($swap['employee_name']) ?></td>
+                        <td><?= date('M j, Y H:i', strtotime($swap['assigned_at'])) ?></td>
+                        <td>
+                            <?php if ($swap['returned_at']): ?>
+                            <?= date('M j, Y H:i', strtotime($swap['returned_at'])) ?>
+                            <?php else: ?>
+                            <span class="badge bg-success">Current</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php
+                            $start = new \DateTime($swap['assigned_at']);
+                            $end = $swap['returned_at'] ? new \DateTime($swap['returned_at']) : new \DateTime();
+                            $diff = $start->diff($end);
+                            if ($diff->days > 0) echo $diff->days . 'd ';
+                            echo $diff->h . 'h ' . $diff->i . 'm';
+                            ?>
+                        </td>
+                        <td><small><?= htmlspecialchars($swap['notes'] ?? '') ?></small></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php elseif ($reportType === 'mileage'): ?>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-speedometer"></i> Mileage Trend</h5>
+        <form class="d-flex gap-2 align-items-center flex-wrap" method="GET">
+            <input type="hidden" name="page" value="<?= $fleetPage ?>">
+            <input type="hidden" name="tab" value="fleet">
+            <input type="hidden" name="fleet_tab" value="reports">
+            <input type="hidden" name="report" value="mileage">
+            <select name="vehicle_id" class="form-select form-select-sm" style="width:auto;" required>
+                <option value="">-- Select Vehicle --</option>
+                <?php foreach ($vehicles as $v): ?>
+                <option value="<?= $v['id'] ?>" <?= $reportVehicle == $v['id'] ? 'selected' : '' ?>><?= htmlspecialchars($v['name']) ?> (<?= htmlspecialchars($v['plate_number'] ?? 'No plate') ?>)</option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> View</button>
+        </form>
+    </div>
+    <div class="card-body">
+        <?php if (!$reportVehicle): ?>
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> Select a vehicle to view its mileage trend over the last 30 days.</div>
+        <?php else: ?>
+        <?php $mileageTrend = $fleet->getMileageTrend($reportVehicle, 30); ?>
+        <?php if (empty($mileageTrend)): ?>
+        <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle"></i> No mileage data recorded for this vehicle yet. Mileage data is stored when daily reports are generated.</div>
+        <?php else: ?>
+        <canvas id="mileageChart" height="100"></canvas>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script>
+        (function() {
+            const data = <?= json_encode($mileageTrend) ?>;
+            const labels = data.map(d => d.report_date);
+            const values = data.map(d => parseFloat(d.mileage));
+            new Chart(document.getElementById('mileageChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Daily Distance (km)',
+                        data: values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Distance (km)' } },
+                        x: { title: { display: true, text: 'Date' } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Daily Mileage - Last 30 Days' }
+                    }
+                }
+            });
+        })();
+        </script>
+
+        <div class="table-responsive mt-3">
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr><th>Date</th><th class="text-end">Distance (km)</th></tr>
+                </thead>
+                <tbody>
+                    <?php $sum = 0; foreach (array_reverse($mileageTrend) as $mt): $sum += (float)$mt['mileage']; ?>
+                    <tr>
+                        <td><?= date('M j, Y (D)', strtotime($mt['report_date'])) ?></td>
+                        <td class="text-end"><?= number_format((float)$mt['mileage'], 2) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot class="table-dark">
+                    <tr><th>Total (<?= count($mileageTrend) ?> days)</th><th class="text-end"><?= number_format($sum, 2) ?> km</th></tr>
+                </tfoot>
+            </table>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php endif; ?>

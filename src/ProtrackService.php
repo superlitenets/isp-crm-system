@@ -189,6 +189,14 @@ class ProtrackService {
             'endtime' => $endTime
         ]);
     }
+
+    public function getBatchMileage(array $imeis, int $beginTime, int $endTime): ?array {
+        return $this->apiGet('/api/device/mileage', [
+            'imeis' => implode(',', $imeis),
+            'begintime' => $beginTime,
+            'endtime' => $endTime
+        ]);
+    }
     
     public function createGeofence(string $imei, string $name, int $alarmType, float $latitude, float $longitude, int $radius): ?array {
         return $this->apiPost('/api/geofence/create', [

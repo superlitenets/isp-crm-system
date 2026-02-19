@@ -400,6 +400,7 @@ CREATE TABLE IF NOT EXISTS fleet_vehicles (
     last_acc_status INTEGER DEFAULT -1,
     last_battery INTEGER DEFAULT -1,
     last_mileage DOUBLE PRECISION DEFAULT 0,
+    fuel_rate DOUBLE PRECISION DEFAULT 0,
     last_update TIMESTAMP,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -482,3 +483,10 @@ CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_status ON fleet_vehicles(status);
 CREATE INDEX IF NOT EXISTS idx_fleet_alarms_vehicle ON fleet_alarms(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_fleet_alarms_time ON fleet_alarms(alarm_time);
 CREATE INDEX IF NOT EXISTS idx_fleet_command_log_vehicle ON fleet_command_log(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_mileage_date ON fleet_mileage_reports(report_date);
+
+-- Add fuel_rate column to existing fleet_vehicles tables (safe to re-run)
+DO $$ BEGIN
+    ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS fuel_rate DOUBLE PRECISION DEFAULT 0;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;

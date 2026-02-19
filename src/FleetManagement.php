@@ -66,7 +66,7 @@ class FleetManagement {
     }
     
     public function addVehicle(array $data): int {
-        $stmt = $this->db->prepare("INSERT INTO fleet_vehicles (name, plate_number, imei, vehicle_type, make, model, year, color, assigned_employee_id, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $this->db->prepare("INSERT INTO fleet_vehicles (name, plate_number, imei, vehicle_type, make, model, year, color, assigned_employee_id, status, notes, fuel_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $data['name'],
             $data['plate_number'] ?? null,
@@ -78,7 +78,8 @@ class FleetManagement {
             $data['color'] ?? null,
             !empty($data['assigned_employee_id']) ? (int)$data['assigned_employee_id'] : null,
             $data['status'] ?? 'active',
-            $data['notes'] ?? null
+            $data['notes'] ?? null,
+            isset($data['fuel_rate']) ? (float)$data['fuel_rate'] : 0
         ]);
         $vehicleId = (int)$this->db->lastInsertId();
         
@@ -96,7 +97,7 @@ class FleetManagement {
         $oldEmployeeId = $vehicle['assigned_employee_id'];
         $newEmployeeId = !empty($data['assigned_employee_id']) ? (int)$data['assigned_employee_id'] : null;
         
-        $stmt = $this->db->prepare("UPDATE fleet_vehicles SET name = ?, plate_number = ?, imei = ?, vehicle_type = ?, make = ?, model = ?, year = ?, color = ?, assigned_employee_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt = $this->db->prepare("UPDATE fleet_vehicles SET name = ?, plate_number = ?, imei = ?, vehicle_type = ?, make = ?, model = ?, year = ?, color = ?, assigned_employee_id = ?, status = ?, notes = ?, fuel_rate = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         $result = $stmt->execute([
             $data['name'],
             $data['plate_number'] ?? null,
@@ -109,6 +110,7 @@ class FleetManagement {
             $newEmployeeId,
             $data['status'] ?? 'active',
             $data['notes'] ?? null,
+            isset($data['fuel_rate']) ? (float)$data['fuel_rate'] : 0,
             $id
         ]);
         
@@ -356,5 +358,163 @@ class FleetManagement {
     public function getEmployees(): array {
         $stmt = $this->db->query("SELECT id, name FROM employees WHERE status = 'active' ORDER BY name");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getDailyReport(string $date, ?int $vehicleId = null): array {
+        $startOfDay = strtotime($date . ' 00:00:00');
+        $endOfDay = strtotime($date . ' 23:59:59');
+
+        $sql = "SELECT v.id, v.name, v.plate_number, v.imei, v.vehicle_type, v.make, v.model, 
+                       v.fuel_rate, v.last_speed, v.last_acc_status, v.last_mileage, v.status,
+                       e.name as assigned_to
+                FROM fleet_vehicles v
+                LEFT JOIN employees e ON v.assigned_employee_id = e.id
+                WHERE v.imei IS NOT NULL AND v.imei != ''";
+        $params = [];
+        if ($vehicleId) {
+            $sql .= " AND v.id = ?";
+            $params[] = $vehicleId;
+        }
+        $sql .= " ORDER BY v.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $vehicles = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        if (empty($vehicles)) return [];
+
+        $imeis = array_column($vehicles, 'imei');
+        $imeiToVehicle = [];
+        foreach ($vehicles as &$v) {
+            $imeiToVehicle[$v['imei']] = &$v;
+            $v['daily_mileage'] = 0;
+            $v['fuel_consumed'] = 0;
+            $v['alarm_count'] = 0;
+            $v['command_count'] = 0;
+        }
+        unset($v);
+
+        try {
+            $mileageResult = $this->protrack->getBatchMileage($imeis, $startOfDay, $endOfDay);
+            if ($mileageResult && ($mileageResult['code'] ?? -1) === 0 && !empty($mileageResult['record'])) {
+                foreach ($mileageResult['record'] as $rec) {
+                    if (isset($imeiToVehicle[$rec['imei']])) {
+                        $km = round((float)($rec['mileage'] ?? 0), 2);
+                        $imeiToVehicle[$rec['imei']]['daily_mileage'] = $km;
+                        $fuelRate = (float)($imeiToVehicle[$rec['imei']]['fuel_rate'] ?? 0);
+                        if ($fuelRate > 0 && $km > 0) {
+                            $imeiToVehicle[$rec['imei']]['fuel_consumed'] = round($km * $fuelRate / 100, 2);
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {}
+
+        $placeholders = implode(',', array_fill(0, count($vehicles), '?'));
+        $vids = array_column($vehicles, 'id');
+
+        $alarmStmt = $this->db->prepare("SELECT vehicle_id, COUNT(*) as cnt FROM fleet_alarms 
+            WHERE vehicle_id IN ($placeholders) AND alarm_time >= ? AND alarm_time <= ?
+            GROUP BY vehicle_id");
+        $alarmStmt->execute(array_merge($vids, [$date . ' 00:00:00', $date . ' 23:59:59']));
+        foreach ($alarmStmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            foreach ($vehicles as &$v) {
+                if ($v['id'] == $row['vehicle_id']) {
+                    $v['alarm_count'] = (int)$row['cnt'];
+                    break;
+                }
+            }
+            unset($v);
+        }
+
+        $cmdStmt = $this->db->prepare("SELECT vehicle_id, COUNT(*) as cnt FROM fleet_command_log 
+            WHERE vehicle_id IN ($placeholders) AND sent_at::date = ?
+            GROUP BY vehicle_id");
+        $cmdStmt->execute(array_merge($vids, [$date]));
+        foreach ($cmdStmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            foreach ($vehicles as &$v) {
+                if ($v['id'] == $row['vehicle_id']) {
+                    $v['command_count'] = (int)$row['cnt'];
+                    break;
+                }
+            }
+            unset($v);
+        }
+
+        $this->storeDailyMileage($vehicles, $date);
+
+        return $vehicles;
+    }
+
+    private function storeDailyMileage(array $vehicles, string $date): void {
+        $stmt = $this->db->prepare("INSERT INTO fleet_mileage_reports (vehicle_id, imei, report_date, mileage)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (vehicle_id, report_date) DO UPDATE SET mileage = EXCLUDED.mileage");
+        foreach ($vehicles as $v) {
+            if ($v['daily_mileage'] > 0) {
+                $stmt->execute([$v['id'], $v['imei'], $date, $v['daily_mileage']]);
+            }
+        }
+    }
+
+    public function getFuelReport(string $startDate, string $endDate, ?int $vehicleId = null): array {
+        $sql = "SELECT v.id, v.name, v.plate_number, v.vehicle_type, v.make, v.model, v.fuel_rate,
+                       e.name as assigned_to,
+                       COALESCE(SUM(mr.mileage), 0) as total_mileage,
+                       COUNT(mr.id) as days_reported
+                FROM fleet_vehicles v
+                LEFT JOIN employees e ON v.assigned_employee_id = e.id
+                LEFT JOIN fleet_mileage_reports mr ON v.id = mr.vehicle_id AND mr.report_date BETWEEN ? AND ?
+                WHERE v.imei IS NOT NULL AND v.imei != ''";
+        $params = [$startDate, $endDate];
+        if ($vehicleId) {
+            $sql .= " AND v.id = ?";
+            $params[] = $vehicleId;
+        }
+        $sql .= " GROUP BY v.id, v.name, v.plate_number, v.vehicle_type, v.make, v.model, v.fuel_rate, e.name
+                  ORDER BY v.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        foreach ($results as &$r) {
+            $fuelRate = (float)($r['fuel_rate'] ?? 0);
+            $totalKm = (float)$r['total_mileage'];
+            $r['fuel_consumed'] = ($fuelRate > 0 && $totalKm > 0) ? round($totalKm * $fuelRate / 100, 2) : 0;
+        }
+        unset($r);
+
+        return $results;
+    }
+
+    public function getSwapHistory(string $startDate, string $endDate, ?int $vehicleId = null): array {
+        $sql = "SELECT va.id, va.vehicle_id, va.employee_id, va.assigned_at, va.returned_at, va.notes,
+                       v.name as vehicle_name, v.plate_number, v.vehicle_type,
+                       e.name as employee_name
+                FROM fleet_vehicle_assignments va
+                JOIN fleet_vehicles v ON va.vehicle_id = v.id
+                JOIN employees e ON va.employee_id = e.id
+                WHERE va.assigned_at::date <= ? AND (va.returned_at IS NULL OR va.returned_at::date >= ?)";
+        $params = [$endDate, $startDate];
+        if ($vehicleId) {
+            $sql .= " AND va.vehicle_id = ?";
+            $params[] = $vehicleId;
+        }
+        $sql .= " ORDER BY va.assigned_at DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getMileageTrend(int $vehicleId, int $days = 30): array {
+        $stmt = $this->db->prepare("SELECT report_date, mileage FROM fleet_mileage_reports 
+            WHERE vehicle_id = ? AND report_date >= CURRENT_DATE - INTERVAL '1 day' * ?
+            ORDER BY report_date ASC");
+        $stmt->execute([$vehicleId, $days]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function updateVehicleFuelRate(int $vehicleId, float $fuelRate): bool {
+        $stmt = $this->db->prepare("UPDATE fleet_vehicles SET fuel_rate = ? WHERE id = ?");
+        return $stmt->execute([$fuelRate, $vehicleId]);
     }
 }
