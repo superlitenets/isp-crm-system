@@ -2933,8 +2933,7 @@ JS;
         if (strcasecmp($encryption, 'Open') === 0) {
             $encParams = [
                 'BeaconType' => 'Basic',
-                'BasicEncryptionModes' => 'None',
-                'BasicAuthenticationMode' => 'None'
+                'BasicEncryptionModes' => 'None'
             ];
         } elseif ($password && strlen($password) >= 8) {
             $encMap = ['AES' => 'AESEncryption', 'TKIP' => 'TKIPEncryption', 'TKIP+AES' => 'TKIPandAESEncryption'];
@@ -3209,9 +3208,6 @@ if (encParams.BeaconType) {
 if (encParams.BasicEncryptionModes) {
   declare(wlanBase + "BasicEncryptionModes", null, {value: encParams.BasicEncryptionModes});
 }
-if (encParams.BasicAuthenticationMode) {
-  declare(wlanBase + "BasicAuthenticationMode", null, {value: encParams.BasicAuthenticationMode});
-}
 if (encParams.IEEE11iAuthenticationMode) {
   declare(wlanBase + "IEEE11iAuthenticationMode", null, {value: encParams.IEEE11iAuthenticationMode});
 }
@@ -3348,7 +3344,6 @@ PROVISION;
                 if (strcasecmp($encryption, 'Open') === 0) {
                     $wlanParams[] = ["{$wlanPath}.BeaconType", 'Basic', 'xsd:string'];
                     $wlanParams[] = ["{$wlanPath}.BasicEncryptionModes", 'None', 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.BasicAuthenticationMode", 'None', 'xsd:string'];
                 } elseif ($password && strlen($password) >= 8) {
                     $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
                     $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
@@ -3427,7 +3422,8 @@ PROVISION;
             
             $faultWarning = '';
             if ($faultCount > 0) {
-                $faultWarning = " WARNING: {$faultCount} task(s) faulted: " . implode('; ', $faultDetails);
+                $flatDetails = array_map(function($d) { return is_array($d) ? json_encode($d) : (string)$d; }, $faultDetails);
+                $faultWarning = " WARNING: {$faultCount} task(s) faulted: " . implode('; ', $flatDetails);
             }
             
             if ($applied) {
