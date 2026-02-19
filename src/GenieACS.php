@@ -2961,31 +2961,66 @@ JS;
         }
         error_log("[executeWifiBridgeConfig] Provision uploaded successfully");
         
-        // Step 2: Queue the provision task with args (no connection_request yet)
+        // Step 2: Queue provision task FIRST (without connection_request)
+        // This ensures the task is always saved, even if the device is unreachable
         $taskArgs = [
             (string)$wifiIndex,
             (string)$vlanId,
-            $ssidName,
-            $password,
+            $ssidName ?: '',
+            $password ?: '',
             $wanConnectionName,
             json_encode($encParams)
         ];
         
-        error_log("[executeWifiBridgeConfig] Queuing provision task with args: wifiIndex={$wifiIndex}, vlanId={$vlanId}, ssid={$ssidName}");
-        $queueResult = $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
+        $taskPayload = json_encode([
             'name' => 'provision',
             'provision' => $provisionName,
             'args' => $taskArgs
         ]);
         
-        if (!($queueResult['success'] ?? false)) {
-            error_log("[executeWifiBridgeConfig] Failed to queue provision task: " . ($queueResult['error'] ?? 'unknown'));
-            return ['success' => false, 'error' => 'Failed to queue provision task: ' . ($queueResult['error'] ?? 'unknown')];
-        }
-        error_log("[executeWifiBridgeConfig] Provision task queued successfully");
+        error_log("[executeWifiBridgeConfig] Step 2: Queuing provision task (no connection_request). URL: {$this->baseUrl}/devices/{$deviceIdEncoded}/tasks");
+        error_log("[executeWifiBridgeConfig] Payload: " . $taskPayload);
         
-        // Step 3: Trigger connection_request to execute the provision
-        error_log("[executeWifiBridgeConfig] Sending connection_request to trigger provision");
+        $taskUrl = $this->baseUrl . "/devices/{$deviceIdEncoded}/tasks";
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $taskUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_FRESH_CONNECT => true,
+            CURLOPT_FORBID_REUSE => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $taskPayload,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen($taskPayload)
+            ]
+        ]);
+        if (!empty($this->username)) {
+            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+        }
+        
+        $queueResponse = curl_exec($ch);
+        $queueCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $queueError = curl_error($ch);
+        $queueErrno = curl_errno($ch);
+        $queueEffUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        curl_close($ch);
+        
+        error_log("[executeWifiBridgeConfig] Queue result: http_code={$queueCode}, curl_errno={$queueErrno}, curl_error={$queueError}, effective_url={$queueEffUrl}, response=" . substr($queueResponse ?: '', 0, 500));
+        
+        if ($queueError) {
+            return ['success' => false, 'error' => "Failed to queue provision task (curl error {$queueErrno}): {$queueError}. URL: {$queueEffUrl}"];
+        }
+        
+        if ($queueCode < 200 || $queueCode >= 300) {
+            return ['success' => false, 'error' => "Failed to queue provision task: HTTP {$queueCode}: " . substr($queueResponse ?: '', 0, 200)];
+        }
+        
+        error_log("[executeWifiBridgeConfig] Provision task queued successfully (HTTP {$queueCode})");
+        
+        // Step 3: Trigger connection_request separately to execute queued tasks
+        error_log("[executeWifiBridgeConfig] Step 3: Sending connection_request to trigger execution");
         $triggerResult = $this->request(
             "POST",
             "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=15000",
@@ -2996,7 +3031,7 @@ JS;
         
         $triggerCode = $triggerResult['http_code'] ?? 0;
         $applied = ($triggerCode === 200);
-        error_log("[executeWifiBridgeConfig] Trigger result: http_code={$triggerCode}, applied=" . ($applied ? 'yes' : 'queued'));
+        error_log("[executeWifiBridgeConfig] Trigger result: http_code={$triggerCode}, applied=" . ($applied ? 'yes' : 'queued') . ", error=" . ($triggerResult['error'] ?? 'none'));
         
         // Step 4: Check for faults after execution
         $faultsResult = $this->getFaults($deviceId);

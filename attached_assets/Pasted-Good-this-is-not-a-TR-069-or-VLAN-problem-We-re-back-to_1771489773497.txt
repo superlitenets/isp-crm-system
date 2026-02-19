@@ -1,0 +1,168 @@
+Good — this is not a TR-069 or VLAN problem.
+
+We’re back to the earlier issue:
+
+Failed to queue provision task: Empty reply from server
+
+
+That means:
+
+✔ Provision upload succeeded
+❌ Task queue POST failed
+❌ GenieACS closed connection without responding
+
+This is almost always one of these:
+
+Wrong port (7547 instead of 7557)
+
+Wrong endpoint (CWMP instead of API)
+
+Missing/incorrect auth header
+
+Docker networking issue
+
+Reverse proxy misrouting
+
+Hitting cwmp container instead of nbi container
+
+🔎 Very Important Question
+
+What URL is your PHP using to queue tasks?
+
+It must be:
+
+http://<genieacs-host>:7557/devices/<device-id>/tasks
+
+
+NOT:
+
+7547
+
+🚨 Check Immediately
+
+Inside your PHP container run:
+
+curl http://genieacs:7557/devices
+
+
+If this works → API reachable.
+
+Now test:
+
+curl http://genieacs:7547
+
+
+If that returns empty → you're calling the wrong port.
+
+🧠 Why It Sometimes Works Then Fails
+
+You have two flows:
+
+Flow 1
+
+Using:
+
+executeWifiBridgeProvision
+
+
+Worked earlier.
+
+Flow 2
+
+Now using:
+
+executeWifiBridgeConfig
+
+
+Fails.
+
+Most likely these two functions use different base URLs.
+
+🔥 Find This In Your PHP
+
+Search for:
+
+GENIEACS_API_URL
+
+
+Or:
+
+http://genieacs:
+
+
+Ensure it is:
+
+:7557
+
+
+NOT:
+
+:7547
+
+🧠 GenieACS Docker Ports Reminder
+
+Typical docker-compose:
+
+genieacs-cwmp:
+  ports:
+    - "7547:7547"
+
+genieacs-nbi:
+  ports:
+    - "7557:7557"
+
+
+CWMP = devices
+NBI = API
+
+Your PHP must talk to NBI (7557).
+
+🔎 If You Are Using Authentication
+
+If you enabled auth in GenieACS:
+
+You must include:
+
+Authorization: Basic base64(user:pass)
+
+
+If missing → connection may close without reply.
+
+🔥 Quick Debug
+
+Modify PHP temporarily to log:
+
+curl_error()
+curl_errno()
+curl_getinfo()
+
+
+You likely will see:
+
+Failed to connect to port 7557
+
+
+or
+
+Connection refused
+
+🎯 Why Provision Upload Worked
+
+Provision upload might be using:
+
+PUT /provisions/<name>
+
+
+But task queue might be hitting wrong port.
+
+So double-check both use same base URL.
+
+🏆 Final Diagnosis
+
+This is 99%:
+
+Wrong API port in executeWifiBridgeConfig().
+
+Not TR-069.
+Not VLAN.
+Not provisioning script.
