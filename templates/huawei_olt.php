@@ -24218,10 +24218,12 @@ function saveDeviceStatus() {
                 const bridgeData = await bridgeResp.json();
 
                 if (bridgeData.success) {
-                    showToast(bridgeData.message || 'WiFi configured with bridge on VLAN ' + vlan, 'success');
+                    const toastType = bridgeData.queued ? 'warning' : 'success';
+                    showToast(bridgeData.message || 'WiFi configured with bridge on VLAN ' + vlan, toastType);
                     bootstrap.Modal.getInstance(document.getElementById('wifiPortConfigModal')).hide();
                     if (typeof loadWiFiFromTR069 === 'function') {
-                        setTimeout(() => loadWiFiFromTR069(), 2000);
+                        const refreshDelay = bridgeData.queued ? 10000 : 2000;
+                        setTimeout(() => loadWiFiFromTR069(), refreshDelay);
                     }
                 } else {
                     showToast('Configuration failed: ' + (bridgeData.error || 'Unknown error'), 'danger');
