@@ -3019,25 +3019,39 @@ JS;
         
         error_log("[executeWifiBridgeConfig] Provision task queued successfully (HTTP {$queueCode})");
         
-        // Step 3: Send connection_request as best-effort acceleration
-        // If device is online, it executes immediately. If not, task runs on next Inform.
-        // Never depend on this result - the task is already queued.
+        // Step 3: Push immediately via connection_request (same pattern as PPPoE tasks)
+        // Task is already queued in Step 2, so even if this fails the task will run on next Inform.
         $applied = false;
-        try {
-            error_log("[executeWifiBridgeConfig] Step 3: Sending best-effort connection_request");
-            $triggerResult = $this->request(
-                "POST",
-                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=8000",
-                ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.DeviceInfo.SoftwareVersion']],
-                [],
-                15
-            );
-            $triggerCode = $triggerResult['http_code'] ?? 0;
-            $applied = ($triggerCode === 200);
-            error_log("[executeWifiBridgeConfig] connection_request result: http_code={$triggerCode}, applied=" . ($applied ? 'yes' : 'no'));
-        } catch (\Exception $e) {
-            error_log("[executeWifiBridgeConfig] connection_request failed (non-fatal): " . $e->getMessage());
+        error_log("[executeWifiBridgeConfig] Step 3: Pushing via connection_request for immediate execution");
+        $crUrl = $this->baseUrl . "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=15000";
+        $crPayload = json_encode([
+            'name' => 'getParameterValues',
+            'parameterNames' => ['InternetGatewayDevice.DeviceInfo.SoftwareVersion']
+        ]);
+        $ch3 = curl_init();
+        curl_setopt_array($ch3, [
+            CURLOPT_URL => $crUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_FRESH_CONNECT => true,
+            CURLOPT_FORBID_REUSE => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $crPayload,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen($crPayload)
+            ]
+        ]);
+        if (!empty($this->username)) {
+            curl_setopt($ch3, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
         }
+        $crResponse = curl_exec($ch3);
+        $crCode = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
+        $crError = curl_error($ch3);
+        curl_close($ch3);
+        
+        $applied = ($crCode === 200);
+        error_log("[executeWifiBridgeConfig] connection_request result: http_code={$crCode}, applied=" . ($applied ? 'yes' : 'pending') . ", curl_error=" . ($crError ?: 'none'));
         
         // Step 4: Check for faults after execution
         $faultsResult = $this->getFaults($deviceId);
