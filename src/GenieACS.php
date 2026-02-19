@@ -99,7 +99,7 @@ class GenieACS {
         return $result;
     }
     
-    private function request(string $method, string $endpoint, ?array $data = null, array $query = []): array {
+    private function request(string $method, string $endpoint, ?array $data = null, array $query = [], ?int $curlTimeout = null): array {
         $url = $this->baseUrl . $endpoint;
         if (!empty($query)) {
             $url .= '?' . http_build_query($query);
@@ -109,7 +109,7 @@ class GenieACS {
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_TIMEOUT => $curlTimeout ?? $this->timeout,
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
@@ -2900,10 +2900,10 @@ JS;
         }
         error_log("[executeWifiBridgeProvision] Provision uploaded successfully");
         
-        // Execute the provision as a task with connection_request
-        $taskResult = $this->request(
+        // Step 1: Queue the provision task WITHOUT connection_request (instant return)
+        $queueResult = $this->request(
             "POST",
-            "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=60000",
+            "/devices/{$deviceIdEncoded}/tasks",
             [
                 'name' => 'provision',
                 'provision' => $provisionName,
@@ -2922,10 +2922,36 @@ JS;
             ]
         );
         
-        $httpCode = $taskResult['http_code'] ?? 0;
-        error_log("[executeWifiBridgeProvision] Task result: success=" . json_encode($taskResult['success'] ?? false) . ", http_code={$httpCode}");
+        if (!($queueResult['success'] ?? false)) {
+            error_log("[executeWifiBridgeProvision] Failed to queue provision task: " . ($queueResult['error'] ?? 'unknown'));
+            return $queueResult;
+        }
+        error_log("[executeWifiBridgeProvision] Provision task queued successfully");
         
-        return $taskResult;
+        // Step 2: Send connection_request with short timeout to nudge the device
+        // Use a 15-second timeout to quickly check if device responds
+        // cURL timeout must be longer than GenieACS timeout to avoid "empty reply"
+        $triggerResult = $this->request(
+            "POST",
+            "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=15000",
+            [
+                'name' => 'getParameterValues',
+                'parameterNames' => ['InternetGatewayDevice.DeviceInfo.SoftwareVersion']
+            ],
+            [],
+            25
+        );
+        
+        $httpCode = $triggerResult['http_code'] ?? 0;
+        error_log("[executeWifiBridgeProvision] Connection request result: http_code={$httpCode}");
+        
+        // If device responded (200), the provision executed in that session
+        if ($httpCode === 200) {
+            return ['success' => true, 'http_code' => 200, 'data' => $triggerResult['data'] ?? null];
+        }
+        
+        // 202 = device didn't respond, but provision is queued and will execute on next inform
+        return ['success' => true, 'http_code' => 202, 'data' => $triggerResult['data'] ?? null];
     }
     
     /**
@@ -3172,22 +3198,18 @@ PROVISION;
                 
                 error_log("[configureWifiAccessVlan] Existing bridge found: WAN device={$wanDeviceIndex}, IP={$ipIndex}, route={$routeIndex}. Updating VLAN to {$vlanId}");
                 
-                $setVlanResult = $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    [
-                        'name' => 'setParameterValues',
-                        'parameterValues' => [
-                            ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
-                            ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
-                            ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
-                            ["{$wanIpPath}.X_HW_VLANPriority", 0, 'xsd:unsignedInt']
-                        ]
+                // Queue VLAN update task
+                $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
+                    'name' => 'setParameterValues',
+                    'parameterValues' => [
+                        ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
+                        ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
+                        ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
+                        ["{$wanIpPath}.X_HW_VLANPriority", 0, 'xsd:unsignedInt']
                     ]
-                );
-                $results[] = ['step' => 'update_existing_vlan', 'result' => $setVlanResult];
-                usleep(500000);
+                ]);
                 
+                // Queue WLAN config task
                 $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
                 $wlanParams = [
                     ["{$wlanPath}.Enable", true, 'xsd:boolean'],
@@ -3209,23 +3231,37 @@ PROVISION;
                     $wlanParams[] = ["{$wlanPath}.IEEE11iEncryptionModes", $encValue, 'xsd:string'];
                     $wlanParams[] = ["{$wlanPath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
                 }
-                $setWlanResult = $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    [
-                        'name' => 'setParameterValues',
-                        'parameterValues' => $wlanParams
-                    ]
-                );
-                $results[] = ['step' => 'set_wlan_config', 'result' => $setWlanResult];
-                error_log("[configureWifiAccessVlan] Existing bridge: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged') . ", encryption={$encryption}");
+                $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
+                    'name' => 'setParameterValues',
+                    'parameterValues' => $wlanParams
+                ]);
                 
+                // Trigger connection_request to push tasks
+                $triggerResult = $this->request(
+                    "POST",
+                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=15000",
+                    ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.DeviceInfo.SoftwareVersion']],
+                    [],
+                    25
+                );
+                $triggerCode = $triggerResult['http_code'] ?? 0;
+                $applied = ($triggerCode === 200);
+                error_log("[configureWifiAccessVlan] Existing bridge update: WLAN {$wifiIndex}, VLAN {$vlanId}, applied=" . ($applied ? 'yes' : 'queued'));
+                
+                if ($applied) {
+                    return [
+                        'success' => true,
+                        'message' => "WiFi {$wifiIndex} bridge updated to VLAN {$vlanId} - applied to device",
+                        'applied' => true,
+                        'results' => $results
+                    ];
+                }
                 return [
                     'success' => true,
-                    'message' => "WiFi {$wifiIndex} bridge updated to VLAN {$vlanId} (reused existing WAN {$wanDeviceIndex})",
-                    'results' => $results,
-                    'wan_name' => $wanName,
-                    'ssid_port' => $ssidPortName
+                    'message' => "WiFi {$wifiIndex} bridge update to VLAN {$vlanId} queued. It will apply when the device checks in.",
+                    'applied' => false,
+                    'queued' => true,
+                    'results' => $results
                 ];
             }
             
@@ -3348,12 +3384,15 @@ PROVISION;
                 ]
             ]);
             
-            // Now trigger ONE connection_request with longer timeout to execute all queued tasks
+            // Now trigger ONE connection_request with short timeout to nudge the device
+            // cURL timeout (25s) > GenieACS timeout (15s) to avoid "empty reply" errors
             error_log("[configureWifiAccessVlan] Fallback: Sending connection_request to trigger all queued tasks");
             $triggerResult = $this->request(
                 "POST",
-                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=60000",
-                ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']]
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=15000",
+                ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']],
+                [],
+                25
             );
             
             $triggerCode = $triggerResult['http_code'] ?? 0;

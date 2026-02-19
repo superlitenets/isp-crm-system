@@ -1,0 +1,22 @@
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Serial: HWTCF1093979, WiFi Index: 4, VLAN: 660, SSID: VVVV, Password: empty, Encryption: Open
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Found device: 00259E-HG8546M-48575443F1093979, calling configureWifiAccessVlan
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Starting: device=00259E-HG8546M-48575443F1093979, wlan=4, vlan=660, ssid=VVVV
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Creating new bridge: WAN device=2, route=1, existingWAN=[1], existingRoutes=[]
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeProvision] Provision uploaded successfully
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:10:10:01 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:10:10:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:10:10:00 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:10:10:09 +0300 "GET /index.php" 302
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:10:10:16 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:10:10:01 +0300 "GET /cron.php" 200
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeProvision] Task result: success=false, http_code=0
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Provision failed: Empty reply from server. Falling back to task-based approach.
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback: Queuing WLAN config task
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback: Queuing addObject WANConnectionDevice
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback: Queuing addObject WANIPConnection under WAN device 2
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback: Queuing setParameterValues for bridge on InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback: Queuing addObject policy_route
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback: Queuing setParameterValues for policy route 1
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback: Sending connection_request to trigger all queued tasks
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Fallback trigger result: http_code=202, applied=queued
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Result: {"success":true,"message":"WiFi 4 configuration with VLAN 660 queued. It will apply when the device checks in (usually within a few minutes). You can click 'Refresh' on the device page to check status.","errors":[]}
