@@ -3481,28 +3481,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 echo json_encode($bridgeResult);
                 exit;
 
-            case 'clear_device_faults':
-                require_once __DIR__ . '/../src/GenieACS.php';
-                header('Content-Type: application/json');
-                
-                $serial = $_POST['serial'] ?? '';
-                if (empty($serial)) {
-                    echo json_encode(['success' => false, 'error' => 'Serial number required']);
-                    exit;
-                }
-                
-                $genieacs = new \App\GenieACS($db);
-                $deviceResult = $genieacs->getDeviceBySerial($serial);
-                if (!($deviceResult['success'] ?? false) || empty($deviceResult['device'])) {
-                    echo json_encode(['success' => false, 'error' => 'Device not found in TR-069']);
-                    exit;
-                }
-                
-                $deviceId = $deviceResult['device']['_id'];
-                $clearResult = $genieacs->clearDeviceFaultsAndTasks($deviceId);
-                echo json_encode($clearResult);
-                exit;
-
             case 'save_device_params':
                 // Save device parameters (batch update)
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -18437,9 +18415,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearDeviceFaults(document.getElementById('wifiPortSerial').value)" title="Clear stuck tasks and faults from GenieACS">
-                        <i class="bi bi-x-circle me-1"></i>Clear Queue
-                    </button>
                     <button type="button" class="btn btn-primary btn-sm" onclick="saveWifiPortConfig()">
                         <i class="bi bi-check-lg me-1"></i>Save Configuration
                     </button>
@@ -24208,27 +24183,6 @@ function saveDeviceStatus() {
             vlanInput.required = false;
         }
     }
-    async function clearDeviceFaults(serial) {
-        if (!serial) {
-            showToast("No device serial number", "danger");
-            return;
-        }
-        try {
-            const resp = await fetch("?page=huawei-olt&t=" + Date.now(), {
-                method: "POST",
-                headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                body: "action=clear_device_faults&serial=" + encodeURIComponent(serial)
-            });
-            const data = await resp.json();
-            if (data.success) {
-                showToast(data.message || "Faults cleared", "success");
-            } else {
-                showToast("Failed: " + (data.error || "Unknown error"), "danger");
-            }
-        } catch (e) {
-            showToast("Error clearing faults: " + e.message, "danger");
-        }
-    }
     // Save WiFi port configuration via TR-069
     async function saveWifiPortConfig() {
         const serial = document.getElementById('wifiPortSerial').value;
@@ -24264,12 +24218,10 @@ function saveDeviceStatus() {
                 const bridgeData = await bridgeResp.json();
 
                 if (bridgeData.success) {
-                    const toastType = bridgeData.queued ? 'warning' : 'success';
-                    showToast(bridgeData.message || 'WiFi configured with bridge on VLAN ' + vlan, toastType);
+                    showToast(bridgeData.message || 'WiFi configured with bridge on VLAN ' + vlan, 'success');
                     bootstrap.Modal.getInstance(document.getElementById('wifiPortConfigModal')).hide();
                     if (typeof loadWiFiFromTR069 === 'function') {
-                        const refreshDelay = bridgeData.queued ? 10000 : 2000;
-                        setTimeout(() => loadWiFiFromTR069(), refreshDelay);
+                        setTimeout(() => loadWiFiFromTR069(), 2000);
                     }
                 } else {
                     showToast('Configuration failed: ' + (bridgeData.error || 'Unknown error'), 'danger');
