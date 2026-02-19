@@ -976,6 +976,57 @@ class GenieACS {
         return $this->request('DELETE', "/faults/{$faultId}");
     }
     
+    public function clearDeviceFaultsAndTasks(string $deviceId): array {
+        $cleared = ['faults' => 0, 'tasks' => 0, 'errors' => []];
+        
+        $faults = $this->getFaults($deviceId);
+        if (!($faults['success'] ?? false)) {
+            $cleared['errors'][] = 'Failed to fetch faults: ' . ($faults['error'] ?? 'unknown');
+        } elseif (!empty($faults['data'])) {
+            $faultList = is_string($faults['data']) ? json_decode($faults['data'], true) : $faults['data'];
+            if (is_array($faultList)) {
+                foreach ($faultList as $fault) {
+                    $faultId = $fault['_id'] ?? null;
+                    if ($faultId) {
+                        $result = $this->deleteFault($faultId);
+                        if ($result['success'] ?? false) {
+                            $cleared['faults']++;
+                        } else {
+                            $cleared['errors'][] = "Fault {$faultId}: " . ($result['error'] ?? 'unknown');
+                        }
+                    }
+                }
+            }
+        }
+        
+        $tasks = $this->getTasks($deviceId);
+        if (!($tasks['success'] ?? false)) {
+            $cleared['errors'][] = 'Failed to fetch tasks: ' . ($tasks['error'] ?? 'unknown');
+        } elseif (!empty($tasks['data'])) {
+            $taskList = is_string($tasks['data']) ? json_decode($tasks['data'], true) : $tasks['data'];
+            if (is_array($taskList)) {
+                foreach ($taskList as $task) {
+                    $taskId = $task['_id'] ?? null;
+                    if ($taskId) {
+                        $result = $this->deleteTask($taskId);
+                        if ($result['success'] ?? false) {
+                            $cleared['tasks']++;
+                        } else {
+                            $cleared['errors'][] = "Task {$taskId}: " . ($result['error'] ?? 'unknown');
+                        }
+                    }
+                }
+            }
+        }
+        
+        $hasErrors = !empty($cleared['errors']);
+        $cleared['success'] = !$hasErrors;
+        $cleared['message'] = $hasErrors
+            ? "Cleared {$cleared['faults']} faults and {$cleared['tasks']} tasks, but encountered errors"
+            : "Cleared {$cleared['faults']} faults and {$cleared['tasks']} pending tasks";
+        return $cleared;
+    }
+    
     public function getPresets(): array {
         return $this->request('GET', '/presets');
     }
@@ -3198,6 +3249,11 @@ PROVISION;
                 
                 error_log("[configureWifiAccessVlan] Existing bridge found: WAN device={$wanDeviceIndex}, IP={$ipIndex}, route={$routeIndex}. Updating VLAN to {$vlanId}");
                 
+                $clearResult = $this->clearDeviceFaultsAndTasks($deviceId);
+                if (!empty($clearResult['errors'])) {
+                    error_log("[configureWifiAccessVlan] Warning: errors clearing faults: " . json_encode($clearResult['errors']));
+                }
+                
                 // Queue VLAN update task
                 $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
                     'name' => 'setParameterValues',
@@ -3273,40 +3329,15 @@ PROVISION;
             
             error_log("[configureWifiAccessVlan] Creating new bridge: WAN device={$wanDeviceIndex}, route={$routeIndex}, existingWAN=" . json_encode($existingWanIndices) . ", existingRoutes=" . json_encode($existingRouteIndices));
             
-            // Use GenieACS provision for atomic execution in a single device session
-            $provisionResult = $this->executeWifiBridgeProvision(
-                $deviceId, $wifiIndex, $vlanId, $ssidName, $password, $encryption,
-                $existingWanCount, $existingRouteCount, $ssidPortName, $wanConnectionName
-            );
-            
-            if ($provisionResult['success']) {
-                $httpCode = $provisionResult['http_code'] ?? 0;
-                $applied = ($httpCode === 200);
-                
-                error_log("[configureWifiAccessVlan] Provision result: http_code={$httpCode}, applied=" . ($applied ? 'yes' : 'queued'));
-                
-                if ($applied) {
-                    return [
-                        'success' => true,
-                        'message' => "WiFi {$wifiIndex} configured with VLAN {$vlanId} in Bridge mode - applied to device",
-                        'applied' => true,
-                        'results' => $results
-                    ];
-                } else {
-                    return [
-                        'success' => true,
-                        'message' => "WiFi {$wifiIndex} configuration with VLAN {$vlanId} queued. It will apply when the device checks in (usually within a few minutes). You can click 'Refresh' on the device page to check status.",
-                        'applied' => false,
-                        'queued' => true,
-                        'results' => $results
-                    ];
-                }
+            $clearResult = $this->clearDeviceFaultsAndTasks($deviceId);
+            if (!empty($clearResult['errors'])) {
+                error_log("[configureWifiAccessVlan] Warning: errors clearing faults/tasks: " . json_encode($clearResult['errors']));
+            } else {
+                error_log("[configureWifiAccessVlan] Cleared {$clearResult['faults']} faults, {$clearResult['tasks']} tasks before queuing new ones");
             }
             
-            error_log("[configureWifiAccessVlan] Provision failed: " . ($provisionResult['error'] ?? 'unknown') . ". Falling back to task-based approach.");
-            
-            // Fallback: Queue all tasks WITHOUT connection_request, then trigger once
-            // This ensures all tasks execute in a single session when device connects
+            // Queue all tasks WITHOUT connection_request, then trigger once
+            // Tasks execute in FIFO order during a single CWMP session when device checks in
             
             // Task 1: Enable WLAN and set SSID/password/encryption
             $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
