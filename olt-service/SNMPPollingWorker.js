@@ -54,6 +54,8 @@ class SNMPPollingWorker {
         this.signalHistoryInterval = setInterval(() => this.recordSignalHistory(), 5 * 60 * 1000);
         this.mgmtIpInterval = setInterval(() => this.refreshManagementIPs(), 5 * 60 * 1000);
         this.losBackfillInterval = setInterval(() => this.backfillOfflineDownCause(), 10 * 60 * 1000);
+        this.signalCleanupInterval = setInterval(() => this.cleanupSignalHistory(), 6 * 60 * 60 * 1000);
+        setTimeout(() => this.cleanupSignalHistory(), 30000);
         
         setTimeout(() => this.runPolling(), 5000);
         setTimeout(() => this.refreshManagementIPs(), 15000);
@@ -76,6 +78,10 @@ class SNMPPollingWorker {
         if (this.mgmtIpInterval) {
             clearInterval(this.mgmtIpInterval);
             console.log('[SNMP] Stopped Management IP refresh');
+        }
+        if (this.signalCleanupInterval) {
+            clearInterval(this.signalCleanupInterval);
+            console.log('[SNMP] Stopped signal history cleanup');
         }
         if (this.losBackfillInterval) {
             clearInterval(this.losBackfillInterval);
@@ -694,6 +700,21 @@ class SNMPPollingWorker {
             }
         } catch (error) {
             console.error('[SNMP] Failed to record signal history:', error.message);
+        }
+    }
+
+    async cleanupSignalHistory() {
+        try {
+            const retentionDays = 7;
+            const result = await this.pool.query(`
+                DELETE FROM onu_signal_history 
+                WHERE recorded_at < NOW() - INTERVAL '${retentionDays} days'
+            `);
+            if (result.rowCount > 0) {
+                console.log(`[SNMP] Signal history cleanup: removed ${result.rowCount} records older than ${retentionDays} days`);
+            }
+        } catch (error) {
+            console.error('[SNMP] Signal history cleanup failed:', error.message);
         }
     }
 
