@@ -705,7 +705,7 @@ class SNMPPollingWorker {
 
     async cleanupSignalHistory() {
         try {
-            const retentionDays = 7;
+            const retentionDays = 2;
             const result = await this.pool.query(`
                 DELETE FROM onu_signal_history 
                 WHERE recorded_at < NOW() - INTERVAL '${retentionDays} days'
