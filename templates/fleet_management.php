@@ -4,6 +4,7 @@ $fleetTab = $_GET['fleet_tab'] ?? 'overview';
 $vehicles = $fleet->getVehicles();
 $employees = $fleet->getEmployees();
 $csrfToken = \App\Auth::generateToken();
+$fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory' : 'inventory';
 ?>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -35,32 +36,32 @@ $csrfToken = \App\Auth::generateToken();
 
 <ul class="nav nav-pills mb-4">
     <li class="nav-item">
-        <a class="nav-link <?= $fleetTab === 'overview' ? 'active' : '' ?>" href="?page=inventory&tab=fleet&fleet_tab=overview">
+        <a class="nav-link <?= $fleetTab === 'overview' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=overview">
             <i class="bi bi-speedometer2"></i> Overview
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link <?= $fleetTab === 'vehicles' ? 'active' : '' ?>" href="?page=inventory&tab=fleet&fleet_tab=vehicles">
+        <a class="nav-link <?= $fleetTab === 'vehicles' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=vehicles">
             <i class="bi bi-truck"></i> Vehicles
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link <?= $fleetTab === 'tracking' ? 'active' : '' ?>" href="?page=inventory&tab=fleet&fleet_tab=tracking">
+        <a class="nav-link <?= $fleetTab === 'tracking' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=tracking">
             <i class="bi bi-geo-alt"></i> Live Tracking
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link <?= $fleetTab === 'playback' ? 'active' : '' ?>" href="?page=inventory&tab=fleet&fleet_tab=playback">
+        <a class="nav-link <?= $fleetTab === 'playback' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=playback">
             <i class="bi bi-play-circle"></i> Playback
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link <?= $fleetTab === 'geofences' ? 'active' : '' ?>" href="?page=inventory&tab=fleet&fleet_tab=geofences">
+        <a class="nav-link <?= $fleetTab === 'geofences' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=geofences">
             <i class="bi bi-circle"></i> Geofences
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link <?= $fleetTab === 'alarms' ? 'active' : '' ?>" href="?page=inventory&tab=fleet&fleet_tab=alarms">
+        <a class="nav-link <?= $fleetTab === 'alarms' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=alarms">
             <i class="bi bi-bell"></i> Alarms
             <?php $stats = $fleet->getStats(); if ($stats['unacknowledged_alarms'] > 0): ?>
             <span class="badge bg-danger"><?= $stats['unacknowledged_alarms'] ?></span>
@@ -68,7 +69,7 @@ $csrfToken = \App\Auth::generateToken();
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link <?= $fleetTab === 'commands' ? 'active' : '' ?>" href="?page=inventory&tab=fleet&fleet_tab=commands">
+        <a class="nav-link <?= $fleetTab === 'commands' ? 'active' : '' ?>" href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=commands">
             <i class="bi bi-terminal"></i> Commands
         </a>
     </li>
@@ -147,7 +148,7 @@ $csrfToken = \App\Auth::generateToken();
 
     function updatePositions() {
         document.getElementById('map-update-status').textContent = 'Updating...';
-        fetch('?page=inventory&tab=fleet&action=ajax_track')
+        fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_track')
             .then(r => r.json())
             .then(data => {
                 if (data.code === 0 && data.record) {
@@ -261,7 +262,7 @@ $csrfToken = \App\Auth::generateToken();
                                 <button class="btn btn-outline-primary" onclick="editVehicle(<?= htmlspecialchars(json_encode($v)) ?>)" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <a href="?page=inventory&tab=fleet&fleet_tab=tracking&vehicle_id=<?= $v['id'] ?>" class="btn btn-outline-success" title="Track">
+                                <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=tracking&vehicle_id=<?= $v['id'] ?>" class="btn btn-outline-success" title="Track">
                                     <i class="bi bi-geo-alt"></i>
                                 </a>
                                 <button class="btn btn-outline-danger" onclick="confirmDeleteVehicle(<?= $v['id'] ?>, '<?= htmlspecialchars(addslashes($v['name'])) ?>')" title="Delete">
@@ -281,7 +282,7 @@ $csrfToken = \App\Auth::generateToken();
 <div class="modal fade" id="vehicleModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <form method="POST" action="?page=inventory&tab=fleet&action=save_vehicle">
+            <form method="POST" action="?page=<?= $fleetPage ?>&tab=fleet&action=save_vehicle">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <input type="hidden" name="vehicle_id" id="vehicle_id" value="">
                 <div class="modal-header">
@@ -369,7 +370,7 @@ $csrfToken = \App\Auth::generateToken();
 <div class="modal fade" id="deleteVehicleModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" action="?page=inventory&tab=fleet&action=delete_vehicle">
+            <form method="POST" action="?page=<?= $fleetPage ?>&tab=fleet&action=delete_vehicle">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <input type="hidden" name="vehicle_id" id="delete_vehicle_id" value="">
                 <div class="modal-header">
@@ -433,7 +434,7 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
     const btn = this;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Syncing...';
-    fetch('?page=inventory&tab=fleet&action=ajax_sync_devices')
+    fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_sync_devices')
         .then(r => r.json())
         .then(data => {
             if (data.success) {
@@ -524,7 +525,7 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
     function updateTracking() {
         const vehicleId = select.value;
         if (!vehicleId) return;
-        fetch('?page=inventory&tab=fleet&action=ajax_track&vehicle_id=' + vehicleId)
+        fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_track&vehicle_id=' + vehicleId)
             .then(r => r.json())
             .then(data => {
                 if (data.code === 0 && data.record && data.record.length > 0) {
@@ -556,7 +557,7 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
         if (!vehicleId) return;
         if (!confirm('Send command: ' + command + '?')) return;
 
-        fetch('?page=inventory&tab=fleet&action=ajax_send_command', {
+        fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_send_command', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'vehicle_id=' + vehicleId + '&command=' + encodeURIComponent(command) + '&csrf_token=' + encodeURIComponent('<?= htmlspecialchars($csrfToken) ?>')
@@ -676,7 +677,7 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
         this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading...';
         stopAnimation();
 
-        fetch('?page=inventory&tab=fleet&action=ajax_playback&vehicle_id=' + vehicleId + '&begintime=' + beginTs + '&endtime=' + endTs)
+        fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_playback&vehicle_id=' + vehicleId + '&begintime=' + beginTs + '&endtime=' + endTs)
             .then(r => r.json())
             .then(data => {
                 if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
@@ -771,7 +772,7 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
         <div class="card mb-3">
             <div class="card-header"><h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add Geofence</h5></div>
             <div class="card-body">
-                <form method="POST" action="?page=inventory&tab=fleet&action=save_geofence">
+                <form method="POST" action="?page=<?= $fleetPage ?>&tab=fleet&action=save_geofence">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                     <div class="mb-3">
                         <label class="form-label">Name *</label>
@@ -824,7 +825,7 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
                                 | <?= $gf['alarm_type'] == 1 ? 'Enter' : ($gf['alarm_type'] == 2 ? 'Exit' : 'Enter/Exit') ?>
                             </small>
                         </div>
-                        <form method="POST" action="?page=inventory&tab=fleet&action=delete_geofence" class="d-inline" onsubmit="return confirm('Delete this geofence?')">
+                        <form method="POST" action="?page=<?= $fleetPage ?>&tab=fleet&action=delete_geofence" class="d-inline" onsubmit="return confirm('Delete this geofence?')">
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                             <input type="hidden" name="geofence_id" value="<?= $gf['id'] ?>">
                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
@@ -968,7 +969,7 @@ $alarms = $fleet->getAlarms($alarmFilters);
                         </td>
                         <td>
                             <?php if (!$alarm['acknowledged']): ?>
-                            <form method="POST" action="?page=inventory&tab=fleet&action=acknowledge_alarm" class="d-inline">
+                            <form method="POST" action="?page=<?= $fleetPage ?>&tab=fleet&action=acknowledge_alarm" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                                 <input type="hidden" name="alarm_id" value="<?= $alarm['id'] ?>">
                                 <button type="submit" class="btn btn-sm btn-outline-success" title="Acknowledge">

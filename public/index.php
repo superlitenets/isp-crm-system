@@ -2387,6 +2387,70 @@ if ($page === 'isp_inventory') {
                     }
                     header('Location: ?page=isp_inventory&tab=maintenance');
                     exit;
+
+                case 'fleet':
+                    $fleet = new \App\FleetManagement($db);
+                    if ($ispAction === 'save_vehicle') {
+                        $data = [
+                            'name' => $_POST['name'],
+                            'plate_number' => $_POST['plate_number'] ?? null,
+                            'imei' => $_POST['imei'] ?? null,
+                            'vehicle_type' => $_POST['vehicle_type'] ?? 'car',
+                            'make' => $_POST['make'] ?? null,
+                            'model' => $_POST['model'] ?? null,
+                            'year' => $_POST['year'] ?? null,
+                            'color' => $_POST['color'] ?? null,
+                            'assigned_employee_id' => $_POST['assigned_employee_id'] ?? null,
+                            'status' => $_POST['status'] ?? 'active',
+                            'notes' => $_POST['notes'] ?? null
+                        ];
+                        $vid = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : (!empty($_POST['id']) ? (int)$_POST['id'] : null);
+                        if ($vid) {
+                            $fleet->updateVehicle($vid, $data);
+                            $_SESSION['success_message'] = 'Vehicle updated successfully!';
+                        } else {
+                            $fleet->addVehicle($data);
+                            $_SESSION['success_message'] = 'Vehicle added successfully!';
+                        }
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=isp_inventory&tab=fleet&fleet_tab=vehicles');
+                        exit;
+                    } elseif ($ispAction === 'delete_vehicle') {
+                        $vid = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : (int)($_POST['id'] ?? 0);
+                        $fleet->deleteVehicle($vid);
+                        $_SESSION['success_message'] = 'Vehicle deleted successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=isp_inventory&tab=fleet&fleet_tab=vehicles');
+                        exit;
+                    } elseif ($ispAction === 'save_geofence' || $ispAction === 'add_geofence') {
+                        $fleet->addGeofence([
+                            'name' => $_POST['name'],
+                            'geofence_type' => $_POST['geofence_type'] ?? 'circle',
+                            'latitude' => (float)($_POST['latitude'] ?? 0),
+                            'longitude' => (float)($_POST['longitude'] ?? 0),
+                            'radius' => (int)($_POST['radius'] ?? 500),
+                            'alarm_type' => (int)($_POST['alarm_type'] ?? 2)
+                        ]);
+                        $_SESSION['success_message'] = 'Geofence created successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=isp_inventory&tab=fleet&fleet_tab=geofences');
+                        exit;
+                    } elseif ($ispAction === 'delete_geofence') {
+                        $gid = !empty($_POST['geofence_id']) ? (int)$_POST['geofence_id'] : (int)($_POST['id'] ?? 0);
+                        $fleet->deleteGeofence($gid);
+                        $_SESSION['success_message'] = 'Geofence deleted successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=isp_inventory&tab=fleet&fleet_tab=geofences');
+                        exit;
+                    } elseif ($ispAction === 'acknowledge_alarm') {
+                        $aid = !empty($_POST['alarm_id']) ? (int)$_POST['alarm_id'] : (int)($_POST['id'] ?? 0);
+                        $fleet->acknowledgeAlarm($aid, (int)$_SESSION['employee_id']);
+                        $_SESSION['success_message'] = 'Alarm acknowledged.';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=isp_inventory&tab=fleet&fleet_tab=alarms');
+                        exit;
+                    }
+                    break;
             }
         } catch (\Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
@@ -8567,8 +8631,9 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                             'status' => $_POST['status'] ?? 'active',
                             'notes' => $_POST['notes'] ?? null
                         ];
-                        if (!empty($_POST['id'])) {
-                            $fleet->updateVehicle((int)$_POST['id'], $data);
+                        $vid = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : (!empty($_POST['id']) ? (int)$_POST['id'] : null);
+                        if ($vid) {
+                            $fleet->updateVehicle($vid, $data);
                             $_SESSION['success_message'] = 'Vehicle updated successfully!';
                         } else {
                             $fleet->addVehicle($data);
@@ -8578,12 +8643,13 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         header('Location: ?page=inventory&tab=fleet&fleet_tab=vehicles');
                         exit;
                     } elseif ($inventoryAction === 'delete_vehicle') {
-                        $fleet->deleteVehicle((int)$_POST['id']);
+                        $vid = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : (int)($_POST['id'] ?? 0);
+                        $fleet->deleteVehicle($vid);
                         $_SESSION['success_message'] = 'Vehicle deleted successfully!';
                         \App\Auth::regenerateToken();
                         header('Location: ?page=inventory&tab=fleet&fleet_tab=vehicles');
                         exit;
-                    } elseif ($inventoryAction === 'add_geofence') {
+                    } elseif ($inventoryAction === 'save_geofence' || $inventoryAction === 'add_geofence') {
                         $fleet->addGeofence([
                             'name' => $_POST['name'],
                             'geofence_type' => $_POST['geofence_type'] ?? 'circle',
@@ -8597,13 +8663,15 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         header('Location: ?page=inventory&tab=fleet&fleet_tab=geofences');
                         exit;
                     } elseif ($inventoryAction === 'delete_geofence') {
-                        $fleet->deleteGeofence((int)$_POST['id']);
+                        $gid = !empty($_POST['geofence_id']) ? (int)$_POST['geofence_id'] : (int)($_POST['id'] ?? 0);
+                        $fleet->deleteGeofence($gid);
                         $_SESSION['success_message'] = 'Geofence deleted successfully!';
                         \App\Auth::regenerateToken();
                         header('Location: ?page=inventory&tab=fleet&fleet_tab=geofences');
                         exit;
                     } elseif ($inventoryAction === 'acknowledge_alarm') {
-                        $fleet->acknowledgeAlarm((int)$_POST['id'], (int)$_SESSION['employee_id']);
+                        $aid = !empty($_POST['alarm_id']) ? (int)$_POST['alarm_id'] : (int)($_POST['id'] ?? 0);
+                        $fleet->acknowledgeAlarm($aid, (int)$_SESSION['employee_id']);
                         $_SESSION['success_message'] = 'Alarm acknowledged.';
                         \App\Auth::regenerateToken();
                         header('Location: ?page=inventory&tab=fleet&fleet_tab=alarms');
@@ -8618,7 +8686,7 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Handle Fleet Management AJAX endpoints
-if ($page === 'inventory' && ($tab ?? $_GET['tab'] ?? '') === 'fleet' && !empty($_GET['action'])) {
+if (in_array($page, ['inventory', 'isp_inventory']) && ($tab ?? $_GET['tab'] ?? '') === 'fleet' && !empty($_GET['action'])) {
     if (!\App\Auth::can('inventory.view')) {
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'error' => 'Access denied']);

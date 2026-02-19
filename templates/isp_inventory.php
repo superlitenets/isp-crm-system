@@ -323,6 +323,7 @@ $olts = $ispInv->getOLTs();
         <li><a href="?page=isp_inventory&tab=warehouse" class="<?= $tab === 'warehouse' ? 'active' : '' ?>"><i class="bi bi-box-seam"></i> Warehouse</a></li>
         <li><a href="?page=isp_inventory&tab=assets" class="<?= $tab === 'assets' ? 'active' : '' ?>"><i class="bi bi-tools"></i> Field Assets</a></li>
         <li><a href="?page=isp_inventory&tab=maintenance" class="<?= $tab === 'maintenance' ? 'active' : '' ?>"><i class="bi bi-wrench"></i> Maintenance</a></li>
+        <li><a href="?page=isp_inventory&tab=fleet" class="<?= $tab === 'fleet' ? 'active' : '' ?>"><i class="bi bi-truck"></i> Fleet Management</a></li>
     </ul>
 </aside>
 
@@ -1870,6 +1871,9 @@ $olts = $ispInv->getOLTs();
     </div>
     <?php endif; ?>
 
+    <?php elseif ($tab === 'fleet'): ?>
+    <?php include __DIR__ . '/fleet_management.php'; ?>
+
     <?php endif; ?>
 </div>
 
@@ -1893,6 +1897,7 @@ $olts = $ispInv->getOLTs();
             <li class="mb-1"><a href="?page=isp_inventory&tab=warehouse" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'warehouse' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-box-seam"></i> Warehouse</a></li>
             <li class="mb-1"><a href="?page=isp_inventory&tab=assets" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'assets' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-tools"></i> Field Assets</a></li>
             <li class="mb-1"><a href="?page=isp_inventory&tab=maintenance" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'maintenance' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-wrench"></i> Maintenance</a></li>
+            <li class="mb-1"><a href="?page=isp_inventory&tab=fleet" class="d-flex align-items-center gap-2 p-2 rounded text-decoration-none" style="color: var(--inv-text); <?= $tab === 'fleet' ? 'background: var(--inv-accent-light); color: var(--inv-accent) !important;' : '' ?>"><i class="bi bi-truck"></i> Fleet Management</a></li>
         </ul>
     </div>
 </div>
