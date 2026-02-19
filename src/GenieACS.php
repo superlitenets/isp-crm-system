@@ -2913,12 +2913,14 @@ JS;
      */
     private function executeWifiBridgeProvision(
         string $deviceId, int $wifiIndex, int $vlanId, string $ssidName,
-        string $password, string $encryption, int $existingWanCount,
-        int $existingRouteCount, string $ssidPortName, string $wanConnectionName
+        string $password, string $encryption, string $wanConnectionName = ''
     ): array {
         $deviceIdEncoded = rawurlencode($deviceId);
         
-        // Build encryption parameters for the provision script
+        if (empty($wanConnectionName)) {
+            $wanConnectionName = "WIFI_Bridge_VLAN_{$vlanId}";
+        }
+        
         $encParams = [];
         if (strcasecmp($encryption, 'Open') === 0) {
             $encParams = [
@@ -2939,10 +2941,8 @@ JS;
             ];
         }
         
-        // Build the provision script
         $provisionScript = $this->buildWifiBridgeProvisionScript();
         
-        // Upload provision to GenieACS
         $provisionName = 'configure_wifi_bridge';
         $uploadResult = $this->uploadProvision($provisionName, $provisionScript);
         if (!$uploadResult['success']) {
@@ -2951,7 +2951,6 @@ JS;
         }
         error_log("[executeWifiBridgeProvision] Provision uploaded successfully");
         
-        // Step 1: Queue the provision task WITHOUT connection_request (instant return)
         $queueResult = $this->request(
             "POST",
             "/devices/{$deviceIdEncoded}/tasks",
@@ -2964,9 +2963,6 @@ JS;
                     $ssidName,
                     $password,
                     $encryption,
-                    $existingWanCount,
-                    $existingRouteCount,
-                    $ssidPortName,
                     $wanConnectionName,
                     json_encode($encParams)
                 ]
@@ -2979,9 +2975,6 @@ JS;
         }
         error_log("[executeWifiBridgeProvision] Provision task queued successfully");
         
-        // Step 2: Send connection_request with short timeout to nudge the device
-        // Use a 15-second timeout to quickly check if device responds
-        // cURL timeout must be longer than GenieACS timeout to avoid "empty reply"
         $triggerResult = $this->request(
             "POST",
             "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=15000",
@@ -2996,12 +2989,10 @@ JS;
         $httpCode = $triggerResult['http_code'] ?? 0;
         error_log("[executeWifiBridgeProvision] Connection request result: http_code={$httpCode}");
         
-        // If device responded (200), the provision executed in that session
         if ($httpCode === 200) {
             return ['success' => true, 'http_code' => 200, 'data' => $triggerResult['data'] ?? null];
         }
         
-        // 202 = device didn't respond, but provision is queued and will execute on next inform
         return ['success' => true, 'http_code' => 202, 'data' => $triggerResult['data'] ?? null];
     }
     
@@ -3046,117 +3037,79 @@ JS;
     /**
      * Build the GenieACS provision script for WiFi bridge configuration.
      * This script runs atomically on the device in a single CWMP session.
+     * 
+     * Key rules:
+     * - Uses null for timestamps (not Date.now()) 
+     * - Uses {path: 1} to create ONE new instance
+     * - Uses returned object.path for dynamic path resolution
+     * - Sets X_HW_VLANID directly on WLANConfiguration (no policy routes needed)
+     * - Never modifies existing WANConnectionDevice to avoid breaking customer internet
      */
     private function buildWifiBridgeProvisionScript(): string {
         return <<<'PROVISION'
-const now = Date.now();
-const wifiIndex = args[0];
-const vlanId = args[1];
-const ssidName = args[2];
-const password = args[3];
-const encryption = args[4];
-const existingWanCount = args[5];
-const existingRouteCount = args[6];
-const ssidPortName = args[7];
-const wanConnectionName = args[8];
-const encParamsJson = args[9];
+const wifiIndex = parseInt(args[0]);
+const vlanId = parseInt(args[1]);
+const ssidName = args[2] || "";
+const password = args[3] || "";
+const encryption = args[4] || "AES";
+const wanConnectionName = args[5] || ("WIFI_Bridge_VLAN_" + vlanId);
+const encParamsJson = args[6] || "{}";
 
 let encParams = {};
 try { encParams = JSON.parse(encParamsJson); } catch(e) {}
 
-const wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
+// Step 1: Create a NEW WANConnectionDevice (never modify existing ones)
+let guestWan = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", null, {path: 1});
 
-// Step 1: Enable WLAN
-declare(wlanBase + "Enable", {value: now}, {value: true});
+// Step 2: Create WANIPConnection under the new WANConnectionDevice
+declare(guestWan.path + "WANIPConnection.", null, {path: 1});
+
+// Step 3: Configure the WANIPConnection as a bridge with VLAN
+declare(guestWan.path + "WANIPConnection.1.Enable", null, {value: true});
+declare(guestWan.path + "WANIPConnection.1.ConnectionType", null, {value: "IP_Bridged"});
+declare(guestWan.path + "WANIPConnection.1.NATEnabled", null, {value: false});
+declare(guestWan.path + "WANIPConnection.1.X_HW_VLAN", null, {value: vlanId});
+declare(guestWan.path + "WANIPConnection.1.X_HW_ServiceList", null, {value: "INTERNET"});
+declare(guestWan.path + "WANIPConnection.1.Name", null, {value: wanConnectionName});
+
+// Step 4: Configure WiFi interface - bind to VLAN and set SSID
+const wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
+declare(wlanBase + "Enable", null, {value: true});
+declare(wlanBase + "SSIDAdvertisementEnabled", null, {value: true});
+declare(wlanBase + "X_HW_VLANID", null, {value: vlanId});
+declare(wlanBase + "X_HW_APIsolation", null, {value: true});
+
 if (ssidName) {
-    declare(wlanBase + "SSID", {value: now}, {value: ssidName});
+    declare(wlanBase + "SSID", null, {value: ssidName});
 }
 
-// Apply encryption settings
+// Step 5: Apply encryption settings
 if (encParams.BeaconType) {
-    declare(wlanBase + "BeaconType", {value: now}, {value: encParams.BeaconType});
+    declare(wlanBase + "BeaconType", null, {value: encParams.BeaconType});
 }
 if (encParams.BasicEncryptionModes) {
-    declare(wlanBase + "BasicEncryptionModes", {value: now}, {value: encParams.BasicEncryptionModes});
+    declare(wlanBase + "BasicEncryptionModes", null, {value: encParams.BasicEncryptionModes});
 }
 if (encParams.BasicAuthenticationMode) {
-    declare(wlanBase + "BasicAuthenticationMode", {value: now}, {value: encParams.BasicAuthenticationMode});
+    declare(wlanBase + "BasicAuthenticationMode", null, {value: encParams.BasicAuthenticationMode});
 }
 if (encParams.IEEE11iAuthenticationMode) {
-    declare(wlanBase + "IEEE11iAuthenticationMode", {value: now}, {value: encParams.IEEE11iAuthenticationMode});
+    declare(wlanBase + "IEEE11iAuthenticationMode", null, {value: encParams.IEEE11iAuthenticationMode});
 }
 if (encParams.WPAAuthenticationMode) {
-    declare(wlanBase + "WPAAuthenticationMode", {value: now}, {value: encParams.WPAAuthenticationMode});
+    declare(wlanBase + "WPAAuthenticationMode", null, {value: encParams.WPAAuthenticationMode});
 }
 if (encParams.WPAEncryptionModes) {
-    declare(wlanBase + "WPAEncryptionModes", {value: now}, {value: encParams.WPAEncryptionModes});
+    declare(wlanBase + "WPAEncryptionModes", null, {value: encParams.WPAEncryptionModes});
 }
 if (encParams.IEEE11iEncryptionModes) {
-    declare(wlanBase + "IEEE11iEncryptionModes", {value: now}, {value: encParams.IEEE11iEncryptionModes});
+    declare(wlanBase + "IEEE11iEncryptionModes", null, {value: encParams.IEEE11iEncryptionModes});
 }
 if (encParams.KeyPassphrase) {
-    declare(wlanBase + "PreSharedKey.1.KeyPassphrase", {value: now}, {value: encParams.KeyPassphrase});
+    declare(wlanBase + "PreSharedKey.1.KeyPassphrase", null, {value: encParams.KeyPassphrase});
 }
 
-// Step 2: Create new WANConnectionDevice (ensure existingCount + 1 instances)
-const wanDevBase = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.";
-declare(wanDevBase + "*", {path: now}, {path: existingWanCount + 1});
-
-// Step 3: Refresh to discover the new WANConnectionDevice instances
-let wanDevices = declare(wanDevBase + "*", {path: now});
-let maxWanIdx = 0;
-for (let d of wanDevices) {
-    let parts = d.path.split(".");
-    let idx = parseInt(parts[4]);
-    if (!isNaN(idx) && idx > maxWanIdx) maxWanIdx = idx;
-}
-let wanDeviceIndex = maxWanIdx > 0 ? maxWanIdx : existingWanCount + 1;
-
-// Step 4: Ensure WANIPConnection exists under the new WANConnectionDevice
-const wanIpBase = wanDevBase + wanDeviceIndex + ".WANIPConnection.";
-declare(wanIpBase + "*", {path: now}, {path: 1});
-
-// Refresh to get the WANIPConnection index
-let wanIpConns = declare(wanIpBase + "*", {path: now});
-let ipIdx = 1;
-for (let c of wanIpConns) {
-    let parts = c.path.split(".");
-    let idx = parseInt(parts[6]);
-    if (!isNaN(idx) && idx > 0) { ipIdx = idx; break; }
-}
-
-// Step 5: Configure the WANIPConnection as a bridge
-const wanIpPath = wanIpBase + ipIdx + ".";
-declare(wanIpPath + "Enable", {value: now}, {value: true});
-declare(wanIpPath + "ConnectionType", {value: now}, {value: "IP_Bridged"});
-declare(wanIpPath + "X_HW_ServiceList", {value: now}, {value: "INTERNET"});
-declare(wanIpPath + "X_HW_MulticastVLAN", {value: now}, {value: -1});
-declare(wanIpPath + "Name", {value: now}, {value: wanConnectionName});
-declare(wanIpPath + "X_HW_VLAN", {value: now}, {value: vlanId});
-declare(wanIpPath + "X_HW_VLANPriority", {value: now}, {value: 0});
-
-// Step 6: Create policy route
-const routeBase = "InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.";
-declare(routeBase + "*", {path: now}, {path: existingRouteCount + 1});
-
-// Refresh to get the new route index
-let routes = declare(routeBase + "*", {path: now});
-let maxRouteIdx = 0;
-for (let r of routes) {
-    let parts = r.path.split(".");
-    let idx = parseInt(parts[3]);
-    if (!isNaN(idx) && idx > maxRouteIdx) maxRouteIdx = idx;
-}
-let routeIndex = maxRouteIdx > 0 ? maxRouteIdx : existingRouteCount + 1;
-
-// Step 7: Bind SSID port to WAN bridge via policy route
-const wanName = "wan1." + wanDeviceIndex + ".ip" + ipIdx;
-const routePath = routeBase + routeIndex + ".";
-declare(routePath + "PhyPortName", {value: now}, {value: ssidPortName});
-declare(routePath + "PolicyRouteType", {value: now}, {value: "SourcePhyPort"});
-declare(routePath + "WanName", {value: now}, {value: wanName});
-
-log("WiFi bridge configured: SSID" + wifiIndex + " -> VLAN " + vlanId + " via WAN device " + wanDeviceIndex + ", route " + routeIndex);
+log("WiFi bridge configured: SSID" + wifiIndex + " -> VLAN " + vlanId + " via " + guestWan.path);
 PROVISION;
     }
 
@@ -3321,13 +3274,7 @@ PROVISION;
                 ];
             }
             
-            $wanDeviceIndex = !empty($existingWanIndices) ? max($existingWanIndices) + 1 : 2;
-            $routeIndex = !empty($existingRouteIndices) ? max($existingRouteIndices) + 1 : 1;
-            $wanName = "wan1.{$wanDeviceIndex}.ip1";
-            $existingWanCount = count($existingWanIndices);
-            $existingRouteCount = count($existingRouteIndices);
-            
-            error_log("[configureWifiAccessVlan] Creating new bridge: WAN device={$wanDeviceIndex}, route={$routeIndex}, existingWAN=" . json_encode($existingWanIndices) . ", existingRoutes=" . json_encode($existingRouteIndices));
+            error_log("[configureWifiAccessVlan] Creating new bridge: existingWAN=" . json_encode($existingWanIndices));
             
             $clearResult = $this->clearDeviceFaultsAndTasks($deviceId);
             if (!empty($clearResult['errors'])) {
@@ -3336,99 +3283,25 @@ PROVISION;
                 error_log("[configureWifiAccessVlan] Cleared {$clearResult['faults']} faults, {$clearResult['tasks']} tasks before queuing new ones");
             }
             
-            // Queue all tasks WITHOUT connection_request, then trigger once
-            // Tasks execute in FIFO order during a single CWMP session when device checks in
-            
-            // Task 1: Enable WLAN and set SSID/password/encryption
-            $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
-            $wlanParams = [
-                ["{$wlanPath}.Enable", true, 'xsd:boolean'],
-            ];
-            if ($ssidName) {
-                $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
-            }
-            if (strcasecmp($encryption, 'Open') === 0) {
-                $wlanParams[] = ["{$wlanPath}.BeaconType", 'Basic', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.BasicEncryptionModes", 'None', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.BasicAuthenticationMode", 'None', 'xsd:string'];
-            } elseif ($password && strlen($password) >= 8) {
-                $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                $encMap = ['AES' => 'AESEncryption', 'TKIP' => 'TKIPEncryption', 'TKIP+AES' => 'TKIPandAESEncryption'];
-                $encValue = $encMap[$encryption] ?? 'AESEncryption';
-                $wlanParams[] = ["{$wlanPath}.WPAEncryptionModes", $encValue, 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.IEEE11iEncryptionModes", $encValue, 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
-            }
-            error_log("[configureWifiAccessVlan] Fallback: Queuing WLAN config task");
-            $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
-                'name' => 'setParameterValues',
-                'parameterValues' => $wlanParams
-            ]);
-            
-            // Task 2: Add WANConnectionDevice
-            error_log("[configureWifiAccessVlan] Fallback: Queuing addObject WANConnectionDevice");
-            $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
-                'name' => 'addObject',
-                'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
-            ]);
-            
-            // Task 3: Add WANIPConnection under predicted index
-            error_log("[configureWifiAccessVlan] Fallback: Queuing addObject WANIPConnection under WAN device {$wanDeviceIndex}");
-            $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
-                'name' => 'addObject',
-                'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection."
-            ]);
-            
-            // Task 4: Set bridge parameters
-            $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1";
-            error_log("[configureWifiAccessVlan] Fallback: Queuing setParameterValues for bridge on {$wanIpPath}");
-            $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
-                'name' => 'setParameterValues',
-                'parameterValues' => [
-                    ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
-                    ["{$wanIpPath}.ConnectionType", 'IP_Bridged', 'xsd:string'],
-                    ["{$wanIpPath}.X_HW_ServiceList", 'INTERNET', 'xsd:string'],
-                    ["{$wanIpPath}.X_HW_MulticastVLAN", -1, 'xsd:int'],
-                    ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
-                    ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
-                    ["{$wanIpPath}.X_HW_VLANPriority", 0, 'xsd:unsignedInt']
-                ]
-            ]);
-            
-            // Task 5: Add policy route
-            error_log("[configureWifiAccessVlan] Fallback: Queuing addObject policy_route");
-            $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
-                'name' => 'addObject',
-                'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'
-            ]);
-            
-            // Task 6: Set policy route binding
-            error_log("[configureWifiAccessVlan] Fallback: Queuing setParameterValues for policy route {$routeIndex}");
-            $this->request("POST", "/devices/{$deviceIdEncoded}/tasks", [
-                'name' => 'setParameterValues',
-                'parameterValues' => [
-                    ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", $ssidPortName, 'xsd:string'],
-                    ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
-                    ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string']
-                ]
-            ]);
-            
-            // Now trigger ONE connection_request with short timeout to nudge the device
-            // cURL timeout (25s) > GenieACS timeout (15s) to avoid "empty reply" errors
-            error_log("[configureWifiAccessVlan] Fallback: Sending connection_request to trigger all queued tasks");
-            $triggerResult = $this->request(
-                "POST",
-                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=15000",
-                ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']],
-                [],
-                25
+            // Use provision script for atomic execution in a single CWMP session
+            // This creates a new WANConnectionDevice (never modifying existing ones),
+            // configures bridge with VLAN, and binds WiFi interface - all atomically
+            $provisionResult = $this->executeWifiBridgeProvision(
+                $deviceId, $wifiIndex, $vlanId, $ssidName, $password, $encryption, $wanConnectionName
             );
             
-            $triggerCode = $triggerResult['http_code'] ?? 0;
-            $applied = ($triggerCode === 200);
-            error_log("[configureWifiAccessVlan] Fallback trigger result: http_code={$triggerCode}, applied=" . ($applied ? 'yes' : 'queued'));
+            if (!$provisionResult['success']) {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to queue bridge configuration: ' . ($provisionResult['error'] ?? 'unknown'),
+                    'results' => $results
+                ];
+            }
+            
+            $httpCode = $provisionResult['http_code'] ?? 0;
+            $applied = ($httpCode === 200);
+            
+            error_log("[configureWifiAccessVlan] Provision result: http_code={$httpCode}, applied=" . ($applied ? 'yes' : 'queued'));
             
             if ($applied) {
                 return [
