@@ -2963,7 +2963,9 @@ JS;
         
         // Step 2: Queue provision task FIRST (without connection_request)
         // This ensures the task is always saved, even if the device is unreachable
-        $taskArgs = [
+        // GenieACS API format: name="provisions", provisions=[[scriptName, arg1, arg2, ...]]
+        $provisionArgs = [
+            $provisionName,
             (string)$wifiIndex,
             (string)$vlanId,
             $ssidName ?: '',
@@ -2973,9 +2975,8 @@ JS;
         ];
         
         $taskPayload = json_encode([
-            'name' => 'provision',
-            'provision' => $provisionName,
-            'args' => $taskArgs
+            'name' => 'provisions',
+            'provisions' => [$provisionArgs]
         ]);
         
         error_log("[executeWifiBridgeConfig] Step 2: Queuing provision task (no connection_request). URL: {$this->baseUrl}/devices/{$deviceIdEncoded}/tasks");

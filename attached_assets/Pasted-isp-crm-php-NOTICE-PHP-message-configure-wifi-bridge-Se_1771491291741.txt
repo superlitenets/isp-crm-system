@@ -1,0 +1,29 @@
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Serial: HWTCF1093979, WiFi Index: 4, VLAN: 660, SSID: VXXXXX, Password: empty, Encryption: Open
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Found device: 00259E-HG8546M-48575443F1093979, calling configureWifiAccessVlan
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Starting: device=00259E-HG8546M-48575443F1093979, wlan=4, vlan=660, ssid=VXXXXX
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Creating new bridge: existingWAN=[1]
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Cleared 0 faults, 0 tasks before queuing new ones
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Uploading provision script 'wifi_bridge_config'
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Provision uploaded successfully
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Step 2: Queuing provision task (no connection_request). URL: http://10.200.0.1:7557/devices/00259E-HG8546M-48575443F1093979/tasks
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Payload: {"name":"provision","provision":"wifi_bridge_config","args":["4","660","VXXXXX","","WIFI_Bridge_VLAN_660","{\"BeaconType\":\"Basic\",\"BasicEncryptionModes\":\"None\",\"BasicAuthenticationMode\":\"None\"}"]}
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:53:55 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:00 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:00 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Queue result: http_code=0, curl_errno=28, curl_error=Operation timed out after 15002 milliseconds with 0 bytes received, effective_url=http://10.200.0.1:7557/devices/00259E-HG8546M-48575443F1093979/tasks, response=
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Result: {"success":false,"message":"","errors":[]}
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:53:48 +0300 "POST /index.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:53:55 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:06 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:07 +0300 "POST /index.php" 302
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:08 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:10 +0300 "GET /index.php" 200
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:11 +0300 "GET /index.php" 200
+isp_crm_php  | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Class "Database" not found in /var/www/html/src/Ticket.php:14
+isp_crm_php  | 172.18.0.3 -  19/Feb/2026:11:54:15 +0300 "GET /api/customer-history.php" 500
+isp_crm_php  | Stack trace:
+isp_crm_php  | #0 /var/www/html/public/api/customer-history.php(23): App\Ticket->__construct()
+isp_crm_php  | #1 {main}
+isp_crm_php  |   thrown in /var/www/html/src/Ticket.php on line 14
+^C
+root@superlitecrm:~/isp#
