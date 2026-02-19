@@ -3542,7 +3542,29 @@ class HuaweiOLT {
             $params[] = $boolVal;
         }
         
-        $orderBy = " ORDER BY olt.name, o.frame, o.slot, o.port, o.onu_id";
+        $sortOption = $filters['sort'] ?? 'default';
+        switch ($sortOption) {
+            case 'auth_date_desc':
+                $orderBy = " ORDER BY COALESCE(o.auth_date, o.created_at) DESC NULLS LAST";
+                break;
+            case 'auth_date_asc':
+                $orderBy = " ORDER BY COALESCE(o.auth_date, o.created_at) ASC NULLS LAST";
+                break;
+            case 'name_asc':
+                $orderBy = " ORDER BY o.name ASC NULLS LAST";
+                break;
+            case 'name_desc':
+                $orderBy = " ORDER BY o.name DESC NULLS LAST";
+                break;
+            case 'signal_asc':
+                $orderBy = " ORDER BY CAST(NULLIF(o.rx_power, '') AS DECIMAL) ASC NULLS LAST";
+                break;
+            case 'signal_desc':
+                $orderBy = " ORDER BY CAST(NULLIF(o.rx_power, '') AS DECIMAL) DESC NULLS LAST";
+                break;
+            default:
+                $orderBy = " ORDER BY olt.name, o.frame, o.slot, o.port, o.onu_id";
+        }
         
         // Try enhanced query with ONU types (may fail if tables don't exist yet)
         try {

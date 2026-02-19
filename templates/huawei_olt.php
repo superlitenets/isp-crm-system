@@ -6110,6 +6110,7 @@ if ($view === 'onus' || $view === 'dashboard') {
     if ($oltId) $onuFilters['olt_id'] = $oltId;
     if (!empty($_GET['status'])) $onuFilters['status'] = $_GET['status'];
     if (!empty($_GET['search'])) $onuFilters['search'] = $_GET['search'];
+    if (!empty($_GET['sort'])) $onuFilters['sort'] = $_GET['sort'];
     if (isset($_GET['unconfigured'])) {
         $onuFilters['is_authorized'] = false;
     } else {
@@ -9218,6 +9219,15 @@ try {
                             <option value="online" <?= ($_GET['status'] ?? '') === 'online' ? 'selected' : '' ?>>Online</option>
                             <option value="offline" <?= ($_GET['status'] ?? '') === 'offline' ? 'selected' : '' ?>>Offline</option>
                             <option value="los" <?= ($_GET['status'] ?? '') === 'los' ? 'selected' : '' ?>>LOS</option>
+                        </select>
+                        <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="">Sort: Port</option>
+                            <option value="auth_date_desc" <?= ($_GET['sort'] ?? '') === 'auth_date_desc' ? 'selected' : '' ?>>Auth Date (Newest)</option>
+                            <option value="auth_date_asc" <?= ($_GET['sort'] ?? '') === 'auth_date_asc' ? 'selected' : '' ?>>Auth Date (Oldest)</option>
+                            <option value="name_asc" <?= ($_GET['sort'] ?? '') === 'name_asc' ? 'selected' : '' ?>>Name (A-Z)</option>
+                            <option value="name_desc" <?= ($_GET['sort'] ?? '') === 'name_desc' ? 'selected' : '' ?>>Name (Z-A)</option>
+                            <option value="signal_asc" <?= ($_GET['sort'] ?? '') === 'signal_asc' ? 'selected' : '' ?>>Signal (Weakest)</option>
+                            <option value="signal_desc" <?= ($_GET['sort'] ?? '') === 'signal_desc' ? 'selected' : '' ?>>Signal (Strongest)</option>
                         </select>
                         <input type="text" name="search" class="form-control form-control-sm" placeholder="Search SN/Name..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
                         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
