@@ -1,0 +1,132 @@
+Good — now we know with 100% certainty:
+
+It is NOT security parameters anymore.
+
+You removed BasicAuthenticationMode.
+
+The fault is still:
+
+Invalid parameter path
+at wifi_bridge_config:34:13
+
+
+That means line 34 in your provision script is declaring something that does not exist on this HG8546M firmware.
+
+Since security JSON is now clean, the remaining likely culprit is:
+
+X_HW_VLANID
+
+
+or
+
+X_HW_VLAN
+
+
+or WAN path creation logic.
+
+🔎 Let’s Think Clearly
+
+On Huawei HG8546M:
+
+WiFi interface does NOT have:
+
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.X_HW_VLANID
+
+
+VLAN is NOT set on WLAN object.
+
+VLAN is set on the WAN bridge interface:
+
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.X.WANIPConnection.1.X_HW_VLAN
+
+
+NOT under WLANConfiguration.
+
+🎯 Most Likely Offending Line (Line 34)
+
+Your script probably has something like:
+
+declare(wlanPath + "X_HW_VLANID", null, {value: vlanId});
+
+
+or
+
+declare(wlanPath + "X_HW_VLAN", null, {value: vlanId});
+
+
+That parameter does NOT exist under WLANConfiguration.
+
+That is your fault.
+
+🧠 Why It Still “Works”
+
+Because:
+
+WAN bridge is being created correctly
+
+WiFi SSID enable works
+
+Only the invalid declare throws fault
+
+GenieACS still marks applied
+
+✅ Correct Architecture For Huawei
+
+You must:
+
+1️⃣ Create WAN bridge object
+2️⃣ Set VLAN on WANIPConnection
+3️⃣ Bind SSID to WAN via X_HW_LanInterface or ServiceList
+4️⃣ Do NOT attempt to set VLAN on WLAN object
+
+🚀 Immediate Fix
+
+Open wifi_bridge_config and remove ANY line that sets VLAN under WLANConfiguration.
+
+WiFi SSID section should ONLY contain:
+
+declare(wlanPath + "Enable", null, {value: true});
+declare(wlanPath + "SSID", null, {value: ssid});
+declare(wlanPath + "SSIDAdvertisementEnabled", null, {value: true});
+declare(wlanPath + "BeaconType", null, {value: "Basic"});
+declare(wlanPath + "BasicEncryptionModes", null, {value: "None"});
+declare(wlanPath + "X_HW_APIsolation", null, {value: true});
+
+
+Nothing else.
+
+VLAN belongs ONLY under:
+
+wanPath + "X_HW_VLAN"
+
+🔥 How To Confirm Instantly
+
+In GenieACS UI:
+
+Go to device → search:
+
+WLANConfiguration.4
+
+
+Expand parameters.
+
+If you don’t see:
+
+X_HW_VLAN
+
+
+Then that’s your invalid parameter.
+
+🧠 Why SmartOLT Works
+
+SmartOLT:
+
+Creates WAN bridge
+
+Sets VLAN on WAN
+
+Maps SSID to bridge
+
+Never sets VLAN on WLAN object
+
+Your script slightly mixed models.

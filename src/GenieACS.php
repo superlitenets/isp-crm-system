@@ -3195,8 +3195,7 @@ if (!existing) {
 var wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
 
 declare(wlanBase + "Enable", null, {value: true});
-declare(wlanBase + "X_HW_VLANID", null, {value: vlanId});
-declare(wlanBase + "X_HW_APIsolation", null, {value: true});
+declare(wlanBase + "SSIDAdvertisementEnabled", null, {value: true});
 
 if (ssidName) {
   declare(wlanBase + "SSID", null, {value: ssidName});
