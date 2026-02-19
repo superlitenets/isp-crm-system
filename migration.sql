@@ -490,3 +490,29 @@ DO $$ BEGIN
     ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS fuel_rate DOUBLE PRECISION DEFAULT 0;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
+
+-- Add missing columns to radius_subscriptions (safe to re-run)
+DO $$ BEGIN
+    ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS online_status VARCHAR(20) DEFAULT 'offline';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS framed_ip_address VARCHAR(45);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS last_nas_ip VARCHAR(45);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS needs_disconnect BOOLEAN DEFAULT FALSE;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
