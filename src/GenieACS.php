@@ -3142,7 +3142,7 @@ JS;
      */
     private function buildWifiBridgeProvisionScript(): string {
         return <<<'PROVISION'
-// wifi_bridge_config v5 - wildcard instances + radio enable
+// wifi_bridge_config v6 - fix existing bridge + add policy route binding
 var wifiIndex = args[0];
 var vlanId = parseInt(args[1]);
 var ssidName = args[2] || "";
@@ -3153,28 +3153,26 @@ var encParamsJson = args[5] || "{}";
 var encParams = {};
 try { encParams = JSON.parse(encParamsJson); } catch(e) {}
 
-log("wifi_bridge_config: Starting - SSID" + wifiIndex + " VLAN=" + vlanId + " name=" + wanConnectionName);
+log("wifi_bridge_config v6: Starting - SSID" + wifiIndex + " VLAN=" + vlanId + " name=" + wanConnectionName);
 
 // ==============================
-// CHECK IF VLAN BRIDGE ALREADY EXISTS
+// FIND OR CREATE VLAN BRIDGE
 // ==============================
-var existing = false;
+var bridgeIpPath = "";
 
 var wans = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.*.X_HW_VLAN", {value: 1});
 
 for (var w of wans) {
   if (w.value && w.value[0] == vlanId) {
-    existing = true;
-    log("wifi_bridge_config: VLAN " + vlanId + " bridge already exists at " + w.path + " - skipping creation");
+    var vlanPath = w.path;
+    bridgeIpPath = vlanPath.replace(".X_HW_VLAN", ".");
+    log("wifi_bridge_config: Found existing VLAN " + vlanId + " at " + bridgeIpPath);
     break;
   }
 }
 
-// ==============================
-// CREATE BRIDGE ONLY IF MISSING
-// ==============================
-if (!existing) {
-  log("wifi_bridge_config: No existing VLAN " + vlanId + " bridge found, creating new one");
+if (!bridgeIpPath) {
+  log("wifi_bridge_config: No existing VLAN " + vlanId + " bridge, creating new one");
 
   var wanDevs = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: 1});
   var wanCount = 0;
@@ -3199,19 +3197,73 @@ if (!existing) {
   declare(newWanPath + "WANIPConnection.*", null, {path: 1});
 
   var ipConns = declare(newWanPath + "WANIPConnection.*", {path: 1});
-  var ipPath = "";
   for (var ic of ipConns) {
-    ipPath = ic.path;
+    bridgeIpPath = ic.path;
   }
-  log("wifi_bridge_config: WANIPConnection at " + ipPath);
+  log("wifi_bridge_config: WANIPConnection at " + bridgeIpPath);
+}
 
-  declare(ipPath + "Enable", null, {value: true});
-  declare(ipPath + "ConnectionType", null, {value: "IP_Bridged"});
-  declare(ipPath + "X_HW_VLAN", null, {value: vlanId});
-  declare(ipPath + "X_HW_ServiceList", null, {value: "INTERNET"});
-  declare(ipPath + "Name", null, {value: wanConnectionName});
+// ==============================
+// CONFIGURE BRIDGE (ALWAYS - fixes broken bridges too)
+// ==============================
+declare(bridgeIpPath + "Enable", null, {value: true});
+declare(bridgeIpPath + "ConnectionType", null, {value: "IP_Bridged"});
+declare(bridgeIpPath + "X_HW_VLAN", null, {value: vlanId});
+declare(bridgeIpPath + "X_HW_ServiceList", null, {value: "INTERNET"});
+declare(bridgeIpPath + "Name", null, {value: wanConnectionName});
 
-  log("wifi_bridge_config: Bridge created at " + ipPath);
+log("wifi_bridge_config: Bridge configured at " + bridgeIpPath);
+
+// ==============================
+// BIND SSID TO BRIDGE VIA POLICY ROUTE
+// ==============================
+// Extract the WAN connection name for policy route binding
+// Format: WANConnectionDevice.X.WANIPConnection.Y => "IP_B_X_Y"
+var pathParts = bridgeIpPath.split(".");
+var wanDevIdx = pathParts[4];
+var ipConnIdx = pathParts[6];
+
+// Build the WanName that Huawei expects in policy route
+// Typical format: "1_INTERNET_B_VID_660" or use the connection path
+var ssidPortName = "SSID" + wifiIndex;
+
+// Check existing policy routes to avoid duplicates
+var existingRoutes = declare("InternetGatewayDevice.Layer3Forwarding.X_HW_Policy_route.*", {path: 1});
+var routeExists = false;
+var routeCount = 0;
+for (var er of existingRoutes) {
+  routeCount++;
+  var portCheck = declare(er.path + "PhyPortName", {value: 1});
+  for (var pc of portCheck) {
+    if (pc.value && pc.value[0] == ssidPortName) {
+      routeExists = true;
+      log("wifi_bridge_config: Policy route already exists for " + ssidPortName + " at " + er.path);
+    }
+  }
+}
+
+if (!routeExists) {
+  log("wifi_bridge_config: Creating policy route binding " + ssidPortName + " -> " + wanConnectionName);
+
+  declare("InternetGatewayDevice.Layer3Forwarding.X_HW_Policy_route.*", null, {path: routeCount + 1});
+
+  var newRoutes = declare("InternetGatewayDevice.Layer3Forwarding.X_HW_Policy_route.*", {path: 1});
+  var maxRouteIdx = 0;
+  var newRoutePath = "";
+  for (var nr of newRoutes) {
+    var rParts = nr.path.split(".");
+    var rIdx = parseInt(rParts[3]);
+    if (rIdx > maxRouteIdx) {
+      maxRouteIdx = rIdx;
+      newRoutePath = nr.path;
+    }
+  }
+
+  if (newRoutePath) {
+    declare(newRoutePath + "PhyPortName", null, {value: ssidPortName});
+    declare(newRoutePath + "WanName", null, {value: wanConnectionName});
+    log("wifi_bridge_config: Policy route created at " + newRoutePath);
+  }
 }
 
 // ==============================
@@ -3222,7 +3274,6 @@ var wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiInde
 declare(wlanBase + "Enable", null, {value: true});
 declare(wlanBase + "SSIDAdvertisementEnabled", null, {value: true});
 
-// Enable radio if parameter exists (needed for 5GHz secondary SSIDs)
 var radioCheck = declare(wlanBase + "RadioEnabled", {value: 1});
 var hasRadio = false;
 for (var rc of radioCheck) { hasRadio = true; }
@@ -3257,7 +3308,7 @@ if (encParams.KeyPassphrase) {
   declare(wlanBase + "PreSharedKey.1.KeyPassphrase", null, {value: encParams.KeyPassphrase});
 }
 
-log("wifi_bridge_config: Complete - SSID" + wifiIndex + " -> VLAN " + vlanId);
+log("wifi_bridge_config v6: Complete - SSID" + wifiIndex + " -> VLAN " + vlanId + " bridge=" + bridgeIpPath);
 PROVISION;
     }
 
