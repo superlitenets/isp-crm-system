@@ -3175,18 +3175,42 @@ for (var w of wans) {
 if (!existing) {
   log("wifi_bridge_config: No existing VLAN " + vlanId + " bridge found, creating new one");
 
-  var wan = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", null, {path: 1});
+  var wanDevs = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: 1});
+  var wanCount = 0;
+  for (var wd of wanDevs) { wanCount++; }
+  log("wifi_bridge_config: Current WANConnectionDevice count = " + wanCount);
 
-  var ip = declare(wan.path + "WANIPConnection.", null, {path: 1});
+  declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", null, {path: wanCount + 1});
 
-  declare(ip.path + "Enable", null, {value: true});
-  declare(ip.path + "ConnectionType", null, {value: "IP_Bridged"});
-  declare(ip.path + "NATEnabled", null, {value: false});
-  declare(ip.path + "X_HW_VLAN", null, {value: vlanId});
-  declare(ip.path + "X_HW_ServiceList", null, {value: "INTERNET"});
-  declare(ip.path + "Name", null, {value: wanConnectionName});
+  var newWanDevs = declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: 1});
+  var maxIdx = 0;
+  var newWanPath = "";
+  for (var nd of newWanDevs) {
+    var parts = nd.path.split(".");
+    var idx = parseInt(parts[4]);
+    if (idx > maxIdx) {
+      maxIdx = idx;
+      newWanPath = nd.path;
+    }
+  }
+  log("wifi_bridge_config: New WANConnectionDevice at " + newWanPath);
 
-  log("wifi_bridge_config: Bridge created at " + ip.path);
+  declare(newWanPath + "WANIPConnection.*", null, {path: 1});
+
+  var ipConns = declare(newWanPath + "WANIPConnection.*", {path: 1});
+  var ipPath = "";
+  for (var ic of ipConns) {
+    ipPath = ic.path;
+  }
+  log("wifi_bridge_config: WANIPConnection at " + ipPath);
+
+  declare(ipPath + "Enable", null, {value: true});
+  declare(ipPath + "ConnectionType", null, {value: "IP_Bridged"});
+  declare(ipPath + "X_HW_VLAN", null, {value: vlanId});
+  declare(ipPath + "X_HW_ServiceList", null, {value: "INTERNET"});
+  declare(ipPath + "Name", null, {value: wanConnectionName});
+
+  log("wifi_bridge_config: Bridge created at " + ipPath);
 }
 
 // ==============================
