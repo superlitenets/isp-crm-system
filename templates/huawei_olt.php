@@ -9221,7 +9221,7 @@ try {
                             <option value="los" <?= ($_GET['status'] ?? '') === 'los' ? 'selected' : '' ?>>LOS</option>
                         </select>
                         <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
-                            <option value="">Sort: Port</option>
+                            <option value="default">Sort: Port</option>
                             <option value="auth_date_desc" <?= ($_GET['sort'] ?? '') === 'auth_date_desc' ? 'selected' : '' ?>>Auth Date (Newest)</option>
                             <option value="auth_date_asc" <?= ($_GET['sort'] ?? '') === 'auth_date_asc' ? 'selected' : '' ?>>Auth Date (Oldest)</option>
                             <option value="name_asc" <?= ($_GET['sort'] ?? '') === 'name_asc' ? 'selected' : '' ?>>Name (A-Z)</option>

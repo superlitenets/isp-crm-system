@@ -3542,7 +3542,7 @@ class HuaweiOLT {
             $params[] = $boolVal;
         }
         
-        $sortOption = $filters['sort'] ?? 'default';
+        $sortOption = $filters['sort'] ?? 'auth_date_desc';
         switch ($sortOption) {
             case 'auth_date_desc':
                 $orderBy = " ORDER BY COALESCE(o.auth_date, o.created_at) DESC NULLS LAST";
