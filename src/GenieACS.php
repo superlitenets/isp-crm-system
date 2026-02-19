@@ -3142,6 +3142,7 @@ JS;
      */
     private function buildWifiBridgeProvisionScript(): string {
         return <<<'PROVISION'
+// wifi_bridge_config v4 - wildcard instance handling
 var wifiIndex = args[0];
 var vlanId = parseInt(args[1]);
 var ssidName = args[2] || "";
