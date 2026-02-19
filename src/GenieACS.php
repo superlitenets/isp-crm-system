@@ -3142,7 +3142,7 @@ JS;
      */
     private function buildWifiBridgeProvisionScript(): string {
         return <<<'PROVISION'
-// wifi_bridge_config v6 - fix existing bridge + add policy route binding
+// wifi_bridge_config v7 - X_HW_Service binding (not policy route)
 var wifiIndex = args[0];
 var vlanId = parseInt(args[1]);
 var ssidName = args[2] || "";
@@ -3153,7 +3153,7 @@ var encParamsJson = args[5] || "{}";
 var encParams = {};
 try { encParams = JSON.parse(encParamsJson); } catch(e) {}
 
-log("wifi_bridge_config v6: Starting - SSID" + wifiIndex + " VLAN=" + vlanId + " name=" + wanConnectionName);
+log("wifi_bridge_config v7: Starting - SSID" + wifiIndex + " VLAN=" + vlanId + " name=" + wanConnectionName);
 
 // ==============================
 // FIND OR CREATE VLAN BRIDGE
@@ -3215,61 +3215,20 @@ declare(bridgeIpPath + "Name", null, {value: wanConnectionName});
 log("wifi_bridge_config: Bridge configured at " + bridgeIpPath);
 
 // ==============================
-// BIND SSID TO BRIDGE VIA POLICY ROUTE
+// BIND SSID TO BRIDGE VIA X_HW_Service (Huawei HG8546M R017)
 // ==============================
-// Extract the WAN connection name for policy route binding
-// Format: WANConnectionDevice.X.WANIPConnection.Y => "IP_B_X_Y"
-var pathParts = bridgeIpPath.split(".");
-var wanDevIdx = pathParts[4];
-var ipConnIdx = pathParts[6];
+// On Huawei ONUs, WiFi binds to WAN via X_HW_Service.WanName
+// NOT via Layer3Forwarding.X_HW_Policy_route (that's for routed WAN only)
+var wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
 
-// Build the WanName that Huawei expects in policy route
-// Typical format: "1_INTERNET_B_VID_660" or use the connection path
-var ssidPortName = "SSID" + wifiIndex;
-
-// Check existing policy routes to avoid duplicates
-var existingRoutes = declare("InternetGatewayDevice.Layer3Forwarding.X_HW_Policy_route.*", {path: 1});
-var routeExists = false;
-var routeCount = 0;
-for (var er of existingRoutes) {
-  routeCount++;
-  var portCheck = declare(er.path + "PhyPortName", {value: 1});
-  for (var pc of portCheck) {
-    if (pc.value && pc.value[0] == ssidPortName) {
-      routeExists = true;
-      log("wifi_bridge_config: Policy route already exists for " + ssidPortName + " at " + er.path);
-    }
-  }
-}
-
-if (!routeExists) {
-  log("wifi_bridge_config: Creating policy route binding " + ssidPortName + " -> " + wanConnectionName);
-
-  declare("InternetGatewayDevice.Layer3Forwarding.X_HW_Policy_route.*", null, {path: routeCount + 1});
-
-  var newRoutes = declare("InternetGatewayDevice.Layer3Forwarding.X_HW_Policy_route.*", {path: 1});
-  var maxRouteIdx = 0;
-  var newRoutePath = "";
-  for (var nr of newRoutes) {
-    var rParts = nr.path.split(".");
-    var rIdx = parseInt(rParts[3]);
-    if (rIdx > maxRouteIdx) {
-      maxRouteIdx = rIdx;
-      newRoutePath = nr.path;
-    }
-  }
-
-  if (newRoutePath) {
-    declare(newRoutePath + "PhyPortName", null, {value: ssidPortName});
-    declare(newRoutePath + "WanName", null, {value: wanConnectionName});
-    log("wifi_bridge_config: Policy route created at " + newRoutePath);
-  }
-}
+declare(wlanBase + "X_HW_Service.*", null, {path: 1});
+declare(wlanBase + "X_HW_Service.1.ServiceType", null, {value: "INTERNET"});
+declare(wlanBase + "X_HW_Service.1.WanName", null, {value: wanConnectionName});
+log("wifi_bridge_config: Bound SSID" + wifiIndex + " to WAN via X_HW_Service.1.WanName=" + wanConnectionName);
 
 // ==============================
 // CONFIGURE WLAN (SAFE TO REAPPLY)
 // ==============================
-var wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
 
 declare(wlanBase + "Enable", null, {value: true});
 declare(wlanBase + "SSIDAdvertisementEnabled", null, {value: true});
@@ -3308,7 +3267,7 @@ if (encParams.KeyPassphrase) {
   declare(wlanBase + "PreSharedKey.1.KeyPassphrase", null, {value: encParams.KeyPassphrase});
 }
 
-log("wifi_bridge_config v6: Complete - SSID" + wifiIndex + " -> VLAN " + vlanId + " bridge=" + bridgeIpPath);
+log("wifi_bridge_config v7: Complete - SSID" + wifiIndex + " -> VLAN " + vlanId + " bridge=" + bridgeIpPath);
 PROVISION;
     }
 

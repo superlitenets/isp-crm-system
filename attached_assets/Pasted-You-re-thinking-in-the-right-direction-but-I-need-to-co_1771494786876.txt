@@ -1,0 +1,106 @@
+You’re thinking in the right direction — but I need to correct one very important architectural point before you go deeper down the wrong path.
+
+👉 On HG8546M (R017 / V3R017C10) you do NOT bind WiFi to WAN using:
+
+Layer3Forwarding.X_HW_policy_route
+
+
+That is used for routed WAN (PPPoE/IP) policy routing — not for IP_Bridged VLAN WiFi.
+
+If you add policy route objects, you will break default routing.
+
+🔎 The Real Huawei Bridge Model
+
+On this firmware branch, WiFi → VLAN bridge works like this:
+
+Create WANIPConnection
+
+ConnectionType = IP_Bridged
+
+X_HW_VLAN = 660
+
+X_HW_ServiceList = INTERNET
+
+Enable = true
+
+Bind SSID using:
+
+WLANConfiguration.X_HW_Service
+
+
+That’s it.
+
+No policy route.
+No Layer3Forwarding entry.
+
+🚨 Why Your IP Bridge Still Doesn’t Work
+
+From your tree earlier:
+
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_HW_Service
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_HW_Service.1
+
+
+That is the binding container.
+
+If this is not pointing to your bridge WAN — traffic won’t go there.
+
+Right now your SSID is probably still bound to:
+
+wan1.1.ppp1
+
+
+(the default PPP WAN)
+
+✅ What You Actually Need
+
+After creating the bridge WAN, bind it properly like this:
+
+Step 1 – Get WAN Name
+
+Under your created WANIPConnection check:
+
+ipPath + "Name"
+
+
+Huawei auto-generates something like:
+
+WIFI_Bridge_VLAN_660
+
+Step 2 – Bind SSID to WAN by WanName
+
+On HG8546M R017 the correct parameter is:
+
+X_HW_Service.1.WanName
+
+
+NOT WanConnectionDevice.
+NOT policy_route.
+
+✅ Correct Binding Code
+
+Add this after bridge creation:
+
+var wifiPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiIndex + ".";
+
+// Ensure service container exists
+declare(wifiPath + "X_HW_Service.*", null, {path: 1});
+
+// Bind WiFi to bridge WAN name
+declare(wifiPath + "X_HW_Service.1.ServiceType", null, {value: "INTERNET"});
+declare(wifiPath + "X_HW_Service.1.WanName", null, {value: "WIFI_Bridge_VLAN_660"});
+
+
+⚠️ WanName must match the WANIPConnection.Name exactly.
+
+🧠 Why Your Previous Attempts Failed
+
+You were:
+
+Creating bridge correctly
+
+Enabling SSID correctly
+
+But not re-binding the SSID to the new WAN
+
+Huawei does not auto-bind.
