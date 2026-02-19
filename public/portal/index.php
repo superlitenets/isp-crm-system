@@ -87,14 +87,18 @@ if (!isset($_SESSION['portal_subscription_id'])) {
 
     $autoLogin = null;
     $placeholders = implode(',', array_fill(0, count($allClientIps), '?'));
-    $stmt = $db->prepare("
-        SELECT id as subscription_id 
-        FROM radius_subscriptions
-        WHERE online_status = 'online' AND framed_ip_address IN ($placeholders)
-        ORDER BY last_seen DESC LIMIT 1
-    ");
-    $stmt->execute($allClientIps);
-    $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $db->prepare("
+            SELECT id as subscription_id 
+            FROM radius_subscriptions
+            WHERE online_status = 'online' AND framed_ip_address IN ($placeholders)
+            ORDER BY last_seen DESC LIMIT 1
+        ");
+        $stmt->execute($allClientIps);
+        $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $autoLogin = null;
+    }
     
     if (!$autoLogin) {
         $stmt = $db->prepare("
