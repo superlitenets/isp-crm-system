@@ -151,6 +151,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-shield-check"></i> License
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'protrack' ? 'active' : '' ?>" href="?page=settings&subpage=protrack">
+            <i class="bi bi-truck"></i> Fleet / Protrack
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -7879,6 +7884,95 @@ $mode = $licenseValidation['mode'] ?? '';
                     <li>7-day grace period if the server is unreachable</li>
                     <li>Features are enabled/disabled based on your plan tier</li>
                     <li>Leave both fields empty to run without license restrictions</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($subpage === 'protrack'): ?>
+
+<?php
+$protrackAccount = $settings->get('protrack_account') ?? '';
+$protrackPassword = $settings->get('protrack_password') ?? '';
+$protrackApiBase = $settings->get('protrack_api_base') ?? 'https://api.protrack365.com';
+$protrackToken = $settings->get('protrack_access_token') ?? '';
+$protrackExpiry = $settings->get('protrack_token_expiry') ?? '';
+$tokenValid = $protrackExpiry && time() < (int)$protrackExpiry;
+?>
+
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-truck me-2"></i>Protrack GPS Fleet Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_protrack_settings">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Protrack Account</label>
+                        <input type="text" class="form-control" name="protrack_account" value="<?= htmlspecialchars($protrackAccount) ?>" placeholder="Your Protrack365 account username">
+                        <div class="form-text">The account name provided by your Protrack service provider.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Protrack Password</label>
+                        <input type="password" class="form-control" name="protrack_password" value="<?= htmlspecialchars($protrackPassword) ?>" placeholder="Your Protrack365 password">
+                        <div class="form-text">Used to generate MD5 authentication signatures.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">API Base URL</label>
+                        <input type="text" class="form-control" name="protrack_api_base" value="<?= htmlspecialchars($protrackApiBase) ?>">
+                        <div class="form-text">Default: https://api.protrack365.com - change only if your provider uses a different API endpoint.</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Save Settings</button>
+                    
+                    <?php if ($protrackAccount): ?>
+                    <button type="submit" name="action" value="test_protrack" class="btn btn-outline-info ms-2">
+                        <i class="bi bi-wifi me-1"></i> Test Connection
+                    </button>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card <?= $tokenValid ? 'border-success' : 'border-secondary' ?>">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-shield-check me-1"></i> Connection Status</h6>
+            </div>
+            <div class="card-body">
+                <?php if (!$protrackAccount): ?>
+                    <span class="badge bg-secondary">Not Configured</span>
+                    <p class="small text-muted mt-2 mb-0">Enter your Protrack account credentials to enable fleet tracking.</p>
+                <?php elseif ($tokenValid): ?>
+                    <span class="badge bg-success">Connected</span>
+                    <p class="small text-muted mt-2 mb-0">
+                        Token expires: <?= date('Y-m-d H:i:s', (int)$protrackExpiry) ?>
+                    </p>
+                <?php else: ?>
+                    <span class="badge bg-warning">Token Expired</span>
+                    <p class="small text-muted mt-2 mb-0">Token will be refreshed automatically on next API call.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card border-info mt-3">
+            <div class="card-body">
+                <h6><i class="bi bi-info-circle text-info me-1"></i> About Protrack Integration</h6>
+                <ul class="mb-0 small text-muted">
+                    <li>Real-time GPS vehicle tracking</li>
+                    <li>Route playback and history</li>
+                    <li>Geofence alerts</li>
+                    <li>Remote commands (engine stop/restore)</li>
+                    <li>Mileage and alarm reports</li>
+                    <li>API: <a href="https://www.protrack365.com/api.jsp" target="_blank">protrack365.com/api.jsp</a></li>
                 </ul>
             </div>
         </div>

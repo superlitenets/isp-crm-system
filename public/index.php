@@ -7649,6 +7649,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'save_protrack_settings':
+                try {
+                    $settings->set('protrack_account', trim($_POST['protrack_account'] ?? ''));
+                    $settings->set('protrack_password', $_POST['protrack_password'] ?? '');
+                    $apiBase = trim($_POST['protrack_api_base'] ?? '');
+                    if (!empty($apiBase)) {
+                        $settings->set('protrack_api_base', rtrim($apiBase, '/'));
+                    }
+                    $settings->set('protrack_access_token', '');
+                    $settings->set('protrack_token_expiry', '');
+                    \App\Settings::clearCache();
+                    $message = 'Protrack settings saved successfully! Token will be refreshed on next API call.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving Protrack settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'test_protrack':
+                try {
+                    $settings->set('protrack_account', trim($_POST['protrack_account'] ?? ''));
+                    $settings->set('protrack_password', $_POST['protrack_password'] ?? '');
+                    $apiBase = trim($_POST['protrack_api_base'] ?? '');
+                    if (!empty($apiBase)) {
+                        $settings->set('protrack_api_base', rtrim($apiBase, '/'));
+                    }
+                    $settings->set('protrack_access_token', '');
+                    $settings->set('protrack_token_expiry', '');
+                    \App\Settings::clearCache();
+                    
+                    $protrack = new \App\ProtrackService($db);
+                    $accountInfo = $protrack->getAccountInfo();
+                    if ($accountInfo && ($accountInfo['code'] ?? -1) === 0) {
+                        $message = 'Protrack connection successful! Account verified.';
+                        $messageType = 'success';
+                    } else {
+                        $errorMsg = $accountInfo['message'] ?? 'Unknown error (code: ' . ($accountInfo['code'] ?? 'null') . ')';
+                        $message = 'Protrack connection failed: ' . $errorMsg;
+                        $messageType = 'danger';
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Protrack test failed: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_role':
                 if (!\App\Auth::can('roles.manage')) {
                     $message = 'You do not have permission to create roles.';
@@ -8501,11 +8550,210 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         exit;
                     }
                     break;
+                    
+                case 'fleet':
+                    $fleet = new \App\FleetManagement($db);
+                    if ($inventoryAction === 'save_vehicle') {
+                        $data = [
+                            'name' => $_POST['name'],
+                            'plate_number' => $_POST['plate_number'] ?? null,
+                            'imei' => $_POST['imei'] ?? null,
+                            'vehicle_type' => $_POST['vehicle_type'] ?? 'car',
+                            'make' => $_POST['make'] ?? null,
+                            'model' => $_POST['model'] ?? null,
+                            'year' => $_POST['year'] ?? null,
+                            'color' => $_POST['color'] ?? null,
+                            'assigned_employee_id' => $_POST['assigned_employee_id'] ?? null,
+                            'status' => $_POST['status'] ?? 'active',
+                            'notes' => $_POST['notes'] ?? null
+                        ];
+                        if (!empty($_POST['id'])) {
+                            $fleet->updateVehicle((int)$_POST['id'], $data);
+                            $_SESSION['success_message'] = 'Vehicle updated successfully!';
+                        } else {
+                            $fleet->addVehicle($data);
+                            $_SESSION['success_message'] = 'Vehicle added successfully!';
+                        }
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=fleet&fleet_tab=vehicles');
+                        exit;
+                    } elseif ($inventoryAction === 'delete_vehicle') {
+                        $fleet->deleteVehicle((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Vehicle deleted successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=fleet&fleet_tab=vehicles');
+                        exit;
+                    } elseif ($inventoryAction === 'add_geofence') {
+                        $fleet->addGeofence([
+                            'name' => $_POST['name'],
+                            'geofence_type' => $_POST['geofence_type'] ?? 'circle',
+                            'latitude' => (float)($_POST['latitude'] ?? 0),
+                            'longitude' => (float)($_POST['longitude'] ?? 0),
+                            'radius' => (int)($_POST['radius'] ?? 500),
+                            'alarm_type' => (int)($_POST['alarm_type'] ?? 2)
+                        ]);
+                        $_SESSION['success_message'] = 'Geofence created successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=fleet&fleet_tab=geofences');
+                        exit;
+                    } elseif ($inventoryAction === 'delete_geofence') {
+                        $fleet->deleteGeofence((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Geofence deleted successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=fleet&fleet_tab=geofences');
+                        exit;
+                    } elseif ($inventoryAction === 'acknowledge_alarm') {
+                        $fleet->acknowledgeAlarm((int)$_POST['id'], (int)$_SESSION['employee_id']);
+                        $_SESSION['success_message'] = 'Alarm acknowledged.';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=fleet&fleet_tab=alarms');
+                        exit;
+                    }
+                    break;
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
         }
     }
+}
+
+// Handle Fleet Management AJAX endpoints
+if ($page === 'inventory' && ($tab ?? $_GET['tab'] ?? '') === 'fleet' && !empty($_GET['action'])) {
+    if (!\App\Auth::can('inventory.view')) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Access denied']);
+        exit;
+    }
+    
+    $fleet = new \App\FleetManagement($db);
+    $fleetAction = $_GET['action'];
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    
+    try {
+        switch ($fleetAction) {
+            case 'ajax_track':
+                $vehicleIds = !empty($_GET['vehicle_ids']) ? explode(',', $_GET['vehicle_ids']) : null;
+                $result = $fleet->trackVehicles($vehicleIds);
+                $vehicles = $fleet->getVehicles(['status' => 'active']);
+                echo json_encode([
+                    'success' => true,
+                    'tracking' => $result['record'] ?? [],
+                    'vehicles' => $vehicles
+                ]);
+                break;
+                
+            case 'ajax_track_vehicle':
+                $vehicleId = (int)($_GET['vehicle_id'] ?? 0);
+                if (!$vehicleId) {
+                    echo json_encode(['success' => false, 'error' => 'Vehicle ID required']);
+                    break;
+                }
+                $vehicle = $fleet->getVehicle($vehicleId);
+                if (!$vehicle || empty($vehicle['imei'])) {
+                    echo json_encode(['success' => false, 'error' => 'Vehicle not found or no IMEI']);
+                    break;
+                }
+                $result = $fleet->trackVehicles([$vehicleId]);
+                $track = null;
+                if (!empty($result['record'])) {
+                    foreach ($result['record'] as $t) {
+                        if ($t['imei'] === $vehicle['imei']) { $track = $t; break; }
+                    }
+                }
+                $vehicle = $fleet->getVehicle($vehicleId);
+                echo json_encode(['success' => true, 'track' => $track, 'vehicle' => $vehicle]);
+                break;
+                
+            case 'ajax_playback':
+                $vehicleId = (int)($_GET['vehicle_id'] ?? 0);
+                $beginTime = (int)($_GET['begintime'] ?? 0);
+                $endTime = (int)($_GET['endtime'] ?? 0);
+                if (!$vehicleId || !$beginTime || !$endTime) {
+                    echo json_encode(['success' => false, 'error' => 'Vehicle ID, begin time and end time required']);
+                    break;
+                }
+                $result = $fleet->getPlayback($vehicleId, $beginTime, $endTime);
+                if ($result && ($result['code'] ?? -1) === 0) {
+                    $points = [];
+                    $record = $result['record'] ?? '';
+                    if ($record) {
+                        $entries = explode(';', $record);
+                        foreach ($entries as $entry) {
+                            $parts = explode(',', $entry);
+                            if (count($parts) >= 5) {
+                                $points[] = [
+                                    'lng' => (float)$parts[0],
+                                    'lat' => (float)$parts[1],
+                                    'time' => (int)$parts[2],
+                                    'speed' => (int)$parts[3],
+                                    'course' => (int)$parts[4]
+                                ];
+                            }
+                        }
+                    }
+                    echo json_encode(['success' => true, 'points' => $points]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'Failed to get playback data']);
+                }
+                break;
+                
+            case 'ajax_send_command':
+                if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                    echo json_encode(['success' => false, 'error' => 'POST required']);
+                    break;
+                }
+                if (!\App\Auth::can('inventory.manage')) {
+                    echo json_encode(['success' => false, 'error' => 'Insufficient permissions to send commands']);
+                    break;
+                }
+                $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+                $csrfToken = $input['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+                if (!$csrfToken || !\App\Auth::validateToken($csrfToken)) {
+                    echo json_encode(['success' => false, 'error' => 'Invalid security token']);
+                    break;
+                }
+                $vehicleId = (int)($input['vehicle_id'] ?? 0);
+                $command = $input['command'] ?? '';
+                if (!$vehicleId || !$command) {
+                    echo json_encode(['success' => false, 'error' => 'Vehicle ID and command required']);
+                    break;
+                }
+                $result = $fleet->sendCommand($vehicleId, $command, (int)($_SESSION['employee_id'] ?? 0));
+                echo json_encode([
+                    'success' => $result && ($result['code'] ?? -1) === 0,
+                    'result' => $result
+                ]);
+                break;
+                
+            case 'ajax_sync_devices':
+                if (!\App\Auth::can('inventory.manage')) {
+                    echo json_encode(['success' => false, 'error' => 'Insufficient permissions']);
+                    break;
+                }
+                $result = $fleet->syncDevicesFromProtrack();
+                echo json_encode($result);
+                break;
+                
+            case 'ajax_fetch_alarms':
+                $vehicleId = (int)($_GET['vehicle_id'] ?? 0);
+                if ($vehicleId) {
+                    $fleet->fetchAndStoreAlarms($vehicleId);
+                }
+                $filters = [];
+                if ($vehicleId) $filters['vehicle_id'] = $vehicleId;
+                if (isset($_GET['acknowledged'])) $filters['acknowledged'] = $_GET['acknowledged'] === '1';
+                $alarms = $fleet->getAlarms($filters);
+                echo json_encode(['success' => true, 'alarms' => $alarms]);
+                break;
+                
+            default:
+                echo json_encode(['success' => false, 'error' => 'Unknown action']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
 }
 
 // Handle inventory GET actions (template download and export)

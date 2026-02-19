@@ -57,6 +57,16 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Live Traffic Monitoring**: Real-time traffic graph for PPPoE, DHCP, and Static IP subscribers with on-demand Chart.js visualization polling MikroTik every 2 seconds.
 - **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers). License settings configurable via Settings > License page (server URL, key, activation, renewal) with database persistence. Config priority: DB settings > environment variables > defaults.
 - **Hotspot Captive Portal**: URL-based NAS routing (`/hotspot/{nas_ip}`) for per-NAS package selection, MAC-based auto-login, M-Pesa STK Push, voucher redemption, and MikroTik CHAP integration. PHP built-in server uses `public/router.php` for URL path routing; Apache uses `.htaccess` rewrite rules.
+- **Fleet Management (Protrack365 GPS)**: Vehicle fleet tracking integrated as a tab within the Inventory module.
+  - **Vehicle Management**: CRUD for vehicles with IMEI, plate number, type, make/model, employee assignment tracking.
+  - **Real-Time GPS Tracking**: Live map view with auto-refresh using Leaflet.js and OpenStreetMap tiles via Protrack365 API.
+  - **Route Playback**: Historical route playback with animation controls for any vehicle and date range.
+  - **Geofencing**: Create/delete circle geofences with entry/exit alarms.
+  - **Remote Commands**: Engine stop/restore, door lock/unlock via Protrack device commands.
+  - **Alarm Monitoring**: SOS, overspeed, geofence, vibration, power disconnect alerts with acknowledgement workflow.
+  - **Device Sync**: Bulk import devices from Protrack365 account.
+  - **Employee Assignment**: Track vehicle assignment history with timestamps.
+  - Settings configurable via Settings > Fleet / Protrack page (account, password, API base URL) with connection testing.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
@@ -70,3 +80,4 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **One-ISP Billing API**: For customer data lookup and import.
 - **Huawei OLT Devices**: Direct Telnet/SSH/SNMP connectivity.
 - **GenieACS**: Open-source TR-069 ACS server.
+- **Protrack365 GPS API**: Vehicle GPS tracking, commands, geofencing, and alarm monitoring.

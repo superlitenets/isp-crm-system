@@ -98,6 +98,11 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 <i class="bi bi-upload"></i> Import/Export
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $tab === 'fleet' ? 'active' : '' ?>" href="?page=inventory&tab=fleet">
+                <i class="bi bi-truck"></i> Fleet Management
+            </a>
+        </li>
     </ul>
 
     <?php if ($tab === 'overview'): ?>
@@ -2071,6 +2076,9 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         </div>
     </div>
     <?php endif; ?>
+
+    <?php elseif ($tab === 'fleet'): ?>
+    <?php include __DIR__ . '/fleet_management.php'; ?>
 
     <?php endif; ?>
 </div>
