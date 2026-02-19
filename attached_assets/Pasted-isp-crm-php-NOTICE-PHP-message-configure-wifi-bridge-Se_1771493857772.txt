@@ -1,0 +1,15 @@
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Serial: HWTCF1093979, WiFi Index: 4, VLAN: 660, SSID: VXXXXX, Password: empty, Encryption: Open
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Found device: 00259E-HG8546M-48575443F1093979, calling configureWifiAccessVlan
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Starting: device=00259E-HG8546M-48575443F1093979, wlan=4, vlan=660, ssid=VXXXXX
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Creating new bridge: existingWAN=[1]
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Cleared 1 faults, 0 tasks before queuing new ones
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Uploading provision script 'wifi_bridge_config'
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Provision uploaded successfully
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Step 2: Queuing provision task (no connection_request). URL: http://10.200.0.1:7557/devices/00259E-HG8546M-48575443F1093979/tasks
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Payload: {"name":"provisions","provisions":[["wifi_bridge_config","4","660","VXXXXX","","WIFI_Bridge_VLAN_660","{\"BeaconType\":\"Basic\",\"BasicEncryptionModes\":\"None\"}"]]}
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Queue result: http_code=202, curl_errno=0, curl_error=, effective_url=http://10.200.0.1:7557/devices/00259E-HG8546M-48575443F1093979/tasks, response={"name":"provisions","provisions":[["wifi_bridge_config","4","660","VXXXXX","","WIFI_Bridge_VLAN_660","{\"BeaconType\":\"Basic\",\"BasicEncryptionModes\":\"None\"}"]],"device":"00259E-HG8546M-48575443F1093979","timestamp":"2026-02-19T09:33:52.229Z","_id":"6996d900d99ab88088dc6242"}
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Provision task queued successfully (HTTP 202)
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] Step 3: Pushing via connection_request for immediate execution
+isp_crm_php  | NOTICE: PHP message: [executeWifiBridgeConfig] connection_request result: http_code=200, applied=yes, curl_error=none
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Bridge config result: http_code=200, applied=yes, faults=0
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Result: {"success":true,"message":"WiFi 4 configured with VLAN 660 in Bridge mode - applied to device","errors":[]}

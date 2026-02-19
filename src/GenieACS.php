@@ -3142,7 +3142,7 @@ JS;
      */
     private function buildWifiBridgeProvisionScript(): string {
         return <<<'PROVISION'
-// wifi_bridge_config v4 - wildcard instance handling
+// wifi_bridge_config v5 - wildcard instances + radio enable
 var wifiIndex = args[0];
 var vlanId = parseInt(args[1]);
 var ssidName = args[2] || "";
@@ -3221,6 +3221,15 @@ var wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration." + wifiInde
 
 declare(wlanBase + "Enable", null, {value: true});
 declare(wlanBase + "SSIDAdvertisementEnabled", null, {value: true});
+
+// Enable radio if parameter exists (needed for 5GHz secondary SSIDs)
+var radioCheck = declare(wlanBase + "RadioEnabled", {value: 1});
+var hasRadio = false;
+for (var rc of radioCheck) { hasRadio = true; }
+if (hasRadio) {
+  declare(wlanBase + "RadioEnabled", null, {value: true});
+  log("wifi_bridge_config: RadioEnabled set to true for SSID" + wifiIndex);
+}
 
 if (ssidName) {
   declare(wlanBase + "SSID", null, {value: ssidName});
