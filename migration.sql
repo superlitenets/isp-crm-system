@@ -380,3 +380,105 @@ CREATE TABLE IF NOT EXISTS olt_port_zones (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(olt_id, frame, slot, port)
 );
+
+-- Fleet Management (Protrack365 GPS Integration)
+CREATE TABLE IF NOT EXISTS fleet_vehicles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    plate_number VARCHAR(50),
+    imei VARCHAR(50) UNIQUE,
+    vehicle_type VARCHAR(50) DEFAULT 'car',
+    make VARCHAR(100),
+    model VARCHAR(100),
+    year INTEGER,
+    color VARCHAR(50),
+    assigned_employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    last_latitude DOUBLE PRECISION,
+    last_longitude DOUBLE PRECISION,
+    last_speed DOUBLE PRECISION DEFAULT 0,
+    last_acc_status INTEGER DEFAULT -1,
+    last_battery INTEGER DEFAULT -1,
+    last_mileage DOUBLE PRECISION DEFAULT 0,
+    last_update TIMESTAMP,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_vehicle_assignments (
+    id SERIAL PRIMARY KEY,
+    vehicle_id INTEGER NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    returned_at TIMESTAMP,
+    notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS fleet_geofences (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    geofence_type VARCHAR(20) DEFAULT 'circle',
+    latitude DOUBLE PRECISION DEFAULT 0,
+    longitude DOUBLE PRECISION DEFAULT 0,
+    radius INTEGER DEFAULT 500,
+    polygon_points TEXT,
+    alarm_type INTEGER DEFAULT 2,
+    protrack_geofence_id VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_vehicle_geofences (
+    id SERIAL PRIMARY KEY,
+    vehicle_id INTEGER NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+    geofence_id INTEGER NOT NULL REFERENCES fleet_geofences(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(vehicle_id, geofence_id)
+);
+
+CREATE TABLE IF NOT EXISTS fleet_alarms (
+    id SERIAL PRIMARY KEY,
+    vehicle_id INTEGER REFERENCES fleet_vehicles(id) ON DELETE SET NULL,
+    imei VARCHAR(50),
+    alarm_type INTEGER,
+    alarm_name VARCHAR(100),
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    speed DOUBLE PRECISION DEFAULT 0,
+    alarm_time TIMESTAMP,
+    acknowledged BOOLEAN DEFAULT FALSE,
+    acknowledged_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    acknowledged_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_mileage_reports (
+    id SERIAL PRIMARY KEY,
+    vehicle_id INTEGER NOT NULL REFERENCES fleet_vehicles(id) ON DELETE CASCADE,
+    imei VARCHAR(50),
+    report_date DATE NOT NULL,
+    mileage DOUBLE PRECISION DEFAULT 0,
+    start_mileage DOUBLE PRECISION DEFAULT 0,
+    end_mileage DOUBLE PRECISION DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(vehicle_id, report_date)
+);
+
+CREATE TABLE IF NOT EXISTS fleet_command_log (
+    id SERIAL PRIMARY KEY,
+    vehicle_id INTEGER REFERENCES fleet_vehicles(id) ON DELETE SET NULL,
+    imei VARCHAR(50),
+    command VARCHAR(255) NOT NULL,
+    command_id VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'pending',
+    response TEXT,
+    sent_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_imei ON fleet_vehicles(imei);
+CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_status ON fleet_vehicles(status);
+CREATE INDEX IF NOT EXISTS idx_fleet_alarms_vehicle ON fleet_alarms(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_alarms_time ON fleet_alarms(alarm_time);
+CREATE INDEX IF NOT EXISTS idx_fleet_command_log_vehicle ON fleet_command_log(vehicle_id);
