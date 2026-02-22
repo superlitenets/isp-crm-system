@@ -15,7 +15,6 @@ class SNMPPollingWorker {
         this.sessionManager = sessionManager;
         this.discoveryWorker = discoveryWorker;
         this.isRunning = false;
-        this.cliActiveOlts = new Set();
         this.cronJob = null;
         this.pollInterval = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
         this.phpApiUrl = process.env.PHP_API_URL || 'http://localhost:5000';
@@ -162,40 +161,9 @@ class SNMPPollingWorker {
     }
 
     async pollOlt(olt) {
-        const paused = this.isOltPaused(olt.id);
-
-        if (paused) {
-            console.log(`[Poll] OLT ${olt.name} paused for authorization - skipping poll`);
-            await this.updatePollingStats(olt.id, false, 'Paused for authorization');
-            return { olt: olt.name, onuCount: 0, method: 'skipped-paused' };
-        }
-
-        try {
-            console.log(`[Poll] OLT ${olt.name} - trying CLI first...`);
-            const cliResult = await this.pollOltViaCli(olt);
-            await this.updatePollingStats(olt.id, true, null, 'cli');
-
-            this.snmpSupplementOlt(olt).catch(e => {
-                console.log(`[Poll] SNMP supplement for ${olt.name} skipped: ${e.message}`);
-            });
-
-            return { olt: olt.name, ...cliResult, method: 'cli' };
-        } catch (cliError) {
-            console.log(`[Poll] OLT ${olt.name} CLI failed (${cliError.message}), falling back to SNMP...`);
-
-            try {
-                const snmpResult = await this.pollOltViaSnmp(olt);
-                await this.updatePollingStats(olt.id, true, null, 'snmp');
-                return { olt: olt.name, ...snmpResult, method: 'snmp' };
-            } catch (snmpError) {
-                await this.updatePollingStats(olt.id, false, `CLI: ${cliError.message}, SNMP: ${snmpError.message}`);
-                throw snmpError;
-            }
-        }
-    }
-
-    async pollOltViaSnmp(olt) {
         return new Promise(async (resolve, reject) => {
+            const paused = this.isOltPaused(olt.id);
+            
             const session = snmp.createSession(olt.ip_address, olt.snmp_community, {
                 port: olt.snmp_port,
                 version: olt.snmp_version === 'v1' ? snmp.Version1 : snmp.Version2c,
@@ -207,45 +175,56 @@ class SNMPPollingWorker {
                 const sysInfo = await this.getSysInfo(session);
                 const onuStatuses = await this.getONUStatuses(session, olt.id);
                 const opticalData = await this.getONUOpticalPower(session, olt.id);
-
+                
                 await this.updateOltInfo(olt.id, sysInfo);
                 await this.updateONUStatuses(olt.id, onuStatuses);
                 if (Object.keys(opticalData).length > 0) {
                     await this.updateONUOpticalPower(olt.id, opticalData, onuStatuses);
                 }
-
+                await this.updatePollingStats(olt.id, true, null, 'snmp');
+                
                 session.close();
-                resolve({ ...sysInfo, onuCount: onuStatuses.length });
-            } catch (error) {
+                
+                if (onuStatuses.length === 0 && !paused) {
+                    const dbOnuCount = await this.pool.query(
+                        'SELECT COUNT(*) as cnt FROM huawei_onus WHERE olt_id = $1 AND is_authorized = true',
+                        [olt.id]
+                    );
+                    const hasDbOnus = parseInt(dbOnuCount.rows[0]?.cnt || 0) > 0;
+                    
+                    if (hasDbOnus) {
+                        console.log(`[SNMP] OLT ${olt.name} returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh`);
+                        this.pollOltViaCli(olt).catch(e => {
+                            console.log(`[SNMP] CLI fallback for ${olt.name} failed: ${e.message}`);
+                        });
+                    }
+                } else if (onuStatuses.length === 0 && paused) {
+                    console.log(`[SNMP] OLT ${olt.name} paused for authorization - skipping all CLI activity`);
+                }
+                
+                resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length, method: 'snmp' });
+            } catch (snmpError) {
                 session.close();
-                reject(error);
+                
+                if (paused) {
+                    console.log(`[SNMP] OLT ${olt.name} SNMP failed but paused for authorization - skipping CLI fallback`);
+                    await this.updatePollingStats(olt.id, false, 'Paused for authorization');
+                    resolve({ olt: olt.name, onuCount: 0, method: 'skipped-paused' });
+                    return;
+                }
+                
+                console.log(`[SNMP] OLT ${olt.name} SNMP failed, trying CLI fallback...`);
+                
+                try {
+                    const cliResult = await this.pollOltViaCli(olt);
+                    await this.updatePollingStats(olt.id, true, null, 'cli');
+                    resolve({ olt: olt.name, ...cliResult, method: 'cli' });
+                } catch (cliError) {
+                    await this.updatePollingStats(olt.id, false, snmpError.message);
+                    reject(snmpError);
+                }
             }
         });
-    }
-
-    async snmpSupplementOlt(olt) {
-        const session = snmp.createSession(olt.ip_address, olt.snmp_community, {
-            port: olt.snmp_port,
-            version: olt.snmp_version === 'v1' ? snmp.Version1 : snmp.Version2c,
-            timeout: 5000,
-            retries: 1
-        });
-
-        try {
-            const sysInfo = await this.getSysInfo(session);
-            await this.updateOltInfo(olt.id, sysInfo);
-
-            const opticalData = await this.getONUOpticalPower(session, olt.id);
-            if (Object.keys(opticalData).length > 0) {
-                const onuStatuses = await this.getONUStatuses(session, olt.id);
-                await this.updateONUOpticalPower(olt.id, opticalData, onuStatuses);
-                console.log(`[Poll] SNMP supplement for ${olt.name}: updated optical power for ${Object.keys(opticalData).length} ONUs`);
-            }
-            session.close();
-        } catch (e) {
-            session.close();
-            throw e;
-        }
     }
     
     async pollOltViaCli(olt) {
@@ -279,45 +258,34 @@ class SNMPPollingWorker {
         const oltKey = olt.id.toString();
         const existingSession = this.sessionManager.sessions?.get(oltKey);
         if (!existingSession || !existingSession.connected) {
-            const configResult = await this.pool.query(`
-                SELECT ip_address, port, ssh_port, username, password_encrypted, cli_protocol, connection_type
-                FROM huawei_olts WHERE id = $1
-            `, [olt.id]);
-            if (configResult.rows.length === 0) {
-                throw new Error(`CLI connection failed: OLT config not found`);
-            }
-            const cfg = configResult.rows[0];
-            const password = this.decryptPassword(cfg.password_encrypted);
-            const primaryProto = cfg.connection_type || cfg.cli_protocol || 'telnet';
-            const fallbackProto = primaryProto === 'telnet' ? 'ssh' : 'telnet';
-            
-            let connected = false;
-            for (const proto of [primaryProto, fallbackProto]) {
-                try {
-                    const connectPort = proto === 'ssh' ? (cfg.ssh_port || 22) : (cfg.port || 23);
+            try {
+                const configResult = await this.pool.query(`
+                    SELECT ip_address, port, ssh_port, username, password_encrypted, cli_protocol, connection_type
+                    FROM huawei_olts WHERE id = $1
+                `, [olt.id]);
+                if (configResult.rows.length > 0) {
+                    const cfg = configResult.rows[0];
+                    const proto = cfg.connection_type || cfg.cli_protocol || 'telnet';
+                    const password = this.decryptPassword(cfg.password_encrypted);
+                    const connectPort = proto === 'ssh' ? (cfg.ssh_port || cfg.port || 22) : (cfg.port || 23);
                     await this.sessionManager.connect(oltKey, {
                         host: cfg.ip_address,
                         port: connectPort,
-                        sshPort: proto === 'ssh' ? connectPort : (cfg.ssh_port || 22),
+                        sshPort: connectPort,
                         username: cfg.username,
                         password: password,
                         enablePassword: password,
                         protocol: proto
                     });
-                    console.log(`[CLI] Connected to OLT ${olt.name} via ${proto.toUpperCase()} for polling`);
-                    connected = true;
-                    break;
-                } catch (connErr) {
-                    console.log(`[CLI] ${proto.toUpperCase()} connection to ${olt.name} failed: ${connErr.message}`);
+                    console.log(`[CLI] Connected to OLT ${olt.name} for polling`);
                 }
-            }
-            if (!connected) {
-                throw new Error(`CLI connection failed: both ${primaryProto} and ${fallbackProto} failed`);
+            } catch (connErr) {
+                console.log(`[CLI] Cannot connect to OLT ${olt.name}: ${connErr.message} - preserving current status`);
+                return { onuCount: 0, method: 'cli', error: connErr.message };
             }
         }
 
-        this.cliActiveOlts.add(olt.id);
-
+        // Group by frame/slot/port for efficient batch querying
         const groupedByPort = {};
         for (const onu of onuResult.rows) {
             const key = `${onu.frame}/${onu.slot}/${onu.port}`;
@@ -383,12 +351,11 @@ class SNMPPollingWorker {
                         updated++;
                     }
                     
+                    // For offline ONUs, check last_down_cause to distinguish LOS vs normal offline
                     if (offlineOnus.length > 0) {
-                        const needCauseQuery = offlineOnus.filter(o => {
-                            const cause = (o.onu.last_down_cause || '').trim();
-                            return o.onu.status === 'online' || !cause || cause === '-';
-                        });
-                        for (const { onu } of needCauseQuery) {
+                        // For ONUs newly going offline (were online), query OLT for down cause
+                        const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online');
+                        for (const { onu } of newlyOffline) {
                             try {
                                 const infoCmd = `display ont info ${port} ${onu.onu_id}`;
                                 const infoResult = await this.sessionManager.execute(oltKey, infoCmd, { timeout: 8000 });
@@ -403,6 +370,9 @@ class SNMPPollingWorker {
                             } catch (e) { /* ignore individual query failures */ }
                         }
                         
+                        // For already offline ONUs, last_down_cause is already loaded from the initial query
+                        
+                        // Now determine final status based on last_down_cause
                         for (const { onu } of offlineOnus) {
                             let finalStatus = 'offline';
                             const cause = (onu.last_down_cause || '').toLowerCase();
@@ -440,41 +410,13 @@ class SNMPPollingWorker {
                     }
                 } catch (e) {
                     console.log(`[CLI] Error polling port ${portKey}: ${e.message} - preserving current status for ${onus.length} ONUs`);
-                    if (e.message && (e.message.includes('not connected') || e.message.includes('Socket closed'))) {
-                        console.log(`[CLI] SSH session lost for OLT ${olt.name} - stopping port iteration`);
-                        break;
-                    }
                 }
             }
         } catch (e) {
             console.log(`[CLI] Error during CLI polling: ${e.message}`);
-        } finally {
-            this.cliActiveOlts.delete(olt.id);
         }
         
         console.log(`[CLI] Updated ${updated} ONUs for OLT ${olt.name}`);
-        
-        try {
-            const losPromo = await this.pool.query(`
-                UPDATE huawei_onus SET status = 'los'
-                WHERE olt_id = $1 AND is_authorized = true AND status = 'offline'
-                  AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
-                  AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' 
-                       OR LOWER(last_down_cause) LIKE '%losi%' OR LOWER(last_down_cause) LIKE '%lobi%'
-                       OR LOWER(last_down_cause) LIKE '%lofi%')
-            `, [olt.id]);
-            const dgPromo = await this.pool.query(`
-                UPDATE huawei_onus SET status = 'dying-gasp'
-                WHERE olt_id = $1 AND is_authorized = true AND status = 'offline'
-                  AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
-                  AND (LOWER(last_down_cause) LIKE '%dying%' OR LOWER(last_down_cause) LIKE '%power%')
-            `, [olt.id]);
-            if (losPromo.rowCount > 0 || dgPromo.rowCount > 0) {
-                console.log(`[CLI] Status promotion for ${olt.name}: ${losPromo.rowCount} → LOS, ${dgPromo.rowCount} → dying-gasp`);
-            }
-        } catch (e) {
-            console.log(`[CLI] Status promotion error: ${e.message}`);
-        }
         
         if (faults.length > 0) {
             console.log(`[CLI] Detected ${faults.length} fault(s) on OLT ${olt.name} - sending notifications`);
@@ -1079,6 +1021,8 @@ class SNMPPollingWorker {
             
             for (const olt of olts.rows) {
                 const oltKey = olt.id.toString();
+                const session = this.sessionManager.sessions?.get(oltKey);
+                if (!session || !session.connected) continue;
                 
                 await this.pool.query(`
                     UPDATE huawei_onus 
@@ -1087,9 +1031,9 @@ class SNMPPollingWorker {
                       AND is_authorized = true 
                       AND status = 'offline'
                       AND last_down_cause IS NOT NULL 
-                      AND last_down_cause != '' AND last_down_cause != '-'
+                      AND last_down_cause != ''
                       AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' 
-                           OR LOWER(last_down_cause) LIKE '%losi%' OR LOWER(last_down_cause) LIKE '%lobi%'
+                           OR LOWER(last_down_cause) LIKE '%losi%' OR LOWER(last_down_cause) LIKE '%lobi%' 
                            OR LOWER(last_down_cause) LIKE '%lofi%')
                 `, [olt.id]);
                 
@@ -1100,20 +1044,9 @@ class SNMPPollingWorker {
                       AND is_authorized = true 
                       AND status = 'offline'
                       AND last_down_cause IS NOT NULL 
-                      AND last_down_cause != '' AND last_down_cause != '-'
+                      AND last_down_cause != ''
                       AND (LOWER(last_down_cause) LIKE '%dying%' OR LOWER(last_down_cause) LIKE '%power%')
                 `, [olt.id]);
-                
-                if (this.cliActiveOlts.has(olt.id)) {
-                    console.log(`[LOS-Backfill] Skipping CLI queries for ${olt.name} - CLI poll in progress`);
-                    continue;
-                }
-                
-                const session = this.sessionManager.sessions?.get(oltKey);
-                if (!session || !session.connected) {
-                    console.log(`[LOS-Backfill] No CLI session for ${olt.name} - SQL promotions applied, skipping CLI queries`);
-                    continue;
-                }
                 
                 const offlineOnus = await this.pool.query(`
                     SELECT id, frame, slot, port, onu_id, sn, status, last_down_cause
