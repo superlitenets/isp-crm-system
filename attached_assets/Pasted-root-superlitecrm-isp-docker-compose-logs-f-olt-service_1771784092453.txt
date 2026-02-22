@@ -1,0 +1,76 @@
+root@superlitecrm:~/isp# docker compose logs -f olt-service
+isp_crm_olt_service  | OLT Session Manager running on port 3002
+isp_crm_olt_service  | [Discovery] Starting scheduled discovery worker (*/30 * * * * *)
+isp_crm_olt_service  | [SNMP] Starting polling worker (every 30s)
+isp_crm_olt_service  | [JobWorker] Started (polling every 5s)
+isp_crm_olt_service  | [Discovery] CLI autofind started (every 60s - for new unconfigured ONUs)
+isp_crm_olt_service  | [SNMP] Background polling started (every 30s - for status updates)
+isp_crm_olt_service  | [SessionSync] RADIUS session sync started (every 180s)
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [Poll] OLT HRM_OLT - trying CLI first...
+isp_crm_olt_service  | [Poll] OLT G45_OLT - trying CLI first...
+isp_crm_olt_service  | [CLI] Polling 236 ONUs for OLT HRM_OLT via CLI...
+isp_crm_olt_service  | [OLT 2] Using Telnet protocol
+isp_crm_olt_service  | [OLT 2] TCP connected to 10.98.0.2
+isp_crm_olt_service  | [OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+isp_crm_olt_service  | [CLI] Polling 637 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] Using Telnet protocol
+isp_crm_olt_service  | [OLT 1] TCP connected to 10.98.0.3
+isp_crm_olt_service  | [OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+isp_crm_olt_service  | [Discovery] Already running, skipping...
+isp_crm_olt_service  | [Discovery] Cached 0 SmartOLT serial numbers
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [Discovery] Connecting to HRM_OLT...
+isp_crm_olt_service  | [Discovery] Decrypted password: on***
+isp_crm_olt_service  | [OLT 2] Using SSH protocol
+isp_crm_olt_service  | [MGMT-IP] Refreshed 43/753 Management IPs in 282ms
+isp_crm_olt_service  | [OLT 2] SSH connected to 10.98.0.2
+isp_crm_olt_service  | [OLT 2] SSH sending: "enable"
+isp_crm_olt_service  | [OLT 2] SSH entered enable mode
+isp_crm_olt_service  | [OLT 2] SSH sending: "config"
+isp_crm_olt_service  | [OLT 2] SSH entered config mode
+isp_crm_olt_service  | [OLT 2] SSH sending: "screen-length 0 temporary"
+isp_crm_olt_service  | [OLT 2] SSH init timeout, proceeding anyway
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [Discovery] Connecting to G45_OLT...
+isp_crm_olt_service  | [Discovery] Decrypted password: on***
+isp_crm_olt_service  | [OLT 1] Using SSH protocol
+isp_crm_olt_service  | [OLT 2] SSH command timeout, got 109 bytes
+isp_crm_olt_service  | [OLT 2] SSH disabled paging
+isp_crm_olt_service  | [SNMP] Already running, skipping...
+isp_crm_olt_service  | [SNMP] Signal history cleanup: removed 864 records older than 2 days
+isp_crm_olt_service  | [OLT 1] SSH connected to 10.98.0.3
+isp_crm_olt_service  | [OLT 1] SSH sending: "enable"
+isp_crm_olt_service  | [OLT 1] SSH entered enable mode
+isp_crm_olt_service  | [OLT 1] SSH sending: "config"
+isp_crm_olt_service  | [OLT 1] SSH entered config mode
+isp_crm_olt_service  | [OLT 1] SSH sending: "screen-length 0 temporary"
+isp_crm_olt_service  | [Discovery] Already running, skipping...
+isp_crm_olt_service  | [OLT 1] SSH init timeout, proceeding anyway
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [OLT 1] SSH command timeout, got 109 bytes
+isp_crm_olt_service  | [OLT 1] SSH disabled paging
+isp_crm_olt_service  | [CLI] Cannot connect to OLT HRM_OLT: Login timeout - will fall back to SNMP
+isp_crm_olt_service  | [Poll] OLT HRM_OLT CLI failed (CLI connection failed: Login timeout), falling back to SNMP...
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304000.0, decoded=f0/s0/p0/o0, status=offline
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304000.1, decoded=f0/s0/p0/o1, status=online
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304512.0, decoded=f0/s0/p2/o0, status=online
+isp_crm_olt_service  | [CLI] Cannot connect to OLT G45_OLT: Login timeout - will fall back to SNMP
+isp_crm_olt_service  | [Poll] OLT G45_OLT CLI failed (CLI connection failed: Login timeout), falling back to SNMP...
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194312192.0, decoded=f0/s1/p0/o0, status=offline
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194312192.1, decoded=f0/s1/p0/o1, status=online
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194312192.3, decoded=f0/s1/p0/o3, status=offline

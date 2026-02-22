@@ -279,30 +279,40 @@ class SNMPPollingWorker {
         const oltKey = olt.id.toString();
         const existingSession = this.sessionManager.sessions?.get(oltKey);
         if (!existingSession || !existingSession.connected) {
-            try {
-                const configResult = await this.pool.query(`
-                    SELECT ip_address, port, ssh_port, username, password_encrypted, cli_protocol, connection_type
-                    FROM huawei_olts WHERE id = $1
-                `, [olt.id]);
-                if (configResult.rows.length > 0) {
-                    const cfg = configResult.rows[0];
-                    const proto = cfg.connection_type || cfg.cli_protocol || 'telnet';
-                    const password = this.decryptPassword(cfg.password_encrypted);
-                    const connectPort = proto === 'ssh' ? (cfg.ssh_port || cfg.port || 22) : (cfg.port || 23);
+            const configResult = await this.pool.query(`
+                SELECT ip_address, port, ssh_port, username, password_encrypted, cli_protocol, connection_type
+                FROM huawei_olts WHERE id = $1
+            `, [olt.id]);
+            if (configResult.rows.length === 0) {
+                throw new Error(`CLI connection failed: OLT config not found`);
+            }
+            const cfg = configResult.rows[0];
+            const password = this.decryptPassword(cfg.password_encrypted);
+            const primaryProto = cfg.connection_type || cfg.cli_protocol || 'telnet';
+            const fallbackProto = primaryProto === 'telnet' ? 'ssh' : 'telnet';
+            
+            let connected = false;
+            for (const proto of [primaryProto, fallbackProto]) {
+                try {
+                    const connectPort = proto === 'ssh' ? (cfg.ssh_port || 22) : (cfg.port || 23);
                     await this.sessionManager.connect(oltKey, {
                         host: cfg.ip_address,
                         port: connectPort,
-                        sshPort: connectPort,
+                        sshPort: proto === 'ssh' ? connectPort : (cfg.ssh_port || 22),
                         username: cfg.username,
                         password: password,
                         enablePassword: password,
                         protocol: proto
                     });
-                    console.log(`[CLI] Connected to OLT ${olt.name} for polling`);
+                    console.log(`[CLI] Connected to OLT ${olt.name} via ${proto.toUpperCase()} for polling`);
+                    connected = true;
+                    break;
+                } catch (connErr) {
+                    console.log(`[CLI] ${proto.toUpperCase()} connection to ${olt.name} failed: ${connErr.message}`);
                 }
-            } catch (connErr) {
-                console.log(`[CLI] Cannot connect to OLT ${olt.name}: ${connErr.message} - will fall back to SNMP`);
-                throw new Error(`CLI connection failed: ${connErr.message}`);
+            }
+            if (!connected) {
+                throw new Error(`CLI connection failed: both ${primaryProto} and ${fallbackProto} failed`);
             }
         }
 
