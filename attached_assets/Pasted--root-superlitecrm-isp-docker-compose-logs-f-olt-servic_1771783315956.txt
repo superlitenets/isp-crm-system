@@ -1,0 +1,290 @@
+
+root@superlitecrm:~/isp# docker compose logs -f olt-service
+isp_crm_olt_service  | OLT Session Manager running on port 3002
+isp_crm_olt_service  | [Discovery] Starting scheduled discovery worker (*/30 * * * * *)
+isp_crm_olt_service  | [SNMP] Starting polling worker (every 30s)
+isp_crm_olt_service  | [JobWorker] Started (polling every 5s)
+isp_crm_olt_service  | [Discovery] CLI autofind started (every 60s - for new unconfigured ONUs)
+isp_crm_olt_service  | [SNMP] Background polling started (every 30s - for status updates)
+isp_crm_olt_service  | [SessionSync] RADIUS session sync started (every 180s)
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Already running, skipping...
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [Poll] OLT G45_OLT - trying CLI first...
+isp_crm_olt_service  | [Poll] OLT HRM_OLT - trying CLI first...
+isp_crm_olt_service  | [CLI] Polling 637 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] Using Telnet protocol
+isp_crm_olt_service  | [OLT 1] TCP connected to 10.98.0.3
+isp_crm_olt_service  | [OLT 1] Sent proactive telnet negotiation (BINARY + character mode)
+isp_crm_olt_service  | [CLI] Polling 236 ONUs for OLT HRM_OLT via CLI...
+isp_crm_olt_service  | [OLT 2] Using Telnet protocol
+isp_crm_olt_service  | [OLT 2] TCP connected to 10.98.0.2
+isp_crm_olt_service  | [OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+isp_crm_olt_service  | [Discovery] Cached 0 SmartOLT serial numbers
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [Discovery] Connecting to G45_OLT...
+isp_crm_olt_service  | [Discovery] Decrypted password: on***
+isp_crm_olt_service  | [OLT 1] Using SSH protocol
+isp_crm_olt_service  | [OLT 1] SSH connected to 10.98.0.3
+isp_crm_olt_service  | [MGMT-IP] Refreshed 43/753 Management IPs in 286ms
+isp_crm_olt_service  | [OLT 1] SSH sending: "enable"
+isp_crm_olt_service  | [OLT 1] SSH entered enable mode
+isp_crm_olt_service  | [OLT 1] SSH sending: "config"
+isp_crm_olt_service  | [OLT 1] SSH entered config mode
+isp_crm_olt_service  | [OLT 1] SSH sending: "screen-length 0 temporary"
+isp_crm_olt_service  | [OLT 1] SSH init timeout, proceeding anyway
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [Discovery] Connecting to HRM_OLT...
+isp_crm_olt_service  | [Discovery] Decrypted password: on***
+isp_crm_olt_service  | [OLT 2] Using SSH protocol
+isp_crm_olt_service  | [OLT 1] SSH command timeout, got 109 bytes
+isp_crm_olt_service  | [OLT 1] SSH disabled paging
+isp_crm_olt_service  | [SNMP] Already running, skipping...
+isp_crm_olt_service  | [SNMP] Signal history cleanup: removed 1728 records older than 2 days
+isp_crm_olt_service  | [OLT 2] SSH connected to 10.98.0.2
+isp_crm_olt_service  | [Discovery] Already running, skipping...
+isp_crm_olt_service  | [OLT 2] SSH sending: "enable"
+isp_crm_olt_service  | [OLT 2] SSH entered enable mode
+isp_crm_olt_service  | [OLT 2] SSH sending: "config"
+isp_crm_olt_service  | [OLT 2] SSH entered config mode
+isp_crm_olt_service  | [OLT 2] SSH sending: "screen-length 0 temporary"
+isp_crm_olt_service  | [OLT 2] SSH init timeout, proceeding anyway
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [OLT 2] SSH command timeout, got 109 bytes
+isp_crm_olt_service  | [OLT 2] SSH disabled paging
+isp_crm_olt_service  | [CLI] Cannot connect to OLT G45_OLT: Login timeout - preserving current status
+isp_crm_olt_service  | [SNMP] Updated OLT 1 status via cli
+isp_crm_olt_service  | [CLI] Cannot connect to OLT HRM_OLT: Login timeout - preserving current status
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via cli
+isp_crm_olt_service  | [SNMP] Completed in 45223ms - Success: 2, Failed: 0
+isp_crm_olt_service  | [LOS-Backfill] Checking 55 offline ONUs across 11 ports on HRM_OLT...
+isp_crm_olt_service  | [OLT 2] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 2] SSH raw> config
+isp_crm_olt_service  | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service  | [Poll] OLT HRM_OLT - trying CLI first...
+isp_crm_olt_service  | [Poll] OLT G45_OLT - trying CLI first...
+isp_crm_olt_service  | [CLI] Polling 236 ONUs for OLT HRM_OLT via CLI...
+isp_crm_olt_service  | [CLI] Polling 637 ONUs for OLT G45_OLT via CLI...
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> interface gpon 0/0
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 0 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> display ont info 0 all
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [SNMP] Optical power collected for OLT 2: 182 ONUs
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304000.0, decoded=f0/s0/p0/o0, status=offline
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304000.1, decoded=f0/s0/p0/o1, status=online
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304512.0, decoded=f0/s0/p2/o0, status=online
+isp_crm_olt_service  | [SNMP] Walk OID 46.1.15 for OLT 2: 235 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 235 ONUs
+isp_crm_olt_service  | [CLI] ONU 0/2/0/2 not matched in output, defaulting to offline
+isp_crm_olt_service  | [SNMP] Updated optical power for 182 ONUs on OLT 2
+isp_crm_olt_service  | [Poll] SNMP supplement for HRM_OLT: updated optical power for 182 ONUs
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 1 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [OLT 2] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 2] SSH raw script completed (2002 bytes)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont info 0 0 0 all"
+isp_crm_olt_service  | [OLT 2] Socket closed
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 2 all"
+isp_crm_olt_service  | [OLT 1] Socket closed
+isp_crm_olt_service  | [Discovery] Parsing autofind output (90 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 2] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 2] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [OLT 2] SSH raw> interface gpon 0/0
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 3 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> display ont info 2 all
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 4 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [OLT 2] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 2] SSH raw script completed (4041 bytes)
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont info 0 0 2 all"
+isp_crm_olt_service  | [SNMP] Optical power collected for OLT 1: 216 ONUs
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194312192.0, decoded=f0/s1/p0/o0, status=offline
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194312192.1, decoded=f0/s1/p0/o1, status=online
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194312192.3, decoded=f0/s1/p0/o3, status=offline
+isp_crm_olt_service  | [SNMP] Walk OID 46.1.15 for OLT 1: 638 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 1: 638 ONUs
+isp_crm_olt_service  | [SNMP] Updated optical power for 214 ONUs on OLT 1
+isp_crm_olt_service  | [Poll] SNMP supplement for G45_OLT: updated optical power for 216 ONUs
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 5 all"
+isp_crm_olt_service  | [OLT 2] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 2] SSH raw> config
+isp_crm_olt_service  | [OLT 2] SSH raw> interface gpon 0/1
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 6 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> display ont info 0 all
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 7 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [OLT 2] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 2] SSH raw script completed (5224 bytes)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 8 all"
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont info 0 1 0 all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 9 all"
+isp_crm_olt_service  | [OLT 2] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 2] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 10 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> interface gpon 0/1
+isp_crm_olt_service  | [OLT 2] SSH raw> display ont info 1 all
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 11 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 13 all"
+isp_crm_olt_service  | [OLT 2] SSH raw> quit
+isp_crm_olt_service  | [OLT 2] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 2] SSH raw script: auto-confirming y/n
+isp_crm_olt_service  | [OLT 2] SSH raw script completed (445 bytes)
+isp_crm_olt_service  | [OLT 2] SSH stream closed
+isp_crm_olt_service  | [OLT 2] SSH connection closed
+isp_crm_olt_service  | [OLT 2] SSH command failed: SSH not connected
+isp_crm_olt_service  | [LOS-Backfill] Updated 0 ONUs on HRM_OLT (0 LOS detected)
+isp_crm_olt_service  | [CLI] Error polling port 0/1/1: SSH session not connected - preserving current status for 79 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/2: SSH session not connected - preserving current status for 20 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/4: SSH session not connected - preserving current status for 5 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/5: SSH session not connected - preserving current status for 1 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/6: SSH session not connected - preserving current status for 1 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/9: SSH session not connected - preserving current status for 4 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/10: SSH session not connected - preserving current status for 5 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/12: SSH session not connected - preserving current status for 17 ONUs
+isp_crm_olt_service  | [CLI] Error polling port 0/1/13: SSH session not connected - preserving current status for 49 ONUs
+isp_crm_olt_service  | [CLI] Updated 55 ONUs for OLT HRM_OLT
+isp_crm_olt_service  | [LOS-Backfill] Checking 421 offline ONUs across 34 ports on G45_OLT...
+isp_crm_olt_service  | [SNMP] Updated OLT 2 status via cli
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2
+isp_crm_olt_service  | [OLT 1] SSH raw> display ont info 0 all
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 1] SSH raw script completed (3754 bytes)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 14 all"
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2
+isp_crm_olt_service  | [OLT 1] SSH raw> display ont info 1 all
+isp_crm_olt_service  | [SNMP] Already running, skipping...
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH raw script completed (2488 bytes)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 2 15 all"
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (90 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [Discovery] Connecting to HRM_OLT...
+isp_crm_olt_service  | [Discovery] Decrypted password: on***
+isp_crm_olt_service  | [OLT 2] SSH disconnected
+isp_crm_olt_service  | [OLT 2] Using SSH protocol
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2
+isp_crm_olt_service  | [OLT 1] SSH raw> display ont info 3 all
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 1] SSH raw script completed (26 bytes)
+isp_crm_olt_service  | [SNMP] Optical power collected for OLT 2: 181 ONUs
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 3 0 all"
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304000.0, decoded=f0/s0/p0/o0, status=offline
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304000.1, decoded=f0/s0/p0/o1, status=online
+isp_crm_olt_service  | [SNMP] ONU sample: index=4194304512.0, decoded=f0/s0/p2/o0, status=online
+isp_crm_olt_service  | [SNMP] Walk OID 46.1.15 for OLT 2: 235 ONUs
+isp_crm_olt_service  | [SNMP] ONU status walk completed for OLT 2: 235 ONUs
+isp_crm_olt_service  | [SNMP] Updated optical power for 181 ONUs on OLT 2
+isp_crm_olt_service  | [Poll] SNMP supplement for HRM_OLT: updated optical power for 181 ONUs
+isp_crm_olt_service  | [OLT 2] SSH connected to 10.98.0.2
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2
+isp_crm_olt_service  | [OLT 2] SSH sending: "enable"
+isp_crm_olt_service  | [OLT 2] SSH entered enable mode
+isp_crm_olt_service  | [OLT 2] SSH sending: "config"
+isp_crm_olt_service  | [OLT 2] SSH entered config mode
+isp_crm_olt_service  | [OLT 1] SSH raw> display ont info 4 all
+isp_crm_olt_service  | [OLT 2] SSH sending: "screen-length 0 temporary"
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 1] SSH raw script completed (4791 bytes)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 3 2 all"
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2
+isp_crm_olt_service  | [OLT 1] SSH raw> display ont info 5 all
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 2] SSH init timeout, proceeding anyway
+isp_crm_olt_service  | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service  | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service  | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service  | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service  | [Discovery] Skipping cleanup - no ONUs in autofind (command may have failed)
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [Discovery] Discovery cycle complete
+isp_crm_olt_service  | [OLT 1] SSH raw script completed (4110 bytes)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 3 3 all"
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2
+isp_crm_olt_service  | [OLT 2] SSH command timeout, got 109 bytes
+isp_crm_olt_service  | [OLT 2] SSH disabled paging
+isp_crm_olt_service  | [OLT 1] SSH raw> display ont info 6 all
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [OLT 1] SSH raw script completed (4836 bytes)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 3 4 all"
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2
+isp_crm_olt_service  | [OLT 1] SSH raw> display ont info 7 all
+isp_crm_olt_service  | [SNMP] Already running, skipping...
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw> quit
+isp_crm_olt_service  | [OLT 1] SSH raw script: all 5 commands sent, waiting for final prompt
+isp_crm_olt_service  | [Discovery] Starting discovery cycle...
+isp_crm_olt_service  | [OLT 1] SSH raw script completed (1230 bytes)
+isp_crm_olt_service  | [Discovery] Found 2 active OLTs
+isp_crm_olt_service  | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service  | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service  | [OLT 1] SSH sending: "display ont info 0 3 5 all"
+isp_crm_olt_service  | [OLT 1] SSH raw script: sending 5 commands
+isp_crm_olt_service  | [OLT 1] SSH raw> config
+isp_crm_olt_service  | [OLT 1] SSH raw> interface gpon 0/2

@@ -15,6 +15,7 @@ class SNMPPollingWorker {
         this.sessionManager = sessionManager;
         this.discoveryWorker = discoveryWorker;
         this.isRunning = false;
+        this.cliActiveOlts = new Set();
         this.cronJob = null;
         this.pollInterval = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
         this.phpApiUrl = process.env.PHP_API_URL || 'http://localhost:5000';
@@ -300,12 +301,13 @@ class SNMPPollingWorker {
                     console.log(`[CLI] Connected to OLT ${olt.name} for polling`);
                 }
             } catch (connErr) {
-                console.log(`[CLI] Cannot connect to OLT ${olt.name}: ${connErr.message} - preserving current status`);
-                return { onuCount: 0, method: 'cli', error: connErr.message };
+                console.log(`[CLI] Cannot connect to OLT ${olt.name}: ${connErr.message} - will fall back to SNMP`);
+                throw new Error(`CLI connection failed: ${connErr.message}`);
             }
         }
 
-        // Group by frame/slot/port for efficient batch querying
+        this.cliActiveOlts.add(olt.id);
+
         const groupedByPort = {};
         for (const onu of onuResult.rows) {
             const key = `${onu.frame}/${onu.slot}/${onu.port}`;
@@ -371,9 +373,7 @@ class SNMPPollingWorker {
                         updated++;
                     }
                     
-                    // For offline ONUs, check last_down_cause to distinguish LOS vs normal offline
                     if (offlineOnus.length > 0) {
-                        // For ONUs newly going offline (were online), query OLT for down cause
                         const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online');
                         for (const { onu } of newlyOffline) {
                             try {
@@ -390,9 +390,6 @@ class SNMPPollingWorker {
                             } catch (e) { /* ignore individual query failures */ }
                         }
                         
-                        // For already offline ONUs, last_down_cause is already loaded from the initial query
-                        
-                        // Now determine final status based on last_down_cause
                         for (const { onu } of offlineOnus) {
                             let finalStatus = 'offline';
                             const cause = (onu.last_down_cause || '').toLowerCase();
@@ -430,10 +427,16 @@ class SNMPPollingWorker {
                     }
                 } catch (e) {
                     console.log(`[CLI] Error polling port ${portKey}: ${e.message} - preserving current status for ${onus.length} ONUs`);
+                    if (e.message && (e.message.includes('not connected') || e.message.includes('Socket closed'))) {
+                        console.log(`[CLI] SSH session lost for OLT ${olt.name} - stopping port iteration`);
+                        break;
+                    }
                 }
             }
         } catch (e) {
             console.log(`[CLI] Error during CLI polling: ${e.message}`);
+        } finally {
+            this.cliActiveOlts.delete(olt.id);
         }
         
         console.log(`[CLI] Updated ${updated} ONUs for OLT ${olt.name}`);
@@ -1041,6 +1044,12 @@ class SNMPPollingWorker {
             
             for (const olt of olts.rows) {
                 const oltKey = olt.id.toString();
+                
+                if (this.cliActiveOlts.has(olt.id)) {
+                    console.log(`[LOS-Backfill] Skipping ${olt.name} - CLI poll in progress`);
+                    continue;
+                }
+                
                 const session = this.sessionManager.sessions?.get(oltKey);
                 if (!session || !session.connected) continue;
                 
