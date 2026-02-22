@@ -82,15 +82,21 @@ class HuaweiOLT {
         return $result ?: null;
     }
     
+    public static function losCondition(string $tableAlias = ''): string {
+        $prefix = $tableAlias ? "{$tableAlias}." : '';
+        return "(({$prefix}status = 'los') OR ({$prefix}status = 'offline' AND {$prefix}last_down_cause IS NOT NULL AND {$prefix}last_down_cause != '' AND {$prefix}last_down_cause != '-' AND (LOWER({$prefix}last_down_cause) LIKE '%los%' OR LOWER({$prefix}last_down_cause) LIKE '%lob%' OR LOWER({$prefix}last_down_cause) LIKE '%lofi%')))";
+    }
+    
     public function getStats(): array {
+        $losCond = self::losCondition();
         $stats = $this->db->query("
             SELECT 
                 COUNT(*) as total_onus,
                 COUNT(*) FILTER (WHERE is_authorized = TRUE) as authorized_onus,
                 COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured_onus,
                 COUNT(*) FILTER (WHERE status = 'online') as online_onus,
-                COUNT(*) FILTER (WHERE status = 'offline' OR status = 'dying-gasp') as offline_onus,
-                COUNT(*) FILTER (WHERE status = 'los') as los_onus,
+                COUNT(*) FILTER (WHERE (status = 'offline' AND NOT {$losCond}) OR status = 'dying-gasp') as offline_onus,
+                COUNT(*) FILTER (WHERE {$losCond}) as los_onus,
                 COUNT(*) FILTER (WHERE status = 'dying-gasp') as dying_gasp_onus
             FROM huawei_onus
         ")->fetch(\PDO::FETCH_ASSOC);
@@ -4708,18 +4714,13 @@ class HuaweiOLT {
         $stats['total_olts'] = (int)$row['total'];
         $stats['active_olts'] = (int)$row['active'];
         
+        $losCond = self::losCondition();
         $stmt = $this->db->query("
             SELECT COUNT(*) as total,
                    COUNT(*) FILTER (WHERE is_authorized = TRUE) as total_authorized,
                    COUNT(*) FILTER (WHERE status = 'online') as online,
-                   COUNT(*) FILTER (WHERE (status = 'offline' AND NOT (
-                       last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
-                       AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' OR LOWER(last_down_cause) LIKE '%lofi%')
-                   )) OR status = 'dying-gasp') as offline,
-                   COUNT(*) FILTER (WHERE status = 'los' 
-                       OR (status = 'offline' AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
-                           AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' OR LOWER(last_down_cause) LIKE '%lofi%'))
-                   ) as los,
+                   COUNT(*) FILTER (WHERE (status = 'offline' AND NOT {$losCond}) OR status = 'dying-gasp') as offline,
+                   COUNT(*) FILTER (WHERE {$losCond}) as los,
                    COUNT(*) FILTER (WHERE status = 'dying-gasp') as dying_gasp,
                    COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured
             FROM huawei_onus
@@ -4801,13 +4802,14 @@ class HuaweiOLT {
                 'ip' => $olt['ip_address']
             ];
             
+            $losCondNoAlias = self::losCondition();
             $portStmt = $this->db->prepare("
                 SELECT DISTINCT COALESCE(frame, 0) || '/' || slot || '/' || port as frame_slot_port,
                        frame, slot, port,
                        COUNT(id) as onu_count,
                        COUNT(*) FILTER (WHERE status = 'online') as online,
-                       COUNT(*) FILTER (WHERE status = 'offline') as offline,
-                       COUNT(*) FILTER (WHERE status = 'los') as los
+                       COUNT(*) FILTER (WHERE status = 'offline' AND NOT {$losCondNoAlias}) as offline,
+                       COUNT(*) FILTER (WHERE {$losCondNoAlias}) as los
                 FROM huawei_onus 
                 WHERE olt_id = :olt_id AND is_authorized = TRUE AND slot IS NOT NULL AND port IS NOT NULL
                 GROUP BY frame, slot, port 
@@ -11538,6 +11540,7 @@ class HuaweiOLT {
     }
     
     public function getLOSOnUs(): array {
+        $losCond = self::losCondition('o');
         $sql = "
             SELECT o.id, o.sn, o.name, o.description, o.status, o.slot, o.port, o.onu_id, o.frame,
                    o.rx_power, o.tx_power, o.distance, o.updated_at, o.olt_id,
@@ -11549,11 +11552,7 @@ class HuaweiOLT {
             LEFT JOIN customers c ON o.customer_id = c.id
             LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
             LEFT JOIN branches b ON olt.branch_id = b.id
-            WHERE o.status = 'los'
-               OR (o.status = 'offline' AND o.last_down_cause IS NOT NULL 
-                   AND o.last_down_cause != '' AND o.last_down_cause != '-'
-                   AND (LOWER(o.last_down_cause) LIKE '%los%' OR LOWER(o.last_down_cause) LIKE '%lob%' 
-                        OR LOWER(o.last_down_cause) LIKE '%lofi%'))
+            WHERE {$losCond}
             ORDER BY o.updated_at DESC
         ";
         $stmt = $this->db->query($sql);
