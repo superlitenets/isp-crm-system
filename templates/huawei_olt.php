@@ -8116,6 +8116,24 @@ try {
                 </div>
             </div>
 
+            <script>
+            function toggleDashTheme() {
+                const isLight = document.body.classList.toggle('dash-light');
+                localStorage.setItem('dashTheme', isLight ? 'light' : 'dark');
+                document.getElementById('themeIcon').className = isLight ? 'bi bi-moon-fill' : 'bi bi-sun-fill';
+                document.getElementById('themeLabel').textContent = isLight ? 'Dark' : 'Light';
+                if (typeof updateChartTheme === 'function') updateChartTheme(isLight);
+            }
+            (function() {
+                const saved = localStorage.getItem('dashTheme');
+                if (saved === 'light') {
+                    document.body.classList.add('dash-light');
+                    document.getElementById('themeIcon').className = 'bi bi-moon-fill';
+                    document.getElementById('themeLabel').textContent = 'Dark';
+                }
+            })();
+            </script>
+
             <div class="row g-3 mb-4">
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
                     <a href="?page=huawei-olt&view=onus" class="kpi-card h-100 d-block text-decoration-none">
@@ -8771,14 +8789,6 @@ try {
             </script>
 
             <script>
-            function toggleDashTheme() {
-                const isLight = document.body.classList.toggle('dash-light');
-                localStorage.setItem('dashTheme', isLight ? 'light' : 'dark');
-                document.getElementById('themeIcon').className = isLight ? 'bi bi-moon-fill' : 'bi bi-sun-fill';
-                document.getElementById('themeLabel').textContent = isLight ? 'Dark' : 'Light';
-                updateChartTheme(isLight);
-            }
-
             function updateChartTheme(isLight) {
                 const tickColor = isLight ? '#94a3b8' : 'rgba(255,255,255,0.4)';
                 const tickColorBold = isLight ? '#64748b' : 'rgba(255,255,255,0.6)';
@@ -8819,10 +8829,7 @@ try {
             (function() {
                 const saved = localStorage.getItem('dashTheme');
                 if (saved === 'light') {
-                    document.body.classList.add('dash-light');
-                    document.getElementById('themeIcon').className = 'bi bi-moon-fill';
-                    document.getElementById('themeLabel').textContent = 'Dark';
-                    setTimeout(function() { updateChartTheme(true); }, 100);
+                    setTimeout(function() { if (typeof updateChartTheme === 'function') updateChartTheme(true); }, 100);
                 }
             })();
             </script>
