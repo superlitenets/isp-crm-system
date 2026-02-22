@@ -1224,8 +1224,8 @@ class SNMPPollingWorker {
         const result = await this.pool.query(`
             SELECT id, name, snmp_status, snmp_last_poll,
                    (SELECT COUNT(*) FROM huawei_onus WHERE olt_id = huawei_olts.id AND status = 'online') as online_count,
-                   (SELECT COUNT(*) FROM huawei_onus WHERE olt_id = huawei_olts.id AND status = 'offline') as offline_count,
-                   (SELECT COUNT(*) FROM huawei_onus WHERE olt_id = huawei_olts.id AND status = 'los') as los_count,
+                   (SELECT COUNT(*) FROM huawei_onus WHERE olt_id = huawei_olts.id AND status = 'offline' AND NOT ((status = 'los') OR (status = 'offline' AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-' AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' OR LOWER(last_down_cause) LIKE '%lofi%')))) as offline_count,
+                   (SELECT COUNT(*) FROM huawei_onus WHERE olt_id = huawei_olts.id AND ((status = 'los') OR (status = 'offline' AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-' AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' OR LOWER(last_down_cause) LIKE '%lofi%')))) as los_count,
                    (SELECT COUNT(*) FROM huawei_onus WHERE olt_id = huawei_olts.id AND is_authorized = false) as unconfigured_count
             FROM huawei_olts WHERE is_active = true
         `);

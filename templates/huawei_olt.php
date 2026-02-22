@@ -8523,13 +8523,14 @@ try {
                         </div>
                         <div class="card-inner" style="max-height: 310px; overflow-y: auto;">
                             <?php
+                            $losCondO = \HuaweiOLT::losCondition('o');
                             $issueONUs = $db->query("
-                                SELECT o.id, o.sn, o.name as description, o.status, o.rx_power 
+                                SELECT o.id, o.sn, o.name as description, o.status, o.rx_power, o.last_down_cause 
                                 FROM huawei_onus o 
                                 WHERE o.is_authorized = true 
-                                  AND (LOWER(o.status) IN ('offline', 'los') OR CAST(o.rx_power AS DECIMAL) <= -28)
+                                  AND ((o.status = 'offline' AND NOT {$losCondO}) OR {$losCondO} OR CAST(o.rx_power AS DECIMAL) <= -28)
                                 ORDER BY 
-                                    CASE WHEN LOWER(o.status) = 'los' THEN 0 ELSE 1 END,
+                                    CASE WHEN {$losCondO} THEN 0 ELSE 1 END,
                                     o.rx_power ASC NULLS LAST
                                 LIMIT 8
                             ")->fetchAll(PDO::FETCH_ASSOC);
@@ -8543,7 +8544,9 @@ try {
                             </div>
                             <?php else: ?>
                             <?php foreach ($issueONUs as $issue): 
-                                $isLos = strtolower($issue['status']) === 'los';
+                                $issueStatus = strtolower($issue['status'] ?? '');
+                                $issueDc = strtolower($issue['last_down_cause'] ?? '');
+                                $isLos = ($issueStatus === 'los') || ($issueStatus === 'offline' && $issueDc !== '' && $issueDc !== '-' && (strpos($issueDc, 'los') !== false || strpos($issueDc, 'lob') !== false || strpos($issueDc, 'lofi') !== false));
                                 $rxPower = floatval($issue['rx_power'] ?? 0);
                                 $pillBg = $isLos ? '#ef4444' : ($rxPower <= -28 ? '#f59e0b' : '#64748b');
                                 $pillText = $isLos ? 'LOS' : (isset($issue['rx_power']) ? number_format($rxPower, 1) . ' dBm' : 'Offline');

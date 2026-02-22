@@ -5018,7 +5018,9 @@ class HuaweiOLT {
             $status = strtolower($onu['status'] ?? '');
             
             // Check status first (these are critical issues)
-            if ($status === 'los') {
+            $downCause = strtolower($onu['last_down_cause'] ?? '');
+            $isLos = ($status === 'los') || ($status === 'offline' && $downCause !== '' && $downCause !== '-' && (strpos($downCause, 'los') !== false || strpos($downCause, 'lob') !== false || strpos($downCause, 'lofi') !== false));
+            if ($isLos) {
                 $issues['los'][] = $onu;
                 $this->createSignalAlert($onu, 'error', 'Loss of Signal', 
                     "ONU {$onu['sn']} has lost signal (LOS)");
@@ -5088,11 +5090,12 @@ class HuaweiOLT {
             $params[] = $oltId;
         }
         
+        $losCondRaw = self::losCondition();
         $sql = "SELECT 
                     COUNT(*) as total,
                     COUNT(CASE WHEN LOWER(status) = 'online' THEN 1 END) as online,
-                    COUNT(CASE WHEN LOWER(status) = 'offline' THEN 1 END) as offline,
-                    COUNT(CASE WHEN LOWER(status) = 'los' THEN 1 END) as los,
+                    COUNT(CASE WHEN LOWER(status) = 'offline' AND NOT {$losCondRaw} THEN 1 END) as offline,
+                    COUNT(CASE WHEN {$losCondRaw} THEN 1 END) as los,
                     COUNT(CASE WHEN rx_power <= -28 THEN 1 END) as critical_signal,
                     COUNT(CASE WHEN rx_power > -28 AND rx_power <= -25 THEN 1 END) as warning_signal,
                     COUNT(CASE WHEN rx_power > -25 AND rx_power IS NOT NULL THEN 1 END) as good_signal,
@@ -12665,10 +12668,11 @@ class HuaweiOLT {
     }
     
     public function getPortCapacity(int $oltId): array {
+        $losCondRaw = self::losCondition();
         $stmt = $this->db->prepare("
             SELECT slot, port, COUNT(*) as onu_count,
                    SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END) as online_count,
-                   SUM(CASE WHEN status = 'los' THEN 1 ELSE 0 END) as los_count
+                   SUM(CASE WHEN {$losCondRaw} THEN 1 ELSE 0 END) as los_count
             FROM huawei_onus
             WHERE olt_id = ? AND is_authorized = TRUE
             GROUP BY slot, port
@@ -12685,7 +12689,7 @@ class HuaweiOLT {
             JOIN huawei_olts ol ON o.olt_id = ol.id
             LEFT JOIN customers c ON o.customer_id = c.id
             WHERE o.is_authorized = TRUE 
-            AND (o.rx_power < ? OR o.rx_power > -8 OR o.status = 'los')
+            AND (o.rx_power < ? OR o.rx_power > -8 OR " . self::losCondition('o') . ")
             ORDER BY o.rx_power ASC NULLS LAST
         ");
         $stmt->execute([$rxThreshold]);
