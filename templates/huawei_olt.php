@@ -1046,6 +1046,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'create_los_ticket' && $_SERVER['R
     echo json_encode(['success' => $ticketId !== null, 'ticket_id' => $ticketId]);
     exit;
 }
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'send_los_report_whatsapp') {
+    header('Content-Type: application/json');
+    $result = $huaweiOLT->sendLOSReportToWhatsApp();
+    echo json_encode($result);
+    exit;
+}
 // TR-069 Device Info (GET)
 if (isset($_GET['action']) && $_GET['action'] === 'get_tr069_device_info') {
     header('Content-Type: application/json');
@@ -6185,6 +6191,8 @@ if ($view === 'dashboard') {
         ORDER BY offline_count DESC LIMIT 10
     ");
     $topOfflinePorts = $topOfflineQuery->fetchAll(PDO::FETCH_ASSOC);
+
+    $losOnusList = $huaweiOLT->getLOSOnUs();
 }
 // Load location data only when needed (lazy load for performance)
 $zones = [];
@@ -8332,6 +8340,81 @@ try {
                 </div>
             </div>
 
+            <?php if (!empty($losOnusList)): ?>
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <div class="dash-card">
+                        <div class="card-hdr d-flex justify-content-between align-items-center">
+                            <h6><i class="bi bi-exclamation-triangle-fill me-2 text-danger"></i>LOS ONUs <span class="badge bg-danger ms-2"><?= count($losOnusList) ?></span></h6>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="sendLOSReportWhatsApp()" id="btnSendLosWA">
+                                    <i class="bi bi-whatsapp me-1"></i> Send to WhatsApp
+                                </button>
+                                <a href="?page=huawei-olt&view=onus&status=los" class="btn btn-sm btn-outline-light rounded-pill">
+                                    <i class="bi bi-list-ul me-1"></i> View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-inner">
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.8rem;">
+                                    <thead class="sticky-top" style="background: var(--bs-body-bg, #1a1d2e);">
+                                        <tr>
+                                            <th style="color: rgba(255,255,255,0.5);">#</th>
+                                            <th style="color: rgba(255,255,255,0.5);">ONU</th>
+                                            <th style="color: rgba(255,255,255,0.5);">SN</th>
+                                            <th style="color: rgba(255,255,255,0.5);">Port</th>
+                                            <th style="color: rgba(255,255,255,0.5);">Customer</th>
+                                            <th style="color: rgba(255,255,255,0.5);">OLT / Branch</th>
+                                            <th style="color: rgba(255,255,255,0.5);">Since</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($losOnusList as $idx => $losOnu): 
+                                            $losPort = "{$losOnu['frame']}/{$losOnu['slot']}/{$losOnu['port']}:{$losOnu['onu_id']}";
+                                            $losName = $losOnu['name'] ?: $losOnu['description'] ?: $losOnu['sn'];
+                                            $losSince = $losOnu['updated_at'] ? date('M d, H:i', strtotime($losOnu['updated_at'])) : 'Unknown';
+                                            $losDuration = $losOnu['updated_at'] ? (new DateTime())->diff(new DateTime($losOnu['updated_at'])) : null;
+                                            $losDurStr = '';
+                                            if ($losDuration) {
+                                                if ($losDuration->days > 0) $losDurStr = $losDuration->days . 'd ' . $losDuration->h . 'h';
+                                                elseif ($losDuration->h > 0) $losDurStr = $losDuration->h . 'h ' . $losDuration->i . 'm';
+                                                else $losDurStr = $losDuration->i . 'm';
+                                            }
+                                        ?>
+                                        <tr>
+                                            <td class="text-muted"><?= $idx + 1 ?></td>
+                                            <td>
+                                                <a href="?page=huawei-olt&view=onu_detail&id=<?= $losOnu['id'] ?>" class="text-decoration-none fw-semibold" style="color: #ef4444;">
+                                                    <?= htmlspecialchars($losName) ?>
+                                                </a>
+                                            </td>
+                                            <td><code style="font-size: 0.75rem;"><?= htmlspecialchars($losOnu['sn']) ?></code></td>
+                                            <td><span class="badge bg-dark"><?= $losPort ?></span></td>
+                                            <td><?= htmlspecialchars($losOnu['customer_name'] ?: 'N/A') ?></td>
+                                            <td>
+                                                <span class="fw-semibold"><?= htmlspecialchars($losOnu['olt_name'] ?? '') ?></span>
+                                                <?php if (!empty($losOnu['branch_name'])): ?>
+                                                <br><small class="text-muted"><?= htmlspecialchars($losOnu['branch_name']) ?></small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div><?= $losSince ?></div>
+                                                <?php if ($losDurStr): ?>
+                                                <small class="text-danger"><?= $losDurStr ?> ago</small>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="row g-4 mb-4">
                 <div class="col-lg-4">
                     <div class="dash-card h-100">
@@ -8781,6 +8864,38 @@ try {
                 </div>
             </div>
             <script>
+            function sendLOSReportWhatsApp() {
+                const btn = document.getElementById('btnSendLosWA');
+                if (!btn) return;
+                const origHTML = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending...';
+                
+                fetch('?page=huawei-olt&ajax=send_los_report_whatsapp')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Sent!';
+                            btn.classList.remove('btn-outline-success');
+                            btn.classList.add('btn-success');
+                            setTimeout(() => {
+                                btn.innerHTML = origHTML;
+                                btn.disabled = false;
+                                btn.classList.remove('btn-success');
+                                btn.classList.add('btn-outline-success');
+                            }, 3000);
+                        } else {
+                            alert('Failed to send: ' + (data.error || 'Unknown error'));
+                            btn.innerHTML = origHTML;
+                            btn.disabled = false;
+                        }
+                    })
+                    .catch(err => {
+                        alert('Error sending report: ' + err.message);
+                        btn.innerHTML = origHTML;
+                        btn.disabled = false;
+                    });
+            }
             function showBulkBindTR069Modal() {
                 new bootstrap.Modal(document.getElementById('bulkBindTR069Modal')).show();
             }

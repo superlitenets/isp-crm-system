@@ -864,13 +864,13 @@ class SNMPPollingWorker {
                 
                 if (result.rowCount > 0) {
                     updated++;
-                    if (prevOnu && prevStatus === 'online' && s.status === 'los') {
+                    if (prevOnu && prevStatus !== s.status && (s.status === 'los' || s.status === 'dying-gasp')) {
                         faults.push({
                             onu_id: prevOnu.id,
                             sn: prevOnu.sn,
                             name: prevOnu.name || prevOnu.description || prevOnu.sn,
                             slot, port, onu_id: onuId,
-                            prev_status: prevOnu.prev_status,
+                            prev_status: prevStatus || 'unknown',
                             new_status: s.status,
                             customer_name: prevOnu.customer_name,
                             customer_phone: prevOnu.customer_phone,
@@ -1018,8 +1018,8 @@ class SNMPPollingWorker {
                 console.log(`[LOS-Backfill] Checking ${offlineOnus.rows.length} offline ONUs on ${olt.name}...`);
                 let updated = 0;
                 let losFound = 0;
+                const backfillFaults = [];
                 
-                // Query each ONU individually using atomic raw script to avoid session interleaving
                 for (const onu of offlineOnus.rows) {
                     try {
                         const script = `config\ninterface gpon ${onu.frame}/${onu.slot}\ndisplay ont info ${onu.port} ${onu.onu_id}\nquit\nquit\n`;
@@ -1042,11 +1042,38 @@ class SNMPPollingWorker {
                                 UPDATE huawei_onus SET last_down_cause = $1, status = $2, snmp_status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3
                             `, [cause, newStatus, onu.id]);
                             updated++;
+                            
+                            if (newStatus === 'los' || newStatus === 'dying-gasp') {
+                                const onuDetail = await this.pool.query(`
+                                    SELECT o.*, c.name as customer_name, c.phone as customer_phone
+                                    FROM huawei_onus o LEFT JOIN customers c ON o.customer_id = c.id
+                                    WHERE o.id = $1
+                                `, [onu.id]);
+                                const detail = onuDetail.rows[0];
+                                if (detail) {
+                                    backfillFaults.push({
+                                        onu_id: detail.id,
+                                        sn: detail.sn,
+                                        name: detail.name || detail.description || detail.sn,
+                                        slot: detail.slot, port: detail.port, onu_id: detail.onu_id,
+                                        prev_status: 'offline',
+                                        new_status: newStatus,
+                                        customer_name: detail.customer_name,
+                                        customer_phone: detail.customer_phone,
+                                        customer_id: detail.customer_id
+                                    });
+                                }
+                            }
                         }
                     } catch (e) { /* skip individual failures */ }
                 }
                 
                 console.log(`[LOS-Backfill] Updated ${updated} ONUs on ${olt.name} (${losFound} LOS detected)`);
+                
+                if (backfillFaults.length > 0) {
+                    console.log(`[LOS-Backfill] Sending ${backfillFaults.length} fault notifications for ${olt.name}`);
+                    await this.sendFaultNotifications(olt.id, backfillFaults);
+                }
             }
         } catch (e) {
             console.log(`[LOS-Backfill] Error: ${e.message}`);
