@@ -8129,7 +8129,7 @@ try {
                             </span>
                         </div>
                         <div class="kpi-value"><?= number_format($stats['offline_onus']) ?></div>
-                        <div class="kpi-label">Offline</div>
+                        <div class="kpi-label">Offline<?php if (($stats['dying_gasp_onus'] ?? 0) > 0): ?> <small class="text-muted">(<?= $stats['dying_gasp_onus'] ?> power off)</small><?php endif; ?></div>
                     </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
@@ -8466,7 +8466,7 @@ try {
                 new Chart(document.getElementById('onuStatusChart'), {
                     type: 'doughnut',
                     data: {
-                        labels: ['Online', 'Offline', 'LOS'],
+                        labels: ['Online', 'Offline / Power Off', 'LOS'],
                         datasets: [{
                             data: [<?= (int)$stats['online_onus'] ?>, <?= (int)$stats['offline_onus'] ?>, <?= (int)$stats['los_onus'] ?>],
                             backgroundColor: ['#22c55e', '#475569', '#ef4444'],

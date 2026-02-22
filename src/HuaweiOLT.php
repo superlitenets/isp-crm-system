@@ -89,8 +89,9 @@ class HuaweiOLT {
                 COUNT(*) FILTER (WHERE is_authorized = TRUE) as authorized_onus,
                 COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured_onus,
                 COUNT(*) FILTER (WHERE status = 'online') as online_onus,
-                COUNT(*) FILTER (WHERE status = 'offline') as offline_onus,
-                COUNT(*) FILTER (WHERE status = 'los') as los_onus
+                COUNT(*) FILTER (WHERE status = 'offline' OR status = 'dying-gasp') as offline_onus,
+                COUNT(*) FILTER (WHERE status = 'los') as los_onus,
+                COUNT(*) FILTER (WHERE status = 'dying-gasp') as dying_gasp_onus
             FROM huawei_onus
         ")->fetch(\PDO::FETCH_ASSOC);
         
@@ -100,7 +101,8 @@ class HuaweiOLT {
             'unconfigured_onus' => (int)($stats['unconfigured_onus'] ?? 0),
             'online_onus' => (int)($stats['online_onus'] ?? 0),
             'offline_onus' => (int)($stats['offline_onus'] ?? 0),
-            'los_onus' => (int)($stats['los_onus'] ?? 0)
+            'los_onus' => (int)($stats['los_onus'] ?? 0),
+            'dying_gasp_onus' => (int)($stats['dying_gasp_onus'] ?? 0)
         ];
     }
     
@@ -3525,8 +3527,12 @@ class HuaweiOLT {
         }
         
         if (!empty($filters['status'])) {
-            $conditions .= " AND o.status = ?";
-            $params[] = $filters['status'];
+            if ($filters['status'] === 'offline') {
+                $conditions .= " AND (o.status = 'offline' OR o.status = 'dying-gasp')";
+            } else {
+                $conditions .= " AND o.status = ?";
+                $params[] = $filters['status'];
+            }
         }
         
         if (!empty($filters['search'])) {
@@ -4704,17 +4710,21 @@ class HuaweiOLT {
         
         $stmt = $this->db->query("
             SELECT COUNT(*) as total,
+                   COUNT(*) FILTER (WHERE is_authorized = TRUE) as total_authorized,
                    COUNT(*) FILTER (WHERE status = 'online') as online,
-                   COUNT(*) FILTER (WHERE status = 'offline') as offline,
+                   COUNT(*) FILTER (WHERE status = 'offline' OR status = 'dying-gasp') as offline,
                    COUNT(*) FILTER (WHERE status = 'los') as los,
+                   COUNT(*) FILTER (WHERE status = 'dying-gasp') as dying_gasp,
                    COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured
             FROM huawei_onus
         ");
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         $stats['total_onus'] = (int)$row['total'];
+        $stats['total_authorized_onus'] = (int)$row['total_authorized'];
         $stats['online_onus'] = (int)$row['online'];
         $stats['offline_onus'] = (int)$row['offline'];
         $stats['los_onus'] = (int)$row['los'];
+        $stats['dying_gasp_onus'] = (int)$row['dying_gasp'];
         $stats['unconfigured_onus'] = (int)$row['unconfigured'];
         
         try {
