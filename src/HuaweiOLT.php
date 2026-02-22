@@ -4712,8 +4712,14 @@ class HuaweiOLT {
             SELECT COUNT(*) as total,
                    COUNT(*) FILTER (WHERE is_authorized = TRUE) as total_authorized,
                    COUNT(*) FILTER (WHERE status = 'online') as online,
-                   COUNT(*) FILTER (WHERE status = 'offline' OR status = 'dying-gasp') as offline,
-                   COUNT(*) FILTER (WHERE status = 'los') as los,
+                   COUNT(*) FILTER (WHERE (status = 'offline' AND NOT (
+                       last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
+                       AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' OR LOWER(last_down_cause) LIKE '%lofi%')
+                   )) OR status = 'dying-gasp') as offline,
+                   COUNT(*) FILTER (WHERE status = 'los' 
+                       OR (status = 'offline' AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
+                           AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' OR LOWER(last_down_cause) LIKE '%lofi%'))
+                   ) as los,
                    COUNT(*) FILTER (WHERE status = 'dying-gasp') as dying_gasp,
                    COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured
             FROM huawei_onus
@@ -11535,6 +11541,7 @@ class HuaweiOLT {
         $sql = "
             SELECT o.id, o.sn, o.name, o.description, o.status, o.slot, o.port, o.onu_id, o.frame,
                    o.rx_power, o.tx_power, o.distance, o.updated_at, o.olt_id,
+                   o.last_down_cause,
                    o.customer_id, c.name as customer_name, c.phone as customer_phone,
                    olt.name as olt_name, olt.ip_address as olt_ip,
                    b.name as branch_name, b.code as branch_code
@@ -11543,6 +11550,10 @@ class HuaweiOLT {
             LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
             LEFT JOIN branches b ON olt.branch_id = b.id
             WHERE o.status = 'los'
+               OR (o.status = 'offline' AND o.last_down_cause IS NOT NULL 
+                   AND o.last_down_cause != '' AND o.last_down_cause != '-'
+                   AND (LOWER(o.last_down_cause) LIKE '%los%' OR LOWER(o.last_down_cause) LIKE '%lob%' 
+                        OR LOWER(o.last_down_cause) LIKE '%lofi%'))
             ORDER BY o.updated_at DESC
         ";
         $stmt = $this->db->query($sql);
