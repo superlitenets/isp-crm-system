@@ -11531,6 +11531,88 @@ class HuaweiOLT {
         }
     }
     
+    public function getLOSOnUs(): array {
+        $sql = "
+            SELECT o.id, o.sn, o.name, o.description, o.status, o.slot, o.port, o.onu_id, o.frame,
+                   o.rx_power, o.tx_power, o.distance, o.updated_at, o.olt_id,
+                   o.customer_id, c.name as customer_name, c.phone as customer_phone,
+                   olt.name as olt_name, olt.ip_address as olt_ip,
+                   b.name as branch_name, b.code as branch_code
+            FROM huawei_onus o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+            LEFT JOIN branches b ON olt.branch_id = b.id
+            WHERE o.status = 'los'
+            ORDER BY o.updated_at DESC
+        ";
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function sendLOSReportToWhatsApp(): array {
+        try {
+            require_once __DIR__ . '/WhatsApp.php';
+            require_once __DIR__ . '/Settings.php';
+            $whatsapp = new \App\WhatsApp($this->db);
+            $settings = new \App\Settings();
+            
+            $provisioningGroup = $settings->get('wa_provisioning_group', '');
+            if (empty($provisioningGroup)) {
+                return ['success' => false, 'error' => 'No WhatsApp provisioning group configured. Go to Settings > Huawei OLT to set wa_provisioning_group.'];
+            }
+            
+            $losOnus = $this->getLOSOnUs();
+            
+            if (empty($losOnus)) {
+                return ['success' => true, 'message' => 'No LOS ONUs to report. All clear!', 'count' => 0];
+            }
+            
+            $byOlt = [];
+            foreach ($losOnus as $onu) {
+                $oltName = $onu['olt_name'] ?? 'Unknown OLT';
+                $byOlt[$oltName][] = $onu;
+            }
+            
+            $message = "📡 *LOS ONU REPORT*\n";
+            $message .= "📅 " . date('Y-m-d H:i:s') . "\n";
+            $message .= "🔴 *Total LOS ONUs:* " . count($losOnus) . "\n";
+            $message .= "━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+            
+            foreach ($byOlt as $oltName => $onus) {
+                $message .= "🏢 *{$oltName}* ({$onus[0]['branch_name']})\n";
+                $message .= "   {$onus[0]['olt_ip']} — " . count($onus) . " LOS\n\n";
+                
+                foreach ($onus as $i => $onu) {
+                    $port = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
+                    $name = $onu['name'] ?: $onu['description'] ?: $onu['sn'];
+                    $customer = $onu['customer_name'] ?: 'No customer';
+                    $since = $onu['updated_at'] ? date('M d H:i', strtotime($onu['updated_at'])) : 'Unknown';
+                    
+                    $message .= ($i + 1) . ". ❌ *{$name}*\n";
+                    $message .= "   SN: {$onu['sn']}\n";
+                    $message .= "   Port: {$port}\n";
+                    $message .= "   Customer: {$customer}\n";
+                    $message .= "   Since: {$since}\n\n";
+                }
+            }
+            
+            $message .= "━━━━━━━━━━━━━━━━━━━━━━━━\n";
+            $message .= "🔧 Please investigate fiber connections.";
+            
+            $result = $whatsapp->sendToGroup($provisioningGroup, $message);
+            
+            return [
+                'success' => $result['success'] ?? false,
+                'message' => ($result['success'] ?? false) ? 'LOS report sent to WhatsApp group' : 'Failed to send',
+                'count' => count($losOnus),
+                'error' => $result['error'] ?? null
+            ];
+        } catch (\Exception $e) {
+            error_log("LOS Report WhatsApp Error: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     public function sendLosNotification(array $onu, array $olt, string $previousStatus = 'online'): bool {
         try {
             require_once __DIR__ . '/WhatsApp.php';
