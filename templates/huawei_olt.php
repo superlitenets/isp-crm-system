@@ -527,6 +527,17 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
                 $stmt = $db->query($discSql);
             }
             $discoveredOnus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            $authorizedSnMap = [];
+            if (!empty($discoveredOnus)) {
+                $snList = array_map(function($d) { return $d['serial_number']; }, $discoveredOnus);
+                $snPlaceholders = implode(',', array_fill(0, count($snList), '?'));
+                $authStmt = $db->prepare("SELECT id, sn, name, description, frame, slot, port, onu_id, olt_id FROM huawei_onus WHERE is_authorized = TRUE AND sn IN ({$snPlaceholders})");
+                $authStmt->execute($snList);
+                foreach ($authStmt->fetchAll(\PDO::FETCH_ASSOC) as $authOnu) {
+                    $authorizedSnMap[$authOnu['sn']] = $authOnu;
+                }
+            }
         }
         
         echo json_encode([
@@ -6111,6 +6122,7 @@ $profiles = $huaweiOLT->getServiceProfiles(false);
 $logs = [];
 $alerts = [];
 $discoveredOnus = [];
+$authorizedSnMap = [];
 if ($view === 'onus' || $view === 'dashboard') {
     $onuFilters = [];
     if ($oltId) $onuFilters['olt_id'] = $oltId;
@@ -6128,6 +6140,17 @@ if ($view === 'onus' || $view === 'dashboard') {
     // Always fetch discovered ONUs (auto-populated by OLT Session Manager)
     // These are pending ONUs waiting to be authorized
     $discoveredOnus = $huaweiOLT->getDiscoveredONUs($oltId, true);
+    
+    $authorizedSnMap = [];
+    if (!empty($discoveredOnus)) {
+        $snList = array_map(function($d) { return $d['serial_number']; }, $discoveredOnus);
+        $snPlaceholders = implode(',', array_fill(0, count($snList), '?'));
+        $authStmt = $db->prepare("SELECT id, sn, name, description, frame, slot, port, onu_id, olt_id FROM huawei_onus WHERE is_authorized = TRUE AND sn IN ({$snPlaceholders})");
+        $authStmt->execute($snList);
+        foreach ($authStmt->fetchAll(\PDO::FETCH_ASSOC) as $authOnu) {
+            $authorizedSnMap[$authOnu['sn']] = $authOnu;
+        }
+    }
 }
 if ($view === 'logs') {
     $logFilters = [];
@@ -9514,10 +9537,22 @@ try {
                                         <small><?= date('Y-m-d H:i', strtotime($disc['last_seen_at'])) ?></small>
                                     </td>
                                     <td>
+                                        <?php 
+                                        $existingAuth = $authorizedSnMap[$disc['serial_number']] ?? null;
+                                        if ($existingAuth): 
+                                            $existingPort = "{$existingAuth['frame']}/{$existingAuth['slot']}/{$existingAuth['port']}:{$existingAuth['onu_id']}";
+                                        ?>
+                                        <button type="button" class="btn btn-sm btn-warning" 
+                                            onclick="openDiscoveryMoveModal(<?= $existingAuth['id'] ?>, '<?= htmlspecialchars($disc['serial_number']) ?>', <?= (int)$existingAuth['slot'] ?>, <?= (int)$existingAuth['port'] ?>, <?= (int)$existingAuth['onu_id'] ?>, '<?= htmlspecialchars($disc['frame_slot_port'] ?? '') ?>')">
+                                            <i class="bi bi-arrow-right-circle me-1"></i> Move
+                                        </button>
+                                        <br><small class="text-muted">Currently on <?= $existingPort ?></small>
+                                        <?php else: ?>
                                         <button type="button" class="btn btn-sm btn-success" 
                                             onclick="openAuthModal('<?= htmlspecialchars($disc['serial_number']) ?>', '<?= $disc['olt_id'] ?>', '<?= htmlspecialchars($disc['frame_slot_port'] ?? '') ?>', '<?= $disc['onu_type_id'] ?? '' ?>')">
                                             <i class="bi bi-check-lg"></i> Authorize
                                         </button>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -10029,6 +10064,74 @@ try {
             }
             </style>
             
+            <div class="modal fade" id="discoveryMoveModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-arrow-right-circle me-2 text-warning"></i>Move ONU to New Port</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post" action="?page=huawei-olt&view=onus">
+                            <div class="modal-body">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="move_onu">
+                                <input type="hidden" name="onu_id" id="discMoveOnuId">
+                                <input type="hidden" name="redirect_view" value="onus&unconfigured=1">
+                                
+                                <div class="alert alert-warning mb-3">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    This ONU is already authorized on another port. It will be moved to the new location.
+                                </div>
+                                <div class="alert alert-info mb-3">
+                                    <strong>ONU:</strong> <span id="discMoveSn"></span><br>
+                                    <strong>Current Port:</strong> <span id="discMoveCurrent"></span><br>
+                                    <strong>Detected at:</strong> <span id="discMoveDetected"></span>
+                                </div>
+                                
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">New Slot</label>
+                                        <input type="number" name="new_slot" id="discMoveNewSlot" class="form-control" min="0" max="20" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">New Port</label>
+                                        <input type="number" name="new_port" id="discMoveNewPort" class="form-control" min="0" max="15" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">ONU ID <small class="text-muted">(optional)</small></label>
+                                        <input type="number" name="new_onu_id" id="discMoveNewOnuId" class="form-control" min="0" max="127" placeholder="Auto">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer justify-content-between">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-warning"><i class="bi bi-arrow-right-circle me-1"></i> Move ONU</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <script>
+            function openDiscoveryMoveModal(onuDbId, sn, currentSlot, currentPort, currentOnuId, detectedFsp) {
+                document.getElementById('discMoveOnuId').value = onuDbId;
+                document.getElementById('discMoveSn').textContent = sn;
+                document.getElementById('discMoveCurrent').textContent = '0/' + currentSlot + '/' + currentPort + ':' + currentOnuId;
+                document.getElementById('discMoveDetected').textContent = detectedFsp || 'Unknown';
+                
+                var parts = (detectedFsp || '').replace(/\s/g, '').split('/');
+                if (parts.length >= 3) {
+                    var portParts = parts[2].split(':');
+                    document.getElementById('discMoveNewSlot').value = parseInt(parts[1]) || 0;
+                    document.getElementById('discMoveNewPort').value = parseInt(portParts[0]) || 0;
+                    if (portParts.length > 1) {
+                        document.getElementById('discMoveNewOnuId').value = parseInt(portParts[1]) || '';
+                    }
+                }
+                
+                new bootstrap.Modal(document.getElementById('discoveryMoveModal')).show();
+            }
+            </script>
+
             <?php elseif ($view === 'onu_detail' && $currentOnu): ?>
             <?php
             // Get provisioning stage info
