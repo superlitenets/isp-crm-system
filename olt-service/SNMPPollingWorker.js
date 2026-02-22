@@ -763,6 +763,7 @@ class SNMPPollingWorker {
             
             const dbResult = await client.query(`
                 SELECT o.id, o.sn, o.slot, o.port, o.onu_id, o.status as prev_status, o.description, o.name,
+                       o.last_down_cause,
                        c.name as customer_name, c.phone as customer_phone, c.id as customer_id
                 FROM huawei_onus o
                 LEFT JOIN customers c ON o.customer_id = c.id
@@ -841,25 +842,37 @@ class SNMPPollingWorker {
                 const prevStatus = prevOnu?.prev_status;
                 const dbId = prevOnu?.id;
                 
+                let effectiveStatus = s.status;
+                if (s.status === 'offline' && (prevStatus === 'los' || prevStatus === 'dying-gasp')) {
+                    const cause = (prevOnu.last_down_cause || '').toLowerCase();
+                    const causeSuggestsLos = cause.includes('los') || cause.includes('lob') || cause.includes('losi') || cause.includes('lobi') || cause.includes('lofi');
+                    const causeSuggestsDying = cause.includes('dying') || cause.includes('power');
+                    if (prevStatus === 'los' && causeSuggestsLos) {
+                        effectiveStatus = 'los';
+                    } else if (prevStatus === 'dying-gasp' && causeSuggestsDying) {
+                        effectiveStatus = 'dying-gasp';
+                    }
+                }
+                
                 let result;
-                if (s.status === 'online' && prevStatus !== 'online') {
+                if (effectiveStatus === 'online' && prevStatus !== 'online') {
                     result = await client.query(`
                         UPDATE huawei_onus 
-                        SET status = $1, snmp_status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = $2
-                    `, [s.status, dbId]);
-                } else if (s.status !== 'online' && prevStatus === 'online') {
+                        SET status = $1, snmp_status = $2, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $3
+                    `, [effectiveStatus, s.status, dbId]);
+                } else if (effectiveStatus !== 'online' && prevStatus === 'online') {
                     result = await client.query(`
                         UPDATE huawei_onus 
-                        SET status = $1, snmp_status = $1, online_since = NULL, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = $2
-                    `, [s.status, dbId]);
+                        SET status = $1, snmp_status = $2, online_since = NULL, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $3
+                    `, [effectiveStatus, s.status, dbId]);
                 } else {
                     result = await client.query(`
                         UPDATE huawei_onus 
-                        SET status = $1, snmp_status = $1, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = $2
-                    `, [s.status, dbId]);
+                        SET status = $1, snmp_status = $2, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $3
+                    `, [effectiveStatus, s.status, dbId]);
                 }
                 
                 if (result.rowCount > 0) {
@@ -998,6 +1011,30 @@ class SNMPPollingWorker {
                 const oltKey = olt.id.toString();
                 const session = this.sessionManager.sessions?.get(oltKey);
                 if (!session || !session.connected) continue;
+                
+                await this.pool.query(`
+                    UPDATE huawei_onus 
+                    SET status = 'los'
+                    WHERE olt_id = $1 
+                      AND is_authorized = true 
+                      AND status = 'offline'
+                      AND last_down_cause IS NOT NULL 
+                      AND last_down_cause != ''
+                      AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' 
+                           OR LOWER(last_down_cause) LIKE '%losi%' OR LOWER(last_down_cause) LIKE '%lobi%' 
+                           OR LOWER(last_down_cause) LIKE '%lofi%')
+                `, [olt.id]);
+                
+                await this.pool.query(`
+                    UPDATE huawei_onus 
+                    SET status = 'dying-gasp'
+                    WHERE olt_id = $1 
+                      AND is_authorized = true 
+                      AND status = 'offline'
+                      AND last_down_cause IS NOT NULL 
+                      AND last_down_cause != ''
+                      AND (LOWER(last_down_cause) LIKE '%dying%' OR LOWER(last_down_cause) LIKE '%power%')
+                `, [olt.id]);
                 
                 const offlineOnus = await this.pool.query(`
                     SELECT id, frame, slot, port, onu_id, sn, status
