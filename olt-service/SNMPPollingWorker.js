@@ -744,11 +744,16 @@ class SNMPPollingWorker {
     decodeIfIndex(ifIndex) {
         const ponIndex = ifIndex > 0xFFFFFF ? (ifIndex & 0xFFFFFF) : ifIndex;
         
+        const base = { slot: (ponIndex >> 13) & 0x1F, port: (ponIndex >> 8) & 0x1F };
         const methods = [
-            { slot: (ponIndex >> 13) & 0x1F, port: (ponIndex >> 8) & 0x1F },
+            base,
             { slot: (ponIndex >> 8) & 0xFF, port: ponIndex & 0xFF },
             { slot: Math.floor(ponIndex / 256), port: ponIndex % 256 },
         ];
+        
+        for (const offset of [1, -1, 2, -2]) {
+            methods.push({ slot: base.slot + offset, port: base.port, slotOffset: offset });
+        }
         
         return methods;
     }
@@ -794,11 +799,16 @@ class SNMPPollingWorker {
                         for (const m of methods) {
                             const tryKey = `${m.slot}.${m.port}.${onuId}`;
                             if (dbMap[tryKey]) {
-                                console.log(`[SNMP] OLT ${oltId}: ifIndex ${ifIndex} - method (s=${slot},p=${port}) failed, using (s=${m.slot},p=${m.port})`);
+                                const offsetUsed = m.slotOffset || 0;
+                                console.log(`[SNMP] OLT ${oltId}: ifIndex ${ifIndex} - method (s=${slot},p=${port}) failed, using (s=${m.slot},p=${m.port})${offsetUsed ? ` [slot offset=${offsetUsed > 0 ? '+' : ''}${offsetUsed}]` : ''}`);
                                 correctedSlotPort = { 
+                                    slotOffset: offsetUsed,
                                     calcSlot: (ifIdx) => {
                                         const pi = ifIdx > 0xFFFFFF ? (ifIdx & 0xFFFFFF) : ifIdx;
-                                        if (m.slot === ((pi >> 13) & 0x1F)) return { slot: (pi >> 13) & 0x1F, port: (pi >> 8) & 0x1F };
+                                        const baseSlot = (pi >> 13) & 0x1F;
+                                        const basePort = (pi >> 8) & 0x1F;
+                                        if (offsetUsed) return { slot: baseSlot + offsetUsed, port: basePort };
+                                        if (m.slot === baseSlot) return { slot: baseSlot, port: basePort };
                                         if (m.slot === ((pi >> 8) & 0xFF)) return { slot: (pi >> 8) & 0xFF, port: pi & 0xFF };
                                         return { slot: Math.floor(pi / 256), port: pi % 256 };
                                     }
