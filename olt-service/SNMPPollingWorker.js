@@ -161,9 +161,40 @@ class SNMPPollingWorker {
     }
 
     async pollOlt(olt) {
+        const paused = this.isOltPaused(olt.id);
+
+        if (paused) {
+            console.log(`[Poll] OLT ${olt.name} paused for authorization - skipping poll`);
+            await this.updatePollingStats(olt.id, false, 'Paused for authorization');
+            return { olt: olt.name, onuCount: 0, method: 'skipped-paused' };
+        }
+
+        try {
+            console.log(`[Poll] OLT ${olt.name} - trying CLI first...`);
+            const cliResult = await this.pollOltViaCli(olt);
+            await this.updatePollingStats(olt.id, true, null, 'cli');
+
+            this.snmpSupplementOlt(olt).catch(e => {
+                console.log(`[Poll] SNMP supplement for ${olt.name} skipped: ${e.message}`);
+            });
+
+            return { olt: olt.name, ...cliResult, method: 'cli' };
+        } catch (cliError) {
+            console.log(`[Poll] OLT ${olt.name} CLI failed (${cliError.message}), falling back to SNMP...`);
+
+            try {
+                const snmpResult = await this.pollOltViaSnmp(olt);
+                await this.updatePollingStats(olt.id, true, null, 'snmp');
+                return { olt: olt.name, ...snmpResult, method: 'snmp' };
+            } catch (snmpError) {
+                await this.updatePollingStats(olt.id, false, `CLI: ${cliError.message}, SNMP: ${snmpError.message}`);
+                throw snmpError;
+            }
+        }
+    }
+
+    async pollOltViaSnmp(olt) {
         return new Promise(async (resolve, reject) => {
-            const paused = this.isOltPaused(olt.id);
-            
             const session = snmp.createSession(olt.ip_address, olt.snmp_community, {
                 port: olt.snmp_port,
                 version: olt.snmp_version === 'v1' ? snmp.Version1 : snmp.Version2c,
@@ -175,56 +206,45 @@ class SNMPPollingWorker {
                 const sysInfo = await this.getSysInfo(session);
                 const onuStatuses = await this.getONUStatuses(session, olt.id);
                 const opticalData = await this.getONUOpticalPower(session, olt.id);
-                
+
                 await this.updateOltInfo(olt.id, sysInfo);
                 await this.updateONUStatuses(olt.id, onuStatuses);
                 if (Object.keys(opticalData).length > 0) {
                     await this.updateONUOpticalPower(olt.id, opticalData, onuStatuses);
                 }
-                await this.updatePollingStats(olt.id, true, null, 'snmp');
-                
+
                 session.close();
-                
-                if (onuStatuses.length === 0 && !paused) {
-                    const dbOnuCount = await this.pool.query(
-                        'SELECT COUNT(*) as cnt FROM huawei_onus WHERE olt_id = $1 AND is_authorized = true',
-                        [olt.id]
-                    );
-                    const hasDbOnus = parseInt(dbOnuCount.rows[0]?.cnt || 0) > 0;
-                    
-                    if (hasDbOnus) {
-                        console.log(`[SNMP] OLT ${olt.name} returned 0 ONUs via SNMP but has ONUs in DB - triggering CLI refresh`);
-                        this.pollOltViaCli(olt).catch(e => {
-                            console.log(`[SNMP] CLI fallback for ${olt.name} failed: ${e.message}`);
-                        });
-                    }
-                } else if (onuStatuses.length === 0 && paused) {
-                    console.log(`[SNMP] OLT ${olt.name} paused for authorization - skipping all CLI activity`);
-                }
-                
-                resolve({ olt: olt.name, ...sysInfo, onuCount: onuStatuses.length, method: 'snmp' });
-            } catch (snmpError) {
+                resolve({ ...sysInfo, onuCount: onuStatuses.length });
+            } catch (error) {
                 session.close();
-                
-                if (paused) {
-                    console.log(`[SNMP] OLT ${olt.name} SNMP failed but paused for authorization - skipping CLI fallback`);
-                    await this.updatePollingStats(olt.id, false, 'Paused for authorization');
-                    resolve({ olt: olt.name, onuCount: 0, method: 'skipped-paused' });
-                    return;
-                }
-                
-                console.log(`[SNMP] OLT ${olt.name} SNMP failed, trying CLI fallback...`);
-                
-                try {
-                    const cliResult = await this.pollOltViaCli(olt);
-                    await this.updatePollingStats(olt.id, true, null, 'cli');
-                    resolve({ olt: olt.name, ...cliResult, method: 'cli' });
-                } catch (cliError) {
-                    await this.updatePollingStats(olt.id, false, snmpError.message);
-                    reject(snmpError);
-                }
+                reject(error);
             }
         });
+    }
+
+    async snmpSupplementOlt(olt) {
+        const session = snmp.createSession(olt.ip_address, olt.snmp_community, {
+            port: olt.snmp_port,
+            version: olt.snmp_version === 'v1' ? snmp.Version1 : snmp.Version2c,
+            timeout: 5000,
+            retries: 1
+        });
+
+        try {
+            const sysInfo = await this.getSysInfo(session);
+            await this.updateOltInfo(olt.id, sysInfo);
+
+            const opticalData = await this.getONUOpticalPower(session, olt.id);
+            if (Object.keys(opticalData).length > 0) {
+                const onuStatuses = await this.getONUStatuses(session, olt.id);
+                await this.updateONUOpticalPower(olt.id, opticalData, onuStatuses);
+                console.log(`[Poll] SNMP supplement for ${olt.name}: updated optical power for ${Object.keys(opticalData).length} ONUs`);
+            }
+            session.close();
+        } catch (e) {
+            session.close();
+            throw e;
+        }
     }
     
     async pollOltViaCli(olt) {
