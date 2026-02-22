@@ -7835,6 +7835,7 @@ try {
                     height: 400px;
                     background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
                     border-radius: 50%;
+                    pointer-events: none;
                 }
                 .live-dot {
                     width: 8px; height: 8px;
@@ -8019,6 +8020,8 @@ try {
                     display: inline-flex;
                     align-items: center;
                     gap: 5px;
+                    position: relative;
+                    z-index: 2;
                 }
                 .theme-toggle:hover {
                     background: rgba(255,255,255,0.18);
