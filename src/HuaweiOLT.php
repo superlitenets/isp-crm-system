@@ -3534,7 +3534,11 @@ class HuaweiOLT {
         
         if (!empty($filters['status'])) {
             if ($filters['status'] === 'offline') {
-                $conditions .= " AND (o.status = 'offline' OR o.status = 'dying-gasp')";
+                $losCondO = self::losCondition('o');
+                $conditions .= " AND ((o.status = 'offline' AND NOT {$losCondO}) OR o.status = 'dying-gasp')";
+            } elseif ($filters['status'] === 'los') {
+                $losCondO = self::losCondition('o');
+                $conditions .= " AND {$losCondO}";
             } else {
                 $conditions .= " AND o.status = ?";
                 $params[] = $filters['status'];

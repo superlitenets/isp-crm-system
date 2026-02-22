@@ -481,15 +481,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         }
         
         if ($status) {
-            $where[] = "o.status = ?";
-            $params[] = $status;
+            $losCondO = \HuaweiOLT::losCondition('o');
+            if ($status === 'los') {
+                $where[] = $losCondO;
+            } elseif ($status === 'offline') {
+                $where[] = "((o.status = 'offline' AND NOT {$losCondO}) OR o.status = 'dying-gasp')";
+            } else {
+                $where[] = "o.status = ?";
+                $params[] = $status;
+            }
         }
         
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
         
         $sql = "SELECT o.id, o.sn, o.name, o.status, o.snmp_status, o.rx_power, o.tx_power, 
                        o.frame, o.slot, o.port, o.onu_id, o.olt_id, 
-                       o.tr069_ip, o.distance, o.vlan_id,
+                       o.tr069_ip, o.distance, o.vlan_id, o.last_down_cause,
                        ol.name as olt_name, o.updated_at,
                        c.name as customer_name, z.name as zone_name
                 FROM huawei_onus o
@@ -9660,14 +9667,20 @@ try {
                                         $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'power_fail'];
                                         $snmpStatus = strtolower($onu['snmp_status'] ?? '');
                                         $dbStatus = strtolower($onu['status'] ?? 'offline');
+                                        $onuDc = strtolower($onu['last_down_cause'] ?? '');
                                         
-                                        // SNMP status is authoritative when available
                                         if (in_array($snmpStatus, $snmpFaultStatuses)) {
                                             $status = $snmpStatus;
-                                        } elseif ($snmpStatus === 'offline') {
-                                            $status = 'offline';
                                         } elseif ($snmpStatus === 'online') {
                                             $status = 'online';
+                                        } elseif ($snmpStatus === 'offline' || $snmpStatus === '') {
+                                            if ($dbStatus === 'los' || ($dbStatus === 'offline' && $onuDc !== '' && $onuDc !== '-' && (strpos($onuDc, 'los') !== false || strpos($onuDc, 'lob') !== false || strpos($onuDc, 'lofi') !== false))) {
+                                                $status = 'los';
+                                            } elseif ($dbStatus === 'dying-gasp' || ($dbStatus === 'offline' && $onuDc !== '' && $onuDc !== '-' && (strpos($onuDc, 'dying') !== false || strpos($onuDc, 'power') !== false))) {
+                                                $status = 'dying-gasp';
+                                            } else {
+                                                $status = $dbStatus;
+                                            }
                                         } else {
                                             $status = $dbStatus;
                                         }
@@ -9779,7 +9792,20 @@ try {
                         
                         const statusBadge = row.querySelector('.badge');
                         if (statusBadge) {
-                            const snmpStatus = (onu.snmp_status || "").toLowerCase(); const faultStatuses = ["los","dying-gasp","dyinggasp","power_fail"]; let newStatus; if (faultStatuses.includes(snmpStatus)) { newStatus = snmpStatus; } else if (snmpStatus === "offline") { newStatus = "offline"; } else if (snmpStatus === "online") { newStatus = "online"; } else { newStatus = onu.status || "offline"; }
+                            const snmpStatus = (onu.snmp_status || "").toLowerCase();
+                            const dbStatus = (onu.status || "offline").toLowerCase();
+                            const dc = (onu.last_down_cause || "").toLowerCase();
+                            const faultStatuses = ["los","dying-gasp","dyinggasp","power_fail"];
+                            const isLosCause = dc && dc !== '-' && (dc.includes('los') || dc.includes('lob') || dc.includes('lofi'));
+                            const isDyingCause = dc && dc !== '-' && (dc.includes('dying') || dc.includes('power'));
+                            let newStatus;
+                            if (faultStatuses.includes(snmpStatus)) { newStatus = snmpStatus; }
+                            else if (snmpStatus === "online") { newStatus = "online"; }
+                            else if (snmpStatus === "offline" || snmpStatus === "") {
+                                if (dbStatus === 'los' || isLosCause) { newStatus = 'los'; }
+                                else if (dbStatus === 'dying-gasp' || isDyingCause) { newStatus = 'dying-gasp'; }
+                                else { newStatus = dbStatus; }
+                            } else { newStatus = dbStatus; }
                             const statusCfg = {
                                 online: { class: 'bg-success', icon: 'check-circle-fill' },
                                 offline: { class: 'bg-secondary', icon: 'circle' },
