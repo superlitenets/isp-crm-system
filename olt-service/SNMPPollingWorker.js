@@ -384,8 +384,11 @@ class SNMPPollingWorker {
                     }
                     
                     if (offlineOnus.length > 0) {
-                        const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online');
-                        for (const { onu } of newlyOffline) {
+                        const needCauseQuery = offlineOnus.filter(o => {
+                            const cause = (o.onu.last_down_cause || '').trim();
+                            return o.onu.status === 'online' || !cause || cause === '-';
+                        });
+                        for (const { onu } of needCauseQuery) {
                             try {
                                 const infoCmd = `display ont info ${port} ${onu.onu_id}`;
                                 const infoResult = await this.sessionManager.execute(oltKey, infoCmd, { timeout: 8000 });
@@ -450,6 +453,28 @@ class SNMPPollingWorker {
         }
         
         console.log(`[CLI] Updated ${updated} ONUs for OLT ${olt.name}`);
+        
+        try {
+            const losPromo = await this.pool.query(`
+                UPDATE huawei_onus SET status = 'los'
+                WHERE olt_id = $1 AND is_authorized = true AND status = 'offline'
+                  AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
+                  AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' 
+                       OR LOWER(last_down_cause) LIKE '%losi%' OR LOWER(last_down_cause) LIKE '%lobi%'
+                       OR LOWER(last_down_cause) LIKE '%lofi%')
+            `, [olt.id]);
+            const dgPromo = await this.pool.query(`
+                UPDATE huawei_onus SET status = 'dying-gasp'
+                WHERE olt_id = $1 AND is_authorized = true AND status = 'offline'
+                  AND last_down_cause IS NOT NULL AND last_down_cause != '' AND last_down_cause != '-'
+                  AND (LOWER(last_down_cause) LIKE '%dying%' OR LOWER(last_down_cause) LIKE '%power%')
+            `, [olt.id]);
+            if (losPromo.rowCount > 0 || dgPromo.rowCount > 0) {
+                console.log(`[CLI] Status promotion for ${olt.name}: ${losPromo.rowCount} → LOS, ${dgPromo.rowCount} → dying-gasp`);
+            }
+        } catch (e) {
+            console.log(`[CLI] Status promotion error: ${e.message}`);
+        }
         
         if (faults.length > 0) {
             console.log(`[CLI] Detected ${faults.length} fault(s) on OLT ${olt.name} - sending notifications`);
@@ -1055,14 +1080,6 @@ class SNMPPollingWorker {
             for (const olt of olts.rows) {
                 const oltKey = olt.id.toString();
                 
-                if (this.cliActiveOlts.has(olt.id)) {
-                    console.log(`[LOS-Backfill] Skipping ${olt.name} - CLI poll in progress`);
-                    continue;
-                }
-                
-                const session = this.sessionManager.sessions?.get(oltKey);
-                if (!session || !session.connected) continue;
-                
                 await this.pool.query(`
                     UPDATE huawei_onus 
                     SET status = 'los'
@@ -1070,9 +1087,9 @@ class SNMPPollingWorker {
                       AND is_authorized = true 
                       AND status = 'offline'
                       AND last_down_cause IS NOT NULL 
-                      AND last_down_cause != ''
+                      AND last_down_cause != '' AND last_down_cause != '-'
                       AND (LOWER(last_down_cause) LIKE '%los%' OR LOWER(last_down_cause) LIKE '%lob%' 
-                           OR LOWER(last_down_cause) LIKE '%losi%' OR LOWER(last_down_cause) LIKE '%lobi%' 
+                           OR LOWER(last_down_cause) LIKE '%losi%' OR LOWER(last_down_cause) LIKE '%lobi%'
                            OR LOWER(last_down_cause) LIKE '%lofi%')
                 `, [olt.id]);
                 
@@ -1083,9 +1100,20 @@ class SNMPPollingWorker {
                       AND is_authorized = true 
                       AND status = 'offline'
                       AND last_down_cause IS NOT NULL 
-                      AND last_down_cause != ''
+                      AND last_down_cause != '' AND last_down_cause != '-'
                       AND (LOWER(last_down_cause) LIKE '%dying%' OR LOWER(last_down_cause) LIKE '%power%')
                 `, [olt.id]);
+                
+                if (this.cliActiveOlts.has(olt.id)) {
+                    console.log(`[LOS-Backfill] Skipping CLI queries for ${olt.name} - CLI poll in progress`);
+                    continue;
+                }
+                
+                const session = this.sessionManager.sessions?.get(oltKey);
+                if (!session || !session.connected) {
+                    console.log(`[LOS-Backfill] No CLI session for ${olt.name} - SQL promotions applied, skipping CLI queries`);
+                    continue;
+                }
                 
                 const offlineOnus = await this.pool.query(`
                     SELECT id, frame, slot, port, onu_id, sn, status, last_down_cause
