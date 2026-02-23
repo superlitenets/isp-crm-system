@@ -13563,65 +13563,119 @@ try {
             <?php elseif ($view === 'topology'): ?>
             <?php
             $topologyOltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
-            $topologyData = $huaweiOLT->getTopologyData($topologyOltId);
+            $topologySlot = isset($_GET['topo_slot']) && $_GET['topo_slot'] !== '' ? (int)$_GET['topo_slot'] : null;
+            $topologyPort = isset($_GET['topo_port']) && $_GET['topo_port'] !== '' ? (int)$_GET['topo_port'] : null;
+            if ($topologySlot === null) $topologyPort = null;
+            $topologyData = $huaweiOLT->getTopologyData($topologyOltId, $topologySlot, $topologyPort);
+            $viewLevel = $topologyPort !== null ? 'onu' : ($topologySlot !== null ? 'port' : 'slot');
             ?>
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-start mb-3">
                 <div>
                     <h4 class="page-title mb-1"><i class="bi bi-diagram-3"></i> PON Network Map</h4>
-                    <small class="text-muted">Interactive topology visualization</small>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-0" style="font-size: 0.85rem;">
+                                <li class="breadcrumb-item <?= $viewLevel === 'slot' && !$topologyOltId ? 'active' : '' ?>">
+                                    <?php if ($viewLevel !== 'slot' || $topologyOltId): ?>
+                                    <a href="?page=huawei-olt&view=topology">All OLTs</a>
+                                    <?php else: ?>All OLTs<?php endif; ?>
+                                </li>
+                                <?php if ($topologyOltId): ?>
+                                <li class="breadcrumb-item <?= $viewLevel === 'slot' ? 'active' : '' ?>">
+                                    <?php
+                                    $topoOltName = '';
+                                    foreach ($olts as $o) { if ($o['id'] == $topologyOltId) { $topoOltName = $o['name']; break; } }
+                                    ?>
+                                    <?php if ($viewLevel !== 'slot'): ?>
+                                    <a href="?page=huawei-olt&view=topology&olt_id=<?= $topologyOltId ?>"><?= htmlspecialchars($topoOltName) ?></a>
+                                    <?php else: ?><?= htmlspecialchars($topoOltName) ?><?php endif; ?>
+                                </li>
+                                <?php endif; ?>
+                                <?php if ($topologySlot !== null): ?>
+                                <li class="breadcrumb-item <?= $viewLevel === 'port' ? 'active' : '' ?>">
+                                    <?php if ($viewLevel !== 'port'): ?>
+                                    <a href="?page=huawei-olt&view=topology&olt_id=<?= $topologyOltId ?>&topo_slot=<?= $topologySlot ?>">Slot <?= $topologySlot ?></a>
+                                    <?php else: ?>Slot <?= $topologySlot ?><?php endif; ?>
+                                </li>
+                                <?php endif; ?>
+                                <?php if ($topologyPort !== null): ?>
+                                <li class="breadcrumb-item active">Port <?= $topologyPort ?></li>
+                                <?php endif; ?>
+                            </ol>
+                        </nav>
+                    </div>
                 </div>
-                <div class="d-flex gap-2">
-                    <select id="topologyOltFilter" class="form-select form-select-sm" style="width: 200px;" onchange="filterTopology(this.value)">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <select id="topologyOltFilter" class="form-select form-select-sm" style="width: 160px;" onchange="filterTopology(this.value)">
                         <option value="">All OLTs</option>
                         <?php foreach ($olts as $olt): ?>
                         <option value="<?= $olt['id'] ?>" <?= $topologyOltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="resetTopologyView()">
-                        <i class="bi bi-arrows-angle-contract me-1"></i> Fit View
+                    <?php if ($topologyOltId && !empty($topologyData['slots'])): ?>
+                    <select id="topologySlotFilter" class="form-select form-select-sm" style="width: 120px;" onchange="filterSlot(this.value)">
+                        <option value="">All Slots</option>
+                        <?php foreach ($topologyData['slots'] as $s): ?>
+                        <option value="<?= $s ?>" <?= $topologySlot !== null && $topologySlot == $s ? 'selected' : '' ?>>Slot <?= $s ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php endif; ?>
+                    <?php if ($topologySlot !== null && !empty($topologyData['ports'])): ?>
+                    <select id="topologyPortFilter" class="form-select form-select-sm" style="width: 120px;" onchange="filterPort(this.value)">
+                        <option value="">All Ports</option>
+                        <?php foreach ($topologyData['ports'] as $p): ?>
+                        <option value="<?= $p ?>" <?= $topologyPort !== null && $topologyPort == $p ? 'selected' : '' ?>>Port <?= $p ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php endif; ?>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="resetTopologyView()" title="Fit View">
+                        <i class="bi bi-arrows-angle-contract"></i>
                     </button>
-                    <button class="btn btn-outline-primary btn-sm" onclick="location.reload()">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                    </button>
+                    <?php if ($topologySlot !== null || $topologyPort !== null): ?>
+                    <a href="?page=huawei-olt&view=topology<?= $topologyOltId ? '&olt_id=' . $topologyOltId : '' ?>" class="btn btn-outline-warning btn-sm" title="Back to overview">
+                        <i class="bi bi-arrow-up-circle"></i> Overview
+                    </a>
+                    <?php endif; ?>
                 </div>
             </div>
             
-            <div class="row g-3 mb-3">
-                <div class="col-auto">
-                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
-                        <span class="topology-legend-dot" style="background: var(--oms-primary);"></span>
-                        <small>OLT</small>
-                    </div>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <div class="d-flex align-items-center gap-1 bg-light rounded px-2 py-1">
+                    <span class="topology-legend-dot" style="background: var(--oms-primary);"></span>
+                    <small>OLT</small>
                 </div>
-                <div class="col-auto">
-                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
-                        <span class="topology-legend-dot" style="background: #8b5cf6;"></span>
-                        <small>PON Port</small>
-                    </div>
+                <div class="d-flex align-items-center gap-1 bg-light rounded px-2 py-1">
+                    <span class="topology-legend-dot" style="background: #f59e0b;"></span>
+                    <small>Slot</small>
                 </div>
-                <div class="col-auto">
-                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
-                        <span class="topology-legend-dot" style="background: var(--oms-success);"></span>
-                        <small>Online ONU</small>
-                    </div>
+                <div class="d-flex align-items-center gap-1 bg-light rounded px-2 py-1">
+                    <span class="topology-legend-dot" style="background: #8b5cf6;"></span>
+                    <small>PON Port</small>
                 </div>
-                <div class="col-auto">
-                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
-                        <span class="topology-legend-dot" style="background: var(--oms-danger);"></span>
-                        <small>LOS ONU</small>
-                    </div>
+                <div class="d-flex align-items-center gap-1 bg-light rounded px-2 py-1">
+                    <span class="topology-legend-dot" style="background: var(--oms-success);"></span>
+                    <small>Online</small>
                 </div>
-                <div class="col-auto">
-                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
-                        <span class="topology-legend-dot" style="background: #6b7280;"></span>
-                        <small>Offline ONU</small>
-                    </div>
+                <div class="d-flex align-items-center gap-1 bg-light rounded px-2 py-1">
+                    <span class="topology-legend-dot" style="background: var(--oms-danger);"></span>
+                    <small>LOS</small>
+                </div>
+                <div class="d-flex align-items-center gap-1 bg-light rounded px-2 py-1">
+                    <span class="topology-legend-dot" style="background: #6b7280;"></span>
+                    <small>Offline</small>
+                </div>
+                <div class="ms-auto">
+                    <small class="text-muted">
+                        <?= count($topologyData['nodes']) ?> nodes |
+                        <?= $viewLevel === 'slot' ? 'Showing slots' : ($viewLevel === 'port' ? 'Showing ports' : 'Showing ONUs') ?>
+                        | Double-click to drill down
+                    </small>
                 </div>
             </div>
             
             <div class="card shadow-sm">
                 <div class="card-body p-0">
-                    <div id="topologyContainer" style="height: 600px; width: 100%; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 0.375rem;"></div>
+                    <div id="topologyContainer" style="height: 650px; width: 100%; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 0.375rem;"></div>
                 </div>
             </div>
             
@@ -13656,6 +13710,9 @@ try {
             </style>
             <script>
             const topologyData = <?= json_encode($topologyData) ?>;
+            const currentOltId = <?= $topologyOltId ? $topologyOltId : 'null' ?>;
+            const currentSlot = <?= $topologySlot !== null ? $topologySlot : 'null' ?>;
+            const currentPort = <?= $topologyPort !== null ? $topologyPort : 'null' ?>;
             let network = null;
             
             function initTopology() {
@@ -13667,13 +13724,26 @@ try {
                     if (node.type === 'olt') {
                         color = { background: '#3b82f6', border: '#1d4ed8', highlight: { background: '#60a5fa', border: '#2563eb' } };
                         shape = 'box';
-                        size = 30;
+                        size = 35;
                         font = { color: '#ffffff', size: 14, bold: true };
-                    } else if (node.type === 'port') {
-                        color = { background: '#8b5cf6', border: '#6d28d9', highlight: { background: '#a78bfa', border: '#7c3aed' } };
-                        shape = 'diamond';
-                        size = 20;
-                        font = { color: '#ffffff', size: 11 };
+                    } else if (node.type === 'slot' || node.type === 'slot_root') {
+                        const hasLos = node.los > 0;
+                        const hasOffline = node.offline > 0;
+                        const bg = node.type === 'slot_root' ? '#3b82f6' : (hasLos ? '#ef4444' : (hasOffline ? '#f59e0b' : '#10b981'));
+                        const border = node.type === 'slot_root' ? '#1d4ed8' : (hasLos ? '#dc2626' : (hasOffline ? '#d97706' : '#059669'));
+                        color = { background: bg, border: border, highlight: { background: bg, border: border } };
+                        shape = node.type === 'slot_root' ? 'box' : 'hexagon';
+                        size = node.type === 'slot_root' ? 35 : 28;
+                        font = { color: '#ffffff', size: 13, bold: true };
+                    } else if (node.type === 'port' || node.type === 'port_root') {
+                        const hasLos = node.los > 0;
+                        const hasOffline = node.offline > 0;
+                        const bg = node.type === 'port_root' ? '#3b82f6' : (hasLos ? '#ef4444' : (hasOffline ? '#f59e0b' : '#8b5cf6'));
+                        const border = node.type === 'port_root' ? '#1d4ed8' : (hasLos ? '#dc2626' : (hasOffline ? '#d97706' : '#6d28d9'));
+                        color = { background: bg, border: border, highlight: { background: bg, border: border } };
+                        shape = node.type === 'port_root' ? 'box' : 'diamond';
+                        size = node.type === 'port_root' ? 35 : 22;
+                        font = { color: '#ffffff', size: 12, bold: node.type === 'port_root' };
                     } else {
                         if (node.status === 'online') {
                             color = { background: '#10b981', border: '#059669', highlight: { background: '#34d399', border: '#10b981' } };
@@ -13683,13 +13753,13 @@ try {
                             color = { background: '#6b7280', border: '#4b5563', highlight: { background: '#9ca3af', border: '#6b7280' } };
                         }
                         shape = 'dot';
-                        size = 12;
+                        size = 14;
                         font = { color: '#e2e8f0', size: 10 };
                     }
                     
                     return {
                         id: node.id,
-                        label: node.label,
+                        label: node.label + (node.onu_count ? ` (${node.onu_count})` : ''),
                         title: node.title,
                         color: color,
                         shape: shape,
@@ -13703,19 +13773,20 @@ try {
                     from: edge.from,
                     to: edge.to,
                     color: { color: '#475569', highlight: '#60a5fa', opacity: 0.6 },
-                    width: edge.from.startsWith('olt_') ? 3 : 1,
-                    smooth: { type: 'cubicBezier', roundness: 0.5 }
+                    width: 2,
+                    smooth: { type: 'cubicBezier', roundness: 0.4 }
                 })));
                 
+                const nodeCount = topologyData.nodes.length;
                 const options = {
                     layout: {
                         hierarchical: {
                             enabled: true,
                             direction: 'UD',
                             sortMethod: 'directed',
-                            levelSeparation: 120,
-                            nodeSpacing: 80,
-                            treeSpacing: 100
+                            levelSeparation: nodeCount > 50 ? 100 : 140,
+                            nodeSpacing: nodeCount > 50 ? 60 : 100,
+                            treeSpacing: 120
                         }
                     },
                     physics: {
@@ -13750,8 +13821,15 @@ try {
                     if (params.nodes.length > 0) {
                         const nodeId = params.nodes[0];
                         const node = nodes.get(nodeId);
-                        if (node.nodeData.type === 'onu' && node.nodeData.db_id) {
-                            window.location.href = '?page=huawei-olt&view=onus&onu_id=' + node.nodeData.db_id;
+                        const nd = node.nodeData;
+                        if (nd.type === 'onu' && nd.db_id) {
+                            window.location.href = '?page=huawei-olt&view=onus&onu_id=' + nd.db_id;
+                        } else if (nd.type === 'slot' && nd.olt_id) {
+                            window.location.href = '?page=huawei-olt&view=topology&olt_id=' + nd.olt_id + '&topo_slot=' + nd.slot;
+                        } else if (nd.type === 'port' && nd.olt_id) {
+                            window.location.href = '?page=huawei-olt&view=topology&olt_id=' + nd.olt_id + '&topo_slot=' + nd.slot + '&topo_port=' + nd.port;
+                        } else if (nd.type === 'olt') {
+                            window.location.href = '?page=huawei-olt&view=topology&olt_id=' + nd.id.replace('olt_', '');
                         }
                     }
                 });
@@ -13762,47 +13840,52 @@ try {
                 const content = document.getElementById('nodeInfoContent');
                 
                 let html = '';
-                if (node.type === 'olt') {
+                if (node.type === 'olt' || node.type === 'slot_root' || node.type === 'port_root') {
                     html = `
-                        <div class="row">
+                        <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <p><strong>Type:</strong> OLT Device</p>
-                                <p><strong>Name:</strong> ${node.label}</p>
-                                <p><strong>IP Address:</strong> ${node.ip || 'N/A'}</p>
+                                <p class="mb-1"><strong>Type:</strong> ${node.type === 'olt' ? 'OLT Device' : (node.type === 'slot_root' ? 'Slot' : 'PON Port')}</p>
+                                <p class="mb-1"><strong>Name:</strong> ${node.label}</p>
+                                <p class="mb-0"><strong>IP:</strong> ${node.ip || 'N/A'}</p>
                             </div>
-                            <div class="col-md-6 text-end">
-                                <a href="?page=huawei-olt&view=olts&edit_olt=${node.id.replace('olt_', '')}" class="btn btn-primary btn-sm">
-                                    <i class="bi bi-pencil me-1"></i> Edit OLT
-                                </a>
+                            <div>
+                                ${node.type === 'olt' ? `<a href="?page=huawei-olt&view=topology&olt_id=${node.id.replace('olt_', '')}" class="btn btn-primary btn-sm"><i class="bi bi-zoom-in me-1"></i> Drill Down</a>` : ''}
                             </div>
+                        </div>`;
+                } else if (node.type === 'slot') {
+                    html = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="mb-1"><strong>Slot:</strong> ${node.slot}</p>
+                                <p class="mb-1"><strong>Ports:</strong> ${node.port_count || 0}</p>
+                                <p class="mb-1"><strong>Total ONUs:</strong> ${node.onu_count || 0}</p>
+                                <p class="mb-0"><span class="text-success fw-bold">${node.online || 0} Online</span> &bull; <span class="text-danger fw-bold">${node.los || 0} LOS</span> &bull; <span class="text-secondary">${node.offline || 0} Offline</span></p>
+                            </div>
+                            <a href="?page=huawei-olt&view=topology&olt_id=${node.olt_id}&topo_slot=${node.slot}" class="btn btn-primary btn-sm"><i class="bi bi-zoom-in me-1"></i> View Ports</a>
                         </div>`;
                 } else if (node.type === 'port') {
                     html = `
-                        <div class="row">
+                        <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <p><strong>Type:</strong> PON Port</p>
-                                <p><strong>Port:</strong> ${node.label}</p>
+                                <p class="mb-1"><strong>Port:</strong> ${node.label}</p>
+                                <p class="mb-1"><strong>Total ONUs:</strong> ${node.onu_count || 0}</p>
+                                <p class="mb-0"><span class="text-success fw-bold">${node.online || 0} Online</span> &bull; <span class="text-danger fw-bold">${node.los || 0} LOS</span> &bull; <span class="text-secondary">${node.offline || 0} Offline</span></p>
                             </div>
-                            <div>
-                                <p><strong>Total ONUs:</strong> ${node.onu_count || 0}</p>
-                                <p><span class="text-success">${node.online || 0} Online</span> / <span class="text-danger">${node.los || 0} LOS</span> / <span class="text-secondary">${node.offline || 0} Offline</span></p>
-                            </div>
+                            <a href="?page=huawei-olt&view=topology&olt_id=${node.olt_id}&topo_slot=${node.slot}&topo_port=${node.port}" class="btn btn-primary btn-sm"><i class="bi bi-zoom-in me-1"></i> View ONUs</a>
                         </div>`;
                 } else {
                     const statusClass = node.status === 'online' ? 'success' : (node.status === 'los' ? 'danger' : 'secondary');
                     html = `
-                        <div class="row">
+                        <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <p><strong>Type:</strong> ONU</p>
-                                <p><strong>Name:</strong> ${node.label}</p>
-                                <p><strong>Serial:</strong> <code>${node.serial || 'N/A'}</code></p>
-                                <p><strong>Status:</strong> <span class="badge bg-${statusClass}">${node.status}</span></p>
+                                <p class="mb-1"><strong>ONU:</strong> ${node.label}</p>
+                                <p class="mb-1"><strong>Serial:</strong> <code>${node.serial || 'N/A'}</code></p>
+                                <p class="mb-1"><strong>Status:</strong> <span class="badge bg-${statusClass}">${node.status}</span></p>
+                                <p class="mb-1"><strong>Rx Power:</strong> ${node.rx_power ? node.rx_power + ' dBm' : 'N/A'}</p>
+                                ${node.zone ? `<p class="mb-1"><strong>Zone:</strong> ${node.zone}</p>` : ''}
+                                <p class="mb-0"><strong>Customer:</strong> ${node.customer || 'Not assigned'}</p>
                             </div>
-                            <div>
-                                <p><strong>Rx Power:</strong> ${node.rx_power ? node.rx_power + ' dBm' : 'N/A'}</p>
-                                <p><strong>Customer:</strong> ${node.customer || 'Not assigned'}</p>
-                                ${node.db_id ? `<a href="?page=huawei-olt&view=onus&onu_id=${node.db_id}" class="btn btn-primary btn-sm"><i class="bi bi-eye me-1"></i> View Details</a>` : ''}
-                            </div>
+                            ${node.db_id ? `<a href="?page=huawei-olt&view=onus&onu_id=${node.db_id}" class="btn btn-primary btn-sm"><i class="bi bi-eye me-1"></i> Details</a>` : ''}
                         </div>`;
                 }
                 
@@ -13812,10 +13895,33 @@ try {
             
             function filterTopology(oltId) {
                 const url = new URL(window.location);
+                url.searchParams.delete('topo_slot');
+                url.searchParams.delete('topo_port');
                 if (oltId) {
                     url.searchParams.set('olt_id', oltId);
                 } else {
                     url.searchParams.delete('olt_id');
+                }
+                window.location = url;
+            }
+            
+            function filterSlot(slot) {
+                const url = new URL(window.location);
+                url.searchParams.delete('topo_port');
+                if (slot) {
+                    url.searchParams.set('topo_slot', slot);
+                } else {
+                    url.searchParams.delete('topo_slot');
+                }
+                window.location = url;
+            }
+            
+            function filterPort(port) {
+                const url = new URL(window.location);
+                if (port) {
+                    url.searchParams.set('topo_port', port);
+                } else {
+                    url.searchParams.delete('topo_port');
                 }
                 window.location = url;
             }

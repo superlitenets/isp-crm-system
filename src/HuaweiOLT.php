@@ -4819,8 +4819,9 @@ class HuaweiOLT {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function getTopologyData(?int $oltId = null): array {
-        $topology = ['nodes' => [], 'edges' => []];
+    public function getTopologyData(?int $oltId = null, ?int $slotFilter = null, ?int $portFilter = null): array {
+        $topology = ['nodes' => [], 'edges' => [], 'slots' => [], 'ports' => []];
+        $losCondNoAlias = self::losCondition();
         
         $oltQuery = "SELECT id, name, ip_address, is_active FROM huawei_olts WHERE is_active = TRUE";
         if ($oltId) {
@@ -4838,80 +4839,148 @@ class HuaweiOLT {
         
         foreach ($olts as $olt) {
             $oltNodeId = 'olt_' . $olt['id'];
-            $topology['nodes'][] = [
-                'id' => $oltNodeId,
-                'label' => $olt['name'],
-                'type' => 'olt',
-                'title' => "OLT: {$olt['name']}\nIP: {$olt['ip_address']}",
-                'ip' => $olt['ip_address']
-            ];
             
-            $losCondNoAlias = self::losCondition();
-            $portStmt = $this->db->prepare("
-                SELECT DISTINCT COALESCE(frame, 0) || '/' || slot || '/' || port as frame_slot_port,
-                       frame, slot, port,
-                       COUNT(id) as onu_count,
-                       COUNT(*) FILTER (WHERE status = 'online') as online,
-                       COUNT(*) FILTER (WHERE status = 'offline' AND NOT {$losCondNoAlias}) as offline,
-                       COUNT(*) FILTER (WHERE {$losCondNoAlias}) as los
-                FROM huawei_onus 
-                WHERE olt_id = :olt_id AND is_authorized = TRUE AND slot IS NOT NULL AND port IS NOT NULL
-                GROUP BY frame, slot, port 
-                ORDER BY frame, slot, port
-            ");
-            $portStmt->execute([':olt_id' => $olt['id']]);
-            $ports = $portStmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            foreach ($ports as $port) {
-                $frameSlotPort = $port['frame_slot_port'];
-                $portNodeId = 'port_' . $olt['id'] . '_' . str_replace('/', '_', $frameSlotPort);
-                $portStatus = $port['los'] > 0 ? 'warning' : ($port['offline'] > 0 ? 'partial' : 'online');
-                
+            if ($slotFilter === null) {
                 $topology['nodes'][] = [
-                    'id' => $portNodeId,
-                    'label' => $frameSlotPort,
-                    'type' => 'port',
-                    'title' => "Port: {$frameSlotPort}\nONUs: {$port['onu_count']}\nOnline: {$port['online']}, Offline: {$port['offline']}, LOS: {$port['los']}",
-                    'status' => $portStatus,
-                    'onu_count' => $port['onu_count'],
-                    'online' => $port['online'],
-                    'offline' => $port['offline'],
-                    'los' => $port['los']
+                    'id' => $oltNodeId,
+                    'label' => $olt['name'],
+                    'type' => 'olt',
+                    'title' => "OLT: {$olt['name']}\nIP: {$olt['ip_address']}",
+                    'ip' => $olt['ip_address']
                 ];
                 
-                $topology['edges'][] = [
-                    'from' => $oltNodeId,
-                    'to' => $portNodeId
+                $slotStmt = $this->db->prepare("
+                    SELECT slot,
+                           COUNT(id) as onu_count,
+                           COUNT(*) FILTER (WHERE status = 'online') as online,
+                           COUNT(*) FILTER (WHERE status = 'offline' AND NOT {$losCondNoAlias}) as offline,
+                           COUNT(*) FILTER (WHERE {$losCondNoAlias}) as los,
+                           COUNT(DISTINCT port) as port_count
+                    FROM huawei_onus
+                    WHERE olt_id = :olt_id AND is_authorized = TRUE AND slot IS NOT NULL
+                    GROUP BY slot ORDER BY slot
+                ");
+                $slotStmt->execute([':olt_id' => $olt['id']]);
+                $slots = $slotStmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                foreach ($slots as $sl) {
+                    $slotNodeId = 'slot_' . $olt['id'] . '_' . $sl['slot'];
+                    $slotStatus = $sl['los'] > 0 ? 'warning' : ($sl['offline'] > 0 ? 'partial' : 'online');
+                    $topology['nodes'][] = [
+                        'id' => $slotNodeId,
+                        'label' => "Slot {$sl['slot']}",
+                        'type' => 'slot',
+                        'title' => "Slot {$sl['slot']}\n{$sl['port_count']} Ports, {$sl['onu_count']} ONUs\nOnline: {$sl['online']}, Offline: {$sl['offline']}, LOS: {$sl['los']}",
+                        'status' => $slotStatus,
+                        'onu_count' => (int)$sl['onu_count'],
+                        'online' => (int)$sl['online'],
+                        'offline' => (int)$sl['offline'],
+                        'los' => (int)$sl['los'],
+                        'port_count' => (int)$sl['port_count'],
+                        'slot' => (int)$sl['slot'],
+                        'olt_id' => (int)$olt['id']
+                    ];
+                    $topology['edges'][] = ['from' => $oltNodeId, 'to' => $slotNodeId];
+                    $topology['slots'][] = (int)$sl['slot'];
+                }
+            } elseif ($portFilter === null) {
+                $topology['nodes'][] = [
+                    'id' => 'slot_' . $olt['id'] . '_' . $slotFilter,
+                    'label' => $olt['name'] . " / Slot {$slotFilter}",
+                    'type' => 'slot_root',
+                    'title' => "OLT: {$olt['name']}\nSlot: {$slotFilter}",
+                    'ip' => $olt['ip_address']
+                ];
+                
+                $portStmt = $this->db->prepare("
+                    SELECT COALESCE(frame, 0) as frame, slot, port,
+                           COUNT(id) as onu_count,
+                           COUNT(*) FILTER (WHERE status = 'online') as online,
+                           COUNT(*) FILTER (WHERE status = 'offline' AND NOT {$losCondNoAlias}) as offline,
+                           COUNT(*) FILTER (WHERE {$losCondNoAlias}) as los
+                    FROM huawei_onus
+                    WHERE olt_id = :olt_id AND slot = :slot AND is_authorized = TRUE AND port IS NOT NULL
+                    GROUP BY frame, slot, port ORDER BY frame, slot, port
+                ");
+                $portStmt->execute([':olt_id' => $olt['id'], ':slot' => $slotFilter]);
+                $ports = $portStmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                foreach ($ports as $pt) {
+                    $fsp = "{$pt['frame']}/{$pt['slot']}/{$pt['port']}";
+                    $portNodeId = 'port_' . $olt['id'] . '_' . str_replace('/', '_', $fsp);
+                    $portStatus = $pt['los'] > 0 ? 'warning' : ($pt['offline'] > 0 ? 'partial' : 'online');
+                    $topology['nodes'][] = [
+                        'id' => $portNodeId,
+                        'label' => "Port {$pt['port']}",
+                        'type' => 'port',
+                        'title' => "Port: {$fsp}\nONUs: {$pt['onu_count']}\nOnline: {$pt['online']}, Offline: {$pt['offline']}, LOS: {$pt['los']}",
+                        'status' => $portStatus,
+                        'onu_count' => (int)$pt['onu_count'],
+                        'online' => (int)$pt['online'],
+                        'offline' => (int)$pt['offline'],
+                        'los' => (int)$pt['los'],
+                        'port' => (int)$pt['port'],
+                        'frame' => (int)$pt['frame'],
+                        'slot' => $slotFilter,
+                        'olt_id' => (int)$olt['id']
+                    ];
+                    $topology['edges'][] = ['from' => 'slot_' . $olt['id'] . '_' . $slotFilter, 'to' => $portNodeId];
+                    $topology['ports'][] = (int)$pt['port'];
+                }
+            } else {
+                $frameStmt = $this->db->prepare("SELECT COALESCE(frame, 0) as frame FROM huawei_onus WHERE olt_id = :olt_id AND slot = :slot AND port = :port AND is_authorized = TRUE LIMIT 1");
+                $frameStmt->execute([':olt_id' => $olt['id'], ':slot' => $slotFilter, ':port' => $portFilter]);
+                $frameVal = (int)($frameStmt->fetchColumn() ?: 0);
+                $fspLabel = "{$frameVal}/{$slotFilter}/{$portFilter}";
+                $rootId = 'port_' . $olt['id'] . '_' . $frameVal . '_' . $slotFilter . '_' . $portFilter;
+                $topology['nodes'][] = [
+                    'id' => $rootId,
+                    'label' => $olt['name'] . " / {$fspLabel}",
+                    'type' => 'port_root',
+                    'title' => "OLT: {$olt['name']}\nPort: {$fspLabel}",
+                    'ip' => $olt['ip_address']
                 ];
                 
                 $onuStmt = $this->db->prepare("
-                    SELECT id, name, sn, status, onu_id, rx_power, tx_power,
-                           (SELECT c.name FROM customers c WHERE c.id = o.customer_id) as customer_name
+                    SELECT o.id, o.name, o.sn, o.status, o.onu_id, o.rx_power, o.tx_power, o.last_down_cause,
+                           o.distance, o.vlan_id, z.name as zone_name,
+                           c.name as customer_name
                     FROM huawei_onus o
-                    WHERE olt_id = :olt_id AND COALESCE(frame, 0) = :frame AND slot = :slot AND port = :port AND is_authorized = TRUE
-                    ORDER BY onu_id
+                    LEFT JOIN customers c ON c.id = o.customer_id
+                    LEFT JOIN huawei_zones z ON z.id = o.zone_id
+                    WHERE o.olt_id = :olt_id AND o.slot = :slot AND o.port = :port AND o.is_authorized = TRUE
+                    ORDER BY o.onu_id
                 ");
-                $onuStmt->execute([':olt_id' => $olt['id'], ':frame' => $port['frame'] ?? 0, ':slot' => $port['slot'], ':port' => $port['port']]);
+                $onuStmt->execute([':olt_id' => $olt['id'], ':slot' => $slotFilter, ':port' => $portFilter]);
                 $onus = $onuStmt->fetchAll(\PDO::FETCH_ASSOC);
                 
                 foreach ($onus as $onu) {
+                    $effectiveStatus = self::resolveEffectiveStatus($onu['status'], $onu['last_down_cause']);
                     $onuNodeId = 'onu_' . $onu['id'];
+                    $titleParts = [
+                        "ONU: " . ($onu['name'] ?: $onu['sn']),
+                        "S/N: {$onu['sn']}",
+                        "Status: {$effectiveStatus}",
+                        "Rx: " . ($onu['rx_power'] !== null ? $onu['rx_power'] . ' dBm' : 'N/A'),
+                    ];
+                    if ($onu['distance']) $titleParts[] = "Distance: {$onu['distance']}m";
+                    if ($onu['vlan_id']) $titleParts[] = "VLAN: {$onu['vlan_id']}";
+                    if ($onu['zone_name']) $titleParts[] = "Zone: {$onu['zone_name']}";
+                    if ($onu['customer_name']) $titleParts[] = "Customer: {$onu['customer_name']}";
+                    
                     $topology['nodes'][] = [
                         'id' => $onuNodeId,
                         'label' => $onu['name'] ?: "ONU #{$onu['onu_id']}",
                         'type' => 'onu',
-                        'status' => $onu['status'],
-                        'title' => "ONU: " . ($onu['name'] ?: $onu['sn']) . "\nS/N: {$onu['sn']}\nStatus: {$onu['status']}\nRx: " . ($onu['rx_power'] ?? 'N/A') . " dBm" . ($onu['customer_name'] ? "\nCustomer: {$onu['customer_name']}" : ''),
+                        'status' => $effectiveStatus,
+                        'title' => implode("\n", $titleParts),
                         'serial' => $onu['sn'],
                         'rx_power' => $onu['rx_power'],
                         'customer' => $onu['customer_name'],
+                        'zone' => $onu['zone_name'],
                         'db_id' => $onu['id']
                     ];
-                    
-                    $topology['edges'][] = [
-                        'from' => $portNodeId,
-                        'to' => $onuNodeId
-                    ];
+                    $topology['edges'][] = ['from' => $rootId, 'to' => $onuNodeId];
                 }
             }
         }
