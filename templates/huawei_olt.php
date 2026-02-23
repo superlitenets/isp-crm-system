@@ -9461,20 +9461,21 @@ try {
                         <a href="?page=huawei-olt&view=onus<?= $oltId ? '&olt_id=' . $oltId : '' ?><?= isset($_GET['unconfigured']) ? '&unconfigured=1' : '' ?>" class="btn btn-sm btn-outline-secondary" title="Clear all filters"><i class="bi bi-x-circle"></i> Clear</a>
                         <?php endif; ?>
                     </form>
+                    <div class="d-flex flex-wrap gap-1 align-items-center">
                     <?php if (isset($_GET['unconfigured'])): ?>
                         <?php if ($oltId): ?>
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="discover_unconfigured">
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                             <button type="submit" class="btn btn-warning btn-sm" onclick="showLoading('Discovering unconfigured ONUs...')">
-                                <i class="bi bi-search me-1"></i> Discover ONUs
+                                <i class="bi bi-search me-1"></i> Discover
                             </button>
                         </form>
                         <?php else: ?>
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="discover_all_unconfigured">
                             <button type="submit" class="btn btn-warning btn-sm" onclick="showLoading('Discovering from all OLTs... This may take a while.')">
-                                <i class="bi bi-broadcast me-1"></i> Discover All ONUs
+                                <i class="bi bi-broadcast me-1"></i> Discover All
                             </button>
                         </form>
                         <?php endif; ?>
@@ -9483,15 +9484,15 @@ try {
                             <input type="hidden" name="action" value="cleanup_stale_pending">
                             <input type="hidden" name="hours_old" value="2">
                             <button type="submit" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Clear stale pending entries older than 2 hours?')" title="Remove stale entries that no longer exist on OLT">
-                                <i class="bi bi-trash me-1"></i> Clear Stale
+                                <i class="bi bi-trash"></i>
                             </button>
                         </form>
                     <?php endif; ?>
                     <a href="?page=huawei-olt&ajax=export_csv<?= $oltId ? '&olt_id=' . $oltId : '' ?>" class="btn btn-outline-success btn-sm" title="Export to CSV">
-                        <i class="bi bi-download me-1"></i> Export CSV
+                        <i class="bi bi-download"></i> Export
                     </a>
                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
-                        <i class="bi bi-plus-circle me-1"></i> Add ONU
+                        <i class="bi bi-plus-circle"></i> Add
                     </button>
                     <?php if ($oltId): ?>
                     <div class="btn-group">
@@ -9574,6 +9575,7 @@ try {
                         </div>
                     </div>
                     <?php endif; ?>
+                    </div>
                 </div>
             </div>
             
