@@ -9460,6 +9460,12 @@ try {
                         if ($hasFilters): ?>
                         <a href="?page=huawei-olt&view=onus<?= $oltId ? '&olt_id=' . $oltId : '' ?><?= isset($_GET['unconfigured']) ? '&unconfigured=1' : '' ?>" class="btn btn-sm btn-outline-secondary" title="Clear all filters"><i class="bi bi-x-circle"></i> Clear</a>
                         <?php endif; ?>
+                        <a href="?page=huawei-olt&ajax=export_csv<?= $oltId ? '&olt_id=' . $oltId : '' ?>" class="btn btn-outline-success btn-sm" title="Export to CSV">
+                            <i class="bi bi-download"></i> Export
+                        </a>
+                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
+                            <i class="bi bi-plus-circle"></i> Add
+                        </button>
                     </form>
                     <div class="d-flex flex-wrap gap-1 align-items-center">
                     <?php if (isset($_GET['unconfigured'])): ?>
@@ -9488,12 +9494,6 @@ try {
                             </button>
                         </form>
                     <?php endif; ?>
-                    <a href="?page=huawei-olt&ajax=export_csv<?= $oltId ? '&olt_id=' . $oltId : '' ?>" class="btn btn-outline-success btn-sm" title="Export to CSV">
-                        <i class="bi bi-download"></i> Export
-                    </a>
-                    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
-                        <i class="bi bi-plus-circle"></i> Add
-                    </button>
                     <?php if ($oltId): ?>
                     <div class="btn-group">
                         <form method="post" class="d-inline">
