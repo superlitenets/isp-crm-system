@@ -10466,6 +10466,10 @@ try {
                             <small class="text-muted">Model</small>
                             <div class="fw-medium"><?= htmlspecialchars($currentOnu['onu_type_model'] ?? $currentOnu['discovered_eqid'] ?? 'Unknown') ?></div>
                         </div>
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">Serial Number</small>
+                            <div class="fw-medium"><code><?= htmlspecialchars($currentOnu['sn'] ?? '-') ?></code></div>
+                        </div>
                         <!-- Position -->
                         <div class="col-auto border-start ps-2">
                             <small class="text-muted">Position</small>
