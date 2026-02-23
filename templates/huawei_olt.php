@@ -10369,12 +10369,13 @@ try {
                         <!-- Status & Model -->
                         <div class="col-auto">
                             <?php
-                            $onuStatus = strtolower($currentOnu['status'] ?? 'offline');
-                            $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger'][$onuStatus] ?? 'secondary';
-                            $statusIcon = ['online' => 'check-circle-fill', 'offline' => 'x-circle', 'los' => 'exclamation-triangle-fill'][$onuStatus] ?? 'circle';
+                            $onuStatus = \App\HuaweiOLT::resolveEffectiveStatus($currentOnu['status'] ?? 'offline', $currentOnu['last_down_cause'] ?? null);
+                            $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger', 'dying-gasp' => 'secondary'][$onuStatus] ?? 'secondary';
+                            $statusIcon = ['online' => 'check-circle-fill', 'offline' => 'x-circle', 'los' => 'exclamation-triangle-fill', 'dying-gasp' => 'circle'][$onuStatus] ?? 'circle';
+                            $statusLabel = ['online' => 'Online', 'offline' => 'Offline', 'los' => 'LOS', 'dying-gasp' => 'Offline'][$onuStatus] ?? ucfirst($onuStatus);
                             ?>
                             <span id="onuStatusBadge" class="badge bg-<?= $statusClass ?> fs-6" data-live-status>
-                                <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= ucfirst($onuStatus) ?>
+                                <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= $statusLabel ?>
                             </span>
                             <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="pollOnuLive()" title="Refresh">
                                 <i class="bi bi-arrow-clockwise" id="liveStatusRefreshIcon"></i>

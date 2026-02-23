@@ -87,6 +87,22 @@ class HuaweiOLT {
         return "(({$prefix}status = 'los') OR ({$prefix}status = 'offline' AND {$prefix}last_down_cause IS NOT NULL AND {$prefix}last_down_cause != '' AND {$prefix}last_down_cause != '-' AND (LOWER({$prefix}last_down_cause) LIKE '%los%' OR LOWER({$prefix}last_down_cause) LIKE '%lob%' OR LOWER({$prefix}last_down_cause) LIKE '%lofi%')))";
     }
     
+    public static function resolveEffectiveStatus(string $status, ?string $lastDownCause): string {
+        $status = strtolower($status);
+        if ($status === 'online' || $status === 'los') return $status;
+        if ($status === 'dying-gasp') return 'dying-gasp';
+        $dc = strtolower($lastDownCause ?? '');
+        if ($dc !== '' && $dc !== '-') {
+            if (strpos($dc, 'los') !== false || strpos($dc, 'lob') !== false || strpos($dc, 'lofi') !== false) {
+                return 'los';
+            }
+            if (strpos($dc, 'dying') !== false || strpos($dc, 'power') !== false) {
+                return 'dying-gasp';
+            }
+        }
+        return $status;
+    }
+    
     public function getStats(): array {
         $losCond = self::losCondition();
         $stats = $this->db->query("
@@ -1848,16 +1864,18 @@ class HuaweiOLT {
         $this->triggerBackgroundRefresh($oltId, $onu['id']);
         
         // Return cached data immediately
+        $effectiveStatus = self::resolveEffectiveStatus($onu['status'] ?? 'unknown', $onu['last_down_cause'] ?? null);
         return [
             'success' => true,
             'onu' => [
-                'status' => $onu['status'] ?? 'unknown',
+                'status' => $effectiveStatus,
                 'rx_power' => $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null,
                 'tx_power' => $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null,
                 'distance' => $onu['distance'] !== null ? (int)$onu['distance'] : null,
                 'name' => $onu['name'] ?? '',
                 'tr069_ip' => $onu['tr069_ip'] ?? null,
                 'updated_at' => $onu['updated_at'] ?? null,
+                'last_down_cause' => $onu['last_down_cause'] ?? null,
                 'cached' => true
             ]
         ];

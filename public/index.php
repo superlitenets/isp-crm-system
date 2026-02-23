@@ -903,9 +903,10 @@ if ($page === 'api' && $action === 'poll_onu_live') {
                     else $downSince = floor($diff / 86400) . 'd ago';
                 }
             }
+            $effectiveStatus = \App\HuaweiOLT::resolveEffectiveStatus($onu['status'] ?? 'offline', $onu['last_down_cause'] ?? null);
             echo json_encode(['success' => true, 'fromCache' => true, 'onu' => [
                 'id' => (int)$onu['id'],
-                'status' => $onu['status'],
+                'status' => $effectiveStatus,
                 'rx_power' => $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null,
                 'tx_power' => $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null,
                 'distance' => $onu['distance'] !== null ? (int)$onu['distance'] : null,
