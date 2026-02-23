@@ -9670,8 +9670,9 @@ try {
                                             'online' => ['class' => 'success', 'icon' => 'check-circle-fill', 'label' => 'Online'],
                                             'offline' => ['class' => 'secondary', 'icon' => 'circle', 'label' => 'Offline'],
                                             'los' => ['class' => 'danger', 'icon' => 'exclamation-triangle-fill', 'label' => 'LOS'],
-                                            'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Power Fail'],
-                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Offline'],
+                                            'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Offline'],
+                                            'dying-gasp' => ['class' => 'secondary', 'icon' => 'circle', 'label' => 'Offline'],
+                                            'dyinggasp' => ['class' => 'secondary', 'icon' => 'circle', 'label' => 'Offline'],
                                         ];
                                         // Prefer snmp_status as authoritative source for ONU status
                                         $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'power_fail'];
@@ -9817,16 +9818,19 @@ try {
                                 else { newStatus = dbStatus; }
                             } else { newStatus = dbStatus; }
                             const statusCfg = {
-                                online: { class: 'bg-success', icon: 'check-circle-fill' },
-                                offline: { class: 'bg-secondary', icon: 'circle' },
-                                los: { class: 'bg-danger', icon: 'exclamation-triangle-fill' }
+                                online: { class: 'bg-success', icon: 'check-circle-fill', label: 'Online' },
+                                offline: { class: 'bg-secondary', icon: 'circle', label: 'Offline' },
+                                los: { class: 'bg-danger', icon: 'exclamation-triangle-fill', label: 'LOS' },
+                                'dying-gasp': { class: 'bg-secondary', icon: 'circle', label: 'Offline' },
+                                'dyinggasp': { class: 'bg-secondary', icon: 'circle', label: 'Offline' },
+                                'power_fail': { class: 'bg-secondary', icon: 'circle', label: 'Offline' }
                             };
                             const cfg = statusCfg[newStatus] || statusCfg.offline;
                             
                             // Check if status changed
                             if (!statusBadge.classList.contains(cfg.class)) {
                                 statusBadge.className = 'badge ' + cfg.class;
-                                statusBadge.innerHTML = `<i class="bi bi-${cfg.icon} me-1"></i>${newStatus}`;
+                                statusBadge.innerHTML = `<i class="bi bi-${cfg.icon} me-1"></i>${cfg.label}`;
                                 row.classList.add('row-updated');
                                 setTimeout(() => row.classList.remove('row-updated'), 1000);
                             }
