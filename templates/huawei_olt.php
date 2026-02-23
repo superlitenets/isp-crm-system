@@ -8156,10 +8156,10 @@ try {
                                 <i class="bi bi-hdd-rack-fill"></i>
                             </div>
                             <span class="kpi-badge" style="background: rgba(34,197,94,0.1); color: #22c55e;">
-                                <i class="bi bi-circle-fill" style="font-size: 5px;"></i> <?= $stats['active_olts'] ?> Active
+                                <i class="bi bi-circle-fill" style="font-size: 5px;"></i> <span id="kpiActiveOlts"><?= $stats['active_olts'] ?></span> Active
                             </span>
                         </div>
-                        <div class="kpi-value"><?= $stats['total_olts'] ?></div>
+                        <div class="kpi-value" id="kpiTotalOlts"><?= $stats['total_olts'] ?></div>
                         <div class="kpi-label">OLT Devices</div>
                     </a>
                 </div>
@@ -8169,11 +8169,11 @@ try {
                             <div class="kpi-icon" style="background: rgba(34,197,94,0.1); color: #22c55e;">
                                 <i class="bi bi-wifi"></i>
                             </div>
-                            <span class="kpi-badge" style="background: rgba(34,197,94,0.1); color: #22c55e;">
-                                <i class="bi bi-arrow-up"></i> <?= $uptimePercent ?>%
+                            <span class="kpi-badge" id="kpiUptimeBadge" style="background: rgba(34,197,94,0.1); color: #22c55e;">
+                                <i class="bi bi-arrow-up"></i> <span id="kpiUptimePercent"><?= $uptimePercent ?></span>%
                             </span>
                         </div>
-                        <div class="kpi-value"><?= number_format($stats['online_onus']) ?></div>
+                        <div class="kpi-value" id="kpiOnlineOnus"><?= number_format($stats['online_onus']) ?></div>
                         <div class="kpi-label">Online ONUs</div>
                     </a>
                 </div>
@@ -8183,12 +8183,12 @@ try {
                             <div class="kpi-icon" style="background: rgba(148,163,184,0.1); color: #64748b;">
                                 <i class="bi bi-wifi-off"></i>
                             </div>
-                            <span class="kpi-badge" style="background: <?= $stats['offline_onus'] > 0 ? 'rgba(148,163,184,0.1); color: #94a3b8;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
+                            <span class="kpi-badge" id="kpiOfflineBadge" style="background: <?= $stats['offline_onus'] > 0 ? 'rgba(148,163,184,0.1); color: #94a3b8;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
                                 <?= $stats['offline_onus'] > 0 ? '<i class="bi bi-x-circle"></i> Down' : '<i class="bi bi-check-circle"></i> OK' ?>
                             </span>
                         </div>
-                        <div class="kpi-value"><?= number_format($stats['offline_onus']) ?></div>
-                        <div class="kpi-label">Offline<?php if (($stats['dying_gasp_onus'] ?? 0) > 0): ?> <small class="text-muted">(<?= $stats['dying_gasp_onus'] ?> power off)</small><?php endif; ?></div>
+                        <div class="kpi-value" id="kpiOfflineOnus"><?= number_format($stats['offline_onus']) ?></div>
+                        <div class="kpi-label">Offline <small class="text-muted" id="kpiDyingGaspLabel"><?php if (($stats['dying_gasp_onus'] ?? 0) > 0): ?>(<?= $stats['dying_gasp_onus'] ?> power off)<?php endif; ?></small></div>
                     </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
@@ -8197,11 +8197,11 @@ try {
                             <div class="kpi-icon" style="background: rgba(239,68,68,0.1); color: #ef4444;">
                                 <i class="bi bi-exclamation-triangle-fill"></i>
                             </div>
-                            <span class="kpi-badge" style="background: <?= $stats['los_onus'] > 0 ? 'rgba(239,68,68,0.1); color: #ef4444;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
+                            <span class="kpi-badge" id="kpiLosBadge" style="background: <?= $stats['los_onus'] > 0 ? 'rgba(239,68,68,0.1); color: #ef4444;' : 'rgba(34,197,94,0.1); color: #22c55e;' ?>">
                                 <?= $stats['los_onus'] > 0 ? '<i class="bi bi-exclamation-circle"></i>' : '<i class="bi bi-check-circle"></i> OK' ?>
                             </span>
                         </div>
-                        <div class="kpi-value"><?= number_format($stats['los_onus']) ?></div>
+                        <div class="kpi-value" id="kpiLosOnus"><?= number_format($stats['los_onus']) ?></div>
                         <div class="kpi-label">LOS</div>
                     </a>
                 </div>
@@ -8215,7 +8215,7 @@ try {
                                 View <i class="bi bi-arrow-right"></i>
                             </span>
                         </div>
-                        <div class="kpi-value"><?= number_format($stats['unconfigured_onus']) ?></div>
+                        <div class="kpi-value" id="kpiPendingAuth"><?= number_format($stats['unconfigured_onus']) ?></div>
                         <div class="kpi-label">Pending Auth</div>
                     </a>
                 </div>
@@ -8234,19 +8234,19 @@ try {
                             <div class="row text-center mt-3 g-2">
                                 <div class="col-4">
                                     <div class="p-2 rounded-3 stat-box-online" style="background: rgba(34,197,94,0.1);">
-                                        <div class="fw-bold" style="color: #22c55e; font-size: 1rem;"><?= number_format($stats['online_onus']) ?></div>
+                                        <div class="fw-bold" id="chartOnlineCount" style="color: #22c55e; font-size: 1rem;"><?= number_format($stats['online_onus']) ?></div>
                                         <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">Online</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="p-2 rounded-3 stat-box-offline" style="background: rgba(255,255,255,0.04);">
-                                        <div class="fw-bold" style="color: rgba(255,255,255,0.7); font-size: 1rem;"><?= number_format($stats['offline_onus']) ?></div>
+                                        <div class="fw-bold" id="chartOfflineCount" style="color: rgba(255,255,255,0.7); font-size: 1rem;"><?= number_format($stats['offline_onus']) ?></div>
                                         <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">Offline</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="p-2 rounded-3 stat-box-los" style="background: rgba(239,68,68,0.1);">
-                                        <div class="fw-bold" style="color: #ef4444; font-size: 1rem;"><?= number_format($stats['los_onus']) ?></div>
+                                        <div class="fw-bold" id="chartLosCount" style="color: #ef4444; font-size: 1rem;"><?= number_format($stats['los_onus']) ?></div>
                                         <small style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">LOS</small>
                                     </div>
                                 </div>
@@ -8600,7 +8600,7 @@ try {
                 const chartFont = { family: "'Inter', 'Segoe UI', sans-serif" };
                 Chart.defaults.font.family = chartFont.family;
 
-                new Chart(document.getElementById('onuStatusChart'), {
+                window.onuStatusChart = new Chart(document.getElementById('onuStatusChart'), {
                     type: 'doughnut',
                     data: {
                         labels: ['Online', 'Offline / Power Off', 'LOS'],
@@ -24008,35 +24008,93 @@ function saveDeviceStatus() {
     }
     
     // Live update Non Auth badge from OLT Session Manager
-    function updateNonAuthBadge() {
+    function updateDashboardStats() {
         fetch('api/olt-stats.php')
             .then(r => r.json())
             .then(data => {
-                if (data.success) {
-                    const count = (data.unconfigured_onus || 0) + (data.discovered_onus || 0);
-                    const badgeClass = count > 0 ? 'badge bg-warning badge-pulse ms-auto' : 'badge bg-secondary ms-auto';
-                    const badgeText = count.toString();
-                    
-                    const desktopBadge = document.getElementById('nonAuthBadgeDesktop');
-                    const mobileBadge = document.getElementById('nonAuthBadgeMobile');
-                    
-                    if (desktopBadge) {
-                        desktopBadge.className = badgeClass;
-                        desktopBadge.textContent = badgeText;
-                    }
-                    if (mobileBadge) {
-                        mobileBadge.className = count > 0 ? 'badge bg-warning ms-auto' : 'badge bg-secondary ms-auto';
-                        mobileBadge.textContent = badgeText;
+                if (!data.success) return;
+
+                const fmt = n => Number(n || 0).toLocaleString();
+
+                const el = id => document.getElementById(id);
+
+                const kpiOnline = el('kpiOnlineOnus');
+                if (kpiOnline) kpiOnline.textContent = fmt(data.online_onus);
+
+                const kpiOffline = el('kpiOfflineOnus');
+                if (kpiOffline) kpiOffline.textContent = fmt(data.offline_onus);
+
+                const kpiLos = el('kpiLosOnus');
+                if (kpiLos) kpiLos.textContent = fmt(data.los_onus);
+
+                const kpiPending = el('kpiPendingAuth');
+                if (kpiPending) kpiPending.textContent = fmt(data.unconfigured_onus);
+
+                const kpiTotalOlts = el('kpiTotalOlts');
+                if (kpiTotalOlts) kpiTotalOlts.textContent = fmt(data.total_olts);
+
+                const kpiActiveOlts = el('kpiActiveOlts');
+                if (kpiActiveOlts) kpiActiveOlts.textContent = data.active_olts || 0;
+
+                const kpiUptime = el('kpiUptimePercent');
+                if (kpiUptime) kpiUptime.textContent = data.uptime_percent;
+
+                const dgLabel = el('kpiDyingGaspLabel');
+                if (dgLabel) {
+                    dgLabel.textContent = (data.dying_gasp_onus > 0) ? '(' + data.dying_gasp_onus + ' power off)' : '';
+                }
+
+                const offlineBadge = el('kpiOfflineBadge');
+                if (offlineBadge) {
+                    if (data.offline_onus > 0) {
+                        offlineBadge.style.cssText = 'background: rgba(148,163,184,0.1); color: #94a3b8;';
+                        offlineBadge.innerHTML = '<i class="bi bi-x-circle"></i> Down';
+                    } else {
+                        offlineBadge.style.cssText = 'background: rgba(34,197,94,0.1); color: #22c55e;';
+                        offlineBadge.innerHTML = '<i class="bi bi-check-circle"></i> OK';
                     }
                 }
+
+                const losBadge = el('kpiLosBadge');
+                if (losBadge) {
+                    if (data.los_onus > 0) {
+                        losBadge.style.cssText = 'background: rgba(239,68,68,0.1); color: #ef4444;';
+                        losBadge.innerHTML = '<i class="bi bi-exclamation-circle"></i>';
+                    } else {
+                        losBadge.style.cssText = 'background: rgba(34,197,94,0.1); color: #22c55e;';
+                        losBadge.innerHTML = '<i class="bi bi-check-circle"></i> OK';
+                    }
+                }
+
+                const chartOnline = el('chartOnlineCount');
+                if (chartOnline) chartOnline.textContent = fmt(data.online_onus);
+                const chartOffline = el('chartOfflineCount');
+                if (chartOffline) chartOffline.textContent = fmt(data.offline_onus);
+                const chartLos = el('chartLosCount');
+                if (chartLos) chartLos.textContent = fmt(data.los_onus);
+
+                if (typeof onuStatusChart !== 'undefined' && onuStatusChart && onuStatusChart.data) {
+                    onuStatusChart.data.datasets[0].data = [
+                        data.online_onus || 0,
+                        data.offline_onus || 0,
+                        data.los_onus || 0
+                    ];
+                    onuStatusChart.update('none');
+                }
+
+                const count = (data.unconfigured_onus || 0) + (data.discovered_onus || 0);
+                const badgeClass = count > 0 ? 'badge bg-warning badge-pulse ms-auto' : 'badge bg-secondary ms-auto';
+                const desktopBadge = el('nonAuthBadgeDesktop');
+                const mobileBadge = el('nonAuthBadgeMobile');
+                if (desktopBadge) { desktopBadge.className = badgeClass; desktopBadge.textContent = count; }
+                if (mobileBadge) { mobileBadge.className = count > 0 ? 'badge bg-warning ms-auto' : 'badge bg-secondary ms-auto'; mobileBadge.textContent = count; }
             })
             .catch(() => {});
     }
     
-    // Update badge on page load and every 30 seconds
     document.addEventListener('DOMContentLoaded', function() {
-        updateNonAuthBadge();
-        setInterval(updateNonAuthBadge, 30000);
+        updateDashboardStats();
+        setInterval(updateDashboardStats, 30000);
     });
     
     // Open TR-069 WiFi Config Modal
