@@ -458,6 +458,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
     $unconfigured = isset($_GET['unconfigured']) && $_GET['unconfigured'] == '1';
     $search = $_GET['search'] ?? '';
     $status = $_GET['status'] ?? '';
+    $zoneId = $_GET['zone_id'] ?? '';
+    $vlanId = $_GET['vlan_id'] ?? '';
+    $slotFilter = isset($_GET['slot']) && $_GET['slot'] !== '' ? $_GET['slot'] : null;
+    $portFilter = isset($_GET['port']) && $_GET['port'] !== '' ? $_GET['port'] : null;
     
     try {
         $params = [];
@@ -475,7 +479,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         }
         
         if ($search) {
-            $where[] = "(o.sn ILIKE ? OR o.name ILIKE ?)";
+            $where[] = "(o.sn ILIKE ? OR o.name ILIKE ? OR o.description ILIKE ? OR c.name ILIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
             $params[] = "%$search%";
             $params[] = "%$search%";
         }
@@ -490,6 +496,26 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
                 $where[] = "o.status = ?";
                 $params[] = $status;
             }
+        }
+        
+        if ($zoneId) {
+            $where[] = "o.zone_id = ?";
+            $params[] = (int)$zoneId;
+        }
+        
+        if ($vlanId) {
+            $where[] = "o.vlan_id = ?";
+            $params[] = (int)$vlanId;
+        }
+        
+        if ($slotFilter !== null) {
+            $where[] = "o.slot = ?";
+            $params[] = (int)$slotFilter;
+        }
+        
+        if ($portFilter !== null) {
+            $where[] = "o.port = ?";
+            $params[] = (int)$portFilter;
         }
         
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -6136,6 +6162,10 @@ if ($view === 'onus' || $view === 'dashboard') {
     if (!empty($_GET['status'])) $onuFilters['status'] = $_GET['status'];
     if (!empty($_GET['search'])) $onuFilters['search'] = $_GET['search'];
     if (!empty($_GET['sort'])) $onuFilters['sort'] = $_GET['sort'];
+    if (!empty($_GET['zone_id'])) $onuFilters['zone_id'] = $_GET['zone_id'];
+    if (!empty($_GET['vlan_id'])) $onuFilters['vlan_id'] = $_GET['vlan_id'];
+    if (isset($_GET['slot']) && $_GET['slot'] !== '') $onuFilters['slot'] = $_GET['slot'];
+    if (isset($_GET['port']) && $_GET['port'] !== '') $onuFilters['port'] = $_GET['port'];
     if (isset($_GET['unconfigured'])) {
         $onuFilters['is_authorized'] = false;
     } else {
@@ -6229,8 +6259,26 @@ $zones = [];
 $subzones = [];
 $apartments = [];
 $odbs = [];
+$onuVlans = [];
+$onuSlots = [];
 if (in_array($view, ["locations", "onus", "onu_detail"])) {
 $zones = $huaweiOLT->getZones(false);
+try {
+    $vlanSql = "SELECT DISTINCT o.vlan_id FROM huawei_onus o WHERE o.vlan_id IS NOT NULL AND o.is_authorized = TRUE";
+    $vlanParams = [];
+    if ($oltId) { $vlanSql .= " AND o.olt_id = ?"; $vlanParams[] = $oltId; }
+    $vlanSql .= " ORDER BY o.vlan_id";
+    $vlanStmt = $db->prepare($vlanSql);
+    $vlanStmt->execute($vlanParams);
+    $onuVlans = $vlanStmt->fetchAll(\PDO::FETCH_COLUMN);
+    $slotSql = "SELECT DISTINCT slot FROM huawei_onus WHERE is_authorized = TRUE";
+    $slotParams = [];
+    if ($oltId) { $slotSql .= " AND olt_id = ?"; $slotParams[] = $oltId; }
+    $slotSql .= " ORDER BY slot";
+    $slotStmt = $db->prepare($slotSql);
+    $slotStmt->execute($slotParams);
+    $onuSlots = $slotStmt->fetchAll(\PDO::FETCH_COLUMN);
+} catch (\Exception $e) {}
 $subzones = $huaweiOLT->getSubzones();
 $apartments = $huaweiOLT->getApartments();
 $odbs = $huaweiOLT->getODBs();
@@ -9359,26 +9407,44 @@ try {
                         <small id="realtime-indicator" class="text-muted">Auto-refreshing...</small>
                     </div>
                 </div>
-                <div class="d-flex gap-2">
-                    <form class="d-flex gap-2" method="get">
+                <div class="d-flex flex-column gap-2">
+                    <form class="d-flex flex-wrap gap-2 align-items-end" method="get" id="onuFilterForm">
                         <input type="hidden" name="page" value="huawei-olt">
                         <input type="hidden" name="view" value="onus">
                         <?php if (isset($_GET['unconfigured'])): ?>
                         <input type="hidden" name="unconfigured" value="1">
                         <?php endif; ?>
-                        <select name="olt_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <select name="olt_id" class="form-select form-select-sm" style="width:auto;min-width:120px" onchange="this.form.submit()">
                             <option value="">All OLTs</option>
                             <?php foreach ($olts as $olt): ?>
                             <option value="<?= $olt['id'] ?>" <?= $oltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <select name="status" class="form-select form-select-sm" style="width:auto;min-width:110px" onchange="this.form.submit()">
                             <option value="">All Status</option>
                             <option value="online" <?= ($_GET['status'] ?? '') === 'online' ? 'selected' : '' ?>>Online</option>
                             <option value="offline" <?= ($_GET['status'] ?? '') === 'offline' ? 'selected' : '' ?>>Offline</option>
                             <option value="los" <?= ($_GET['status'] ?? '') === 'los' ? 'selected' : '' ?>>LOS</option>
                         </select>
-                        <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <select name="zone_id" class="form-select form-select-sm" style="width:auto;min-width:130px" onchange="this.form.submit()">
+                            <option value="">All Zones</option>
+                            <?php foreach ($zones as $z): ?>
+                            <option value="<?= $z['id'] ?>" <?= ($_GET['zone_id'] ?? '') == $z['id'] ? 'selected' : '' ?>><?= htmlspecialchars($z['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select name="vlan_id" class="form-select form-select-sm" style="width:auto;min-width:110px" onchange="this.form.submit()">
+                            <option value="">All VLANs</option>
+                            <?php foreach ($onuVlans as $vid): ?>
+                            <option value="<?= $vid ?>" <?= ($_GET['vlan_id'] ?? '') == $vid ? 'selected' : '' ?>>VLAN <?= $vid ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select name="slot" class="form-select form-select-sm" style="width:auto;min-width:90px" onchange="this.form.submit()">
+                            <option value="">All Slots</option>
+                            <?php foreach ($onuSlots as $s): ?>
+                            <option value="<?= $s ?>" <?= (isset($_GET['slot']) && $_GET['slot'] !== '' && $_GET['slot'] == $s) ? 'selected' : '' ?>>Slot <?= $s ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select name="sort" class="form-select form-select-sm" style="width:auto;min-width:140px" onchange="this.form.submit()">
                             <option value="default">Sort: Port</option>
                             <option value="auth_date_desc" <?= ($_GET['sort'] ?? '') === 'auth_date_desc' ? 'selected' : '' ?>>Auth Date (Newest)</option>
                             <option value="auth_date_asc" <?= ($_GET['sort'] ?? '') === 'auth_date_asc' ? 'selected' : '' ?>>Auth Date (Oldest)</option>
@@ -9387,8 +9453,13 @@ try {
                             <option value="signal_asc" <?= ($_GET['sort'] ?? '') === 'signal_asc' ? 'selected' : '' ?>>Signal (Weakest)</option>
                             <option value="signal_desc" <?= ($_GET['sort'] ?? '') === 'signal_desc' ? 'selected' : '' ?>>Signal (Strongest)</option>
                         </select>
-                        <input type="text" name="search" class="form-control form-control-sm" placeholder="Search SN/Name..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+                        <input type="text" name="search" class="form-control form-control-sm" style="width:auto;min-width:180px" placeholder="Search SN/Name/Customer..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
                         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+                        <?php
+                        $hasFilters = !empty($_GET['search']) || !empty($_GET['status']) || !empty($_GET['zone_id']) || !empty($_GET['vlan_id']) || (isset($_GET['slot']) && $_GET['slot'] !== '') || (!empty($_GET['sort']) && $_GET['sort'] !== 'default');
+                        if ($hasFilters): ?>
+                        <a href="?page=huawei-olt&view=onus<?= $oltId ? '&olt_id=' . $oltId : '' ?><?= isset($_GET['unconfigured']) ? '&unconfigured=1' : '' ?>" class="btn btn-sm btn-outline-secondary" title="Clear all filters"><i class="bi bi-x-circle"></i> Clear</a>
+                        <?php endif; ?>
                     </form>
                     <?php if (isset($_GET['unconfigured'])): ?>
                         <?php if ($oltId): ?>
@@ -9745,6 +9816,10 @@ try {
                 const oltId = <?= $oltId ? $oltId : 'null' ?>;
                 const searchParam = '<?= htmlspecialchars($_GET['search'] ?? '') ?>';
                 const statusParam = '<?= htmlspecialchars($_GET['status'] ?? '') ?>';
+                const zoneParam = '<?= htmlspecialchars($_GET['zone_id'] ?? '') ?>';
+                const vlanParam = '<?= htmlspecialchars($_GET['vlan_id'] ?? '') ?>';
+                const slotParam = '<?= isset($_GET['slot']) && $_GET['slot'] !== '' ? htmlspecialchars($_GET['slot']) : '' ?>';
+                const portParam = '<?= isset($_GET['port']) && $_GET['port'] !== '' ? htmlspecialchars($_GET['port']) : '' ?>';
                 let isDiscovering = false;
                 let realtimeInterval = null;
                 const REFRESH_INTERVAL = 45000; // 45 seconds for ONU list (reduced to prevent hangs)
@@ -9774,6 +9849,10 @@ try {
                         if (isUnconfigured) url += '&unconfigured=1';
                         if (searchParam) url += '&search=' + encodeURIComponent(searchParam);
                         if (statusParam) url += '&status=' + encodeURIComponent(statusParam);
+                        if (zoneParam) url += '&zone_id=' + encodeURIComponent(zoneParam);
+                        if (vlanParam) url += '&vlan_id=' + encodeURIComponent(vlanParam);
+                        if (slotParam !== '') url += '&slot=' + encodeURIComponent(slotParam);
+                        if (portParam !== '') url += '&port=' + encodeURIComponent(portParam);
                         
                         const resp = await fetch(url);
                         const data = await resp.json();

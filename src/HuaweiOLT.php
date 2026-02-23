@@ -3571,6 +3571,26 @@ class HuaweiOLT {
             $params = array_merge($params, [$term, $term, $term, $term]);
         }
         
+        if (!empty($filters['zone_id'])) {
+            $conditions .= " AND o.zone_id = ?";
+            $params[] = (int)$filters['zone_id'];
+        }
+        
+        if (!empty($filters['vlan_id'])) {
+            $conditions .= " AND o.vlan_id = ?";
+            $params[] = (int)$filters['vlan_id'];
+        }
+        
+        if (isset($filters['slot']) && $filters['slot'] !== '') {
+            $conditions .= " AND o.slot = ?";
+            $params[] = (int)$filters['slot'];
+        }
+        
+        if (isset($filters['port']) && $filters['port'] !== '') {
+            $conditions .= " AND o.port = ?";
+            $params[] = (int)$filters['port'];
+        }
+        
         if (isset($filters['is_authorized'])) {
             // PostgreSQL needs string 'true'/'false' for boolean params via PDO
             $boolVal = $this->castBoolean($filters['is_authorized']) ? 'true' : 'false';
