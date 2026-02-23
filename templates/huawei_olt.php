@@ -24084,7 +24084,7 @@ function saveDeviceStatus() {
                         data.offline_onus || 0,
                         data.los_onus || 0
                     ];
-                    onuStatusChart.update('none');
+                    onuStatusChart.update();
                 }
 
                 const count = (data.unconfigured_onus || 0) + (data.discovered_onus || 0);

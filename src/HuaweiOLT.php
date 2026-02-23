@@ -1771,7 +1771,8 @@ class HuaweiOLT {
         $allOnus = [];
         $slotsFound = [];
         foreach ($rows as $row) {
-            $effectiveStatus = $row['snmp_status'] ?: $row['status'] ?: 'offline';
+            $rawStatus = $row['snmp_status'] ?: $row['status'] ?: 'offline';
+            $effectiveStatus = self::resolveEffectiveStatus($rawStatus, $row['last_down_cause'] ?? null);
             $slotsFound[(int)$row['slot']] = true;
             $allOnus[] = [
                 'frame' => (int)$row['frame'],
@@ -1785,6 +1786,7 @@ class HuaweiOLT {
                 'name' => $row['name'] ?: $row['description'] ?: '',
                 'rx_power' => $row['rx_power'] !== null ? (float)$row['rx_power'] : null,
                 'tx_power' => $row['tx_power'] !== null ? (float)$row['tx_power'] : null,
+                'last_down_cause' => $row['last_down_cause'] ?? null,
             ];
         }
         
