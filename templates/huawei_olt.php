@@ -8188,7 +8188,7 @@ try {
                             </span>
                         </div>
                         <div class="kpi-value" id="kpiOfflineOnus"><?= number_format($stats['offline_onus']) ?></div>
-                        <div class="kpi-label">Offline <small class="text-muted" id="kpiDyingGaspLabel"><?php if (($stats['dying_gasp_onus'] ?? 0) > 0): ?>(<?= $stats['dying_gasp_onus'] ?> power off)<?php endif; ?></small></div>
+                        <div class="kpi-label">Offline <small class="text-muted" id="kpiDyingGaspLabel"><?php if (($stats['dying_gasp_onus'] ?? 0) > 0): ?>(<?= $stats['dying_gasp_onus'] ?> power fail)<?php endif; ?></small></div>
                     </a>
                 </div>
                 <div class="col-xl-2 col-md-4 col-6 animate-in">
@@ -9671,7 +9671,7 @@ try {
                                             'offline' => ['class' => 'secondary', 'icon' => 'circle', 'label' => 'Offline'],
                                             'los' => ['class' => 'danger', 'icon' => 'exclamation-triangle-fill', 'label' => 'LOS'],
                                             'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Power Fail'],
-                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Dying Gasp'],
+                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Offline'],
                                         ];
                                         // Prefer snmp_status as authoritative source for ONU status
                                         $snmpFaultStatuses = ['los', 'dying-gasp', 'dyinggasp', 'power_fail'];
@@ -11934,7 +11934,7 @@ try {
                     'online': { cls: 'success', icon: 'check-circle-fill', label: 'Online' },
                     'offline': { cls: 'secondary', icon: 'x-circle', label: 'Offline' },
                     'los': { cls: 'danger', icon: 'exclamation-triangle-fill', label: 'LOS' },
-                    'dying-gasp': { cls: 'warning', icon: 'lightning-fill', label: 'Dying Gasp' }
+                    'dying-gasp': { cls: 'warning', icon: 'lightning-fill', label: 'Offline' }
                 };
                 const st = statusMap[status] || statusMap.offline;
                 badge.className = `badge bg-${st.cls} fs-6`;
@@ -24041,7 +24041,7 @@ function saveDeviceStatus() {
 
                 const dgLabel = el('kpiDyingGaspLabel');
                 if (dgLabel) {
-                    dgLabel.textContent = (data.dying_gasp_onus > 0) ? '(' + data.dying_gasp_onus + ' power off)' : '';
+                    dgLabel.textContent = (data.dying_gasp_onus > 0) ? '(' + data.dying_gasp_onus + ' power fail)' : '';
                 }
 
                 const offlineBadge = el('kpiOfflineBadge');
