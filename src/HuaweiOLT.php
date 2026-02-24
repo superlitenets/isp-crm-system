@@ -3884,9 +3884,14 @@ class HuaweiOLT {
                 'olt_id' => $onu['olt_id'],
                 'action' => 'delete_onu',
                 'status' => 'warning',
-                'message' => "OLT deauth failed for ONU {$onu['sn']}: " . ($deauthResult['message'] ?? 'Unknown error') . " - still removing from database",
+                'message' => "OLT deauth failed for ONU {$onu['sn']}: " . ($deauthResult['message'] ?? 'Unknown error'),
                 'user_id' => $_SESSION['user_id'] ?? null
             ]);
+            return [
+                'success' => false,
+                'deauthorized' => false,
+                'deauth_message' => 'Failed to remove ONU from OLT: ' . ($deauthResult['message'] ?? 'Unknown error') . '. ONU kept in database. Try using "Delete from OLT" button on the ONU detail page, or remove manually from OLT first.'
+            ];
         }
         
         if (!empty($onu['sn'])) {
@@ -9505,7 +9510,7 @@ class HuaweiOLT {
         
         $output = $result['output'] ?? '';
         $allOutput .= "[Delete ONU]\n{$output}";
-        $success = ($result['success'] ?? false) && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $output);
+        $success = ($result['success'] ?? false) && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command|Unknown command|Parameter error|Too many parameters)/i', $output);
         
         // Also check for success indicators
         if (!$success && preg_match('/success/i', $output)) {

@@ -1440,12 +1440,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $result = $huaweiOLT->deleteONU((int)$_POST['id']);
                 if ($result['success']) {
                     $message = 'ONU deleted from database';
-                    if ($result['deauthorized']) {
+                    if ($result['deauthorized'] ?? false) {
                         $message .= ' and deauthorized from OLT';
                     }
                     $messageType = 'success';
                 } else {
-                    $message = $result['error'] ?? 'Failed to delete ONU';
+                    $message = $result['deauth_message'] ?? $result['error'] ?? 'Failed to delete ONU';
                     $messageType = 'danger';
                 }
                 break;
