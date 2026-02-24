@@ -353,18 +353,19 @@ class SNMPPollingWorker {
                     
                     // For offline ONUs, check last_down_cause to distinguish LOS vs normal offline
                     if (offlineOnus.length > 0) {
-                        // For ONUs newly going offline (were online), query OLT for down cause
+                        // For ONUs newly going offline (were online), query OLT for down cause per-ONU
                         const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online');
                         for (const { onu } of newlyOffline) {
                             try {
-                                const infoCmd = `display ont info ${port} ${onu.onu_id}`;
-                                const infoResult = await this.sessionManager.execute(oltKey, infoCmd, { timeout: 8000 });
+                                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont info ${port} ${onu.onu_id}\nquit\nquit\n`;
+                                const infoResult = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
                                 if (infoResult) {
                                     const causeMatch = infoResult.match(/Last down cause\s*:\s*(.+)/i);
                                     if (causeMatch) {
                                         const cause = causeMatch[1].trim();
                                         await this.pool.query(`UPDATE huawei_onus SET last_down_cause = $1 WHERE id = $2`, [cause, onu.id]);
                                         onu.last_down_cause = cause;
+                                        console.log(`[CLI] ONU ${frame}/${slot}/${port}/${onu.onu_id} (${onu.sn}) down cause: ${cause}`);
                                     }
                                 }
                             } catch (e) { /* ignore individual query failures */ }
@@ -1078,18 +1079,18 @@ class SNMPPollingWorker {
                 for (const pk of portKeys) {
                     const group = portGroups[pk];
                     try {
-                        const script = `config\ninterface gpon ${group.frame}/${group.slot}\ndisplay ont info ${group.port} all\nquit\nquit\n`;
-                        const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
-                        if (!result) continue;
-                        
-                        const onuBlocks = result.split(/(?=\bONT\s+ID\s*:\s*\d+)/i);
                         const causeMap = {};
-                        for (const block of onuBlocks) {
-                            const idMatch = block.match(/ONT\s+ID\s*:\s*(\d+)/i);
-                            const causeMatch = block.match(/Last down cause\s*:\s*(.+)/i);
-                            if (idMatch && causeMatch) {
-                                causeMap[parseInt(idMatch[1])] = causeMatch[1].trim();
-                            }
+                        for (const onu of group.onus) {
+                            try {
+                                const script = `config\ninterface gpon ${group.frame}/${group.slot}\ndisplay ont info ${group.port} ${onu.onu_id}\nquit\nquit\n`;
+                                const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
+                                if (result) {
+                                    const causeMatch = result.match(/Last down cause\s*:\s*(.+)/i);
+                                    if (causeMatch) {
+                                        causeMap[onu.onu_id] = causeMatch[1].trim();
+                                    }
+                                }
+                            } catch (e) { /* skip individual ONU failures */ }
                         }
                         
                         for (const onu of group.onus) {
