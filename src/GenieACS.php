@@ -479,57 +479,50 @@ class GenieACS {
             'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']
         ];
         
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=5000", $task);
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
         $httpCode = $result['http_code'] ?? 0;
         
-        if ($httpCode != 200) {
-            $hasCRCredentials = !empty($this->crUsername) && $this->crUsername !== 'genieacs';
-            
-            if (!$hasCRCredentials) {
-                $cleared = $this->clearCRCredentialsViaOLT($serial);
-                if ($cleared['success'] ?? false) {
-                    error_log("[GenieACS] CR cleared via OLT for {$serial}, retrying connection request");
-                    sleep(2);
-                    $retry = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
-                    $retryCode = $retry['http_code'] ?? 0;
-                    if ($retryCode == 200) {
-                        return [
-                            'success' => true,
-                            'message' => 'Device responded after clearing cached credentials',
-                            'connection_request_url' => $connReqUrl,
-                            'http_code' => 200,
-                            'cr_cleared' => true,
-                            'queued' => false
-                        ];
-                    }
-                    $httpCode = $retryCode;
-                }
-            } else {
-                error_log("[GenieACS] CR credentials configured (skipping OLT clear), retrying for {$serial}");
-                sleep(2);
-                $retry = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
-                $retryCode = $retry['http_code'] ?? 0;
-                if ($retryCode == 200) {
-                    return [
-                        'success' => true,
-                        'message' => 'Device responded on retry',
-                        'connection_request_url' => $connReqUrl,
-                        'http_code' => 200,
-                        'queued' => false
-                    ];
-                }
-                $httpCode = $retryCode;
+        if ($httpCode == 200) {
+            return [
+                'success' => true,
+                'message' => 'Device responded - connection active',
+                'connection_request_url' => $connReqUrl,
+                'http_code' => 200,
+                'queued' => false
+            ];
+        }
+        
+        $hasCRCredentials = !empty($this->crUsername) && $this->crUsername !== 'genieacs';
+        if (!$hasCRCredentials) {
+            $this->clearCRCredentialsViaOLT($serial);
+            error_log("[GenieACS] CR cleared via OLT for {$serial}");
+        }
+        
+        $maxRetries = 3;
+        error_log("[GenieACS] sendConnectionRequest got HTTP {$httpCode} for {$serial}, retrying up to {$maxRetries} times");
+        
+        for ($retry = 1; $retry <= $maxRetries; $retry++) {
+            sleep(3);
+            $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
+            $retryCode = $retryResult['http_code'] ?? 0;
+            error_log("[GenieACS] sendConnectionRequest retry {$retry}/{$maxRetries} got HTTP {$retryCode} for {$serial}");
+            if ($retryCode == 200) {
+                return [
+                    'success' => true,
+                    'message' => 'Device responded on retry ' . $retry,
+                    'connection_request_url' => $connReqUrl,
+                    'http_code' => 200,
+                    'queued' => false
+                ];
             }
         }
         
         return [
-            'success' => ($httpCode == 200 || $httpCode == 202),
-            'message' => ($httpCode == 200) 
-                ? 'Device responded - connection active'
-                : 'Connection request sent - device will respond on next inform',
+            'success' => false,
+            'message' => "Device unreachable after {$maxRetries} retries",
             'connection_request_url' => $connReqUrl,
-            'http_code' => $httpCode,
-            'queued' => ($httpCode != 200)
+            'http_code' => $retryCode ?? $httpCode,
+            'queued' => false
         ];
     }
     
@@ -779,52 +772,40 @@ class GenieACS {
         $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
         $httpCode = $result['http_code'] ?? 0;
         
-        if ($httpCode == 202 || $httpCode == 401 || $httpCode == 0) {
+        if ($httpCode == 200) {
+            error_log("[GenieACS] setParameterValues delivered instantly to {$deviceId}");
+        } else {
             $serial = $this->extractSerialFromDeviceId($deviceId);
             $hasCRCredentials = !empty($this->crUsername) && $this->crUsername !== 'genieacs';
+            $maxRetries = 3;
+            $delivered = false;
+            
+            error_log("[GenieACS] setParameterValues got HTTP {$httpCode} for {$deviceId}, retrying up to {$maxRetries} times");
             
             if ($serial && !$hasCRCredentials) {
-                $cleared = $this->clearCRCredentialsViaOLT($serial);
-                if ($cleared['success'] ?? false) {
-                    error_log("[GenieACS] CR credentials cleared via OLT for {$serial}, retrying instant push");
-                    sleep(2);
-                    
-                    if ($httpCode == 202) {
-                        $summonTask = ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']];
-                        $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $summonTask);
-                    } else {
-                        $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
-                    }
-                    $retryCode = $retryResult['http_code'] ?? 0;
-                    if ($retryCode == 200) {
-                        $result = $retryResult;
-                        $result['cr_cleared'] = true;
-                        $result['http_code'] = 200;
-                        error_log("[GenieACS] Retry succeeded after CR clear for {$serial}");
-                        return $result;
-                    }
-                    error_log("[GenieACS] Retry still got HTTP {$retryCode} for {$serial}");
-                }
-            } elseif ($serial && $hasCRCredentials) {
-                error_log("[GenieACS] CR credentials configured (skipping OLT clear), retrying connection request for {$serial}");
-                sleep(2);
+                $this->clearCRCredentialsViaOLT($serial);
+                error_log("[GenieACS] CR credentials cleared via OLT for {$serial}");
+            }
+            
+            for ($retry = 1; $retry <= $maxRetries; $retry++) {
+                sleep(3);
+                error_log("[GenieACS] Retry {$retry}/{$maxRetries} for {$deviceId}");
                 $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
                 $retryCode = $retryResult['http_code'] ?? 0;
                 if ($retryCode == 200) {
                     $result = $retryResult;
                     $result['http_code'] = 200;
-                    error_log("[GenieACS] Retry succeeded for {$serial}");
-                    return $result;
+                    $delivered = true;
+                    error_log("[GenieACS] Retry {$retry} succeeded for {$deviceId}");
+                    break;
                 }
-                error_log("[GenieACS] Retry still got HTTP {$retryCode} for {$serial}");
+                error_log("[GenieACS] Retry {$retry} got HTTP {$retryCode} for {$deviceId}");
             }
             
-            if ($httpCode == 202) {
-                $result['queued_fallback'] = true;
-            } else {
-                error_log("[GenieACS] Connection request failed (HTTP {$httpCode}) for {$deviceId}, queuing task");
-                $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-                $result['queued_fallback'] = true;
+            if (!$delivered) {
+                $result['success'] = false;
+                $result['error'] = "Failed to deliver changes after {$maxRetries} retries (last HTTP {$retryCode}). Device may be unreachable.";
+                error_log("[GenieACS] FAILED to deliver setParameterValues to {$deviceId} after {$maxRetries} retries");
             }
         }
         
