@@ -3056,107 +3056,95 @@ JS;
             // Working router pattern: each service gets its own WANConnectionDevice
             // WANConnectionDevice.1 = TR-069, .2 = PPPoE, .3 = Guest bridge, etc.
             error_log("[configureWifiAccessVlan] Step 1: Adding NEW WANConnectionDevice under WANDevice.1");
-            $addWanDevResult = $this->request(
-                "POST",
-                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                [
-                    'name' => 'addObject',
-                    'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
-                ]
-            );
-            $results[] = ['step' => 'add_wan_connection_device', 'result' => $addWanDevResult];
-            error_log("[configureWifiAccessVlan] Step 1 AddObject result: HTTP " . ($addWanDevResult['http_code'] ?? 'N/A'));
+            
+            // Helper: execute a GenieACS task via direct curl with auth and proper timeouts
+            // Returns: ['http_code' => int, 'response' => string, 'error' => string]
+            $execGenieTask = function(string $deviceId, array $taskBody, int $genieTimeout = 45000) {
+                $url = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout={$genieTimeout}";
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => json_encode($taskBody),
+                    CURLOPT_TIMEOUT => (int)($genieTimeout / 1000) + 15,
+                    CURLOPT_CONNECTTIMEOUT => 10
+                ]);
+                if (!empty($this->username)) {
+                    curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+                }
+                $resp = curl_exec($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $err = curl_error($ch);
+                curl_close($ch);
+                return ['http_code' => $code, 'response' => $resp ?: '', 'error' => $err];
+            };
             
             // Helper: scan GenieACS device data for WANConnectionDevice indices
-            // Uses direct GenieACS API query to bypass any caching
-            $scanWanDeviceIndices = function($deviceId) use ($deviceIdEncoded) {
+            $scanWanDeviceIndices = function($deviceId) {
                 $indices = [];
-                // Method 1: Direct GenieACS API query with projection filter
-                $query = json_encode(['_id' => $deviceId]);
-                $apiResult = $this->request('GET', '/devices', null, [
-                    'query' => $query, 
-                    'limit' => 1,
-                    'projection' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice'
-                ]);
-                if ($apiResult['success'] && !empty($apiResult['data'][0])) {
-                    $device = $apiResult['data'][0];
-                    // Scan all keys (flat or nested) for WANConnectionDevice indices
-                    $scanKeys = function($data, $prefix = '') use (&$scanKeys, &$indices) {
-                        foreach ($data as $key => $val) {
-                            $fullKey = $prefix ? "{$prefix}.{$key}" : $key;
-                            if (preg_match('/WANConnectionDevice\.(\d+)/', $fullKey, $m)) {
-                                $indices[(int)$m[1]] = true;
-                            }
-                            if (is_array($val) && !isset($val['_value'])) {
-                                $scanKeys($val, $fullKey);
-                            }
+                $result = $this->getDevice($deviceId, true);
+                if ($result['success'] && !empty($result['data'])) {
+                    foreach ($result['data'] as $key => $val) {
+                        if (preg_match('/WANDevice\.1\.WANConnectionDevice\.(\d+)\./', $key, $m)) {
+                            $indices[(int)$m[1]] = true;
                         }
-                    };
-                    $scanKeys($device);
+                    }
                 }
-                // Method 2: Fallback to getDevice with flatten
                 if (empty($indices)) {
-                    $result = $this->getDevice($deviceId, true);
-                    if ($result['success'] && !empty($result['data'])) {
-                        foreach ($result['data'] as $key => $val) {
-                            if (preg_match('/WANDevice\.1\.WANConnectionDevice\.(\d+)\./', $key, $m)) {
-                                $indices[(int)$m[1]] = true;
-                            }
+                    $result2 = $this->getDevice($deviceId, false);
+                    if ($result2['success'] && !empty($result2['data'])) {
+                        $wanDevices = $result2['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
+                        foreach ($wanDevices as $idx => $dev) {
+                            if (is_numeric($idx)) $indices[(int)$idx] = true;
                         }
                     }
                 }
                 return array_keys($indices);
             };
             
-            // Retry loop: refresh FIRST, wait, then read
+            // Execute addObject with longer timeout (45s) to ensure ONU processes it
+            $addResult = $execGenieTask($deviceId, [
+                'name' => 'addObject',
+                'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
+            ], 45000);
+            $results[] = ['step' => 'add_wan_connection_device', 'result' => $addResult];
+            error_log("[configureWifiAccessVlan] Step 1 AddObject: HTTP {$addResult['http_code']}" . ($addResult['error'] ? " ERR: {$addResult['error']}" : ""));
+            
+            // If addObject returned 202 (queued), we need to wait for it to execute
+            // Send a connection_request to trigger the ONU to connect and process pending tasks
+            if ($addResult['http_code'] === 202) {
+                error_log("[configureWifiAccessVlan] AddObject queued (202), waiting for ONU to process...");
+                sleep(5);
+            }
+            
+            // Retry loop: use getParameterNames to force tree rediscovery, then read
             $wanDeviceIndex = null;
             
-            $taskUrl = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
-            
-            for ($attempt = 0; $attempt < 10; $attempt++) {
-                // Step A: getParameterNames forces GenieACS to rediscover children (tree rebuild)
-                $gpnPayload = json_encode(['name' => 'getParameterNames', 'parameterPath' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.', 'nextLevel' => false]);
-                $ch = curl_init($taskUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => $gpnPayload,
-                    CURLOPT_TIMEOUT => 35
-                ]);
-                if (!empty($this->username)) {
-                    curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+            for ($attempt = 0; $attempt < 12; $attempt++) {
+                // Force tree rediscovery: getParameterNames asks ONU for child names under the path
+                // This is the REST API equivalent of clicking "Refresh Parameters" in GenieACS UI
+                $gpnResult = $execGenieTask($deviceId, [
+                    'name' => 'getParameterNames',
+                    'parameterPath' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.',
+                    'nextLevel' => true
+                ], 45000);
+                error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterNames HTTP {$gpnResult['http_code']}" . ($gpnResult['error'] ? " ERR: {$gpnResult['error']}" : "") . " resp: " . substr($gpnResult['response'], 0, 300));
+                
+                // If getParameterNames completed (200), the tree should be updated
+                // If it returned 202 (queued) or 0 (timeout), wait and try again
+                if ($gpnResult['http_code'] === 200) {
+                    sleep(2);
+                } else if ($gpnResult['http_code'] === 0) {
+                    // Connection timeout - increase wait before retry
+                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: connection timeout, waiting longer...");
+                    sleep(8);
+                    continue;
+                } else {
+                    sleep(5);
                 }
-                $gpnResp = curl_exec($ch);
-                $gpnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $gpnErr = curl_error($ch);
-                curl_close($ch);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterNames HTTP {$gpnCode}" . ($gpnErr ? " ERR: {$gpnErr}" : "") . " resp: " . substr($gpnResp ?: '', 0, 200));
                 
-                sleep(4);
-                
-                // Step B: getParameterValues to sync values for the subtree
-                $gpvPayload = json_encode(['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']]);
-                $ch2 = curl_init($taskUrl);
-                curl_setopt_array($ch2, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => $gpvPayload,
-                    CURLOPT_TIMEOUT => 35
-                ]);
-                if (!empty($this->username)) {
-                    curl_setopt($ch2, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-                }
-                $gpvResp = curl_exec($ch2);
-                $gpvCode = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
-                $gpvErr = curl_error($ch2);
-                curl_close($ch2);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterValues HTTP {$gpvCode}" . ($gpvErr ? " ERR: {$gpvErr}" : "") . " resp: " . substr($gpvResp ?: '', 0, 200));
-                
-                sleep(4);
-                
-                // Step C: NOW read the updated tree
+                // Read the tree to check for new indices
                 $newIndices = $scanWanDeviceIndices($deviceId);
                 error_log("[configureWifiAccessVlan] Attempt {$attempt}: found WANConnectionDevice indices: " . json_encode($newIndices) . ", existing: " . json_encode($existingWanIndices));
                 $addedIndices = array_diff($newIndices, $existingWanIndices);
@@ -3166,6 +3154,7 @@ JS;
                     break;
                 }
                 error_log("[configureWifiAccessVlan] Attempt {$attempt}: WANConnectionDevice not yet visible, waiting...");
+                sleep(3);
             }
             
             if ($wanDeviceIndex === null) {
@@ -3190,50 +3179,32 @@ JS;
             $results[] = ['step' => 'add_wan_ip_connection', 'result' => $addWanIpResult];
             error_log("[configureWifiAccessVlan] Step 2 AddObject result: HTTP " . ($addWanIpResult['http_code'] ?? 'N/A'));
             
-            // Retry loop: refresh FIRST, then check for WANIPConnection
+            // Retry loop: getParameterNames to rediscover WANIPConnection children
             $ipConnectionConfirmed = false;
             $ipConnPattern = "/WANConnectionDevice\.{$wanDeviceIndex}\.WANIPConnection\.(\d+)/";
-            $taskUrl2 = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
+            
+            if ($addWanIpResult['http_code'] == 202) {
+                error_log("[configureWifiAccessVlan] WANIPConnection addObject queued (202), waiting...");
+                sleep(5);
+            }
+            
             for ($attempt = 0; $attempt < 8; $attempt++) {
-                // Step A: getParameterNames to rediscover WANIPConnection children
-                $ch3 = curl_init($taskUrl2);
-                curl_setopt_array($ch3, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => json_encode(['name' => 'getParameterNames', 'parameterPath' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.", 'nextLevel' => false]),
-                    CURLOPT_TIMEOUT => 35
-                ]);
-                if (!empty($this->username)) {
-                    curl_setopt($ch3, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+                $gpnResult2 = $execGenieTask($deviceId, [
+                    'name' => 'getParameterNames',
+                    'parameterPath' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.",
+                    'nextLevel' => true
+                ], 45000);
+                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterNames HTTP {$gpnResult2['http_code']}" . ($gpnResult2['error'] ? " ERR: {$gpnResult2['error']}" : ""));
+                
+                if ($gpnResult2['http_code'] === 200) {
+                    sleep(2);
+                } else if ($gpnResult2['http_code'] === 0) {
+                    sleep(8);
+                    continue;
+                } else {
+                    sleep(5);
                 }
-                $r3 = curl_exec($ch3);
-                $rc3 = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
-                curl_close($ch3);
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterNames HTTP {$rc3}");
                 
-                sleep(4);
-                
-                // Step B: getParameterValues to sync
-                $ch4 = curl_init($taskUrl2);
-                curl_setopt_array($ch4, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => json_encode(['name' => 'getParameterValues', 'parameterNames' => ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]]),
-                    CURLOPT_TIMEOUT => 35
-                ]);
-                if (!empty($this->username)) {
-                    curl_setopt($ch4, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-                }
-                $r4 = curl_exec($ch4);
-                $rc4 = curl_getinfo($ch4, CURLINFO_HTTP_CODE);
-                curl_close($ch4);
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterValues HTTP {$rc4}");
-                
-                sleep(4);
-                
-                // Step B: NOW read the tree
                 $refreshedDev2 = $this->getDevice($deviceId, true);
                 if ($refreshedDev2['success'] && !empty($refreshedDev2['data'])) {
                     foreach ($refreshedDev2['data'] as $key => $val) {
@@ -3245,7 +3216,7 @@ JS;
                     }
                 }
                 error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: WANIPConnection not yet visible, waiting...");
-                sleep(2);
+                sleep(3);
             }
             
             if (!$ipConnectionConfirmed) {
