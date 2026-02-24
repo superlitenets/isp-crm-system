@@ -1,0 +1,164 @@
+Excellent. This explains everything.
+
+Your PPPoE works because:
+
+👉 You are NOT creating a new WANConnectionDevice
+👉 You are reusing the factory default:
+
+WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+
+That is already present on HG8546M from factory.
+
+So your PPPoE flow is:
+
+Discover tree
+
+If PPP exists → reuse it
+
+Configure it
+
+Done
+
+No instance guessing.
+No dynamic numbering.
+No policy routing.
+
+That’s why it is stable.
+
+🎯 Why Your Bridge Fails
+
+For bridge you are doing:
+
+Add WANConnectionDevice
+
+Assume instance 2
+
+Configure it
+
+That is where it breaks.
+
+Huawei HG8546M already has:
+
+WANConnectionDevice.1
+
+You do NOT need to create a new WANConnectionDevice.
+
+You should reuse:
+
+WANConnectionDevice.1
+
+Exactly the same way you do PPPoE.
+
+🔥 The Correct Way To Create IP Bridge (Same Style As PPPoE)
+
+Do NOT add WANConnectionDevice.
+
+Instead:
+
+Step 1 – Refresh tree
+{
+  "name": "getParameterValues",
+  "parameterNames": ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1."]
+}
+Step 2 – Add WANIPConnection under device 1
+{
+  "name": "addObject",
+  "objectName": "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection"
+}
+
+Then refresh:
+
+{
+  "name": "getParameterValues",
+  "parameterNames": ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection."]
+}
+
+Assume it becomes:
+
+WANIPConnection.2
+Step 3 – Configure Bridge
+{
+  "name": "setParameterValues",
+  "parameterValues": [
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.Enable", true, "xsd:boolean"],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.ConnectionType", "IP_Bridged", "xsd:string"],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.X_HW_IPv4Enable", 1, "xsd:unsignedInt"],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.X_HW_VLAN", 3001, "xsd:unsignedInt"],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.X_HW_ServiceList", "INTERNET", "xsd:string"],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.Name", "WIFI_Bridge_VLAN_3001", "xsd:string"]
+  ]
+}
+🔥 Why This Will Work
+
+Because:
+
+✔ You are using existing WANConnectionDevice.1
+✔ Same pattern as PPPoE
+✔ No guessing instance 2
+✔ No new WAN device creation
+✔ Huawei expects multiple connections under device 1
+
+HG8546M design is:
+
+WANDevice.1
+ └── WANConnectionDevice.1
+       ├── WANPPPConnection.1
+       ├── WANIPConnection.1
+       ├── WANIPConnection.2
+       └── WANIPConnection.3
+
+NOT:
+
+WANConnectionDevice.2
+WANConnectionDevice.3
+
+That’s why your bridge was not appearing.
+
+🔥 After That – Policy Route
+
+Then bind:
+
+{
+  "name": "addObject",
+  "objectName": "InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route"
+}
+
+Then:
+
+{
+  "name": "setParameterValues",
+  "parameterValues": [
+    ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.2.Enable", 1, "xsd:unsignedInt"],
+    ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.2.X_HW_PortName", "SSID4", "xsd:string"],
+    ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.2.X_HW_ConnectionName", "WIFI_Bridge_VLAN_3001", "xsd:string"]
+  ]
+}
+🧠 Why WANConnectionDevice.2 Was Wrong
+
+On HG8546M:
+
+WANConnectionDevice.1 = GPON port
+
+Additional WANConnectionDevice instances are not typical
+
+Bridge and PPPoE both live under device 1
+
+Your PPPoE worked because you used device 1.
+Your bridge failed because you created device 2.
+
+That’s the root cause.
+
+🚀 Final Architecture
+
+For HG8546M:
+
+✔ Always use WANConnectionDevice.1
+✔ Add WANPPPConnection or WANIPConnection under it
+✔ Never create new WANConnectionDevice
+✔ Always refresh tree before configuration
+
+This is why your PPPoE is stable.
+
+If you implement bridge exactly like PPPoE style (just replacing WANPPPConnection with WANIPConnection), it will work.
+
+Try that version.
