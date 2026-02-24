@@ -181,6 +181,19 @@ class SNMPPollingWorker {
                 if (Object.keys(opticalData).length > 0) {
                     await this.updateONUOpticalPower(olt.id, opticalData, onuStatuses);
                 }
+                
+                const missingTxCount = await this.pool.query(
+                    `SELECT COUNT(*) as cnt FROM huawei_onus WHERE olt_id = $1 AND is_authorized = true AND status = 'online' AND tx_power IS NULL`,
+                    [olt.id]
+                );
+                const missingTx = parseInt(missingTxCount.rows[0]?.cnt || 0);
+                if (missingTx > 0 && !paused) {
+                    console.log(`[SNMP] OLT ${olt.name}: ${missingTx} online ONUs missing TX power after SNMP - supplementing via CLI`);
+                    this.supplementOpticalViaCLI(olt).catch(e => {
+                        console.log(`[SNMP] CLI optical supplement for ${olt.name} failed: ${e.message}`);
+                    });
+                }
+                
                 await this.updatePollingStats(olt.id, true, null, 'snmp');
                 
                 session.close();
@@ -353,21 +366,23 @@ class SNMPPollingWorker {
                     
                     // For offline ONUs, check last_down_cause to distinguish LOS vs normal offline
                     if (offlineOnus.length > 0) {
-                        // For ONUs newly going offline (were online), query OLT for down cause
-                        const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online');
+                        // For ONUs newly going offline (were online), query OLT for down cause per-ONU
+                        const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online').slice(0, 10);
                         for (const { onu } of newlyOffline) {
                             try {
-                                const infoCmd = `display ont info ${port} ${onu.onu_id}`;
-                                const infoResult = await this.sessionManager.execute(oltKey, infoCmd, { timeout: 8000 });
+                                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont info ${port} ${onu.onu_id}\nquit\nquit\n`;
+                                const infoResult = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
                                 if (infoResult) {
                                     const causeMatch = infoResult.match(/Last down cause\s*:\s*(.+)/i);
                                     if (causeMatch) {
                                         const cause = causeMatch[1].trim();
                                         await this.pool.query(`UPDATE huawei_onus SET last_down_cause = $1 WHERE id = $2`, [cause, onu.id]);
                                         onu.last_down_cause = cause;
+                                        console.log(`[CLI] ONU ${frame}/${slot}/${port}/${onu.onu_id} (${onu.sn}) down cause: ${cause}`);
                                     }
                                 }
                             } catch (e) { /* ignore individual query failures */ }
+                            await new Promise(r => setTimeout(r, 200));
                         }
                         
                         // For already offline ONUs, last_down_cause is already loaded from the initial query
@@ -423,7 +438,156 @@ class SNMPPollingWorker {
             await this.sendFaultNotifications(olt.id, faults);
         }
         
+        // Collect optical power via CLI (since SNMP failed)
+        try {
+            await this.collectOpticalViaCLI(olt, oltKey, groupedByPort);
+        } catch (e) {
+            console.log(`[CLI] Optical power collection failed: ${e.message}`);
+        }
+        
         return { onuCount: updated, method: 'cli' };
+    }
+    
+    async collectOpticalViaCLI(olt, oltKey, portMap) {
+        const portKeys = Object.keys(portMap);
+        let opticalUpdated = 0;
+        const startTime = Date.now();
+        const TIME_BUDGET_MS = 120000;
+        
+        for (const portKey of portKeys) {
+            if (Date.now() - startTime > TIME_BUDGET_MS) {
+                console.log(`[CLI] Optical collection time budget exceeded, deferring remaining ports`);
+                break;
+            }
+            
+            const [frame, slot, port] = portKey.split('/').map(Number);
+            try {
+                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\nquit\n`;
+                const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
+                if (!result) continue;
+                
+                const lines = result.split(/\r?\n/);
+                let inTable = false;
+                for (const line of lines) {
+                    if (line.includes('ONT') && line.includes('Rx power') && line.includes('Tx power')) {
+                        inTable = true;
+                        continue;
+                    }
+                    if (line.match(/^[\s-]+$/) && inTable) continue;
+                    if (!inTable) continue;
+                    if (line.trim() === '' || line.includes('MA5683T') || line.includes('quit')) {
+                        inTable = false;
+                        continue;
+                    }
+                    
+                    const cols = line.trim().split(/\s+/);
+                    if (cols.length >= 4) {
+                        const onuId = parseInt(cols[0]);
+                        const onuRx = parseFloat(cols[1]);
+                        const onuTx = parseFloat(cols[2]);
+                        const oltRxOnt = parseFloat(cols[3]);
+                        
+                        if (isNaN(onuId)) continue;
+                        
+                        const rx = isNaN(onuRx) || onuRx < -50 || onuRx > 10 ? null : onuRx;
+                        const tx = isNaN(oltRxOnt) || oltRxOnt < -50 || oltRxOnt > 10 ? null : oltRxOnt;
+                        
+                        if (rx !== null || tx !== null) {
+                            await this.pool.query(`
+                                UPDATE huawei_onus 
+                                SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), updated_at = CURRENT_TIMESTAMP
+                                WHERE olt_id = $3 AND frame = $4 AND slot = $5 AND port = $6 AND onu_id = $7
+                            `, [rx, tx, olt.id, frame, slot, port, onuId]);
+                            opticalUpdated++;
+                        }
+                    }
+                }
+                
+                await new Promise(r => setTimeout(r, 100));
+            } catch (e) { /* skip port failures */ }
+        }
+        
+        if (opticalUpdated > 0) {
+            console.log(`[CLI] Updated optical power (RX/TX) for ${opticalUpdated} ONUs on ${olt.name}`);
+        }
+    }
+
+    async supplementOpticalViaCLI(olt) {
+        const missingResult = await this.pool.query(`
+            SELECT DISTINCT frame, slot, port FROM huawei_onus 
+            WHERE olt_id = $1 AND is_authorized = true AND status = 'online' AND tx_power IS NULL
+            LIMIT 50
+        `, [olt.id]);
+        
+        if (missingResult.rows.length === 0) return;
+        
+        const oltKey = `${olt.id}`;
+        const portKeys = missingResult.rows.map(r => `${r.frame}/${r.slot}/${r.port}`);
+        const uniquePorts = [...new Set(portKeys)];
+        
+        console.log(`[CLI-Supplement] Collecting TX power for ${uniquePorts.length} ports on ${olt.name}`);
+        
+        let opticalUpdated = 0;
+        const startTime = Date.now();
+        const TIME_BUDGET_MS = 60000;
+        
+        for (const portKey of uniquePorts) {
+            if (Date.now() - startTime > TIME_BUDGET_MS) {
+                console.log(`[CLI-Supplement] Time budget exceeded, deferring remaining ports`);
+                break;
+            }
+            
+            const [frame, slot, port] = portKey.split('/').map(Number);
+            try {
+                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\nquit\n`;
+                const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
+                if (!result) continue;
+                
+                const lines = result.split(/\r?\n/);
+                let inTable = false;
+                for (const line of lines) {
+                    if (line.includes('ONT') && line.includes('Rx power') && line.includes('Tx power')) {
+                        inTable = true;
+                        continue;
+                    }
+                    if (line.match(/^[\s-]+$/) && inTable) continue;
+                    if (!inTable) continue;
+                    if (line.trim() === '' || line.includes('MA5683T') || line.includes('quit')) {
+                        inTable = false;
+                        continue;
+                    }
+                    
+                    const cols = line.trim().split(/\s+/);
+                    if (cols.length >= 4) {
+                        const onuId = parseInt(cols[0]);
+                        const onuRx = parseFloat(cols[1]);
+                        const oltRxOnt = parseFloat(cols[3]);
+                        
+                        if (isNaN(onuId)) continue;
+                        
+                        const rx = isNaN(onuRx) || onuRx < -50 || onuRx > 10 ? null : onuRx;
+                        const tx = isNaN(oltRxOnt) || oltRxOnt < -50 || oltRxOnt > 10 ? null : oltRxOnt;
+                        
+                        if (tx !== null) {
+                            await this.pool.query(`
+                                UPDATE huawei_onus 
+                                SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), updated_at = CURRENT_TIMESTAMP
+                                WHERE olt_id = $3 AND frame = $4 AND slot = $5 AND port = $6 AND onu_id = $7 AND tx_power IS NULL
+                            `, [rx, tx, olt.id, frame, slot, port, onuId]);
+                            opticalUpdated++;
+                        }
+                    }
+                }
+                
+                await new Promise(r => setTimeout(r, 100));
+            } catch (e) { /* skip port failures */ }
+        }
+        
+        if (opticalUpdated > 0) {
+            console.log(`[CLI-Supplement] Filled TX power for ${opticalUpdated} ONUs on ${olt.name}`);
+        } else {
+            console.log(`[CLI-Supplement] No additional TX power found for ${olt.name}`);
+        }
     }
 
     getSysInfo(session) {
@@ -617,8 +781,13 @@ class SNMPPollingWorker {
                     completedWalks++;
                     if (completedWalks >= totalWalks) {
                         const count = Object.keys(powerData).length;
+                        let rxCount = 0, txCount = 0;
+                        for (const entry of Object.values(powerData)) {
+                            if (entry.rx_power !== undefined) rxCount++;
+                            if (entry.tx_power !== undefined) txCount++;
+                        }
                         if (count > 0) {
-                            console.log(`[SNMP] Optical power collected for OLT ${oltId}: ${count} ONUs`);
+                            console.log(`[SNMP] Optical power collected for OLT ${oltId}: ${count} ONUs (RX: ${rxCount}, TX/OLT-RX: ${txCount})`);
                         }
                         resolve(powerData);
                     }
@@ -1054,11 +1223,13 @@ class SNMPPollingWorker {
                     WHERE olt_id = $1 
                       AND is_authorized = true 
                       AND status IN ('offline', 'los', 'dying-gasp')
+                      AND (last_down_cause IS NULL OR last_down_cause = '')
                     ORDER BY slot, port, onu_id
+                    LIMIT 50
                 `, [olt.id]);
                 
                 if (offlineOnus.rows.length === 0) {
-                    console.log(`[LOS-Backfill] No offline ONUs on ${olt.name}`);
+                    console.log(`[LOS-Backfill] No unresolved offline ONUs on ${olt.name}`);
                     continue;
                 }
                 
@@ -1075,21 +1246,32 @@ class SNMPPollingWorker {
                 let losFound = 0;
                 const backfillFaults = [];
                 
+                const backfillStart = Date.now();
+                const BACKFILL_TIME_BUDGET_MS = 120000;
+                let backfillTimedOut = false;
+                
                 for (const pk of portKeys) {
+                    if (backfillTimedOut) break;
                     const group = portGroups[pk];
                     try {
-                        const script = `config\ninterface gpon ${group.frame}/${group.slot}\ndisplay ont info ${group.port} all\nquit\nquit\n`;
-                        const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
-                        if (!result) continue;
-                        
-                        const onuBlocks = result.split(/(?=\bONT\s+ID\s*:\s*\d+)/i);
                         const causeMap = {};
-                        for (const block of onuBlocks) {
-                            const idMatch = block.match(/ONT\s+ID\s*:\s*(\d+)/i);
-                            const causeMatch = block.match(/Last down cause\s*:\s*(.+)/i);
-                            if (idMatch && causeMatch) {
-                                causeMap[parseInt(idMatch[1])] = causeMatch[1].trim();
+                        for (const onu of group.onus) {
+                            if (Date.now() - backfillStart > BACKFILL_TIME_BUDGET_MS) {
+                                console.log(`[LOS-Backfill] Time budget exceeded (${BACKFILL_TIME_BUDGET_MS/1000}s), deferring remaining ONUs`);
+                                backfillTimedOut = true;
+                                break;
                             }
+                            try {
+                                const script = `config\ninterface gpon ${group.frame}/${group.slot}\ndisplay ont info ${group.port} ${onu.onu_id}\nquit\nquit\n`;
+                                const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
+                                if (result) {
+                                    const causeMatch = result.match(/Last down cause\s*:\s*(.+)/i);
+                                    if (causeMatch) {
+                                        causeMap[onu.onu_id] = causeMatch[1].trim();
+                                    }
+                                }
+                            } catch (e) { /* skip individual ONU failures */ }
+                            await new Promise(r => setTimeout(r, 200));
                         }
                         
                         for (const onu of group.onus) {
