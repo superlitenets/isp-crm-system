@@ -1,0 +1,119 @@
+Ahhhhh 👌 good — that changes the situation completely.
+
+So what you pasted (WANConnectionDevice.3…) is from a working router, and you’re using it as reference.
+
+That’s perfect. Now we can compare properly.
+
+🔎 What the Working Router Tells Us
+
+From the working router we now know the correct Huawei pattern for WiFi bridge:
+
+✅ Structure
+WANDevice.1
+ └── WANConnectionDevice.3
+      └── WANIPConnection.1
+✅ Inside that bridge
+ConnectionType = IP_Bridged
+X_HW_VLAN = 901
+X_HW_SERVICELIST = INTERNET
+X_HW_LANBIND.SSID2Enable = 1
+
+That is the exact correct Huawei implementation.
+
+No policy route.
+No WLAN VLAN parameter.
+No weird binding object.
+Just:
+
+X_HW_LANBIND.SSIDxEnable = 1
+
+That’s the magic.
+
+🎯 Now Let’s Compare With Your Failing Router
+
+Earlier, your failing attempt showed:
+
+WANConnectionDevice.1.WANIPConnection.1
+
+That means your CRM logic was:
+
+Creating bridge under WANConnectionDevice.1
+
+Reusing .1
+
+Or not waiting correctly
+
+Or wrong WANConnectionDevice selected
+
+But the working router clearly shows:
+
+👉 It created a NEW WANConnectionDevice (3)
+👉 Then WANIPConnection.1 inside it
+👉 Then SSID bind
+
+So your CRM logic must follow THIS pattern:
+
+🔥 Correct Flow (Based On Working Router)
+Step 1 — Add WANConnectionDevice
+{
+  "name": "addObject",
+  "objectName": "InternetGatewayDevice.WANDevice.1.WANConnectionDevice"
+}
+
+Wait until new index appears.
+
+Example:
+Existing: [1,2]
+After add: [1,2,3]
+
+New index = 3
+
+Step 2 — Add WANIPConnection under that device
+{
+  "name": "addObject",
+  "objectName": "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.3.WANIPConnection"
+}
+
+Wait until .1 appears.
+
+Step 3 — Configure bridge
+{
+  "name": "setParameterValues",
+  "parameterValues": [
+    ["...WANIPConnection.1.Enable", true, "xsd:boolean"],
+    ["...ConnectionType", "IP_Bridged", "xsd:string"],
+    ["...X_HW_VLAN", 901, "xsd:unsignedInt"],
+    ["...X_HW_SERVICELIST", "INTERNET", "xsd:string"],
+    ["...X_HW_LANBIND.SSID2Enable", 1, "xsd:unsignedInt"]
+  ]
+}
+🚨 Critical Difference From Your Earlier Logic
+
+You were adding:
+
+WANIPConnection under WANConnectionDevice.1
+
+But Huawei working router adds:
+
+NEW WANConnectionDevice
+Then WANIPConnection inside it
+
+That’s the architectural difference.
+
+🧠 Why This Matters
+
+Huawei internally groups services like this:
+
+WANConnectionDevice.1 → TR069
+
+WANConnectionDevice.2 → PPPoE
+
+WANConnectionDevice.3 → Guest bridge
+
+WANConnectionDevice.4 → IPTV
+
+etc.
+
+Each service gets its own WANConnectionDevice.
+
+You should NOT reuse WANConnectionDevice.1 for bridge.
