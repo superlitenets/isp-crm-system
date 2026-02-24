@@ -169,7 +169,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
         exit;
     }
     try {
-        // Search in customers table
+        $customers = [];
+        $localIds = [];
+
         $stmt = $db->prepare("
             SELECT id, name, phone, email, account_number 
             FROM customers 
@@ -179,7 +181,52 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
         ");
         $search = '%' . $query . '%';
         $stmt->execute([$search, $search, $search]);
-        $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $localCustomers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($localCustomers as &$c) {
+            $c['source'] = 'local';
+        }
+        unset($c);
+        $customers = $localCustomers;
+        $localIds = array_column($localCustomers, 'id');
+
+        $oneISP = new \App\OneISP($db);
+        if ($oneISP->isConfigured()) {
+            try {
+                $result = $oneISP->searchCustomers($query);
+                $oneispData = [];
+                if (!empty($result['success']) && !empty($result['data'])) {
+                    $oneispData = $result['data'];
+                } elseif (!empty($result['data']) && is_array($result['data'])) {
+                    $oneispData = $result['data'];
+                }
+                foreach ($oneispData as $bc) {
+                    $mapped = $oneISP->mapCustomerToLocal($bc);
+                    if (!$mapped) continue;
+
+                    $existingStmt = $db->prepare("SELECT id FROM customers WHERE billing_id = ? OR (phone IS NOT NULL AND phone != '' AND phone = ?)");
+                    $existingStmt->execute([$mapped['billing_id'], $mapped['phone']]);
+                    $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($existing && in_array($existing['id'], $localIds)) {
+                        continue;
+                    }
+
+                    $customers[] = [
+                        'id' => $existing ? $existing['id'] : 'oneisp_' . ($mapped['billing_id'] ?? ''),
+                        'name' => $mapped['name'],
+                        'phone' => $mapped['phone'] ?? '',
+                        'email' => $mapped['email'] ?? '',
+                        'account_number' => $mapped['username'] ?? ($mapped['billing_id'] ?? ''),
+                        'source' => 'oneisp',
+                        'billing_id' => $mapped['billing_id'],
+                        'address' => $mapped['address'] ?? '',
+                        'service_plan' => $mapped['service_plan'] ?? '',
+                    ];
+                }
+            } catch (Exception $oneispErr) {
+                error_log("One-ISP search error: " . $oneispErr->getMessage());
+            }
+        }
+
         echo json_encode(['success' => true, 'customers' => $customers]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -1633,7 +1680,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 // Handle customer creation/selection modes
                 $customerMode = $_POST['customer_mode'] ?? 'existing';
                 $createCustomer = ($_POST['create_customer'] ?? '0') === '1';
-                $billingCustomerId = !empty($_POST['billing_customer_id']) ? (int)$_POST['billing_customer_id'] : null;
+                $billingCustomerIdRaw = trim($_POST['billing_customer_id'] ?? '');
+                $billingCustomerId = null;
+                $oneispBillingId = null;
+                if (!empty($billingCustomerIdRaw)) {
+                    if (strpos($billingCustomerIdRaw, 'oneisp_') === 0) {
+                        $oneispBillingId = substr($billingCustomerIdRaw, 7);
+                    } else {
+                        $billingCustomerId = (int)$billingCustomerIdRaw;
+                    }
+                }
                 $radiusSubscriptionId = !empty($_POST['radius_subscription_id']) ? (int)$_POST['radius_subscription_id'] : null;
                 
                 // Create new customer if requested
@@ -1654,9 +1710,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $name = $newCustomerName;
                             $phone = $newCustomerPhone;
                         } catch (Exception $e) {
-                            // Log but don't fail - customer creation is optional
                             error_log("Failed to create customer: " . $e->getMessage());
                         }
+                    }
+                } elseif ($oneispBillingId && !$customerId) {
+                    try {
+                        $oneISP = new \App\OneISP($db);
+                        $bcResult = $oneISP->getCustomer((int)$oneispBillingId);
+                        $bcData = null;
+                        if (!empty($bcResult['success']) && !empty($bcResult['data'])) {
+                            $bcData = is_array($bcResult['data']) && isset($bcResult['data'][0]) ? $bcResult['data'][0] : $bcResult['data'];
+                        }
+                        if ($bcData) {
+                            $importedId = $oneISP->importCustomer($bcData);
+                            if ($importedId) {
+                                $customerId = $importedId;
+                                $custStmt = $db->prepare("SELECT name, phone FROM customers WHERE id = ?");
+                                $custStmt->execute([$customerId]);
+                                $custRow = $custStmt->fetch(PDO::FETCH_ASSOC);
+                                if ($custRow) {
+                                    $name = $custRow['name'] ?: $name;
+                                    $phone = $custRow['phone'] ?: $phone;
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                        error_log("One-ISP customer import during auth failed: " . $e->getMessage());
                     }
                 } elseif ($billingCustomerId && !$customerId) {
                     $customerId = $billingCustomerId;
@@ -18292,7 +18371,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         if (!query) return;
         
         const resultsDiv = document.getElementById('billingSearchResults');
-        resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Searching...';
+        resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Searching ISP & One-ISP...';
         
         fetch(`?page=huawei-olt&ajax=search_billing_customer&q=${encodeURIComponent(query)}`)
             .then(r => r.json())
@@ -18300,15 +18379,24 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 if (data.success && data.customers && data.customers.length > 0) {
                     let html = '<div class="list-group">';
                     data.customers.forEach(c => {
-                        html += `<a href="#" class="list-group-item list-group-item-action" onclick="selectBillingCustomer('${c.id}', '${c.name}', '${c.phone || ''}', '${c.email || ''}'); return false;">
-                            <strong>${c.name}</strong><br>
-                            <small class="text-muted">${c.account_number || ''} | ${c.phone || ''}</small>
+                        const source = c.source || 'local';
+                        const badge = source === 'oneisp' 
+                            ? '<span class="badge bg-warning text-dark ms-1">One-ISP</span>' 
+                            : '<span class="badge bg-primary ms-1">ISP</span>';
+                        const extraInfo = source === 'oneisp' && c.service_plan ? ` | ${c.service_plan}` : '';
+                        const escapedId = String(c.id).replace(/'/g, "\\'");
+                        const escapedName = (c.name || '').replace(/'/g, "\\'");
+                        const escapedPhone = (c.phone || '').replace(/'/g, "\\'");
+                        const escapedEmail = (c.email || '').replace(/'/g, "\\'");
+                        html += `<a href="#" class="list-group-item list-group-item-action" onclick="selectBillingCustomer('${escapedId}', '${escapedName}', '${escapedPhone}', '${escapedEmail}'); return false;">
+                            <strong>${c.name}</strong>${badge}<br>
+                            <small class="text-muted">${c.account_number || ''} | ${c.phone || ''}${extraInfo}</small>
                         </a>`;
                     });
                     html += '</div>';
                     resultsDiv.innerHTML = html;
                 } else {
-                    resultsDiv.innerHTML = '<div class="text-muted">No customers found</div>';
+                    resultsDiv.innerHTML = '<div class="text-muted">No customers found in ISP or One-ISP</div>';
                 }
             })
             .catch(err => {
@@ -18320,7 +18408,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         document.getElementById('billingCustomerId').value = id;
         document.getElementById('authName').value = name;
         document.getElementById('authPhone').value = phone;
-        document.getElementById('billingSearchResults').innerHTML = `<div class="alert alert-success py-1 mb-0"><i class="bi bi-check-circle me-1"></i>Selected: ${name}</div>`;
+        const isOneISP = String(id).startsWith('oneisp_');
+        const label = isOneISP ? `${name} (from One-ISP - will be imported)` : name;
+        document.getElementById('billingSearchResults').innerHTML = `<div class="alert alert-success py-1 mb-0"><i class="bi bi-check-circle me-1"></i>Selected: ${label}</div>`;
     }
     
     
