@@ -239,6 +239,14 @@ class SSHSession {
                     response = response.replace(/--More--/gi, '');
                 }
                 
+                const lockPromptPattern = /\{[^}]*<K>\s*\}:/i;
+                if (lockPromptPattern.test(this.stripAnsi(chunk))) {
+                    console.log(`[OLT ${this.oltId}] SSH config lock prompt detected, pressing Enter`);
+                    setTimeout(() => {
+                        if (this.stream && this.connected) this.stream.write('\r');
+                    }, 200);
+                }
+
                 if (!confirmationSent && commandSeen) {
                     const confirmPatterns = [
                         /\[y\/n\]/i,
@@ -249,7 +257,8 @@ class SSHSession {
                         /delete this ont/i,
                         /to delete\?/i
                     ];
-                    const needsConfirmation = confirmPatterns.some(p => p.test(cleanResponse));
+                    const recentChunk = this.stripAnsi(chunk);
+                    const needsConfirmation = confirmPatterns.some(p => p.test(recentChunk));
                     if (needsConfirmation) {
                         confirmationSent = true;
                         console.log(`[OLT ${this.oltId}] SSH confirmation prompt detected, sending 'y'`);
@@ -314,6 +323,8 @@ class SSHSession {
                 /delete this ont/i, /to delete\?/i
             ];
 
+            const lockPromptPattern = /\{[^}]*<K>\s*\}:/i;
+
             const lines = script.split(/\r?\n/).filter(l => l.trim());
             console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
 
@@ -341,6 +352,17 @@ class SSHSession {
                 }
                 
                 const recentChunk = this.stripAnsi(chunk);
+
+                if (lockPromptPattern.test(recentChunk)) {
+                    console.log(`[OLT ${this.oltId}] SSH raw script: config lock prompt detected, pressing Enter to take lock`);
+                    setTimeout(() => {
+                        if (this.stream && this.connected) {
+                            this.stream.write('\r');
+                        }
+                    }, 300);
+                    return;
+                }
+
                 if (confirmPatterns.some(p => p.test(recentChunk))) {
                     console.log(`[OLT ${this.oltId}] SSH raw script: auto-confirming y/n`);
                     setTimeout(() => {

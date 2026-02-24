@@ -349,9 +349,16 @@ class OLTSession {
                     response = response.replace(/Press any key.*$/gi, '');
                 }
                 
+                // Handle Huawei config lock prompt { <cr>|<K> }:
+                const lockPromptPattern = /\{[^}]*<K>\s*\}:/i;
+                if (lockPromptPattern.test(response)) {
+                    console.log(`[OLT ${this.oltId}] Config lock prompt detected, pressing Enter to take lock`);
+                    this.socket.write('\r');
+                }
+                
                 // Handle confirmation prompts (y/n) - auto-confirm for delete operations
-                if (!confirmationSent && commandSeen) {
-                    // Match patterns like: "y/n]", "(y/n)", "confirm", "are you sure", "delete this ont"
+                const recentChunk = chunk;
+                if (commandSeen) {
                     const confirmPatterns = [
                         /\[y\/n\]/i,
                         /\(y\/n\)/i,
@@ -361,9 +368,8 @@ class OLTSession {
                         /delete this ont/i,
                         /to delete\?/i
                     ];
-                    const needsConfirmation = confirmPatterns.some(p => p.test(response));
+                    const needsConfirmation = confirmPatterns.some(p => p.test(recentChunk));
                     if (needsConfirmation) {
-                        confirmationSent = true;
                         console.log(`[OLT ${this.oltId}] Confirmation prompt detected, sending 'y'`);
                         setTimeout(() => {
                             this.socket.write('y\r');
