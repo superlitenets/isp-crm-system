@@ -3103,44 +3103,46 @@ JS;
                 return array_keys($indices);
             };
             
-            // Execute addObject with longer timeout (45s) to ensure ONU processes it
+            // Execute addObject - queue it first WITHOUT connection_request for instant acceptance
+            // Then use refreshObject to force tree rediscovery (valid REST API task)
             $addResult = $execGenieTask($deviceId, [
                 'name' => 'addObject',
                 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
             ], 45000);
             $results[] = ['step' => 'add_wan_connection_device', 'result' => $addResult];
-            error_log("[configureWifiAccessVlan] Step 1 AddObject: HTTP {$addResult['http_code']}" . ($addResult['error'] ? " ERR: {$addResult['error']}" : ""));
+            error_log("[configureWifiAccessVlan] Step 1 AddObject: HTTP {$addResult['http_code']}" . ($addResult['error'] ? " ERR: {$addResult['error']}" : "") . " resp: " . substr($addResult['response'], 0, 300));
             
-            // If addObject returned 202 (queued), we need to wait for it to execute
-            // Send a connection_request to trigger the ONU to connect and process pending tasks
-            if ($addResult['http_code'] === 202) {
-                error_log("[configureWifiAccessVlan] AddObject queued (202), waiting for ONU to process...");
-                sleep(5);
-            }
+            // Wait for addObject to be processed by ONU
+            sleep(5);
             
-            // Retry loop: use getParameterNames to force tree rediscovery, then read
+            // Retry loop: use refreshObject (valid REST API task) to force tree rediscovery
+            // refreshObject triggers GetParameterNames RPC internally within GenieACS
+            // objectName must NOT have a trailing dot for refreshObject
             $wanDeviceIndex = null;
             
             for ($attempt = 0; $attempt < 12; $attempt++) {
-                // Force tree rediscovery: getParameterNames asks ONU for child names under the path
-                // This is the REST API equivalent of clicking "Refresh Parameters" in GenieACS UI
-                $gpnResult = $execGenieTask($deviceId, [
-                    'name' => 'getParameterNames',
-                    'parameterPath' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.',
-                    'nextLevel' => true
+                // refreshObject forces GenieACS to rediscover all children under this path
+                // This is the REST API equivalent of "Refresh Parameters" in the GenieACS UI
+                $refreshResult = $execGenieTask($deviceId, [
+                    'name' => 'refreshObject',
+                    'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice'
                 ], 45000);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterNames HTTP {$gpnResult['http_code']}" . ($gpnResult['error'] ? " ERR: {$gpnResult['error']}" : "") . " resp: " . substr($gpnResult['response'], 0, 300));
+                error_log("[configureWifiAccessVlan] Attempt {$attempt}: refreshObject HTTP {$refreshResult['http_code']}" . ($refreshResult['error'] ? " ERR: {$refreshResult['error']}" : "") . " resp: " . substr($refreshResult['response'], 0, 300));
                 
-                // If getParameterNames completed (200), the tree should be updated
-                // If it returned 202 (queued) or 0 (timeout), wait and try again
-                if ($gpnResult['http_code'] === 200) {
+                if ($refreshResult['http_code'] === 200) {
+                    // Task completed synchronously - tree should be updated
                     sleep(2);
-                } else if ($gpnResult['http_code'] === 0) {
-                    // Connection timeout - increase wait before retry
-                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: connection timeout, waiting longer...");
-                    sleep(8);
-                    continue;
+                } else if ($refreshResult['http_code'] === 0) {
+                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: connection timeout, trying getParameterValues fallback...");
+                    // Fallback: try getParameterValues which we know works (returned 202 before)
+                    $gpvResult = $execGenieTask($deviceId, [
+                        'name' => 'getParameterValues',
+                        'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
+                    ], 45000);
+                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterValues fallback HTTP {$gpvResult['http_code']}");
+                    sleep(5);
                 } else {
+                    // 202 = queued, will execute on next inform
                     sleep(5);
                 }
                 
@@ -3189,18 +3191,23 @@ JS;
             }
             
             for ($attempt = 0; $attempt < 8; $attempt++) {
-                $gpnResult2 = $execGenieTask($deviceId, [
-                    'name' => 'getParameterNames',
-                    'parameterPath' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.",
-                    'nextLevel' => true
+                // refreshObject to rediscover WANIPConnection children (no trailing dot)
+                $refreshResult2 = $execGenieTask($deviceId, [
+                    'name' => 'refreshObject',
+                    'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}"
                 ], 45000);
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterNames HTTP {$gpnResult2['http_code']}" . ($gpnResult2['error'] ? " ERR: {$gpnResult2['error']}" : ""));
+                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: refreshObject HTTP {$refreshResult2['http_code']}" . ($refreshResult2['error'] ? " ERR: {$refreshResult2['error']}" : ""));
                 
-                if ($gpnResult2['http_code'] === 200) {
+                if ($refreshResult2['http_code'] === 200) {
                     sleep(2);
-                } else if ($gpnResult2['http_code'] === 0) {
-                    sleep(8);
-                    continue;
+                } else if ($refreshResult2['http_code'] === 0) {
+                    // Fallback to getParameterValues
+                    $gpvFb = $execGenieTask($deviceId, [
+                        'name' => 'getParameterValues',
+                        'parameterNames' => ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]
+                    ], 45000);
+                    error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterValues fallback HTTP {$gpvFb['http_code']}");
+                    sleep(5);
                 } else {
                     sleep(5);
                 }

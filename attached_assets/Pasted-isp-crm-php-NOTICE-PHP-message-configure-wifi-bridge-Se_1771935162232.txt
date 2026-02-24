@@ -1,0 +1,42 @@
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Serial: 48575443F1093979, WiFi Index: 4, VLAN: 660, SSID: XDXDXDXD, Password: empty, Encryption: Open
+isp_crm_php  | NOTICE: PHP message: [configure_wifi_bridge] Found device: 00259E-HG8546M-48575443F1093979, calling configureWifiAccessVlan
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Starting: device=00259E-HG8546M-48575443F1093979, wlan=4, vlan=660, ssid=XDXDXDXD
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Creating new bridge: NEW WANConnectionDevice pattern (from working router), existingWAN=[1]
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Step 0b: Set WLAN 4 Enable=true, SSID=XDXDXDXD, password=unchanged, encryption=Open
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Step 1: Adding NEW WANConnectionDevice under WANDevice.1
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:07:37 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Step 1 AddObject: HTTP 202
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] AddObject queued (202), waiting for ONU to process...
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 0: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 0: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:08:07 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 1: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 1: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:08:37 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 2: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 2: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:09:07 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 3: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 3: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:09:37 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 4: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 4: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:10:01 +0300 "GET /cron.php" 403
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:10:07 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:10:09 +0300 "GET /webhooks/whatsapp.php" 400
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:10:01 +0300 "GET /cron.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 5: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 5: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:10:45 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 6: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 6: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:11:07 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 7: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 7: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:11:30 +0300 "GET /api/smartolt-onus.php" 200
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:11:37 +0300 "GET /api/olt-stats.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 8: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 8: connection timeout, waiting longer...
+isp_crm_php  | 172.18.0.3 -  24/Feb/2026:15:12:09 +0300 "GET /isp-cron.php" 200
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 9: getParameterNames HTTP 0 ERR: Empty reply from server resp:
+isp_crm_php  | NOTICE: PHP message: [configureWifiAccessVlan] Attempt 9: connection timeout, waiting longer...
