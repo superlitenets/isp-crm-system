@@ -9485,9 +9485,14 @@ class HuaweiOLT {
         
         $allOutput = '';
         
-        // Step 1: Find all service-ports for this ONU
-        $spCommand = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
-        $spResult = $this->executeCommand($oltId, $spCommand);
+        // Step 1: Find all service-ports for this ONU via raw script
+        // (using raw script instead of executeCommand to prevent command concatenation)
+        $spQueryScript = "config\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
+        $spResult = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => $spQueryScript,
+            'timeout' => 30000
+        ]);
         $spOutput = $spResult['output'] ?? '';
         $allOutput .= "[Find Service-Ports]\n{$spOutput}\n";
         
@@ -9498,8 +9503,7 @@ class HuaweiOLT {
         }
         
         // Step 2: Build complete delete script as raw lines
-        // Always start with 'config' to ensure we're in config mode
-        // (session may be in enable mode after background script quit)
+        // Session should be in config mode from step 1 (no quit was sent)
         $scriptLines = [];
         $scriptLines[] = "config";
         foreach ($servicePortIds as $spId) {
@@ -9511,7 +9515,6 @@ class HuaweiOLT {
         $script = implode("\n", $scriptLines);
         
         // Use raw script execution - sends all commands with delays, handles y/n auto-confirm
-        // This avoids the multi-line prompt detection issue with interface context prompts
         $result = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
             'script' => $script,
