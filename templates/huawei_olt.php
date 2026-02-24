@@ -5788,6 +5788,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     // Try GenieACS first
                     try {
                         $genieAcs = new \App\GenieACS($db);
+                        
+                        $summonResult = $genieAcs->sendConnectionRequest($onuData['sn']);
+                        $summoned = $summonResult['success'] ?? false;
+                        $summonQueued = $summonResult['queued'] ?? true;
+                        
+                        if ($summoned && !$summonQueued) {
+                            usleep(500000);
+                        }
+                        
                         $device = null;
                         $searchFormats = [
                             $onuData['sn'],
@@ -5804,9 +5813,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $found = true;
                             $deviceId = $device['_id'] ?? null;
                             
-                            // Check last inform time
+                            // Check last inform time - if we just summoned successfully, device is online
                             $lastInformStr = $device['_lastInform'] ?? null;
-                            if ($lastInformStr) {
+                            if ($summoned && !$summonQueued) {
+                                $tr069Status = 'online';
+                            } elseif ($lastInformStr) {
                                 $lastInform = strtotime($lastInformStr);
                                 $diff = time() - $lastInform;
                                 $tr069Status = ($diff < 300) ? 'online' : 'offline';
@@ -5849,11 +5860,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 
+                $summonMsg = '';
+                if (isset($summoned) && $summoned && !$summonQueued) {
+                    $summonMsg = ' — device summoned, pending tasks delivered';
+                } elseif (isset($summoned) && $summoned && $summonQueued) {
+                    $summonMsg = ' — summon queued for next inform';
+                }
+                
                 echo json_encode([
                     'success' => $found || $ip !== '-',
                     'ip' => $ip,
                     'tr069_status' => $tr069Status,
-                    'message' => $found ? "Device found in GenieACS (Status: {$tr069Status})" : ($ip !== '-' ? "IP from OLT CLI" : 'Device not found')
+                    'summoned' => $summoned ?? false,
+                    'message' => $found ? "Device found in GenieACS (Status: {$tr069Status}){$summonMsg}" : ($ip !== '-' ? "IP from OLT CLI" : 'Device not found')
                 ]);
                 exit;
             case 'refresh_ont_ip':
