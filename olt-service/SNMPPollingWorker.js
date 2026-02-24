@@ -354,7 +354,7 @@ class SNMPPollingWorker {
                     // For offline ONUs, check last_down_cause to distinguish LOS vs normal offline
                     if (offlineOnus.length > 0) {
                         // For ONUs newly going offline (were online), query OLT for down cause per-ONU
-                        const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online');
+                        const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online').slice(0, 10);
                         for (const { onu } of newlyOffline) {
                             try {
                                 const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont info ${port} ${onu.onu_id}\nquit\nquit\n`;
@@ -369,6 +369,7 @@ class SNMPPollingWorker {
                                     }
                                 }
                             } catch (e) { /* ignore individual query failures */ }
+                            await new Promise(r => setTimeout(r, 200));
                         }
                         
                         // For already offline ONUs, last_down_cause is already loaded from the initial query
@@ -1055,11 +1056,13 @@ class SNMPPollingWorker {
                     WHERE olt_id = $1 
                       AND is_authorized = true 
                       AND status IN ('offline', 'los', 'dying-gasp')
+                      AND (last_down_cause IS NULL OR last_down_cause = '')
                     ORDER BY slot, port, onu_id
+                    LIMIT 50
                 `, [olt.id]);
                 
                 if (offlineOnus.rows.length === 0) {
-                    console.log(`[LOS-Backfill] No offline ONUs on ${olt.name}`);
+                    console.log(`[LOS-Backfill] No unresolved offline ONUs on ${olt.name}`);
                     continue;
                 }
                 
@@ -1076,11 +1079,21 @@ class SNMPPollingWorker {
                 let losFound = 0;
                 const backfillFaults = [];
                 
+                const backfillStart = Date.now();
+                const BACKFILL_TIME_BUDGET_MS = 120000;
+                let backfillTimedOut = false;
+                
                 for (const pk of portKeys) {
+                    if (backfillTimedOut) break;
                     const group = portGroups[pk];
                     try {
                         const causeMap = {};
                         for (const onu of group.onus) {
+                            if (Date.now() - backfillStart > BACKFILL_TIME_BUDGET_MS) {
+                                console.log(`[LOS-Backfill] Time budget exceeded (${BACKFILL_TIME_BUDGET_MS/1000}s), deferring remaining ONUs`);
+                                backfillTimedOut = true;
+                                break;
+                            }
                             try {
                                 const script = `config\ninterface gpon ${group.frame}/${group.slot}\ndisplay ont info ${group.port} ${onu.onu_id}\nquit\nquit\n`;
                                 const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
@@ -1091,6 +1104,7 @@ class SNMPPollingWorker {
                                     }
                                 }
                             } catch (e) { /* skip individual ONU failures */ }
+                            await new Promise(r => setTimeout(r, 200));
                         }
                         
                         for (const onu of group.onus) {
