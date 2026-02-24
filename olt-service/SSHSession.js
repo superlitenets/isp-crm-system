@@ -305,8 +305,29 @@ class SSHSession {
             let response = '';
             let resolved = false;
             let timeoutId = null;
-            let allCommandsSent = false;
-            let confirmationSent = false;
+            let commandIndex = 0;
+            let waitingForPrompt = false;
+
+            const confirmPatterns = [
+                /\[y\/n\]/i, /\(y\/n\)/i, /y or n/i,
+                /Are you sure/i, /confirm.*\?/i,
+                /delete this ont/i, /to delete\?/i
+            ];
+
+            const lines = script.split(/\r?\n/).filter(l => l.trim());
+            console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
+
+            const sendNextCommand = () => {
+                if (commandIndex >= lines.length) {
+                    waitingForPrompt = true;
+                    console.log(`[OLT ${this.oltId}] SSH raw script: all ${lines.length} commands sent, waiting for final prompt`);
+                    return;
+                }
+                const line = lines[commandIndex];
+                commandIndex++;
+                console.log(`[OLT ${this.oltId}] SSH raw> ${line}`);
+                this.stream.write(line + '\r');
+            };
 
             const dataHandler = (chunk) => {
                 response += chunk;
@@ -316,27 +337,25 @@ class SSHSession {
                     this.stream.write(' ');
                     response = response.replace(/---- More.*?----/gi, '');
                     response = response.replace(/--More--/gi, '');
+                    return;
                 }
                 
-                if (!confirmationSent) {
-                    const confirmPatterns = [
-                        /\[y\/n\]/i, /\(y\/n\)/i, /y or n/i,
-                        /Are you sure/i, /confirm.*\?/i,
-                        /delete this ont/i, /to delete\?/i
-                    ];
-                    if (confirmPatterns.some(p => p.test(cleanResponse))) {
-                        confirmationSent = true;
-                        console.log(`[OLT ${this.oltId}] SSH raw script: auto-confirming y/n`);
-                        setTimeout(() => this.stream.write('y\r'), 200);
-                    }
+                const recentChunk = this.stripAnsi(chunk);
+                if (confirmPatterns.some(p => p.test(recentChunk))) {
+                    console.log(`[OLT ${this.oltId}] SSH raw script: auto-confirming y/n`);
+                    setTimeout(() => {
+                        if (this.stream && this.connected) {
+                            this.stream.write('y\r');
+                        }
+                    }, 300);
+                    return;
                 }
                 
-                if (!allCommandsSent) return;
+                const chunkLines = cleanResponse.split(/\r?\n/).filter(l => l.trim());
+                const lastLine = chunkLines[chunkLines.length - 1] || '';
                 
-                if (this.promptPattern.test(cleanResponse)) {
-                    const lines = cleanResponse.split(/\r?\n/).filter(l => l.trim());
-                    const lastLine = lines[lines.length - 1] || '';
-                    if (this.promptPattern.test(lastLine)) {
+                if (this.promptPattern.test(lastLine)) {
+                    if (waitingForPrompt) {
                         if (!resolved) {
                             resolved = true;
                             clearTimeout(timeoutId);
@@ -345,6 +364,8 @@ class SSHSession {
                             console.log(`[OLT ${this.oltId}] SSH raw script completed (${response.length} bytes)`);
                             resolve(response);
                         }
+                    } else {
+                        setTimeout(() => sendNextCommand(), 200);
                     }
                 }
             };
@@ -368,26 +389,7 @@ class SSHSession {
             this.buffer = '';
             response = '';
             
-            const lines = script.split(/\r?\n/).filter(l => l.trim());
-            console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
-            
-            let delay = 0;
-            const commandDelay = 1000;
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const isLast = (i === lines.length - 1);
-                setTimeout(() => {
-                    if (this.stream && this.connected) {
-                        console.log(`[OLT ${this.oltId}] SSH raw> ${line}`);
-                        this.stream.write(line + '\r');
-                        if (isLast) {
-                            allCommandsSent = true;
-                            console.log(`[OLT ${this.oltId}] SSH raw script: all ${lines.length} commands sent, waiting for final prompt`);
-                        }
-                    }
-                }, delay);
-                delay += commandDelay;
-            }
+            sendNextCommand();
         });
     }
 

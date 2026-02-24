@@ -181,6 +181,19 @@ class SNMPPollingWorker {
                 if (Object.keys(opticalData).length > 0) {
                     await this.updateONUOpticalPower(olt.id, opticalData, onuStatuses);
                 }
+                
+                const missingTxCount = await this.pool.query(
+                    `SELECT COUNT(*) as cnt FROM huawei_onus WHERE olt_id = $1 AND is_authorized = true AND status = 'online' AND tx_power IS NULL`,
+                    [olt.id]
+                );
+                const missingTx = parseInt(missingTxCount.rows[0]?.cnt || 0);
+                if (missingTx > 0 && !paused) {
+                    console.log(`[SNMP] OLT ${olt.name}: ${missingTx} online ONUs missing TX power after SNMP - supplementing via CLI`);
+                    this.supplementOpticalViaCLI(olt).catch(e => {
+                        console.log(`[SNMP] CLI optical supplement for ${olt.name} failed: ${e.message}`);
+                    });
+                }
+                
                 await this.updatePollingStats(olt.id, true, null, 'snmp');
                 
                 session.close();
@@ -499,6 +512,84 @@ class SNMPPollingWorker {
         }
     }
 
+    async supplementOpticalViaCLI(olt) {
+        const missingResult = await this.pool.query(`
+            SELECT DISTINCT frame, slot, port FROM huawei_onus 
+            WHERE olt_id = $1 AND is_authorized = true AND status = 'online' AND tx_power IS NULL
+            LIMIT 50
+        `, [olt.id]);
+        
+        if (missingResult.rows.length === 0) return;
+        
+        const oltKey = `${olt.id}`;
+        const portKeys = missingResult.rows.map(r => `${r.frame}/${r.slot}/${r.port}`);
+        const uniquePorts = [...new Set(portKeys)];
+        
+        console.log(`[CLI-Supplement] Collecting TX power for ${uniquePorts.length} ports on ${olt.name}`);
+        
+        let opticalUpdated = 0;
+        const startTime = Date.now();
+        const TIME_BUDGET_MS = 60000;
+        
+        for (const portKey of uniquePorts) {
+            if (Date.now() - startTime > TIME_BUDGET_MS) {
+                console.log(`[CLI-Supplement] Time budget exceeded, deferring remaining ports`);
+                break;
+            }
+            
+            const [frame, slot, port] = portKey.split('/').map(Number);
+            try {
+                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\nquit\n`;
+                const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
+                if (!result) continue;
+                
+                const lines = result.split(/\r?\n/);
+                let inTable = false;
+                for (const line of lines) {
+                    if (line.includes('ONT') && line.includes('Rx power') && line.includes('Tx power')) {
+                        inTable = true;
+                        continue;
+                    }
+                    if (line.match(/^[\s-]+$/) && inTable) continue;
+                    if (!inTable) continue;
+                    if (line.trim() === '' || line.includes('MA5683T') || line.includes('quit')) {
+                        inTable = false;
+                        continue;
+                    }
+                    
+                    const cols = line.trim().split(/\s+/);
+                    if (cols.length >= 4) {
+                        const onuId = parseInt(cols[0]);
+                        const onuRx = parseFloat(cols[1]);
+                        const oltRxOnt = parseFloat(cols[3]);
+                        
+                        if (isNaN(onuId)) continue;
+                        
+                        const rx = isNaN(onuRx) || onuRx < -50 || onuRx > 10 ? null : onuRx;
+                        const tx = isNaN(oltRxOnt) || oltRxOnt < -50 || oltRxOnt > 10 ? null : oltRxOnt;
+                        
+                        if (tx !== null) {
+                            await this.pool.query(`
+                                UPDATE huawei_onus 
+                                SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), updated_at = CURRENT_TIMESTAMP
+                                WHERE olt_id = $3 AND frame = $4 AND slot = $5 AND port = $6 AND onu_id = $7 AND tx_power IS NULL
+                            `, [rx, tx, olt.id, frame, slot, port, onuId]);
+                            opticalUpdated++;
+                        }
+                    }
+                }
+                
+                await new Promise(r => setTimeout(r, 100));
+            } catch (e) { /* skip port failures */ }
+        }
+        
+        if (opticalUpdated > 0) {
+            console.log(`[CLI-Supplement] Filled TX power for ${opticalUpdated} ONUs on ${olt.name}`);
+        } else {
+            console.log(`[CLI-Supplement] No additional TX power found for ${olt.name}`);
+        }
+    }
+
     getSysInfo(session) {
         return new Promise((resolve, reject) => {
             const oids = [
@@ -690,8 +781,13 @@ class SNMPPollingWorker {
                     completedWalks++;
                     if (completedWalks >= totalWalks) {
                         const count = Object.keys(powerData).length;
+                        let rxCount = 0, txCount = 0;
+                        for (const entry of Object.values(powerData)) {
+                            if (entry.rx_power !== undefined) rxCount++;
+                            if (entry.tx_power !== undefined) txCount++;
+                        }
                         if (count > 0) {
-                            console.log(`[SNMP] Optical power collected for OLT ${oltId}: ${count} ONUs`);
+                            console.log(`[SNMP] Optical power collected for OLT ${oltId}: ${count} ONUs (RX: ${rxCount}, TX/OLT-RX: ${txCount})`);
                         }
                         resolve(powerData);
                     }
