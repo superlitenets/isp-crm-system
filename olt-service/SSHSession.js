@@ -223,6 +223,7 @@ class SSHSession {
             let timeoutId = null;
             let commandSeen = false;
             let confirmationSent = false;
+            let lockPending = false;
             const cmdPrefix = command.substring(0, Math.min(20, command.length));
 
             const dataHandler = (chunk) => {
@@ -242,9 +243,15 @@ class SSHSession {
                 const lockPromptPattern = /\{[^}]*<K>\s*\}:/i;
                 if (lockPromptPattern.test(this.stripAnsi(chunk))) {
                     console.log(`[OLT ${this.oltId}] SSH config lock prompt detected, pressing Enter`);
+                    lockPending = true;
+                    response = '';
                     setTimeout(() => {
-                        if (this.stream && this.connected) this.stream.write('\r');
-                    }, 200);
+                        if (this.stream && this.connected) {
+                            this.stream.write('\r');
+                            lockPending = false;
+                        }
+                    }, 300);
+                    return;
                 }
 
                 if (!confirmationSent && commandSeen) {
@@ -265,8 +272,11 @@ class SSHSession {
                         setTimeout(() => {
                             this.stream.write('y\r');
                         }, 100);
+                        return;
                     }
                 }
+                
+                if (lockPending) return;
                 
                 if (commandSeen && this.promptPattern.test(cleanResponse)) {
                     if (!resolved) {
@@ -318,6 +328,8 @@ class SSHSession {
             let commandIndex = 0;
             let waitingForPrompt = false;
             let commandPending = false;
+            let sendTimer = null;
+            let lockPending = false;
 
             const confirmPatterns = [
                 /\[y\/n\]/i, /\(y\/n\)/i, /y or n/i,
@@ -331,7 +343,9 @@ class SSHSession {
             console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
 
             const sendNextCommand = () => {
+                sendTimer = null;
                 commandPending = false;
+                if (lockPending) return;
                 if (commandIndex >= lines.length) {
                     waitingForPrompt = true;
                     cmdResponse = '';
@@ -362,10 +376,17 @@ class SSHSession {
 
                 if (lockPromptPattern.test(recentChunk)) {
                     console.log(`[OLT ${this.oltId}] SSH raw script: config lock prompt detected, pressing Enter to take lock`);
+                    if (sendTimer) {
+                        clearTimeout(sendTimer);
+                        sendTimer = null;
+                        commandPending = false;
+                    }
+                    lockPending = true;
                     cmdResponse = '';
                     setTimeout(() => {
                         if (this.stream && this.connected) {
                             this.stream.write('\r');
+                            lockPending = false;
                         }
                     }, 300);
                     return;
@@ -373,6 +394,11 @@ class SSHSession {
 
                 if (confirmPatterns.some(p => p.test(recentChunk))) {
                     console.log(`[OLT ${this.oltId}] SSH raw script: auto-confirming y/n`);
+                    if (sendTimer) {
+                        clearTimeout(sendTimer);
+                        sendTimer = null;
+                        commandPending = false;
+                    }
                     setTimeout(() => {
                         if (this.stream && this.connected) {
                             this.stream.write('y\r');
@@ -380,6 +406,8 @@ class SSHSession {
                     }, 300);
                     return;
                 }
+                
+                if (lockPending) return;
                 
                 const cleanCmd = this.stripAnsi(cmdResponse);
                 const cmdLines = cleanCmd.split(/\r?\n/).filter(l => l.trim());
@@ -397,7 +425,7 @@ class SSHSession {
                         }
                     } else {
                         commandPending = true;
-                        setTimeout(() => sendNextCommand(), 200);
+                        sendTimer = setTimeout(() => sendNextCommand(), 200);
                     }
                 }
             };
