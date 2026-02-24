@@ -552,7 +552,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         }
         
         if ($status) {
-            $losCondO = \HuaweiOLT::losCondition('o');
+            $losCondO = \App\HuaweiOLT::losCondition('o');
             if ($status === 'los') {
                 $where[] = $losCondO;
             } elseif ($status === 'offline') {
@@ -8696,7 +8696,7 @@ try {
                         </div>
                         <div class="card-inner" style="max-height: 310px; overflow-y: auto;">
                             <?php
-                            $losCondO = \HuaweiOLT::losCondition('o');
+                            $losCondO = \App\HuaweiOLT::losCondition('o');
                             $issueONUs = $db->query("
                                 SELECT o.id, o.sn, o.name as description, o.status, o.rx_power, o.last_down_cause 
                                 FROM huawei_onus o 
