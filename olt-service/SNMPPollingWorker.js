@@ -425,7 +425,78 @@ class SNMPPollingWorker {
             await this.sendFaultNotifications(olt.id, faults);
         }
         
+        // Collect optical power via CLI (since SNMP failed)
+        try {
+            await this.collectOpticalViaCLI(olt, oltKey, groupedByPort);
+        } catch (e) {
+            console.log(`[CLI] Optical power collection failed: ${e.message}`);
+        }
+        
         return { onuCount: updated, method: 'cli' };
+    }
+    
+    async collectOpticalViaCLI(olt, oltKey, portMap) {
+        const portKeys = Object.keys(portMap);
+        let opticalUpdated = 0;
+        const startTime = Date.now();
+        const TIME_BUDGET_MS = 120000;
+        
+        for (const portKey of portKeys) {
+            if (Date.now() - startTime > TIME_BUDGET_MS) {
+                console.log(`[CLI] Optical collection time budget exceeded, deferring remaining ports`);
+                break;
+            }
+            
+            const [frame, slot, port] = portKey.split('/').map(Number);
+            try {
+                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\nquit\n`;
+                const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
+                if (!result) continue;
+                
+                const lines = result.split(/\r?\n/);
+                let inTable = false;
+                for (const line of lines) {
+                    if (line.includes('ONT') && line.includes('Rx power') && line.includes('Tx power')) {
+                        inTable = true;
+                        continue;
+                    }
+                    if (line.match(/^[\s-]+$/) && inTable) continue;
+                    if (!inTable) continue;
+                    if (line.trim() === '' || line.includes('MA5683T') || line.includes('quit')) {
+                        inTable = false;
+                        continue;
+                    }
+                    
+                    const cols = line.trim().split(/\s+/);
+                    if (cols.length >= 4) {
+                        const onuId = parseInt(cols[0]);
+                        const onuRx = parseFloat(cols[1]);
+                        const onuTx = parseFloat(cols[2]);
+                        const oltRxOnt = parseFloat(cols[3]);
+                        
+                        if (isNaN(onuId)) continue;
+                        
+                        const rx = isNaN(onuRx) || onuRx < -50 || onuRx > 10 ? null : onuRx;
+                        const tx = isNaN(oltRxOnt) || oltRxOnt < -50 || oltRxOnt > 10 ? null : oltRxOnt;
+                        
+                        if (rx !== null || tx !== null) {
+                            await this.pool.query(`
+                                UPDATE huawei_onus 
+                                SET rx_power = COALESCE($1, rx_power), tx_power = COALESCE($2, tx_power), updated_at = CURRENT_TIMESTAMP
+                                WHERE olt_id = $3 AND frame = $4 AND slot = $5 AND port = $6 AND onu_id = $7
+                            `, [rx, tx, olt.id, frame, slot, port, onuId]);
+                            opticalUpdated++;
+                        }
+                    }
+                }
+                
+                await new Promise(r => setTimeout(r, 100));
+            } catch (e) { /* skip port failures */ }
+        }
+        
+        if (opticalUpdated > 0) {
+            console.log(`[CLI] Updated optical power (RX/TX) for ${opticalUpdated} ONUs on ${olt.name}`);
+        }
     }
 
     getSysInfo(session) {
