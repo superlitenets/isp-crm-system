@@ -196,21 +196,27 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
                 $oneispData = [];
                 if (!empty($result['data']) && is_array($result['data'])) {
                     $raw = $result['data'];
-                    if (isset($raw['data']) && is_array($raw['data'])) {
+                    if (isset($raw['Customers']) && is_array($raw['Customers'])) {
+                        $oneispData = $raw['Customers'];
+                    } elseif (isset($raw['data']) && is_array($raw['data'])) {
                         $oneispData = $raw['data'];
                     } elseif (isset($raw['customers']) && is_array($raw['customers'])) {
                         $oneispData = $raw['customers'];
                     } elseif (isset($raw[0]) && is_array($raw[0])) {
                         $oneispData = $raw;
-                    } else {
-                        error_log("One-ISP search response keys: " . implode(', ', array_keys($raw)));
-                        error_log("One-ISP search raw sample: " . substr(json_encode($raw), 0, 500));
                     }
                 } elseif (isset($result['success']) && !$result['success']) {
                     error_log("One-ISP search failed: " . ($result['error'] ?? 'unknown error'));
                 }
+                $queryClean = preg_replace('/[^0-9a-zA-Z]/', '', $query);
                 foreach ($oneispData as $bc) {
                     if (!is_array($bc)) continue;
+                    $nameMatch = stripos(($bc['FirstName'] ?? '') . ' ' . ($bc['LastName'] ?? ''), $query) !== false;
+                    $bcPhone = preg_replace('/[^0-9]/', '', $bc['PhoneNumber'] ?? '');
+                    $phoneMatch = !empty($bcPhone) && !empty($queryClean) && (strpos($bcPhone, $queryClean) !== false || strpos($queryClean, substr($bcPhone, -9)) !== false || strpos($bcPhone, substr($queryClean, -9)) !== false);
+                    $userMatch = !empty($bc['UserName']) && stripos($bc['UserName'], $query) !== false;
+                    if (!$nameMatch && !$phoneMatch && !$userMatch) continue;
+
                     $mapped = $oneISP->mapCustomerToLocal($bc);
                     if (!$mapped) continue;
 
@@ -232,6 +238,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
                         'address' => $mapped['address'] ?? '',
                         'service_plan' => $mapped['service_plan'] ?? '',
                     ];
+                    if (count($customers) >= 20) break;
                 }
             } catch (Exception $oneispErr) {
                 error_log("One-ISP search error: " . $oneispErr->getMessage());
@@ -1727,7 +1734,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 } elseif ($oneispBillingId && !$customerId) {
                     try {
                         $oneISP = new \App\OneISP($db);
-                        $bcResult = $oneISP->getCustomer((int)$oneispBillingId);
+                        $bcResult = $oneISP->getCustomer($oneispBillingId);
                         $bcData = null;
                         if (!empty($bcResult['success']) && !empty($bcResult['data'])) {
                             $bcData = is_array($bcResult['data']) && isset($bcResult['data'][0]) ? $bcResult['data'][0] : $bcResult['data'];
