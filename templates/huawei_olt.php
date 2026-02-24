@@ -18454,21 +18454,60 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         
         // Make zone dropdown searchable
         const zoneSelect = document.getElementById('authZoneId');
-        if (zoneSelect && zoneSelect.options.length > 10) {
-            // Add search input for zones
+        if (zoneSelect) {
             const wrapper = zoneSelect.parentElement;
+            const allOptions = Array.from(zoneSelect.options).map(opt => ({
+                value: opt.value, text: opt.textContent.trim(), name: opt.dataset.name || ''
+            }));
+            
             const searchInput = document.createElement('input');
             searchInput.type = 'text';
             searchInput.className = 'form-control form-control-sm mb-1';
-            searchInput.placeholder = 'Search zones...';
+            searchInput.placeholder = 'Type to search zones...';
+            searchInput.id = 'zoneSearchInput';
+            
+            const listDiv = document.createElement('div');
+            listDiv.className = 'list-group position-absolute w-100 shadow-sm';
+            listDiv.style.cssText = 'z-index:1050; max-height:200px; overflow-y:auto; display:none;';
+            listDiv.id = 'zoneSearchResults';
+            
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.style.position = 'relative';
+            wrapper.insertBefore(wrapperDiv, zoneSelect);
+            wrapperDiv.appendChild(searchInput);
+            wrapperDiv.appendChild(listDiv);
+            zoneSelect.style.display = 'none';
+            
             searchInput.addEventListener('input', function() {
                 const filter = this.value.toLowerCase();
-                Array.from(zoneSelect.options).forEach(opt => {
-                    if (opt.value === '') return;
-                    opt.style.display = opt.textContent.toLowerCase().includes(filter) ? '' : 'none';
-                });
+                if (!filter) { listDiv.style.display = 'none'; return; }
+                const matches = allOptions.filter(o => o.value && o.text.toLowerCase().includes(filter));
+                if (matches.length === 0) {
+                    listDiv.innerHTML = '<div class="list-group-item text-muted small">No zones found</div>';
+                } else {
+                    listDiv.innerHTML = matches.slice(0, 20).map(o =>
+                        `<a href="#" class="list-group-item list-group-item-action py-1 small" data-value="${o.value}" data-name="${o.name}">${o.text}</a>`
+                    ).join('');
+                }
+                listDiv.style.display = '';
             });
-            wrapper.insertBefore(searchInput, zoneSelect);
+            
+            listDiv.addEventListener('click', function(e) {
+                e.preventDefault();
+                const item = e.target.closest('[data-value]');
+                if (!item) return;
+                zoneSelect.value = item.dataset.value;
+                searchInput.value = item.textContent.trim();
+                document.getElementById('authZoneName').value = item.dataset.name || item.textContent.trim();
+                listDiv.style.display = 'none';
+            });
+            
+            searchInput.addEventListener('blur', function() {
+                setTimeout(() => { listDiv.style.display = 'none'; }, 200);
+            });
+            searchInput.addEventListener('focus', function() {
+                if (this.value.trim()) this.dispatchEvent(new Event('input'));
+            });
         }
         
         // Handle staged authorization form submission
