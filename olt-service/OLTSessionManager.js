@@ -540,6 +540,48 @@ class OLTSessionManager {
         this.sessions = new Map();
         this.commandLocks = new Map();
         this.keepaliveIntervals = new Map();
+        this.exclusiveLocks = new Map();
+        this.exclusiveLockTimers = new Map();
+    }
+
+    acquireExclusiveLock(oltId, durationMs = 120000, reason = 'CLI operation') {
+        const oltKey = String(oltId);
+        if (this.exclusiveLockTimers.has(oltKey)) {
+            clearTimeout(this.exclusiveLockTimers.get(oltKey));
+        }
+        this.exclusiveLocks.set(oltKey, { acquired: Date.now(), reason, duration: durationMs });
+        this.stopKeepalive(oltKey);
+        console.log(`[OLT ${oltKey}] Exclusive lock acquired: ${reason} (${durationMs}ms)`);
+        const timer = setTimeout(() => {
+            this.releaseExclusiveLock(oltKey);
+        }, durationMs);
+        this.exclusiveLockTimers.set(oltKey, timer);
+    }
+
+    releaseExclusiveLock(oltId) {
+        const oltKey = String(oltId);
+        if (this.exclusiveLocks.has(oltKey)) {
+            const lock = this.exclusiveLocks.get(oltKey);
+            const held = Date.now() - lock.acquired;
+            this.exclusiveLocks.delete(oltKey);
+            console.log(`[OLT ${oltKey}] Exclusive lock released after ${held}ms (was: ${lock.reason})`);
+        }
+        if (this.exclusiveLockTimers.has(oltKey)) {
+            clearTimeout(this.exclusiveLockTimers.get(oltKey));
+            this.exclusiveLockTimers.delete(oltKey);
+        }
+        const session = this.sessions.get(oltKey);
+        if (session && session.connected) {
+            this.startKeepalive(oltKey, session._protocol || 'telnet');
+        }
+    }
+
+    isExclusivelyLocked(oltId) {
+        return this.exclusiveLocks.has(String(oltId));
+    }
+
+    getExclusiveLockInfo(oltId) {
+        return this.exclusiveLocks.get(String(oltId)) || null;
     }
 
     async connect(oltId, config) {
@@ -561,6 +603,7 @@ class OLTSessionManager {
         }
         
         await session.connect();
+        session._protocol = config.protocol || 'telnet';
         this.sessions.set(oltId, session);
         
         this.startKeepalive(oltId, config.protocol);
@@ -572,6 +615,9 @@ class OLTSessionManager {
         }
         
         const interval = setInterval(async () => {
+            if (this.isExclusivelyLocked(oltId)) {
+                return;
+            }
             const session = this.sessions.get(oltId);
             if (session && session.connected) {
                 try {
@@ -622,7 +668,10 @@ class OLTSessionManager {
             throw new Error(`No session for OLT ${oltId}. Connect first.`);
         }
 
-        // Use command lock to serialize commands per OLT
+        if (this.isExclusivelyLocked(oltId) && !options.priority) {
+            throw new Error(`OLT ${oltId} is exclusively locked for: ${this.getExclusiveLockInfo(oltId)?.reason || 'unknown'}`);
+        }
+
         if (!this.commandLocks.has(oltId)) {
             this.commandLocks.set(oltId, Promise.resolve());
         }
@@ -642,6 +691,10 @@ class OLTSessionManager {
         const session = this.sessions.get(oltId);
         if (!session) {
             throw new Error(`No session for OLT ${oltId}. Connect first.`);
+        }
+
+        if (this.isExclusivelyLocked(oltId) && !options.priority) {
+            throw new Error(`OLT ${oltId} is exclusively locked for: ${this.getExclusiveLockInfo(oltId)?.reason || 'unknown'}`);
         }
 
         if (!this.commandLocks.has(oltId)) {

@@ -311,6 +311,10 @@ class SNMPPollingWorker {
         
         try {
             for (const [portKey, onus] of Object.entries(groupedByPort)) {
+                if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+                    console.log(`[CLI] OLT ${olt.name} exclusively locked mid-poll - stopping status collection`);
+                    break;
+                }
                 const [frame, slot, port] = portKey.split('/').map(Number);
                 
                 try {
@@ -449,12 +453,21 @@ class SNMPPollingWorker {
     }
     
     async collectOpticalViaCLI(olt, oltKey, portMap) {
+        if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+            console.log(`[CLI] OLT ${olt.name} exclusively locked - skipping optical collection`);
+            return;
+        }
+
         const portKeys = Object.keys(portMap);
         let opticalUpdated = 0;
         const startTime = Date.now();
         const TIME_BUDGET_MS = 120000;
         
         for (const portKey of portKeys) {
+            if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+                console.log(`[CLI] OLT ${olt.name} exclusively locked mid-optical - stopping`);
+                break;
+            }
             if (Date.now() - startTime > TIME_BUDGET_MS) {
                 console.log(`[CLI] Optical collection time budget exceeded, deferring remaining ports`);
                 break;
@@ -513,6 +526,11 @@ class SNMPPollingWorker {
     }
 
     async supplementOpticalViaCLI(olt) {
+        if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+            console.log(`[CLI-Supplement] OLT ${olt.name} exclusively locked - skipping optical supplement`);
+            return;
+        }
+
         const missingResult = await this.pool.query(`
             SELECT DISTINCT frame, slot, port FROM huawei_onus 
             WHERE olt_id = $1 AND is_authorized = true AND status = 'online' AND tx_power IS NULL
@@ -532,6 +550,10 @@ class SNMPPollingWorker {
         const TIME_BUDGET_MS = 60000;
         
         for (const portKey of uniquePorts) {
+            if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+                console.log(`[CLI-Supplement] OLT ${olt.name} exclusively locked mid-collection - stopping`);
+                break;
+            }
             if (Date.now() - startTime > TIME_BUDGET_MS) {
                 console.log(`[CLI-Supplement] Time budget exceeded, deferring remaining ports`);
                 break;
@@ -1193,6 +1215,11 @@ class SNMPPollingWorker {
                 const session = this.sessionManager.sessions?.get(oltKey);
                 if (!session || !session.connected) continue;
                 
+                if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+                    console.log(`[LOS-Backfill] OLT ${olt.name} exclusively locked - skipping backfill`);
+                    continue;
+                }
+                
                 await this.pool.query(`
                     UPDATE huawei_onus 
                     SET status = 'los'
@@ -1252,10 +1279,19 @@ class SNMPPollingWorker {
                 
                 for (const pk of portKeys) {
                     if (backfillTimedOut) break;
+                    if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+                        console.log(`[LOS-Backfill] OLT ${olt.name} exclusively locked mid-backfill - stopping`);
+                        break;
+                    }
                     const group = portGroups[pk];
                     try {
                         const causeMap = {};
                         for (const onu of group.onus) {
+                            if (this.sessionManager.isExclusivelyLocked(olt.id)) {
+                                console.log(`[LOS-Backfill] OLT ${olt.name} exclusively locked - aborting ONU queries`);
+                                backfillTimedOut = true;
+                                break;
+                            }
                             if (Date.now() - backfillStart > BACKFILL_TIME_BUDGET_MS) {
                                 console.log(`[LOS-Backfill] Time budget exceeded (${BACKFILL_TIME_BUDGET_MS/1000}s), deferring remaining ONUs`);
                                 backfillTimedOut = true;
