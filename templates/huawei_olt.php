@@ -169,9 +169,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
         exit;
     }
     try {
-        $customers = [];
-        $localIds = [];
-
+        // Search in customers table
         $stmt = $db->prepare("
             SELECT id, name, phone, email, account_number 
             FROM customers 
@@ -181,70 +179,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
         ");
         $search = '%' . $query . '%';
         $stmt->execute([$search, $search, $search]);
-        $localCustomers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($localCustomers as &$c) {
-            $c['source'] = 'local';
-        }
-        unset($c);
-        $customers = $localCustomers;
-        $localIds = array_column($localCustomers, 'id');
-
-        $oneISP = new \App\OneISP($db);
-        if ($oneISP->isConfigured()) {
-            try {
-                $result = $oneISP->searchCustomers($query);
-                $oneispData = [];
-                if (!empty($result['data']) && is_array($result['data'])) {
-                    $raw = $result['data'];
-                    if (isset($raw['Customers']) && is_array($raw['Customers'])) {
-                        $oneispData = $raw['Customers'];
-                    } elseif (isset($raw['data']) && is_array($raw['data'])) {
-                        $oneispData = $raw['data'];
-                    } elseif (isset($raw['customers']) && is_array($raw['customers'])) {
-                        $oneispData = $raw['customers'];
-                    } elseif (isset($raw[0]) && is_array($raw[0])) {
-                        $oneispData = $raw;
-                    }
-                } elseif (isset($result['success']) && !$result['success']) {
-                    error_log("One-ISP search failed: " . ($result['error'] ?? 'unknown error'));
-                }
-                $queryClean = preg_replace('/[^0-9a-zA-Z]/', '', $query);
-                foreach ($oneispData as $bc) {
-                    if (!is_array($bc)) continue;
-                    $nameMatch = stripos(($bc['FirstName'] ?? '') . ' ' . ($bc['LastName'] ?? ''), $query) !== false;
-                    $bcPhone = preg_replace('/[^0-9]/', '', $bc['PhoneNumber'] ?? '');
-                    $phoneMatch = !empty($bcPhone) && !empty($queryClean) && (strpos($bcPhone, $queryClean) !== false || strpos($queryClean, substr($bcPhone, -9)) !== false || strpos($bcPhone, substr($queryClean, -9)) !== false);
-                    $userMatch = !empty($bc['UserName']) && stripos($bc['UserName'], $query) !== false;
-                    if (!$nameMatch && !$phoneMatch && !$userMatch) continue;
-
-                    $mapped = $oneISP->mapCustomerToLocal($bc);
-                    if (!$mapped) continue;
-
-                    $existingStmt = $db->prepare("SELECT id FROM customers WHERE billing_id = ? OR (phone IS NOT NULL AND phone != '' AND phone = ?)");
-                    $existingStmt->execute([$mapped['billing_id'], $mapped['phone']]);
-                    $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
-                    if ($existing && in_array($existing['id'], $localIds)) {
-                        continue;
-                    }
-
-                    $customers[] = [
-                        'id' => $existing ? $existing['id'] : 'oneisp_' . ($mapped['billing_id'] ?? ''),
-                        'name' => $mapped['name'],
-                        'phone' => $mapped['phone'] ?? '',
-                        'email' => $mapped['email'] ?? '',
-                        'account_number' => $mapped['username'] ?? ($mapped['billing_id'] ?? ''),
-                        'source' => 'oneisp',
-                        'billing_id' => $mapped['billing_id'],
-                        'address' => $mapped['address'] ?? '',
-                        'service_plan' => $mapped['service_plan'] ?? '',
-                    ];
-                    if (count($customers) >= 20) break;
-                }
-            } catch (Exception $oneispErr) {
-                error_log("One-ISP search error: " . $oneispErr->getMessage());
-            }
-        }
-
+        $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode(['success' => true, 'customers' => $customers]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -1698,16 +1633,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 // Handle customer creation/selection modes
                 $customerMode = $_POST['customer_mode'] ?? 'existing';
                 $createCustomer = ($_POST['create_customer'] ?? '0') === '1';
-                $billingCustomerIdRaw = trim($_POST['billing_customer_id'] ?? '');
-                $billingCustomerId = null;
-                $oneispBillingId = null;
-                if (!empty($billingCustomerIdRaw)) {
-                    if (strpos($billingCustomerIdRaw, 'oneisp_') === 0) {
-                        $oneispBillingId = substr($billingCustomerIdRaw, 7);
-                    } else {
-                        $billingCustomerId = (int)$billingCustomerIdRaw;
-                    }
-                }
+                $billingCustomerId = !empty($_POST['billing_customer_id']) ? (int)$_POST['billing_customer_id'] : null;
                 $radiusSubscriptionId = !empty($_POST['radius_subscription_id']) ? (int)$_POST['radius_subscription_id'] : null;
                 
                 // Create new customer if requested
@@ -1728,32 +1654,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $name = $newCustomerName;
                             $phone = $newCustomerPhone;
                         } catch (Exception $e) {
+                            // Log but don't fail - customer creation is optional
                             error_log("Failed to create customer: " . $e->getMessage());
                         }
-                    }
-                } elseif ($oneispBillingId && !$customerId) {
-                    try {
-                        $oneISP = new \App\OneISP($db);
-                        $bcResult = $oneISP->getCustomer($oneispBillingId);
-                        $bcData = null;
-                        if (!empty($bcResult['success']) && !empty($bcResult['data'])) {
-                            $bcData = is_array($bcResult['data']) && isset($bcResult['data'][0]) ? $bcResult['data'][0] : $bcResult['data'];
-                        }
-                        if ($bcData) {
-                            $importedId = $oneISP->importCustomer($bcData);
-                            if ($importedId) {
-                                $customerId = $importedId;
-                                $custStmt = $db->prepare("SELECT name, phone FROM customers WHERE id = ?");
-                                $custStmt->execute([$customerId]);
-                                $custRow = $custStmt->fetch(PDO::FETCH_ASSOC);
-                                if ($custRow) {
-                                    $name = $custRow['name'] ?: $name;
-                                    $phone = $custRow['phone'] ?: $phone;
-                                }
-                            }
-                        }
-                    } catch (Exception $e) {
-                        error_log("One-ISP customer import during auth failed: " . $e->getMessage());
                     }
                 } elseif ($billingCustomerId && !$customerId) {
                     $customerId = $billingCustomerId;
@@ -18283,8 +18186,25 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <input type="text" name="address" id="authAddress" class="form-control" placeholder="e.g., 123 Main St, Apt 5">
                         </div>
                         
-                        <input type="hidden" name="latitude" id="authLatitude">
-                        <input type="hidden" name="longitude" id="authLongitude">
+                        <div class="row">
+                            <div>
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Latitude</label>
+                                    <input type="text" name="latitude" id="authLatitude" class="form-control" placeholder="e.g., -1.2921">
+                                </div>
+                            </div>
+                            <div>
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Longitude</label>
+                                    <div class="input-group">
+                                        <input type="text" name="longitude" id="authLongitude" class="form-control" placeholder="e.g., 36.8219">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="getGPSLocation()" title="Get current location">
+                                            <i class="bi bi-crosshair"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         
                         <div class="mb-3">
                             <label class="form-label"><i class="bi bi-router text-info me-1"></i>ONU Type Override</label>
@@ -18372,7 +18292,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         if (!query) return;
         
         const resultsDiv = document.getElementById('billingSearchResults');
-        resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Searching ISP & One-ISP...';
+        resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Searching...';
         
         fetch(`?page=huawei-olt&ajax=search_billing_customer&q=${encodeURIComponent(query)}`)
             .then(r => r.json())
@@ -18380,24 +18300,15 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 if (data.success && data.customers && data.customers.length > 0) {
                     let html = '<div class="list-group">';
                     data.customers.forEach(c => {
-                        const source = c.source || 'local';
-                        const badge = source === 'oneisp' 
-                            ? '<span class="badge bg-warning text-dark ms-1">One-ISP</span>' 
-                            : '<span class="badge bg-primary ms-1">ISP</span>';
-                        const extraInfo = source === 'oneisp' && c.service_plan ? ` | ${c.service_plan}` : '';
-                        const escapedId = String(c.id).replace(/'/g, "\\'");
-                        const escapedName = (c.name || '').replace(/'/g, "\\'");
-                        const escapedPhone = (c.phone || '').replace(/'/g, "\\'");
-                        const escapedEmail = (c.email || '').replace(/'/g, "\\'");
-                        html += `<a href="#" class="list-group-item list-group-item-action" onclick="selectBillingCustomer('${escapedId}', '${escapedName}', '${escapedPhone}', '${escapedEmail}'); return false;">
-                            <strong>${c.name}</strong>${badge}<br>
-                            <small class="text-muted">${c.account_number || ''} | ${c.phone || ''}${extraInfo}</small>
+                        html += `<a href="#" class="list-group-item list-group-item-action" onclick="selectBillingCustomer('${c.id}', '${c.name}', '${c.phone || ''}', '${c.email || ''}'); return false;">
+                            <strong>${c.name}</strong><br>
+                            <small class="text-muted">${c.account_number || ''} | ${c.phone || ''}</small>
                         </a>`;
                     });
                     html += '</div>';
                     resultsDiv.innerHTML = html;
                 } else {
-                    resultsDiv.innerHTML = '<div class="text-muted">No customers found in ISP or One-ISP</div>';
+                    resultsDiv.innerHTML = '<div class="text-muted">No customers found</div>';
                 }
             })
             .catch(err => {
@@ -18409,9 +18320,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         document.getElementById('billingCustomerId').value = id;
         document.getElementById('authName').value = name;
         document.getElementById('authPhone').value = phone;
-        const isOneISP = String(id).startsWith('oneisp_');
-        const label = isOneISP ? `${name} (from One-ISP - will be imported)` : name;
-        document.getElementById('billingSearchResults').innerHTML = `<div class="alert alert-success py-1 mb-0"><i class="bi bi-check-circle me-1"></i>Selected: ${label}</div>`;
+        document.getElementById('billingSearchResults').innerHTML = `<div class="alert alert-success py-1 mb-0"><i class="bi bi-check-circle me-1"></i>Selected: ${name}</div>`;
     }
     
     
@@ -18454,60 +18363,21 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         
         // Make zone dropdown searchable
         const zoneSelect = document.getElementById('authZoneId');
-        if (zoneSelect) {
+        if (zoneSelect && zoneSelect.options.length > 10) {
+            // Add search input for zones
             const wrapper = zoneSelect.parentElement;
-            const allOptions = Array.from(zoneSelect.options).map(opt => ({
-                value: opt.value, text: opt.textContent.trim(), name: opt.dataset.name || ''
-            }));
-            
             const searchInput = document.createElement('input');
             searchInput.type = 'text';
             searchInput.className = 'form-control form-control-sm mb-1';
-            searchInput.placeholder = 'Type to search zones...';
-            searchInput.id = 'zoneSearchInput';
-            
-            const listDiv = document.createElement('div');
-            listDiv.className = 'list-group position-absolute w-100 shadow-sm';
-            listDiv.style.cssText = 'z-index:1050; max-height:200px; overflow-y:auto; display:none;';
-            listDiv.id = 'zoneSearchResults';
-            
-            const wrapperDiv = document.createElement('div');
-            wrapperDiv.style.position = 'relative';
-            wrapper.insertBefore(wrapperDiv, zoneSelect);
-            wrapperDiv.appendChild(searchInput);
-            wrapperDiv.appendChild(listDiv);
-            zoneSelect.style.display = 'none';
-            
+            searchInput.placeholder = 'Search zones...';
             searchInput.addEventListener('input', function() {
                 const filter = this.value.toLowerCase();
-                if (!filter) { listDiv.style.display = 'none'; return; }
-                const matches = allOptions.filter(o => o.value && o.text.toLowerCase().includes(filter));
-                if (matches.length === 0) {
-                    listDiv.innerHTML = '<div class="list-group-item text-muted small">No zones found</div>';
-                } else {
-                    listDiv.innerHTML = matches.slice(0, 20).map(o =>
-                        `<a href="#" class="list-group-item list-group-item-action py-1 small" data-value="${o.value}" data-name="${o.name}">${o.text}</a>`
-                    ).join('');
-                }
-                listDiv.style.display = '';
+                Array.from(zoneSelect.options).forEach(opt => {
+                    if (opt.value === '') return;
+                    opt.style.display = opt.textContent.toLowerCase().includes(filter) ? '' : 'none';
+                });
             });
-            
-            listDiv.addEventListener('click', function(e) {
-                e.preventDefault();
-                const item = e.target.closest('[data-value]');
-                if (!item) return;
-                zoneSelect.value = item.dataset.value;
-                searchInput.value = item.textContent.trim();
-                document.getElementById('authZoneName').value = item.dataset.name || item.textContent.trim();
-                listDiv.style.display = 'none';
-            });
-            
-            searchInput.addEventListener('blur', function() {
-                setTimeout(() => { listDiv.style.display = 'none'; }, 200);
-            });
-            searchInput.addEventListener('focus', function() {
-                if (this.value.trim()) this.dispatchEvent(new Event('input'));
-            });
+            wrapper.insertBefore(searchInput, zoneSelect);
         }
         
         // Handle staged authorization form submission

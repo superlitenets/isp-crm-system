@@ -7165,7 +7165,7 @@ class HuaweiOLT {
             'olt_id' => $oltId, 'onu_id' => $onuDbId, 'action' => 'configure_stage2_tr069',
             'status' => $success ? 'success' : 'failed',
             'message' => $success ? "Stage 2 complete: TR-069 configured on VLAN {$tr069Vlan}" : 'Stage 2 failed: ' . implode(', ', $errors),
-            'command_sent' => implode("\n", $tr069ScriptLines) . "\n" . $cmd3,
+            'command_sent' => $cmd1 . "\n" . $cmd2 . "\n" . $cmd3,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
