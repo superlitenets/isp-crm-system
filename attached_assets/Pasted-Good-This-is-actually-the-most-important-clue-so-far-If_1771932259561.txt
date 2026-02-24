@@ -1,0 +1,316 @@
+Good. This is actually the most important clue so far.
+
+If WANConnectionDevice.2 was NOT created in the tree, then your CRM logic is still suffering from the same core issue:
+
+👉 You are not waiting for the device to execute the AddObject
+👉 Or the AddObject is not actually being committed by the ONU
+
+Your log shows:
+
+Step 1 result: http_code=202
+New WANConnectionDevice index: 2
+
+⚠️ That “New index: 2” is coming from your CRM logic — not from the ONU.
+
+HTTP 202 does NOT mean the object exists.
+It only means GenieACS queued the task.
+
+🔥 This Is The Real Problem
+
+You are doing:
+
+AddObject (WANConnectionDevice)
+
+Immediately assuming it exists
+
+Proceeding to use index 2
+
+But Huawei ONUs do not create the object until:
+
+Inform session completes
+
+ACS finishes RPC exchange
+
+Tree refresh happens
+
+So you are configuring a path that does not yet exist.
+
+🎯 Correct Way (Production Safe)
+
+You must treat AddObject like a database write that is asynchronous.
+
+Proper Flow
+STEP 1 — Get current list
+getParameterValues:
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.
+
+Count entries.
+
+Example:
+
+existing = [1]
+count = 1
+STEP 2 — AddObject
+addObject:
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice
+
+Use ?connection_request
+
+STEP 3 — WAIT AND VERIFY
+
+Now loop until the device confirms.
+
+Example logic:
+
+$oldCount = count($existing);
+
+for ($i=0; $i<10; $i++) {
+    sleep(1);
+
+    $newList = refreshWanConnectionDeviceList();
+
+    if (count($newList) > $oldCount) {
+        break;
+    }
+}
+
+if (count($newList) == $oldCount) {
+    return error("WANConnectionDevice was not created");
+}
+
+Only after this do you proceed.
+
+🚨 Why It’s Not Being Created
+
+Possible reasons:
+
+1️⃣ You didn’t trigger connection_request on AddObject
+
+It must be:
+
+POST /tasks?connection_request
+
+If not, you are waiting for periodic inform.
+
+2️⃣ You are not refreshing the tree
+
+After AddObject you must call:
+
+getParameterValues
+
+to refresh the device tree.
+
+Otherwise GenieACS still shows old structure.
+
+3️⃣ ONU rejected it silently
+
+Some Huawei ONUs:
+
+Do not allow unlimited WANConnectionDevice objects
+
+Require reboot after certain number
+
+Require specific order of parameters
+
+🔥 Critical Test
+
+Right now do this manually in GenieACS UI:
+
+Go to device
+
+Tasks → AddObject
+
+Object:
+
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice
+
+Use connection request
+
+After it completes → Refresh tree
+
+Tell me:
+
+Does a new WANConnectionDevice appear?
+
+If YES → your CRM timing logic is wrong.
+If NO → device is rejecting AddObject.
+
+🧠 Why Your PPPoE Worked
+
+Because PPPoE likely used:
+
+WANConnectionDevice.1
+
+Factory default object.
+
+You were not creating a new one.
+
+Bridge requires new object creation.
+
+That’s why this behaves differently.
+
+🎯 Now We Narrow It
+
+Answer this:
+
+When you manually AddObject from GenieACS UI,
+does a new WANConnectionDevice appear or not?
+
+That answer determines everything.
+
+yes its added but I must refresh parameters
+
+💥 PERFECT. That tells us everything.
+
+The ONU does create the WANConnectionDevice, but GenieACS does NOT automatically refresh the tree — so your CRM logic is reading stale data.
+
+This is not a Huawei issue.
+
+This is a GenieACS tree refresh issue.
+
+🎯 What Is Happening
+
+When you do:
+
+addObject: WANConnectionDevice
+
+GenieACS:
+
+Queues task
+
+Device executes
+
+Object is created on ONU
+
+BUT:
+
+GenieACS does NOT automatically rediscover the new object path.
+
+Until you manually:
+
+Refresh parameters
+
+Your CRM thinks the object does not exist.
+
+🔥 The Correct Fix (Production Way)
+
+After every AddObject you must force tree rediscovery.
+
+There are two correct methods.
+
+✅ OPTION 1 — Use getParameterValues Immediately After AddObject
+
+Right after AddObject completes:
+
+{
+  "name": "getParameterValues",
+  "parameterNames": [
+    "InternetGatewayDevice.WANDevice.1.WANConnectionDevice."
+  ]
+}
+
+With ?connection_request
+
+This forces:
+
+New Inform
+
+Parameter tree sync
+
+GenieACS updates object list
+
+Now your CRM can see the new index.
+
+✅ OPTION 2 — Even Better (Full Tree Sync)
+
+After AddObject:
+
+{
+  "name": "refreshObject",
+  "objectName": "InternetGatewayDevice.WANDevice.1.WANConnectionDevice"
+}
+
+This is cleaner and faster.
+
+It tells GenieACS:
+
+Rebuild this subtree.
+
+🚨 Why Your Current Logic Fails
+
+Right now your flow is:
+
+AddObject
+→ Immediately read from cache
+→ Cache still old
+→ CRM assumes not created
+
+That’s why you were stuck.
+
+🎯 Correct Production Flow For Bridge
+
+Now your final working pattern should be:
+
+Step 1 — Add WANConnectionDevice
+addObject WANConnectionDevice
+
+Use connection_request.
+
+Step 2 — Refresh subtree
+refreshObject WANConnectionDevice
+
+Use connection_request.
+
+Step 3 — Read new indices
+getParameterValues WANConnectionDevice.
+
+Now you will see:
+
+1
+2
+
+New index = max.
+
+Step 4 — Add WANIPConnection under new index
+
+Same logic:
+
+addObject
+
+refreshObject
+
+getParameterValues
+
+detect new index
+
+Step 5 — Configure bridge
+
+Now set:
+
+Enable = true
+ConnectionType = IP_Bridged
+X_HW_VLAN
+X_HW_SERVICELIST = INTERNET
+X_HW_LANBIND.SSIDxEnable = 1
+🧠 This Is The Missing Piece
+
+Your architecture was correct.
+Your timing was correct.
+Your parameters were correct.
+
+The only missing thing was:
+
+🔥 Force parameter refresh after AddObject.
+
+🎯 Now Final Question
+
+In your CRM code, after AddObject, are you:
+
+Just reading cache?
+or
+
+Calling getParameterValues with connection_request?
+
+If you show me that small snippet, I’ll give you the exact corrected version.
+
+You are extremely close now.

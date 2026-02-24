@@ -3065,10 +3065,16 @@ JS;
                 ]
             );
             $results[] = ['step' => 'add_wan_connection_device', 'result' => $addWanDevResult];
-            error_log("[configureWifiAccessVlan] Step 1 result: " . json_encode(['success' => $addWanDevResult['success'] ?? false, 'http_code' => $addWanDevResult['http_code'] ?? 0]));
-            sleep(3);
+            error_log("[configureWifiAccessVlan] Step 1 AddObject result: HTTP " . ($addWanDevResult['http_code'] ?? 'N/A'));
             
-            // Refresh to discover the new WANConnectionDevice index
+            // Force tree refresh with refreshObject + getParameterValues
+            sleep(2);
+            $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                ['name' => 'refreshObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
+            );
+            sleep(3);
             $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
@@ -3076,21 +3082,45 @@ JS;
             );
             sleep(3);
             
-            // Discover the newly created WANConnectionDevice index
-            $wanDeviceIndex = !empty($existingWanIndices) ? max($existingWanIndices) + 1 : 2;
-            $refreshedDevice = $this->getDevice($deviceId, false);
-            if ($refreshedDevice['success'] && !empty($refreshedDevice['data'])) {
-                $newWanDevices = $refreshedDevice['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
-                $newIndices = [];
-                foreach ($newWanDevices as $idx => $dev) {
-                    if (is_numeric($idx)) $newIndices[] = (int)$idx;
+            // Retry loop: wait until ONU confirms new WANConnectionDevice exists in tree
+            $wanDeviceIndex = null;
+            $oldCount = count($existingWanIndices);
+            for ($attempt = 0; $attempt < 10; $attempt++) {
+                $refreshedDevice = $this->getDevice($deviceId, false);
+                if ($refreshedDevice['success'] && !empty($refreshedDevice['data'])) {
+                    $newWanDevices = $refreshedDevice['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
+                    $newIndices = [];
+                    foreach ($newWanDevices as $idx => $dev) {
+                        if (is_numeric($idx)) $newIndices[] = (int)$idx;
+                    }
+                    $addedIndices = array_diff($newIndices, $existingWanIndices);
+                    if (!empty($addedIndices)) {
+                        $wanDeviceIndex = max($addedIndices);
+                        error_log("[configureWifiAccessVlan] WANConnectionDevice.{$wanDeviceIndex} confirmed on attempt {$attempt}");
+                        break;
+                    }
                 }
-                $addedIndices = array_diff($newIndices, $existingWanIndices);
-                if (!empty($addedIndices)) {
-                    $wanDeviceIndex = max($addedIndices);
+                error_log("[configureWifiAccessVlan] Attempt {$attempt}: WANConnectionDevice not yet visible, retrying...");
+                sleep(2);
+                // Re-trigger refresh on each retry
+                if ($attempt % 3 === 2) {
+                    $this->request(
+                        "POST",
+                        "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                        ['name' => 'refreshObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
+                    );
+                    sleep(2);
                 }
             }
-            error_log("[configureWifiAccessVlan] New WANConnectionDevice index: {$wanDeviceIndex}");
+            
+            if ($wanDeviceIndex === null) {
+                error_log("[configureWifiAccessVlan] FAILED: WANConnectionDevice was not created after 10 attempts");
+                return [
+                    'success' => false,
+                    'error' => 'WANConnectionDevice was not created by ONU after multiple attempts. Try again or check device connectivity.',
+                    'results' => $results
+                ];
+            }
             
             // Step 2: Add WANIPConnection under the NEW WANConnectionDevice
             error_log("[configureWifiAccessVlan] Step 2: Adding WANIPConnection under WANConnectionDevice.{$wanDeviceIndex}");
@@ -3103,16 +3133,50 @@ JS;
                 ]
             );
             $results[] = ['step' => 'add_wan_ip_connection', 'result' => $addWanIpResult];
-            error_log("[configureWifiAccessVlan] Step 2 result: " . json_encode(['success' => $addWanIpResult['success'] ?? false, 'http_code' => $addWanIpResult['http_code'] ?? 0]));
-            sleep(3);
+            error_log("[configureWifiAccessVlan] Step 2 AddObject result: HTTP " . ($addWanIpResult['http_code'] ?? 'N/A'));
             
-            // Refresh to discover the WANIPConnection
+            // Force refresh for WANIPConnection
+            sleep(2);
+            $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                ['name' => 'refreshObject', 'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection."]
+            );
+            sleep(3);
             $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
                 ['name' => 'getParameterValues', 'parameterNames' => ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]]
             );
-            sleep(2);
+            
+            // Retry loop: wait until WANIPConnection.1 is confirmed
+            $ipConnectionConfirmed = false;
+            for ($attempt = 0; $attempt < 8; $attempt++) {
+                sleep(2);
+                $refreshedDev2 = $this->getDevice($deviceId, false);
+                if ($refreshedDev2['success'] && !empty($refreshedDev2['data'])) {
+                    $connDev = $refreshedDev2['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'][$wanDeviceIndex] ?? 
+                               $refreshedDev2['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice']["{$wanDeviceIndex}"] ?? null;
+                    if ($connDev && isset($connDev['WANIPConnection'])) {
+                        $ipConnectionConfirmed = true;
+                        error_log("[configureWifiAccessVlan] WANIPConnection confirmed under WANConnectionDevice.{$wanDeviceIndex} on attempt {$attempt}");
+                        break;
+                    }
+                }
+                error_log("[configureWifiAccessVlan] Attempt {$attempt}: WANIPConnection not yet visible, retrying...");
+                if ($attempt % 3 === 2) {
+                    $this->request(
+                        "POST",
+                        "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                        ['name' => 'refreshObject', 'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]
+                    );
+                    sleep(2);
+                }
+            }
+            
+            if (!$ipConnectionConfirmed) {
+                error_log("[configureWifiAccessVlan] WARNING: WANIPConnection not confirmed but proceeding with .1 default");
+            }
             
             // Step 3: Configure bridge with X_HW_LANBIND for SSID binding
             // Working router pattern: use X_HW_LANBIND.SSIDxEnable instead of policy routes
