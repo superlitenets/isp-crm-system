@@ -3002,7 +3002,11 @@ JS;
                 ];
             }
             
-            error_log("[configureWifiAccessVlan] Creating new bridge: NEW WANConnectionDevice pattern (from working router), existingWAN=" . json_encode($existingWanIndices));
+            $wanDeviceIndex = !empty($existingWanIndices) ? max($existingWanIndices) + 1 : 2;
+            $routeIndex = !empty($existingRouteIndices) ? max($existingRouteIndices) + 1 : 1;
+            $wanName = "wan1.{$wanDeviceIndex}.ip1";
+            
+            error_log("[configureWifiAccessVlan] Creating new bridge: WAN device={$wanDeviceIndex}, route={$routeIndex}, existingWAN=" . json_encode($existingWanIndices));
             
             // Step 0: Ensure WLAN configuration exists (secondary SSIDs may need creation)
             if ($wifiIndex > 1 && $wifiIndex != 5) {
@@ -3052,124 +3056,43 @@ JS;
             error_log("[configureWifiAccessVlan] Step 0b: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged') . ", password=" . ($password ? 'set' : 'unchanged') . ", encryption={$encryption}");
             usleep(500000);
             
-            // Step 1: Add NEW WANConnectionDevice under WANDevice.1
-            // Working router pattern: each service gets its own WANConnectionDevice
-            // WANConnectionDevice.1 = TR-069, .2 = PPPoE, .3 = Guest bridge, etc.
-            error_log("[configureWifiAccessVlan] Step 1: Adding NEW WANConnectionDevice under WANDevice.1");
+            // Step 1: Add WANConnectionDevice under WANDevice.1
+            error_log("[configureWifiAccessVlan] Step 1: Adding WANConnectionDevice");
+            $addWanDevResult = $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                [
+                    'name' => 'addObject',
+                    'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
+                ]
+            );
+            $results[] = ['step' => 'add_wan_device', 'result' => $addWanDevResult];
+            error_log("[configureWifiAccessVlan] Step 1 result: " . json_encode(['success' => $addWanDevResult['success'] ?? false, 'http_code' => $addWanDevResult['http_code'] ?? 0]));
+            usleep(1000000);
             
-            // Helper: execute a GenieACS task via direct curl with auth and proper timeouts
-            // Returns: ['http_code' => int, 'response' => string, 'error' => string]
-            $execGenieTask = function(string $deviceId, array $taskBody, int $genieTimeout = 45000) {
-                $url = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout={$genieTimeout}";
-                $ch = curl_init($url);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => json_encode($taskBody),
-                    CURLOPT_TIMEOUT => (int)($genieTimeout / 1000) + 15,
-                    CURLOPT_CONNECTTIMEOUT => 10
-                ]);
-                if (!empty($this->username)) {
-                    curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+            // Refresh device to discover actual WAN device index created
+            $refreshResult = $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']]
+            );
+            usleep(1000000);
+            
+            $refreshedDevice = $this->getDevice($deviceId, false);
+            if ($refreshedDevice['success'] && !empty($refreshedDevice['data'])) {
+                $newWanDevices = $refreshedDevice['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
+                $newIndices = [];
+                foreach ($newWanDevices as $idx => $dev) {
+                    if (is_numeric($idx)) $newIndices[] = (int)$idx;
                 }
-                $resp = curl_exec($ch);
-                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $err = curl_error($ch);
-                curl_close($ch);
-                return ['http_code' => $code, 'response' => $resp ?: '', 'error' => $err];
-            };
-            
-            // Helper: scan GenieACS device data for WANConnectionDevice indices
-            $scanWanDeviceIndices = function($deviceId) {
-                $indices = [];
-                $result = $this->getDevice($deviceId, true);
-                if ($result['success'] && !empty($result['data'])) {
-                    foreach ($result['data'] as $key => $val) {
-                        if (preg_match('/WANDevice\.1\.WANConnectionDevice\.(\d+)\./', $key, $m)) {
-                            $indices[(int)$m[1]] = true;
-                        }
-                    }
-                }
-                if (empty($indices)) {
-                    $result2 = $this->getDevice($deviceId, false);
-                    if ($result2['success'] && !empty($result2['data'])) {
-                        $wanDevices = $result2['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
-                        foreach ($wanDevices as $idx => $dev) {
-                            if (is_numeric($idx)) $indices[(int)$idx] = true;
-                        }
-                    }
-                }
-                return array_keys($indices);
-            };
-            
-            // Execute addObject - queue it first WITHOUT connection_request for instant acceptance
-            // Then use refreshObject to force tree rediscovery (valid REST API task)
-            $addResult = $execGenieTask($deviceId, [
-                'name' => 'addObject',
-                'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
-            ], 45000);
-            $results[] = ['step' => 'add_wan_connection_device', 'result' => $addResult];
-            error_log("[configureWifiAccessVlan] Step 1 AddObject: HTTP {$addResult['http_code']}" . ($addResult['error'] ? " ERR: {$addResult['error']}" : "") . " resp: " . substr($addResult['response'], 0, 300));
-            
-            // Wait for addObject to be processed by ONU
-            sleep(5);
-            
-            // Retry loop: use refreshObject (valid REST API task) to force tree rediscovery
-            // refreshObject triggers GetParameterNames RPC internally within GenieACS
-            // objectName must NOT have a trailing dot for refreshObject
-            $wanDeviceIndex = null;
-            
-            for ($attempt = 0; $attempt < 12; $attempt++) {
-                // refreshObject forces GenieACS to rediscover all children under this path
-                // This is the REST API equivalent of "Refresh Parameters" in the GenieACS UI
-                $refreshResult = $execGenieTask($deviceId, [
-                    'name' => 'refreshObject',
-                    'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice'
-                ], 45000);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: refreshObject HTTP {$refreshResult['http_code']}" . ($refreshResult['error'] ? " ERR: {$refreshResult['error']}" : "") . " resp: " . substr($refreshResult['response'], 0, 300));
-                
-                if ($refreshResult['http_code'] === 200) {
-                    // Task completed synchronously - tree should be updated
-                    sleep(2);
-                } else if ($refreshResult['http_code'] === 0) {
-                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: connection timeout, trying getParameterValues fallback...");
-                    // Fallback: try getParameterValues which we know works (returned 202 before)
-                    $gpvResult = $execGenieTask($deviceId, [
-                        'name' => 'getParameterValues',
-                        'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
-                    ], 45000);
-                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterValues fallback HTTP {$gpvResult['http_code']}");
-                    sleep(5);
-                } else {
-                    // 202 = queued, will execute on next inform
-                    sleep(5);
-                }
-                
-                // Read the tree to check for new indices
-                $newIndices = $scanWanDeviceIndices($deviceId);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: found WANConnectionDevice indices: " . json_encode($newIndices) . ", existing: " . json_encode($existingWanIndices));
                 $addedIndices = array_diff($newIndices, $existingWanIndices);
                 if (!empty($addedIndices)) {
                     $wanDeviceIndex = max($addedIndices);
-                    error_log("[configureWifiAccessVlan] WANConnectionDevice.{$wanDeviceIndex} confirmed on attempt {$attempt}");
-                    break;
+                    $wanName = "wan1.{$wanDeviceIndex}.ip1";
                 }
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: WANConnectionDevice not yet visible, waiting...");
-                sleep(3);
             }
             
-            if ($wanDeviceIndex === null) {
-                error_log("[configureWifiAccessVlan] FAILED: WANConnectionDevice was not created after 10 attempts");
-                return [
-                    'success' => false,
-                    'error' => 'WANConnectionDevice was not created by ONU after multiple attempts. Try again or check device connectivity.',
-                    'results' => $results
-                ];
-            }
-            
-            // Step 2: Add WANIPConnection under the NEW WANConnectionDevice
-            error_log("[configureWifiAccessVlan] Step 2: Adding WANIPConnection under WANConnectionDevice.{$wanDeviceIndex}");
+            // Step 2: Add WANIPConnection under the new WANConnectionDevice
             $addWanIpResult = $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
@@ -3179,98 +3102,85 @@ JS;
                 ]
             );
             $results[] = ['step' => 'add_wan_ip_connection', 'result' => $addWanIpResult];
-            error_log("[configureWifiAccessVlan] Step 2 AddObject result: HTTP " . ($addWanIpResult['http_code'] ?? 'N/A'));
+            usleep(500000);
             
-            // Retry loop: getParameterNames to rediscover WANIPConnection children
-            $ipConnectionConfirmed = false;
-            $ipConnPattern = "/WANConnectionDevice\.{$wanDeviceIndex}\.WANIPConnection\.(\d+)/";
-            
-            if ($addWanIpResult['http_code'] == 202) {
-                error_log("[configureWifiAccessVlan] WANIPConnection addObject queued (202), waiting...");
-                sleep(5);
-            }
-            
-            for ($attempt = 0; $attempt < 8; $attempt++) {
-                // refreshObject to rediscover WANIPConnection children (no trailing dot)
-                $refreshResult2 = $execGenieTask($deviceId, [
-                    'name' => 'refreshObject',
-                    'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}"
-                ], 45000);
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: refreshObject HTTP {$refreshResult2['http_code']}" . ($refreshResult2['error'] ? " ERR: {$refreshResult2['error']}" : ""));
-                
-                if ($refreshResult2['http_code'] === 200) {
-                    sleep(2);
-                } else if ($refreshResult2['http_code'] === 0) {
-                    // Fallback to getParameterValues
-                    $gpvFb = $execGenieTask($deviceId, [
-                        'name' => 'getParameterValues',
-                        'parameterNames' => ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]
-                    ], 45000);
-                    error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterValues fallback HTTP {$gpvFb['http_code']}");
-                    sleep(5);
-                } else {
-                    sleep(5);
-                }
-                
-                $refreshedDev2 = $this->getDevice($deviceId, true);
-                if ($refreshedDev2['success'] && !empty($refreshedDev2['data'])) {
-                    foreach ($refreshedDev2['data'] as $key => $val) {
-                        if (preg_match($ipConnPattern, $key)) {
-                            $ipConnectionConfirmed = true;
-                            error_log("[configureWifiAccessVlan] WANIPConnection confirmed under WANConnectionDevice.{$wanDeviceIndex} on attempt {$attempt}");
-                            break 2;
-                        }
-                    }
-                }
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: WANIPConnection not yet visible, waiting...");
-                sleep(3);
-            }
-            
-            if (!$ipConnectionConfirmed) {
-                error_log("[configureWifiAccessVlan] WARNING: WANIPConnection not confirmed but proceeding with .1 default");
-            }
-            
-            // Step 3: Configure bridge with X_HW_LANBIND for SSID binding
-            // Working router pattern: use X_HW_LANBIND.SSIDxEnable instead of policy routes
+            // Step 3: Set ConnectionType to IP_Bridged and Enable it
+            error_log("[configureWifiAccessVlan] Step 3: Setting bridge type and VLAN {$vlanId} on WAN device {$wanDeviceIndex}");
             $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1";
-            $wanName = "wan1.{$wanDeviceIndex}.ip1";
-            error_log("[configureWifiAccessVlan] Step 3: Setting bridge type and VLAN {$vlanId} at {$wanIpPath} with X_HW_LANBIND.SSID{$wifiIndex}Enable");
-            
-            $bridgeParams = [
-                ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
-                ["{$wanIpPath}.ConnectionType", 'IP_Bridged', 'xsd:string'],
-                ["{$wanIpPath}.X_HW_IPv4Enable", 1, 'xsd:unsignedInt'],
-                ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
-                ["{$wanIpPath}.X_HW_SERVICELIST", 'INTERNET', 'xsd:string'],
-                ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
-            ];
-            
-            // Bind SSID to this bridge using X_HW_LANBIND
-            // Disable all SSID bindings first, then enable only the target one
-            for ($s = 1; $s <= 4; $s++) {
-                $bridgeParams[] = ["{$wanIpPath}.X_HW_LANBIND.SSID{$s}Enable", ($s === $wifiIndex) ? 1 : 0, 'xsd:unsignedInt'];
-            }
-            // Disable LAN port bindings (bridge is WiFi-only)
-            for ($l = 1; $l <= 4; $l++) {
-                $bridgeParams[] = ["{$wanIpPath}.X_HW_LANBIND.LAN{$l}Enable", 0, 'xsd:unsignedInt'];
-            }
-            
             $setBridgeResult = $this->request(
                 "POST",
                 "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
                 [
                     'name' => 'setParameterValues',
-                    'parameterValues' => $bridgeParams
+                    'parameterValues' => [
+                        ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
+                        ["{$wanIpPath}.ConnectionType", 'IP_Bridged', 'xsd:string'],
+                        ["{$wanIpPath}.X_HW_ServiceList", 'INTERNET', 'xsd:string'],
+                        ["{$wanIpPath}.X_HW_MulticastVLAN", -1, 'xsd:int'],
+                        ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
+                        ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
+                        ["{$wanIpPath}.X_HW_VLANPriority", 0, 'xsd:unsignedInt']
+                    ]
                 ]
             );
-            $results[] = ['step' => 'set_bridge_vlan_lanbind', 'result' => $setBridgeResult];
-            error_log("[configureWifiAccessVlan] Step 3 result: " . json_encode(['success' => $setBridgeResult['success'] ?? false, 'http_code' => $setBridgeResult['http_code'] ?? 0]));
+            $results[] = ['step' => 'set_bridge_and_vlan', 'result' => $setBridgeResult];
+            usleep(500000);
             
-            error_log("[configureWifiAccessVlan] Complete: WiFi {$wifiIndex} bridged to VLAN {$vlanId}, WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1 with X_HW_LANBIND");
+            // Step 4: Add Layer3Forwarding.X_HW_policy_route
+            $addRouteResult = $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                [
+                    'name' => 'addObject',
+                    'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'
+                ]
+            );
+            $results[] = ['step' => 'add_policy_route', 'result' => $addRouteResult];
+            usleep(1000000);
+            
+            // Refresh to discover actual policy route index
+            $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.']]
+            );
+            usleep(1000000);
+            
+            $refreshedDevice2 = $this->getDevice($deviceId, false);
+            if ($refreshedDevice2['success'] && !empty($refreshedDevice2['data'])) {
+                $newRoutes = $refreshedDevice2['data']['InternetGatewayDevice']['Layer3Forwarding']['X_HW_policy_route'] ?? [];
+                $newRouteIndices = [];
+                foreach ($newRoutes as $rIdx => $route) {
+                    if (is_numeric($rIdx)) $newRouteIndices[] = (int)$rIdx;
+                }
+                $addedRoutes = array_diff($newRouteIndices, $existingRouteIndices);
+                if (!empty($addedRoutes)) {
+                    $routeIndex = max($addedRoutes);
+                }
+            }
+            
+            // Step 5: Set policy_route binding SSID port to the new WAN bridge
+            error_log("[configureWifiAccessVlan] Step 5: Setting policy route - SSID port={$ssidPortName}, WAN={$wanName}, route index={$routeIndex}");
+            $setRouteResult = $this->request(
+                "POST",
+                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
+                [
+                    'name' => 'setParameterValues',
+                    'parameterValues' => [
+                        ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", $ssidPortName, 'xsd:string'],
+                        ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
+                        ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string']
+                    ]
+                ]
+            );
+            $results[] = ['step' => 'set_policy_route', 'result' => $setRouteResult];
+            error_log("[configureWifiAccessVlan] Step 5 result: " . json_encode(['success' => $setRouteResult['success'] ?? false, 'http_code' => $setRouteResult['http_code'] ?? 0]));
+            
+            error_log("[configureWifiAccessVlan] Complete: WiFi {$wifiIndex} configured with VLAN {$vlanId}, WAN device {$wanDeviceIndex}");
             
             return [
                 'success' => true,
-                'message' => "WiFi {$wifiIndex} configured with VLAN {$vlanId} in Bridge mode (WANConnectionDevice.{$wanDeviceIndex}, X_HW_LANBIND.SSID{$wifiIndex}Enable)",
+                'message' => "WiFi {$wifiIndex} configured with VLAN {$vlanId} in Bridge mode (WAN device {$wanDeviceIndex})",
                 'results' => $results,
                 'wan_name' => $wanName,
                 'ssid_port' => $ssidPortName

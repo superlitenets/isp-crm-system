@@ -68,7 +68,7 @@ app.post('/execute', async (req, res) => {
         if (!oltId || !command) {
             return res.status(400).json({ success: false, error: 'Missing oltId or command' });
         }
-        const result = await sessionManager.execute(oltId, command, { timeout, expectPrompt, priority: true });
+        const result = await sessionManager.execute(oltId, command, { timeout, expectPrompt });
         res.json({ success: true, output: result });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -82,7 +82,7 @@ app.post('/execute-async', async (req, res) => {
         if (!oltId || !command) {
             return res.status(400).json({ success: false, error: 'Missing oltId or command' });
         }
-        sessionManager.execute(oltId, command, { timeout, priority: true }).then(result => {
+        sessionManager.execute(oltId, command, { timeout }).then(result => {
             console.log(`[Async] Command completed for OLT ${oltId}: ${command.substring(0, 50)}...`);
             console.log(`[Async] Result: ${(result || '').substring(0, 200)}`);
         }).catch(err => {
@@ -102,7 +102,7 @@ app.post('/execute-raw', async (req, res) => {
         if (!oltId || !script) {
             return res.status(400).json({ success: false, error: 'Missing oltId or script' });
         }
-        const result = await sessionManager.executeRaw(oltId, script, { timeout: timeout || 60000, priority: true });
+        const result = await sessionManager.executeRaw(oltId, script, { timeout: timeout || 60000 });
         res.json({ success: true, output: result });
     } catch (error) {
         console.log(`[Raw] Error: ${error.message}`);
@@ -118,8 +118,7 @@ app.post('/pause-discovery', async (req, res) => {
         }
         const durationMs = duration || 60000;
         discoveryWorker.pauseOlt(oltId, durationMs);
-        sessionManager.acquireExclusiveLock(oltId, durationMs, 'pause-discovery (authorization)');
-        res.json({ success: true, message: `Discovery and all CLI paused for OLT ${oltId} for ${durationMs}ms` });
+        res.json({ success: true, message: `Discovery paused for OLT ${oltId} for ${durationMs}ms` });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -132,38 +131,8 @@ app.post('/resume-discovery', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing oltId' });
         }
         discoveryWorker.pausedOlts.delete(oltId);
-        sessionManager.releaseExclusiveLock(oltId);
-        console.log(`[Discovery] Manually resumed OLT ${oltId} (exclusive lock released)`);
-        res.json({ success: true, message: `Discovery and CLI resumed for OLT ${oltId}` });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/lock-olt', async (req, res) => {
-    try {
-        const { oltId, duration, reason } = req.body;
-        if (!oltId) {
-            return res.status(400).json({ success: false, error: 'Missing oltId' });
-        }
-        const durationMs = duration || 120000;
-        discoveryWorker.pauseOlt(oltId, durationMs);
-        sessionManager.acquireExclusiveLock(oltId, durationMs, reason || 'API lock');
-        res.json({ success: true, message: `OLT ${oltId} exclusively locked for ${durationMs}ms` });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/unlock-olt', async (req, res) => {
-    try {
-        const { oltId } = req.body;
-        if (!oltId) {
-            return res.status(400).json({ success: false, error: 'Missing oltId' });
-        }
-        discoveryWorker.pausedOlts.delete(oltId);
-        sessionManager.releaseExclusiveLock(oltId);
-        res.json({ success: true, message: `OLT ${oltId} unlocked` });
+        console.log(`[Discovery] Manually resumed OLT ${oltId}`);
+        res.json({ success: true, message: `Discovery resumed for OLT ${oltId}` });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -175,7 +144,7 @@ app.post('/execute-batch', async (req, res) => {
         if (!oltId || !commands || !Array.isArray(commands)) {
             return res.status(400).json({ success: false, error: 'Missing oltId or commands array' });
         }
-        const results = await sessionManager.executeBatch(oltId, commands, { timeout, priority: true });
+        const results = await sessionManager.executeBatch(oltId, commands, { timeout });
         res.json({ success: true, outputs: results });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -239,11 +208,6 @@ app.post('/refresh-onu', async (req, res) => {
 
 // Background refresh function for single ONU
 async function refreshSingleONU(oltId, onuDbId) {
-    if (sessionManager.isExclusivelyLocked(oltId?.toString())) {
-        console.log(`[RefreshONU] OLT ${oltId} exclusively locked - deferring refresh`);
-        return;
-    }
-
     const { Pool } = require('pg');
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     
