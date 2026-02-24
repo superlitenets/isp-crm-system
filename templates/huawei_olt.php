@@ -195,7 +195,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
                 $result = $oneISP->searchCustomers($query);
                 $oneispData = [];
                 if (!empty($result['data']) && is_array($result['data'])) {
-                    $oneispData = $result['data'];
+                    $raw = $result['data'];
+                    if (isset($raw['data']) && is_array($raw['data'])) {
+                        $oneispData = $raw['data'];
+                    } elseif (isset($raw['customers']) && is_array($raw['customers'])) {
+                        $oneispData = $raw['customers'];
+                    } elseif (isset($raw[0]) && is_array($raw[0])) {
+                        $oneispData = $raw;
+                    } else {
+                        error_log("One-ISP search response keys: " . implode(', ', array_keys($raw)));
+                        error_log("One-ISP search raw sample: " . substr(json_encode($raw), 0, 500));
+                    }
+                } elseif (isset($result['success']) && !$result['success']) {
+                    error_log("One-ISP search failed: " . ($result['error'] ?? 'unknown error'));
                 }
                 foreach ($oneispData as $bc) {
                     if (!is_array($bc)) continue;
