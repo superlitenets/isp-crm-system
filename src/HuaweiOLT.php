@@ -3884,9 +3884,14 @@ class HuaweiOLT {
                 'olt_id' => $onu['olt_id'],
                 'action' => 'delete_onu',
                 'status' => 'warning',
-                'message' => "OLT deauth failed for ONU {$onu['sn']}: " . ($deauthResult['message'] ?? 'Unknown error') . " - still removing from database",
+                'message' => "OLT deauth failed for ONU {$onu['sn']}: " . ($deauthResult['message'] ?? 'Unknown error'),
                 'user_id' => $_SESSION['user_id'] ?? null
             ]);
+            return [
+                'success' => false,
+                'deauthorized' => false,
+                'deauth_message' => 'Failed to remove ONU from OLT: ' . ($deauthResult['message'] ?? 'Unknown error') . '. ONU kept in database. Try using "Delete from OLT" button on the ONU detail page, or remove manually from OLT first.'
+            ];
         }
         
         if (!empty($onu['sn'])) {
@@ -6841,6 +6846,7 @@ class HuaweiOLT {
         // Bridge mode needs native VLAN on all ETH ports (from ONU type config)
         if ($vlanId && $assignedOnuId !== null && $isBridgeMode) {
             $scriptLines = [];
+            $scriptLines[] = "config";
             $scriptLines[] = "interface gpon {$frame}/{$slot}";
             for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
                 $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0";
@@ -6869,6 +6875,7 @@ class HuaweiOLT {
             }
         } elseif ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
             $scriptLines = [];
+            $scriptLines[] = "config";
             $scriptLines[] = "interface gpon {$frame}/{$slot}";
             $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0";
             $scriptLines[] = "quit";
@@ -6908,6 +6915,7 @@ class HuaweiOLT {
             
             // TR-069 OMCI config (ipconfig + tr069-server-config)
             $tr069ScriptLines = [];
+            $tr069ScriptLines[] = "config";
             $tr069ScriptLines[] = "interface gpon {$frame}/{$slot}";
             $tr069ScriptLines[] = "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}";
             if ($tr069ProfileId) {
@@ -7067,6 +7075,7 @@ class HuaweiOLT {
         // Step 1 + 2: Configure IPHOST/WAN with DHCP on TR-069 VLAN + TR-069 profile
         $tr069Priority = $options['tr069_priority'] ?? 2;
         $tr069ScriptLines = [];
+        $tr069ScriptLines[] = "config";
         $tr069ScriptLines[] = "interface gpon {$frame}/{$slot}";
         $tr069ScriptLines[] = "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}";
         if ($tr069ProfileId) {
@@ -7125,6 +7134,7 @@ class HuaweiOLT {
         if ($isBridgeMode && $serviceVlan) {
             $output .= "[Bridge Mode: Native VLAN on {$ethPortCount} ETH ports]\n";
             $bridgeScriptLines = [];
+            $bridgeScriptLines[] = "config";
             $bridgeScriptLines[] = "interface gpon {$frame}/{$slot}";
             for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
                 $bridgeScriptLines[] = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$serviceVlan} priority 0";
@@ -7165,7 +7175,7 @@ class HuaweiOLT {
             'olt_id' => $oltId, 'onu_id' => $onuDbId, 'action' => 'configure_stage2_tr069',
             'status' => $success ? 'success' : 'failed',
             'message' => $success ? "Stage 2 complete: TR-069 configured on VLAN {$tr069Vlan}" : 'Stage 2 failed: ' . implode(', ', $errors),
-            'command_sent' => $cmd1 . "\n" . $cmd2 . "\n" . $cmd3,
+            'command_sent' => implode("\n", $tr069ScriptLines) . "\n" . $cmd3,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
@@ -7441,6 +7451,7 @@ class HuaweiOLT {
         // Configure bridge mode: native VLAN on all ETH ports via raw script
         $output .= "[Bridge Mode: Native VLAN on {$ethPortCount} ETH ports]\n";
         $scriptLines = [];
+        $scriptLines[] = "config";
         $scriptLines[] = "interface gpon {$frame}/{$slot}";
         for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
             $scriptLines[] = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority 0";
@@ -7521,6 +7532,7 @@ class HuaweiOLT {
         if ($ethPortCount < 1) $ethPortCount = 1;
         
         $scriptLines = [];
+        $scriptLines[] = "config";
         $scriptLines[] = "interface gpon {$frame}/{$slot}";
         for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
             $scriptLines[] = "undo ont port native-vlan {$port} {$onuOltId} eth {$ethPort}";
@@ -7543,6 +7555,7 @@ class HuaweiOLT {
         
         // Re-apply native VLAN on ETH 1 only (router mode)
         $routerScript = [];
+        $routerScript[] = "config";
         $routerScript[] = "interface gpon {$frame}/{$slot}";
         $routerScript[] = "ont port native-vlan {$port} {$onuOltId} eth 1 vlan {$vlanId} priority 0";
         $routerScript[] = "quit";
@@ -9472,9 +9485,13 @@ class HuaweiOLT {
         
         $allOutput = '';
         
-        // Step 1: Find all service-ports for this ONU
-        $spCommand = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
-        $spResult = $this->executeCommand($oltId, $spCommand);
+        // Step 1: Find all service-ports for this ONU inside interface gpon
+        $spQueryScript = "config\ninterface gpon {$frame}/{$slot}\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}\nquit";
+        $spResult = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => $spQueryScript,
+            'timeout' => 30000
+        ]);
         $spOutput = $spResult['output'] ?? '';
         $allOutput .= "[Find Service-Ports]\n{$spOutput}\n";
         
@@ -9484,28 +9501,34 @@ class HuaweiOLT {
             $servicePortIds = array_map('intval', $matches[1]);
         }
         
-        // Step 2: Build complete delete script as raw lines
-        // Each line is sent separately with delays, only final prompt is awaited
-        $scriptLines = [];
-        foreach ($servicePortIds as $spId) {
-            $scriptLines[] = "undo service-port {$spId}";
+        // Step 2: Delete service-ports if found
+        $spCount = count($servicePortIds);
+        if ($spCount > 0) {
+            $undoLines = ["config"];
+            foreach ($servicePortIds as $spId) {
+                $undoLines[] = "undo service-port {$spId}";
+            }
+            $undoScript = implode("\n", $undoLines);
+            $undoResult = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => $undoScript,
+                'timeout' => 30000
+            ]);
+            $undoOutput = $undoResult['output'] ?? '';
+            $allOutput .= "[Remove Service-Ports]\n{$undoOutput}\n";
         }
-        $scriptLines[] = "interface gpon {$frame}/{$slot}";
-        $scriptLines[] = "ont delete {$port} {$onuIdNum}";
-        $scriptLines[] = "quit";
-        $script = implode("\n", $scriptLines);
         
-        // Use raw script execution - sends all commands with delays, handles y/n auto-confirm
-        // This avoids the multi-line prompt detection issue with interface context prompts
+        // Step 3: Delete the ONU from the OLT
+        $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit";
         $result = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
-            'script' => $script,
+            'script' => $deleteScript,
             'timeout' => 45000
         ]);
         
         $output = $result['output'] ?? '';
         $allOutput .= "[Delete ONU]\n{$output}";
-        $success = ($result['success'] ?? false) && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command)/i', $output);
+        $success = ($result['success'] ?? false) && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command|Unknown command|Parameter error|Too many parameters)/i', $output);
         
         // Also check for success indicators
         if (!$success && preg_match('/success/i', $output)) {
@@ -9516,7 +9539,6 @@ class HuaweiOLT {
             $this->deleteONU($onuId, false);
         }
         
-        $spCount = count($servicePortIds);
         $message = $success 
             ? "ONU {$onu['sn']} deleted from OLT" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
             : ($result['error'] ?? $result['message'] ?? 'Delete command failed');
@@ -12112,7 +12134,7 @@ class HuaweiOLT {
         
         $this->pauseDiscovery($oltId, 60000);
         
-        $script = "interface gpon {$frame}/{$slot}\n";
+        $script = "config\ninterface gpon {$frame}/{$slot}\n";
         
         foreach ($portConfigs as $ethPort => $config) {
             $mode = $config['mode'] ?? 'access';

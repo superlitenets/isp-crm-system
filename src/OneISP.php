@@ -399,7 +399,7 @@ class OneISP {
         return $this->requestWithSession('/api/customers', ['search' => $search]);
     }
     
-    public function getCustomer(int $id): array {
+    public function getCustomer(string|int $id): array {
         if ($this->authMode === 'token') {
             return $this->request('/customers/' . $id);
         }
