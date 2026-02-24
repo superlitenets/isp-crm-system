@@ -9485,8 +9485,7 @@ class HuaweiOLT {
         
         $allOutput = '';
         
-        // Step 1: Find all service-ports for this ONU via raw script
-        // Query inside interface gpon context for proper results
+        // Step 1: Find all service-ports for this ONU inside interface gpon
         $spQueryScript = "config\ninterface gpon {$frame}/{$slot}\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}\nquit";
         $spResult = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
@@ -9502,21 +9501,28 @@ class HuaweiOLT {
             $servicePortIds = array_map('intval', $matches[1]);
         }
         
-        // Step 2: Build delete script - remove service-ports first, then delete ONU
-        $scriptLines = [];
-        $scriptLines[] = "config";
-        foreach ($servicePortIds as $spId) {
-            $scriptLines[] = "undo service-port {$spId}";
+        // Step 2: Delete service-ports if found
+        $spCount = count($servicePortIds);
+        if ($spCount > 0) {
+            $undoLines = ["config"];
+            foreach ($servicePortIds as $spId) {
+                $undoLines[] = "undo service-port {$spId}";
+            }
+            $undoScript = implode("\n", $undoLines);
+            $undoResult = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => $undoScript,
+                'timeout' => 30000
+            ]);
+            $undoOutput = $undoResult['output'] ?? '';
+            $allOutput .= "[Remove Service-Ports]\n{$undoOutput}\n";
         }
-        $scriptLines[] = "interface gpon {$frame}/{$slot}";
-        $scriptLines[] = "ont delete {$port} {$onuIdNum}";
-        $scriptLines[] = "quit";
-        $script = implode("\n", $scriptLines);
         
-        // Use raw script execution - sends all commands with delays, handles y/n auto-confirm
+        // Step 3: Delete the ONU from the OLT
+        $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit";
         $result = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
-            'script' => $script,
+            'script' => $deleteScript,
             'timeout' => 45000
         ]);
         
@@ -9533,7 +9539,6 @@ class HuaweiOLT {
             $this->deleteONU($onuId, false);
         }
         
-        $spCount = count($servicePortIds);
         $message = $success 
             ? "ONU {$onu['sn']} deleted from OLT" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
             : ($result['error'] ?? $result['message'] ?? 'Delete command failed');
