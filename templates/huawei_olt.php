@@ -18265,25 +18265,8 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <input type="text" name="address" id="authAddress" class="form-control" placeholder="e.g., 123 Main St, Apt 5">
                         </div>
                         
-                        <div class="row">
-                            <div>
-                                <div class="mb-3">
-                                    <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Latitude</label>
-                                    <input type="text" name="latitude" id="authLatitude" class="form-control" placeholder="e.g., -1.2921">
-                                </div>
-                            </div>
-                            <div>
-                                <div class="mb-3">
-                                    <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Longitude</label>
-                                    <div class="input-group">
-                                        <input type="text" name="longitude" id="authLongitude" class="form-control" placeholder="e.g., 36.8219">
-                                        <button type="button" class="btn btn-outline-secondary" onclick="getGPSLocation()" title="Get current location">
-                                            <i class="bi bi-crosshair"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <input type="hidden" name="latitude" id="authLatitude">
+                        <input type="hidden" name="longitude" id="authLongitude">
                         
                         <div class="mb-3">
                             <label class="form-label"><i class="bi bi-router text-info me-1"></i>ONU Type Override</label>
