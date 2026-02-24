@@ -3111,34 +3111,33 @@ JS;
             // Retry loop: refresh FIRST, wait, then read
             $wanDeviceIndex = null;
             
+            $taskUrl = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
+            
             for ($attempt = 0; $attempt < 10; $attempt++) {
-                // Step A: Force GenieACS to rediscover the tree via refreshObject
-                // Use direct curl with auth to ensure nothing is lost in the wrapper
-                $refreshUrl = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
-                $refreshPayload = json_encode(['name' => 'refreshObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice']);
-                $ch = curl_init($refreshUrl);
+                // Step A: getParameterNames forces GenieACS to rediscover children (tree rebuild)
+                $gpnPayload = json_encode(['name' => 'getParameterNames', 'parameterPath' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.', 'nextLevel' => false]);
+                $ch = curl_init($taskUrl);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_POST => true,
                     CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => $refreshPayload,
+                    CURLOPT_POSTFIELDS => $gpnPayload,
                     CURLOPT_TIMEOUT => 35
                 ]);
                 if (!empty($this->username)) {
                     curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
                 }
-                $refreshResp = curl_exec($ch);
-                $refreshCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $refreshErr = curl_error($ch);
+                $gpnResp = curl_exec($ch);
+                $gpnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $gpnErr = curl_error($ch);
                 curl_close($ch);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: refreshObject HTTP {$refreshCode}" . ($refreshErr ? " ERR: {$refreshErr}" : "") . " resp: " . substr($refreshResp ?: '', 0, 200));
+                error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterNames HTTP {$gpnCode}" . ($gpnErr ? " ERR: {$gpnErr}" : "") . " resp: " . substr($gpnResp ?: '', 0, 200));
                 
-                sleep(5);
+                sleep(4);
                 
-                // Step B: Force getParameterValues to sync the subtree
-                $gpvUrl = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
+                // Step B: getParameterValues to sync values for the subtree
                 $gpvPayload = json_encode(['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']]);
-                $ch2 = curl_init($gpvUrl);
+                $ch2 = curl_init($taskUrl);
                 curl_setopt_array($ch2, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_POST => true,
@@ -3155,7 +3154,7 @@ JS;
                 curl_close($ch2);
                 error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterValues HTTP {$gpvCode}" . ($gpvErr ? " ERR: {$gpvErr}" : "") . " resp: " . substr($gpvResp ?: '', 0, 200));
                 
-                sleep(5);
+                sleep(4);
                 
                 // Step C: NOW read the updated tree
                 $newIndices = $scanWanDeviceIndices($deviceId);
@@ -3194,15 +3193,15 @@ JS;
             // Retry loop: refresh FIRST, then check for WANIPConnection
             $ipConnectionConfirmed = false;
             $ipConnPattern = "/WANConnectionDevice\.{$wanDeviceIndex}\.WANIPConnection\.(\d+)/";
+            $taskUrl2 = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
             for ($attempt = 0; $attempt < 8; $attempt++) {
-                // Step A: Force refresh via direct curl with auth
-                $refreshUrl3 = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
-                $ch3 = curl_init($refreshUrl3);
+                // Step A: getParameterNames to rediscover WANIPConnection children
+                $ch3 = curl_init($taskUrl2);
                 curl_setopt_array($ch3, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_POST => true,
                     CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => json_encode(['name' => 'refreshObject', 'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}"]),
+                    CURLOPT_POSTFIELDS => json_encode(['name' => 'getParameterNames', 'parameterPath' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.", 'nextLevel' => false]),
                     CURLOPT_TIMEOUT => 35
                 ]);
                 if (!empty($this->username)) {
@@ -3211,11 +3210,12 @@ JS;
                 $r3 = curl_exec($ch3);
                 $rc3 = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
                 curl_close($ch3);
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: refreshObject HTTP {$rc3}");
+                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterNames HTTP {$rc3}");
                 
                 sleep(4);
                 
-                $ch4 = curl_init($refreshUrl3);
+                // Step B: getParameterValues to sync
+                $ch4 = curl_init($taskUrl2);
                 curl_setopt_array($ch4, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_POST => true,
