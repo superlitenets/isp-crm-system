@@ -9486,8 +9486,8 @@ class HuaweiOLT {
         $allOutput = '';
         
         // Step 1: Find all service-ports for this ONU via raw script
-        // (using raw script instead of executeCommand to prevent command concatenation)
-        $spQueryScript = "config\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
+        // Query inside interface gpon context for proper results
+        $spQueryScript = "config\ninterface gpon {$frame}/{$slot}\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}\nquit";
         $spResult = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
             'script' => $spQueryScript,
@@ -9502,8 +9502,7 @@ class HuaweiOLT {
             $servicePortIds = array_map('intval', $matches[1]);
         }
         
-        // Step 2: Build complete delete script as raw lines
-        // Session should be in config mode from step 1 (no quit was sent)
+        // Step 2: Build delete script - remove service-ports first, then delete ONU
         $scriptLines = [];
         $scriptLines[] = "config";
         foreach ($servicePortIds as $spId) {

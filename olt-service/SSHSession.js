@@ -380,6 +380,8 @@ class SSHSession {
                         clearTimeout(sendTimer);
                         sendTimer = null;
                         commandPending = false;
+                        commandIndex--;
+                        console.log(`[OLT ${this.oltId}] SSH raw script: rewound command index to ${commandIndex} (will resend after lock)`);
                     }
                     lockPending = true;
                     cmdResponse = '';
