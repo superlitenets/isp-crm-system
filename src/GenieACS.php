@@ -3110,21 +3110,53 @@ JS;
             
             // Retry loop: refresh FIRST, wait, then read
             $wanDeviceIndex = null;
+            
             for ($attempt = 0; $attempt < 10; $attempt++) {
-                // Step A: Force GenieACS to rediscover the tree from the ONU
-                $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    ['name' => 'refreshObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
-                );
-                sleep(3);
-                // Step B: Force parameter sync
-                $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']]
-                );
-                sleep(3);
+                // Step A: Force GenieACS to rediscover the tree via refreshObject
+                // Use direct curl with auth to ensure nothing is lost in the wrapper
+                $refreshUrl = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
+                $refreshPayload = json_encode(['name' => 'refreshObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice']);
+                $ch = curl_init($refreshUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => $refreshPayload,
+                    CURLOPT_TIMEOUT => 35
+                ]);
+                if (!empty($this->username)) {
+                    curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+                }
+                $refreshResp = curl_exec($ch);
+                $refreshCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $refreshErr = curl_error($ch);
+                curl_close($ch);
+                error_log("[configureWifiAccessVlan] Attempt {$attempt}: refreshObject HTTP {$refreshCode}" . ($refreshErr ? " ERR: {$refreshErr}" : "") . " resp: " . substr($refreshResp ?: '', 0, 200));
+                
+                sleep(5);
+                
+                // Step B: Force getParameterValues to sync the subtree
+                $gpvUrl = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
+                $gpvPayload = json_encode(['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']]);
+                $ch2 = curl_init($gpvUrl);
+                curl_setopt_array($ch2, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => $gpvPayload,
+                    CURLOPT_TIMEOUT => 35
+                ]);
+                if (!empty($this->username)) {
+                    curl_setopt($ch2, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+                }
+                $gpvResp = curl_exec($ch2);
+                $gpvCode = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+                $gpvErr = curl_error($ch2);
+                curl_close($ch2);
+                error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterValues HTTP {$gpvCode}" . ($gpvErr ? " ERR: {$gpvErr}" : "") . " resp: " . substr($gpvResp ?: '', 0, 200));
+                
+                sleep(5);
+                
                 // Step C: NOW read the updated tree
                 $newIndices = $scanWanDeviceIndices($deviceId);
                 error_log("[configureWifiAccessVlan] Attempt {$attempt}: found WANConnectionDevice indices: " . json_encode($newIndices) . ", existing: " . json_encode($existingWanIndices));
@@ -3135,7 +3167,6 @@ JS;
                     break;
                 }
                 error_log("[configureWifiAccessVlan] Attempt {$attempt}: WANConnectionDevice not yet visible, waiting...");
-                sleep(2);
             }
             
             if ($wanDeviceIndex === null) {
@@ -3164,19 +3195,44 @@ JS;
             $ipConnectionConfirmed = false;
             $ipConnPattern = "/WANConnectionDevice\.{$wanDeviceIndex}\.WANIPConnection\.(\d+)/";
             for ($attempt = 0; $attempt < 8; $attempt++) {
-                // Step A: Force refresh of the new WANConnectionDevice subtree
-                $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    ['name' => 'refreshObject', 'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]
-                );
-                sleep(3);
-                $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    ['name' => 'getParameterValues', 'parameterNames' => ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]]
-                );
-                sleep(3);
+                // Step A: Force refresh via direct curl with auth
+                $refreshUrl3 = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout=30000";
+                $ch3 = curl_init($refreshUrl3);
+                curl_setopt_array($ch3, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => json_encode(['name' => 'refreshObject', 'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}"]),
+                    CURLOPT_TIMEOUT => 35
+                ]);
+                if (!empty($this->username)) {
+                    curl_setopt($ch3, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+                }
+                $r3 = curl_exec($ch3);
+                $rc3 = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
+                curl_close($ch3);
+                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: refreshObject HTTP {$rc3}");
+                
+                sleep(4);
+                
+                $ch4 = curl_init($refreshUrl3);
+                curl_setopt_array($ch4, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => json_encode(['name' => 'getParameterValues', 'parameterNames' => ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]]),
+                    CURLOPT_TIMEOUT => 35
+                ]);
+                if (!empty($this->username)) {
+                    curl_setopt($ch4, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
+                }
+                $r4 = curl_exec($ch4);
+                $rc4 = curl_getinfo($ch4, CURLINFO_HTTP_CODE);
+                curl_close($ch4);
+                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterValues HTTP {$rc4}");
+                
+                sleep(4);
+                
                 // Step B: NOW read the tree
                 $refreshedDev2 = $this->getDevice($deviceId, true);
                 if ($refreshedDev2['success'] && !empty($refreshedDev2['data'])) {
@@ -3188,7 +3244,7 @@ JS;
                         }
                     }
                 }
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: WANIPConnection not yet visible, waiting...");
+                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: WANIPConnection not yet visible, waiting...");
                 sleep(2);
             }
             
