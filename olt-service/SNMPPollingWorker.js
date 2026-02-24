@@ -374,7 +374,7 @@ class SNMPPollingWorker {
                         const newlyOffline = offlineOnus.filter(o => o.onu.status === 'online').slice(0, 10);
                         for (const { onu } of newlyOffline) {
                             try {
-                                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont info ${port} ${onu.onu_id}\nquit\nquit\n`;
+                                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont info ${port} ${onu.onu_id}\nquit\n`;
                                 const infoResult = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
                                 if (infoResult) {
                                     const causeMatch = infoResult.match(/Last down cause\s*:\s*(.+)/i);
@@ -475,7 +475,7 @@ class SNMPPollingWorker {
             
             const [frame, slot, port] = portKey.split('/').map(Number);
             try {
-                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\nquit\n`;
+                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\n`;
                 const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
                 if (!result) continue;
                 
@@ -561,7 +561,7 @@ class SNMPPollingWorker {
             
             const [frame, slot, port] = portKey.split('/').map(Number);
             try {
-                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\nquit\n`;
+                const script = `config\ninterface gpon ${frame}/${slot}\ndisplay ont optical-info ${port} all\nquit\n`;
                 const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 20000 });
                 if (!result) continue;
                 
@@ -1298,7 +1298,7 @@ class SNMPPollingWorker {
                                 break;
                             }
                             try {
-                                const script = `config\ninterface gpon ${group.frame}/${group.slot}\ndisplay ont info ${group.port} ${onu.onu_id}\nquit\nquit\n`;
+                                const script = `config\ninterface gpon ${group.frame}/${group.slot}\ndisplay ont info ${group.port} ${onu.onu_id}\nquit\n`;
                                 const result = await this.sessionManager.executeRaw(oltKey, script, { timeout: 15000 });
                                 if (result) {
                                     const causeMatch = result.match(/Last down cause\s*:\s*(.+)/i);

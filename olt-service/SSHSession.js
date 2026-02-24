@@ -311,11 +311,13 @@ class SSHSession {
                 return reject(new Error('SSH not connected'));
             }
 
-            let response = '';
+            let fullResponse = '';
+            let cmdResponse = '';
             let resolved = false;
             let timeoutId = null;
             let commandIndex = 0;
             let waitingForPrompt = false;
+            let commandPending = false;
 
             const confirmPatterns = [
                 /\[y\/n\]/i, /\(y\/n\)/i, /y or n/i,
@@ -329,25 +331,30 @@ class SSHSession {
             console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
 
             const sendNextCommand = () => {
+                commandPending = false;
                 if (commandIndex >= lines.length) {
                     waitingForPrompt = true;
+                    cmdResponse = '';
                     console.log(`[OLT ${this.oltId}] SSH raw script: all ${lines.length} commands sent, waiting for final prompt`);
                     return;
                 }
                 const line = lines[commandIndex];
                 commandIndex++;
+                cmdResponse = '';
                 console.log(`[OLT ${this.oltId}] SSH raw> ${line}`);
                 this.stream.write(line + '\r');
             };
 
             const dataHandler = (chunk) => {
-                response += chunk;
-                const cleanResponse = this.stripAnsi(response);
+                fullResponse += chunk;
+                cmdResponse += chunk;
                 
-                if (response.includes('---- More') || response.includes('--More--')) {
+                if (cmdResponse.includes('---- More') || cmdResponse.includes('--More--')) {
                     this.stream.write(' ');
-                    response = response.replace(/---- More.*?----/gi, '');
-                    response = response.replace(/--More--/gi, '');
+                    cmdResponse = cmdResponse.replace(/---- More.*?----/gi, '');
+                    cmdResponse = cmdResponse.replace(/--More--/gi, '');
+                    fullResponse = fullResponse.replace(/---- More.*?----/gi, '');
+                    fullResponse = fullResponse.replace(/--More--/gi, '');
                     return;
                 }
                 
@@ -355,6 +362,7 @@ class SSHSession {
 
                 if (lockPromptPattern.test(recentChunk)) {
                     console.log(`[OLT ${this.oltId}] SSH raw script: config lock prompt detected, pressing Enter to take lock`);
+                    cmdResponse = '';
                     setTimeout(() => {
                         if (this.stream && this.connected) {
                             this.stream.write('\r');
@@ -373,20 +381,22 @@ class SSHSession {
                     return;
                 }
                 
-                const chunkLines = cleanResponse.split(/\r?\n/).filter(l => l.trim());
-                const lastLine = chunkLines[chunkLines.length - 1] || '';
+                const cleanCmd = this.stripAnsi(cmdResponse);
+                const cmdLines = cleanCmd.split(/\r?\n/).filter(l => l.trim());
+                const lastLine = cmdLines[cmdLines.length - 1] || '';
                 
-                if (this.promptPattern.test(lastLine)) {
+                if (this.promptPattern.test(lastLine) && !commandPending) {
                     if (waitingForPrompt) {
                         if (!resolved) {
                             resolved = true;
                             clearTimeout(timeoutId);
                             this.removeDataListener(dataHandler);
                             this.lastActivity = Date.now();
-                            console.log(`[OLT ${this.oltId}] SSH raw script completed (${response.length} bytes)`);
-                            resolve(response);
+                            console.log(`[OLT ${this.oltId}] SSH raw script completed (${fullResponse.length} bytes)`);
+                            resolve(fullResponse);
                         }
                     } else {
+                        commandPending = true;
                         setTimeout(() => sendNextCommand(), 200);
                     }
                 }
@@ -398,10 +408,10 @@ class SSHSession {
                 if (!resolved) {
                     resolved = true;
                     this.removeDataListener(dataHandler);
-                    console.log(`[OLT ${this.oltId}] SSH raw script timeout, got ${response.length} bytes`);
-                    console.log(`[OLT ${this.oltId}] Last 500 chars: ${response.slice(-500).replace(/\r?\n/g, '\\n')}`);
-                    if (response.length > 50) {
-                        resolve(response);
+                    console.log(`[OLT ${this.oltId}] SSH raw script timeout, got ${fullResponse.length} bytes`);
+                    console.log(`[OLT ${this.oltId}] Last 500 chars: ${fullResponse.slice(-500).replace(/\r?\n/g, '\\n')}`);
+                    if (fullResponse.length > 50) {
+                        resolve(fullResponse);
                     } else {
                         reject(new Error('SSH raw script timeout'));
                     }
@@ -409,7 +419,8 @@ class SSHSession {
             }, timeout);
 
             this.buffer = '';
-            response = '';
+            cmdResponse = '';
+            fullResponse = '';
             
             sendNextCommand();
         });
