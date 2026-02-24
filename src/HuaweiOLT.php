@@ -6846,6 +6846,7 @@ class HuaweiOLT {
         // Bridge mode needs native VLAN on all ETH ports (from ONU type config)
         if ($vlanId && $assignedOnuId !== null && $isBridgeMode) {
             $scriptLines = [];
+            $scriptLines[] = "config";
             $scriptLines[] = "interface gpon {$frame}/{$slot}";
             for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
                 $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth {$ethPort} vlan {$vlanId} priority 0";
@@ -6874,6 +6875,7 @@ class HuaweiOLT {
             }
         } elseif ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
             $scriptLines = [];
+            $scriptLines[] = "config";
             $scriptLines[] = "interface gpon {$frame}/{$slot}";
             $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0";
             $scriptLines[] = "quit";
@@ -6913,6 +6915,7 @@ class HuaweiOLT {
             
             // TR-069 OMCI config (ipconfig + tr069-server-config)
             $tr069ScriptLines = [];
+            $tr069ScriptLines[] = "config";
             $tr069ScriptLines[] = "interface gpon {$frame}/{$slot}";
             $tr069ScriptLines[] = "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}";
             if ($tr069ProfileId) {
@@ -7072,6 +7075,7 @@ class HuaweiOLT {
         // Step 1 + 2: Configure IPHOST/WAN with DHCP on TR-069 VLAN + TR-069 profile
         $tr069Priority = $options['tr069_priority'] ?? 2;
         $tr069ScriptLines = [];
+        $tr069ScriptLines[] = "config";
         $tr069ScriptLines[] = "interface gpon {$frame}/{$slot}";
         $tr069ScriptLines[] = "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}";
         if ($tr069ProfileId) {
@@ -7130,6 +7134,7 @@ class HuaweiOLT {
         if ($isBridgeMode && $serviceVlan) {
             $output .= "[Bridge Mode: Native VLAN on {$ethPortCount} ETH ports]\n";
             $bridgeScriptLines = [];
+            $bridgeScriptLines[] = "config";
             $bridgeScriptLines[] = "interface gpon {$frame}/{$slot}";
             for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
                 $bridgeScriptLines[] = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$serviceVlan} priority 0";
@@ -7446,6 +7451,7 @@ class HuaweiOLT {
         // Configure bridge mode: native VLAN on all ETH ports via raw script
         $output .= "[Bridge Mode: Native VLAN on {$ethPortCount} ETH ports]\n";
         $scriptLines = [];
+        $scriptLines[] = "config";
         $scriptLines[] = "interface gpon {$frame}/{$slot}";
         for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
             $scriptLines[] = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority 0";
@@ -7526,6 +7532,7 @@ class HuaweiOLT {
         if ($ethPortCount < 1) $ethPortCount = 1;
         
         $scriptLines = [];
+        $scriptLines[] = "config";
         $scriptLines[] = "interface gpon {$frame}/{$slot}";
         for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
             $scriptLines[] = "undo ont port native-vlan {$port} {$onuOltId} eth {$ethPort}";
@@ -7548,6 +7555,7 @@ class HuaweiOLT {
         
         // Re-apply native VLAN on ETH 1 only (router mode)
         $routerScript = [];
+        $routerScript[] = "config";
         $routerScript[] = "interface gpon {$frame}/{$slot}";
         $routerScript[] = "ont port native-vlan {$port} {$onuOltId} eth 1 vlan {$vlanId} priority 0";
         $routerScript[] = "quit";
@@ -9490,8 +9498,10 @@ class HuaweiOLT {
         }
         
         // Step 2: Build complete delete script as raw lines
-        // Each line is sent separately with delays, only final prompt is awaited
+        // Always start with 'config' to ensure we're in config mode
+        // (session may be in enable mode after background script quit)
         $scriptLines = [];
+        $scriptLines[] = "config";
         foreach ($servicePortIds as $spId) {
             $scriptLines[] = "undo service-port {$spId}";
         }
@@ -12117,7 +12127,7 @@ class HuaweiOLT {
         
         $this->pauseDiscovery($oltId, 60000);
         
-        $script = "interface gpon {$frame}/{$slot}\n";
+        $script = "config\ninterface gpon {$frame}/{$slot}\n";
         
         foreach ($portConfigs as $ethPort => $config) {
             $mode = $config['mode'] ?? 'access';
