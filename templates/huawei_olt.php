@@ -194,12 +194,11 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
             try {
                 $result = $oneISP->searchCustomers($query);
                 $oneispData = [];
-                if (!empty($result['success']) && !empty($result['data'])) {
-                    $oneispData = $result['data'];
-                } elseif (!empty($result['data']) && is_array($result['data'])) {
+                if (!empty($result['data']) && is_array($result['data'])) {
                     $oneispData = $result['data'];
                 }
                 foreach ($oneispData as $bc) {
+                    if (!is_array($bc)) continue;
                     $mapped = $oneISP->mapCustomerToLocal($bc);
                     if (!$mapped) continue;
 
