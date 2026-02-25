@@ -59,6 +59,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $employeeRecord) {
             $errorMsg = $e->getMessage();
         }
     }
+
+    if ($postAction === 'sign_contract' && !empty($_POST['contract_id'])) {
+        try {
+            $contractId = (int)$_POST['contract_id'];
+            $chk = $db->prepare("SELECT * FROM employee_contracts WHERE id = ? AND employee_id = ? AND status = 'pending'");
+            $chk->execute([$contractId, $employeeRecord['id']]);
+            $contract = $chk->fetch(PDO::FETCH_ASSOC);
+            if (!$contract) {
+                $errorMsg = 'Contract not found or already signed.';
+            } elseif (empty($_POST['signature_data'])) {
+                $errorMsg = 'Please provide your signature.';
+            } elseif (empty($_POST['agree_terms'])) {
+                $errorMsg = 'You must agree to the contract terms.';
+            } else {
+                $signerIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+                $signerName = trim($_POST['signer_name'] ?? $employeeRecord['name']);
+                $upd = $db->prepare("
+                    UPDATE employee_contracts 
+                    SET status = 'signed', signed_at = CURRENT_TIMESTAMP, signature_data = ?, signer_ip = ?, signer_name = ?, viewed_at = COALESCE(viewed_at, CURRENT_TIMESTAMP)
+                    WHERE id = ? AND employee_id = ?
+                ");
+                $upd->execute([$_POST['signature_data'], $signerIp, $signerName, $contractId, $employeeRecord['id']]);
+                $successMsg = 'Contract signed successfully!';
+            }
+        } catch (\Exception $e) {
+            $errorMsg = 'Error signing contract: ' . $e->getMessage();
+        }
+    }
     }
 }
 
@@ -67,6 +95,21 @@ $leaveRequests = $employeeRecord ? $leaveService->getEmployeeRequests($employeeR
 $leaveTypes = $leaveService->getLeaveTypes();
 $advances = $employeeRecord ? $advanceService->getByEmployee($employeeRecord['id']) : [];
 $totalOutstanding = $employeeRecord ? $advanceService->getEmployeeTotalOutstanding($employeeRecord['id']) : 0;
+
+$employeeContracts = [];
+if ($employeeRecord) {
+    try {
+        $cStmt = $db->prepare("SELECT ec.*, u.username as created_by_name FROM employee_contracts ec LEFT JOIN users u ON ec.created_by = u.id WHERE ec.employee_id = ? ORDER BY ec.created_at DESC");
+        $cStmt->execute([$employeeRecord['id']]);
+        $employeeContracts = $cStmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($_GET['subpage'] === 'contracts' && !empty($_GET['view'])) {
+            $viewId = (int)$_GET['view'];
+            $markViewed = $db->prepare("UPDATE employee_contracts SET viewed_at = COALESCE(viewed_at, CURRENT_TIMESTAMP) WHERE id = ? AND employee_id = ?");
+            $markViewed->execute([$viewId, $employeeRecord['id']]);
+        }
+    } catch (\Exception $e) { $employeeContracts = []; }
+}
+$pendingContracts = array_filter($employeeContracts, fn($c) => $c['status'] === 'pending');
 
 $walletData = [];
 if ($employeeRecord) {
@@ -193,6 +236,14 @@ if ($employeeRecord) {
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'wallet' ? 'active' : '' ?>" href="?page=my-hr&subpage=wallet">
             <i class="bi bi-wallet2"></i> My Wallet
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'contracts' ? 'active' : '' ?>" href="?page=my-hr&subpage=contracts">
+            <i class="bi bi-file-earmark-text"></i> Contracts
+            <?php if (count($pendingContracts) > 0): ?>
+                <span class="badge bg-danger"><?= count($pendingContracts) ?></span>
+            <?php endif; ?>
         </a>
     </li>
 </ul>
@@ -470,6 +521,221 @@ if ($employeeRecord) {
         </div>
     </div>
 </div>
+<?php endif; ?>
+
+<?php if ($subpage === 'contracts'): ?>
+<?php
+    $viewContractId = (int)($_GET['view'] ?? 0);
+    $viewContract = null;
+    if ($viewContractId) {
+        foreach ($employeeContracts as $c) {
+            if ($c['id'] == $viewContractId) { $viewContract = $c; break; }
+        }
+    }
+?>
+
+<?php if ($viewContract): ?>
+<div class="mb-3">
+    <a href="?page=my-hr&subpage=contracts" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to Contracts
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-1"><?= htmlspecialchars($viewContract['title']) ?></h5>
+            <small class="text-muted">
+                <?= ucfirst($viewContract['contract_type']) ?> Contract
+                &middot; Sent <?= date('M j, Y', strtotime($viewContract['created_at'])) ?>
+                <?php if ($viewContract['expires_at']): ?>
+                    &middot; Expires <?= date('M j, Y', strtotime($viewContract['expires_at'])) ?>
+                <?php endif; ?>
+            </small>
+        </div>
+        <span class="badge bg-<?= $viewContract['status'] === 'signed' ? 'success' : ($viewContract['status'] === 'pending' ? 'warning text-dark' : 'secondary') ?> fs-6">
+            <?= ucfirst($viewContract['status']) ?>
+        </span>
+    </div>
+    <div class="card-body">
+        <?php if ($viewContract['description']): ?>
+            <p class="text-muted"><?= nl2br(htmlspecialchars($viewContract['description'])) ?></p>
+            <hr>
+        <?php endif; ?>
+
+        <?php if ($viewContract['file_path']): ?>
+            <div class="mb-3">
+                <a href="<?= htmlspecialchars($viewContract['file_path']) ?>" target="_blank" class="btn btn-outline-primary">
+                    <i class="bi bi-file-earmark-pdf"></i> View Contract Document
+                </a>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($viewContract['content']): ?>
+            <div class="border rounded p-4 bg-light mb-4" style="max-height: 500px; overflow-y: auto; font-family: 'Georgia', serif; line-height: 1.8;">
+                <?= nl2br(htmlspecialchars($viewContract['content'])) ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($viewContract['status'] === 'signed'): ?>
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle-fill"></i>
+                <strong>Signed</strong> by <?= htmlspecialchars($viewContract['signer_name']) ?>
+                on <?= date('M j, Y \a\t H:i', strtotime($viewContract['signed_at'])) ?>
+                (IP: <?= htmlspecialchars($viewContract['signer_ip']) ?>)
+            </div>
+            <?php if ($viewContract['signature_data']): ?>
+                <div class="text-center">
+                    <p class="text-muted small mb-1">Digital Signature</p>
+                    <img src="<?= $viewContract['signature_data'] ?>" alt="Signature" class="border rounded" style="max-width: 400px; max-height: 150px; background: #fff;">
+                </div>
+            <?php endif; ?>
+        <?php elseif ($viewContract['status'] === 'pending'): ?>
+            <hr>
+            <h6><i class="bi bi-pen"></i> Sign This Contract</h6>
+            <form method="POST" id="signContractForm">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="sign_contract">
+                <input type="hidden" name="contract_id" value="<?= $viewContract['id'] ?>">
+                <input type="hidden" name="signature_data" id="signatureData">
+
+                <div class="mb-3">
+                    <label class="form-label">Your Full Name (as signature confirmation)</label>
+                    <input type="text" name="signer_name" class="form-control" value="<?= htmlspecialchars($employeeRecord['name']) ?>" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Draw Your Signature</label>
+                    <div class="border rounded bg-white position-relative" style="touch-action: none;">
+                        <canvas id="signatureCanvas" width="500" height="180" style="width: 100%; cursor: crosshair;"></canvas>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="clearSignature()">
+                        <i class="bi bi-eraser"></i> Clear
+                    </button>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="agree_terms" id="agreeTerms" required>
+                    <label class="form-check-label" for="agreeTerms">
+                        I have read and agree to the terms of this contract. I understand that this digital signature is legally binding.
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-success btn-lg" id="signBtn" disabled>
+                    <i class="bi bi-pen"></i> Sign Contract
+                </button>
+            </form>
+
+            <script>
+            (function() {
+                const canvas = document.getElementById('signatureCanvas');
+                const ctx = canvas.getContext('2d');
+                let drawing = false;
+                let hasDrawn = false;
+
+                function getPos(e) {
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    if (e.touches) {
+                        return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+                    }
+                    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+                }
+
+                canvas.addEventListener('mousedown', function(e) { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+                canvas.addEventListener('mousemove', function(e) { if (!drawing) return; const p = getPos(e); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#000'; ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; });
+                canvas.addEventListener('mouseup', function() { drawing = false; updateSignBtn(); });
+                canvas.addEventListener('mouseleave', function() { drawing = false; });
+
+                canvas.addEventListener('touchstart', function(e) { e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+                canvas.addEventListener('touchmove', function(e) { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#000'; ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; });
+                canvas.addEventListener('touchend', function() { drawing = false; updateSignBtn(); });
+
+                window.clearSignature = function() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    hasDrawn = false;
+                    updateSignBtn();
+                };
+
+                function updateSignBtn() {
+                    document.getElementById('signBtn').disabled = !(hasDrawn && document.getElementById('agreeTerms').checked);
+                }
+                document.getElementById('agreeTerms').addEventListener('change', updateSignBtn);
+
+                document.getElementById('signContractForm').addEventListener('submit', function(e) {
+                    if (!hasDrawn) { e.preventDefault(); alert('Please draw your signature.'); return; }
+                    document.getElementById('signatureData').value = canvas.toDataURL('image/png');
+                });
+            })();
+            </script>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php else: ?>
+
+<?php if (count($pendingContracts) > 0): ?>
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    You have <strong><?= count($pendingContracts) ?></strong> contract<?= count($pendingContracts) > 1 ? 's' : '' ?> awaiting your signature.
+</div>
+<?php endif; ?>
+
+<?php if (empty($employeeContracts)): ?>
+<div class="text-center text-muted py-5">
+    <i class="bi bi-file-earmark-text" style="font-size: 3rem;"></i>
+    <p class="mt-2">No contracts yet.</p>
+</div>
+<?php else: ?>
+<div class="row g-3">
+    <?php foreach ($employeeContracts as $c): ?>
+    <div class="col-md-6">
+        <div class="card <?= $c['status'] === 'pending' ? 'border-warning' : '' ?>">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="card-title mb-0"><?= htmlspecialchars($c['title']) ?></h6>
+                    <span class="badge bg-<?= $c['status'] === 'signed' ? 'success' : ($c['status'] === 'pending' ? 'warning text-dark' : 'secondary') ?>">
+                        <?= ucfirst($c['status']) ?>
+                    </span>
+                </div>
+                <p class="text-muted small mb-2">
+                    <i class="bi bi-tag"></i> <?= ucfirst($c['contract_type']) ?>
+                    &middot; Sent <?= date('M j, Y', strtotime($c['created_at'])) ?>
+                    <?php if ($c['expires_at']): ?>
+                        &middot; Expires <?= date('M j, Y', strtotime($c['expires_at'])) ?>
+                    <?php endif; ?>
+                </p>
+                <?php if ($c['description']): ?>
+                    <p class="small mb-2"><?= htmlspecialchars(mb_strimwidth($c['description'], 0, 120, '...')) ?></p>
+                <?php endif; ?>
+                <div class="d-flex gap-2">
+                    <a href="?page=my-hr&subpage=contracts&view=<?= $c['id'] ?>" class="btn btn-sm <?= $c['status'] === 'pending' ? 'btn-warning' : 'btn-outline-primary' ?>">
+                        <?php if ($c['status'] === 'pending'): ?>
+                            <i class="bi bi-pen"></i> Review & Sign
+                        <?php else: ?>
+                            <i class="bi bi-eye"></i> View
+                        <?php endif; ?>
+                    </a>
+                    <?php if ($c['file_path']): ?>
+                        <a href="<?= htmlspecialchars($c['file_path']) ?>" target="_blank" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-download"></i> Download
+                        </a>
+                    <?php endif; ?>
+                </div>
+                <?php if ($c['status'] === 'signed'): ?>
+                    <small class="text-success d-block mt-2">
+                        <i class="bi bi-check-circle"></i> Signed <?= date('M j, Y', strtotime($c['signed_at'])) ?>
+                    </small>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
+<?php endif; ?>
 <?php endif; ?>
 
 <?php if ($subpage === 'wallet'): ?>

@@ -732,6 +732,190 @@ try {
     </div>
 </div>
 
+<!-- Employee Contracts Section -->
+<?php
+    $empContracts = [];
+    try {
+        $ecStmt = $db->prepare("SELECT ec.*, u.username as created_by_name FROM employee_contracts ec LEFT JOIN users u ON ec.created_by = u.id WHERE ec.employee_id = ? ORDER BY ec.created_at DESC");
+        $ecStmt->execute([$employeeData['id']]);
+        $empContracts = $ecStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Exception $e) { $empContracts = []; }
+?>
+<div class="card mt-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Contracts</h5>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createContractModal">
+            <i class="bi bi-plus-lg"></i> New Contract
+        </button>
+    </div>
+    <div class="card-body">
+        <?php if (empty($empContracts)): ?>
+            <p class="text-muted text-center mb-0">No contracts yet.</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Sent</th>
+                        <th>Status</th>
+                        <th>Signed</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($empContracts as $ec): ?>
+                    <tr>
+                        <td>
+                            <?= htmlspecialchars($ec['title']) ?>
+                            <?php if ($ec['file_path']): ?>
+                                <a href="<?= htmlspecialchars($ec['file_path']) ?>" target="_blank" class="ms-1"><i class="bi bi-paperclip"></i></a>
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="badge bg-light text-dark"><?= ucfirst($ec['contract_type']) ?></span></td>
+                        <td><small><?= date('M j, Y', strtotime($ec['created_at'])) ?></small></td>
+                        <td>
+                            <?php if ($ec['status'] === 'signed'): ?>
+                                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Signed</span>
+                            <?php elseif ($ec['status'] === 'pending'): ?>
+                                <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Pending</span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary"><?= ucfirst($ec['status']) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($ec['signed_at']): ?>
+                                <small><?= date('M j, Y H:i', strtotime($ec['signed_at'])) ?></small>
+                                <br><small class="text-muted">by <?= htmlspecialchars($ec['signer_name'] ?? '-') ?></small>
+                            <?php else: ?>
+                                <small class="text-muted">-</small>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($ec['status'] === 'signed' && $ec['signature_data']): ?>
+                                <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#viewSigModal<?= $ec['id'] ?>">
+                                    <i class="bi bi-pen"></i> Signature
+                                </button>
+                            <?php endif; ?>
+                            <?php if ($ec['content']): ?>
+                                <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#viewContentModal<?= $ec['id'] ?>">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            <?php endif; ?>
+                            <?php if ($ec['status'] !== 'signed'): ?>
+                                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this contract?')">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="delete_contract">
+                                    <input type="hidden" name="contract_id" value="<?= $ec['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php foreach ($empContracts as $ec): ?>
+<?php if ($ec['status'] === 'signed' && $ec['signature_data']): ?>
+<div class="modal fade" id="viewSigModal<?= $ec['id'] ?>" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Signature — <?= htmlspecialchars($ec['title']) ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="<?= $ec['signature_data'] ?>" alt="Signature" class="border rounded" style="max-width: 100%; background: #fff;">
+                <p class="mt-3 text-muted small">
+                    Signed by <strong><?= htmlspecialchars($ec['signer_name']) ?></strong>
+                    on <?= date('M j, Y \a\t H:i', strtotime($ec['signed_at'])) ?>
+                    <br>IP: <?= htmlspecialchars($ec['signer_ip']) ?>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<?php if ($ec['content']): ?>
+<div class="modal fade" id="viewContentModal<?= $ec['id'] ?>" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><?= htmlspecialchars($ec['title']) ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="font-family: 'Georgia', serif; line-height: 1.8;">
+                <?= nl2br(htmlspecialchars($ec['content'])) ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<?php endforeach; ?>
+
+<!-- Create Contract Modal -->
+<div class="modal fade" id="createContractModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="create_contract">
+                <input type="hidden" name="employee_id" value="<?= $employeeData['id'] ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-plus"></i> Create Contract for <?= htmlspecialchars($employeeData['name']) ?></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Contract Title</label>
+                            <input type="text" name="contract_title" class="form-control" required placeholder="e.g. Employment Agreement 2026">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Contract Type</label>
+                            <select name="contract_type" class="form-select">
+                                <option value="employment">Employment</option>
+                                <option value="nda">NDA</option>
+                                <option value="amendment">Amendment</option>
+                                <option value="termination">Termination</option>
+                                <option value="probation">Probation</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description (optional)</label>
+                            <input type="text" name="contract_description" class="form-control" placeholder="Brief description of the contract">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Contract Content (text body)</label>
+                            <textarea name="contract_content" class="form-control" rows="10" placeholder="Enter the full contract text here. The employee will read and sign this..."></textarea>
+                            <small class="text-muted">You can also upload a PDF file below instead of or in addition to the text content.</small>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Upload Contract Document (PDF, optional)</label>
+                            <input type="file" name="contract_file" class="form-control" accept=".pdf,.doc,.docx">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Expiry Date (optional)</label>
+                            <input type="date" name="expires_at" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Create & Send for Signing</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Employee Wallet / Earnings Statement -->
 <?php $w = $empStats['wallet'] ?? []; ?>
 <div class="card mt-4">

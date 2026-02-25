@@ -4331,6 +4331,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
                 
+            case 'create_contract':
+                $contractEmpId = (int)($_POST['employee_id'] ?? 0);
+                $contractTitle = trim($_POST['contract_title'] ?? '');
+                if (!$contractEmpId || !$contractTitle) {
+                    $message = 'Employee and contract title are required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $filePath = null;
+                        if (!empty($_FILES['contract_file']['name']) && $_FILES['contract_file']['error'] === UPLOAD_ERR_OK) {
+                            $uploadDir = __DIR__ . '/uploads/contracts/';
+                            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                            $ext = strtolower(pathinfo($_FILES['contract_file']['name'], PATHINFO_EXTENSION));
+                            $filename = 'contract_' . $contractEmpId . '_' . uniqid() . '.' . $ext;
+                            if (move_uploaded_file($_FILES['contract_file']['tmp_name'], $uploadDir . $filename)) {
+                                $filePath = '/uploads/contracts/' . $filename;
+                            }
+                        }
+                        $stmt = $db->prepare("
+                            INSERT INTO employee_contracts (employee_id, title, description, contract_type, content, file_path, status, created_by, sent_at, expires_at)
+                            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP, ?)
+                        ");
+                        $expiresAt = !empty($_POST['expires_at']) ? $_POST['expires_at'] : null;
+                        $stmt->execute([
+                            $contractEmpId,
+                            $contractTitle,
+                            trim($_POST['contract_description'] ?? ''),
+                            $_POST['contract_type'] ?? 'employment',
+                            trim($_POST['contract_content'] ?? ''),
+                            $filePath,
+                            $currentUser['id'],
+                            $expiresAt
+                        ]);
+                        $message = 'Contract created and sent to employee for signing!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error creating contract: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'delete_contract':
+                $contractId = (int)($_POST['contract_id'] ?? 0);
+                if ($contractId) {
+                    try {
+                        $chk = $db->prepare("SELECT file_path, status FROM employee_contracts WHERE id = ?");
+                        $chk->execute([$contractId]);
+                        $contractRow = $chk->fetch(PDO::FETCH_ASSOC);
+                        if ($contractRow && $contractRow['status'] !== 'signed') {
+                            if ($contractRow['file_path'] && file_exists(__DIR__ . $contractRow['file_path'])) {
+                                unlink(__DIR__ . $contractRow['file_path']);
+                            }
+                            $del = $db->prepare("DELETE FROM employee_contracts WHERE id = ?");
+                            $del->execute([$contractId]);
+                            $message = 'Contract deleted.';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Cannot delete a signed contract.';
+                            $messageType = 'warning';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
             case 'create_department':
                 $name = trim($_POST['name'] ?? '');
                 if (empty($name)) {
