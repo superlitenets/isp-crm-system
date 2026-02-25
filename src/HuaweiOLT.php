@@ -9466,136 +9466,82 @@ class HuaweiOLT {
         $onuIdNum = $onu['onu_id'];
         $oltId = $onu['olt_id'];
         
-        if ($onuIdNum === null || $onuIdNum === '') {
-            $this->deleteONU($onuId, false);
-            return ['success' => true, 'message' => "ONU {$onu['sn']} deleted from database (was not authorized on OLT)"];
-        }
-        
-        // Lock the OLT exclusively — blocks ALL other CLI (SNMP poller, discovery, etc.)
-        $this->callOLTService('/lock-olt', [
-            'oltId' => (string)$oltId,
-            'duration' => 90000,
-            'reason' => 'ONU delete'
-        ]);
-        
-        // Wait for any in-flight commands to finish draining
-        sleep(3);
-        
-        $allOutput = '';
-        $spCount = 0;
-        $output = '';
-        $result = ['success' => false];
-        
-        try {
-            // Step 1: Query service-ports
-            $spQueryScript = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
-            $spResult = $this->callOLTService('/execute-raw', [
-                'oltId' => (string)$oltId,
-                'script' => $spQueryScript,
-                'timeout' => 30000
-            ]);
-            $spOutput = $spResult['output'] ?? '';
-            $allOutput .= "[Find Service-Ports]\n{$spOutput}\n";
-            
-            // Parse service-port IDs
-            $servicePortIds = [];
-            if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
-                $servicePortIds = array_map('intval', $matches[1]);
-            }
-            $spCount = count($servicePortIds);
-            
-            // Step 2: Delete service-ports at enable level (no config/system-view needed)
-            if ($spCount > 0) {
-                $undoLines = [];
-                foreach ($servicePortIds as $spId) {
-                    $undoLines[] = "undo service-port {$spId}";
-                }
-                $undoScript = implode("\n", $undoLines);
-                $undoResult = $this->callOLTService('/execute-raw', [
-                    'oltId' => (string)$oltId,
-                    'script' => $undoScript,
-                    'timeout' => 30000
-                ]);
-                $undoOutput = $undoResult['output'] ?? '';
-                $allOutput .= "[Remove Service-Ports]\n{$undoOutput}\n";
-                
-                // Check if any service-port removal failed
-                $undoFailed = preg_match('/Failure:\s*(\d+)/i', $undoOutput, $ufm) && isset($ufm[1]) && (int)$ufm[1] > 0;
-                if ($undoFailed) {
-                    $output = $undoOutput;
-                    $result = $undoResult;
-                    throw new \RuntimeException("Service-port removal failed — aborting ONU delete");
-                }
-                
-                // Verify service-ports are gone
-                $verifyResult = $this->callOLTService('/execute-raw', [
-                    'oltId' => (string)$oltId,
-                    'script' => "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}",
-                    'timeout' => 15000
-                ]);
-                $verifyOutput = $verifyResult['output'] ?? '';
-                $allOutput .= "[Verify SP Removed]\n{$verifyOutput}\n";
-                
-                $remainingSPs = [];
-                if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $verifyOutput, $vm)) {
-                    $remainingSPs = $vm[1];
-                }
-                if (count($remainingSPs) > 0) {
-                    $output = $verifyOutput;
-                    $result = ['success' => false];
-                    throw new \RuntimeException("Service-ports still exist after removal — aborting ONU delete");
-                }
-            }
-            
-            // Step 3: Delete the ONU (only after service-ports are confirmed removed)
-            // interface gpon {frame}/{slot} → ont delete {port} {onuId}
-            $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit\nquit";
-            $result = $this->callOLTService('/execute-raw', [
-                'oltId' => (string)$oltId,
-                'script' => $deleteScript,
-                'timeout' => 60000
-            ]);
-            
-            $output = $result['output'] ?? '';
-            $allOutput .= "[Delete ONU]\n{$output}";
-            
-        } finally {
-            // Always unlock the OLT
-            $this->callOLTService('/unlock-olt', [
-                'oltId' => (string)$oltId
-            ]);
-        }
-        
-        $hasError = preg_match('/(?:does not exist|is not valid|Unrecognized command|Unknown command|Parameter error|Too many parameters)/i', $output);
-        $hasFailure = preg_match('/Failure:\s*(\d+)/i', $output, $failMatch) && isset($failMatch[1]) && (int)$failMatch[1] > 0;
-        $hasSuccess = preg_match('/Number of ONTs that have been deleted|success/i', $output);
-        
-        $success = ($result['success'] ?? false) && !$hasError && !$hasFailure;
-        if ($hasSuccess && !$hasError) {
-            $success = true;
-        }
-        
-        if ($success) {
-            $this->deleteONU($onuId, false);
-        }
+        // Always delete from database first
+        $this->deleteONU($onuId, false);
         
         $deleteCmd = "ont delete {$port} {$onuIdNum}";
-        $message = $success 
-            ? "ONU {$onu['sn']} deleted from OLT" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
-            : "Delete failed: " . ($result['error'] ?? trim(preg_replace('/\s+/', ' ', substr($output, -200))) ?: 'Unknown error');
+        $oltWarning = '';
+        
+        // Attempt OLT cleanup as best-effort (non-blocking)
+        if ($onuIdNum !== null && $onuIdNum !== '') {
+            try {
+                $this->callOLTService('/lock-olt', [
+                    'oltId' => (string)$oltId,
+                    'duration' => 90000,
+                    'reason' => 'ONU delete'
+                ]);
+                sleep(3);
+                
+                // Step 1: Find and remove service-ports
+                $spResult = $this->callOLTService('/execute-raw', [
+                    'oltId' => (string)$oltId,
+                    'script' => "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}",
+                    'timeout' => 30000
+                ]);
+                $spOutput = $spResult['output'] ?? '';
+                
+                $servicePortIds = [];
+                if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
+                    $servicePortIds = array_map('intval', $matches[1]);
+                }
+                
+                if (count($servicePortIds) > 0) {
+                    $undoLines = [];
+                    foreach ($servicePortIds as $spId) {
+                        $undoLines[] = "undo service-port {$spId}";
+                    }
+                    $this->callOLTService('/execute-raw', [
+                        'oltId' => (string)$oltId,
+                        'script' => implode("\n", $undoLines),
+                        'timeout' => 30000
+                    ]);
+                }
+                
+                // Step 2: Delete ONU
+                $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit\nquit";
+                $result = $this->callOLTService('/execute-raw', [
+                    'oltId' => (string)$oltId,
+                    'script' => $deleteScript,
+                    'timeout' => 60000
+                ]);
+                $output = $result['output'] ?? '';
+                
+                $oltSuccess = preg_match('/Number of ONTs that have been deleted|success/i', $output);
+                if (!$oltSuccess) {
+                    $oltWarning = ' (OLT cleanup may need manual action: ' . trim(preg_replace('/\s+/', ' ', substr($output, -150))) . ')';
+                }
+                
+                $this->callOLTService('/unlock-olt', ['oltId' => (string)$oltId]);
+            } catch (\Exception $e) {
+                $oltWarning = ' (OLT cleanup failed: ' . $e->getMessage() . ' — delete manually from OLT)';
+                try { $this->callOLTService('/unlock-olt', ['oltId' => (string)$oltId]); } catch (\Exception $ignore) {}
+            }
+        }
+        
+        $message = "ONU {$onu['sn']} deleted from database" . $oltWarning;
         
         $this->addLog([
             'olt_id' => $oltId,
             'onu_id' => $onuId,
             'action' => 'delete',
-            'status' => $success ? 'success' : 'failed',
+            'status' => 'success',
             'message' => $message,
             'command_sent' => $deleteCmd,
-            'command_response' => $allOutput,
+            'command_response' => $oltWarning ?: 'DB delete only',
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        return ['success' => $success, 'message' => $message, 'output' => $allOutput, 'service_ports_deleted' => $spCount];
+        return ['success' => true, 'message' => $message];
     }
     
     public function resetONUConfig(int $onuId, bool $async = true): array {
