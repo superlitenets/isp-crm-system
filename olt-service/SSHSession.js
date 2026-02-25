@@ -240,8 +240,10 @@ class SSHSession {
                     response = response.replace(/--More--/gi, '');
                 }
                 
-                const lockPromptPattern = /\{[^}]*<K>\s*\}:/i;
-                if (lockPromptPattern.test(this.stripAnsi(chunk))) {
+                const strippedChunk = this.stripAnsi(chunk);
+                const lockPromptPattern = /\{\s*<cr>\s*\|\s*<K>\s*\}:/;
+                const subPromptPattern = /\{[^}]*<cr>[^}]*\}:/i;
+                if (lockPromptPattern.test(strippedChunk)) {
                     console.log(`[OLT ${this.oltId}] SSH config lock prompt detected, pressing Enter`);
                     lockPending = true;
                     response = '';
@@ -251,6 +253,15 @@ class SSHSession {
                             lockPending = false;
                         }
                     }, 300);
+                    return;
+                }
+                if (subPromptPattern.test(strippedChunk) && !lockPromptPattern.test(strippedChunk)) {
+                    console.log(`[OLT ${this.oltId}] SSH sub-prompt detected, sending Enter`);
+                    setTimeout(() => {
+                        if (this.stream && this.connected) {
+                            this.stream.write('\r');
+                        }
+                    }, 200);
                     return;
                 }
 
@@ -337,7 +348,8 @@ class SSHSession {
                 /delete this ont/i, /to delete\?/i
             ];
 
-            const lockPromptPattern = /\{[^}]*<K>\s*\}:/i;
+            const lockPromptPattern = /\{\s*<cr>\s*\|\s*<K>\s*\}:/;
+            const subPromptPattern = /\{[^}]*<cr>[^}]*\}:/i;
 
             const lines = script.split(/\r?\n/).filter(l => l.trim());
             console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);
@@ -391,6 +403,16 @@ class SSHSession {
                             lockPending = false;
                         }
                     }, 300);
+                    return;
+                }
+
+                if (subPromptPattern.test(recentChunk) && !lockPromptPattern.test(recentChunk)) {
+                    console.log(`[OLT ${this.oltId}] SSH raw script: sub-prompt detected, sending Enter`);
+                    setTimeout(() => {
+                        if (this.stream && this.connected) {
+                            this.stream.write('\r');
+                        }
+                    }, 200);
                     return;
                 }
 
