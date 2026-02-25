@@ -1,0 +1,90 @@
+Working PHP Script: Delete ONU (with Service-Port Removal)
+
+Use this script if you want your CRM to automatically do exactly what the online guide explains — in the correct order, and with the commands that actually work on MA5683T.
+
+Requirements:
+• SSH2 extension enabled in PHP
+• SSH access to the OLT
+• Admin credentials
+
+📌 delete_olt_onu.php
+<?php
+
+function sendCmd($stream, $cmd) {
+    fwrite($stream, $cmd . "\n");
+    sleep(1);
+    $output = "";
+    while ($line = fgets($stream)) {
+        $output .= $line;
+        if (strpos($line, "#") !== false) break;
+    }
+    return $output;
+}
+
+function deleteHuaweiONT($oltIp, $username, $password, $serial) {
+    // Connect via SSH
+    $connection = ssh2_connect($oltIp, 22);
+    if (!$connection) return "SSH connection failed.";
+
+    if (!ssh2_auth_password($connection, $username, $password)) {
+        return "SSH authentication failed.";
+    }
+
+    $stream = ssh2_shell($connection, 'xterm', null, 80, 40, SSH2_TERM_UNIT_CHARS);
+    stream_set_blocking($stream, true);
+
+    // Disable pagination
+    sendCmd($stream, "scroll 512");
+
+    // 1) Get ONU location
+    $out = sendCmd($stream, "display ont info by-sn $serial");
+    if (!preg_match('/(\d+)\/(\d+)\/(\d+)/', $out, $fsp)) return "Could not find F/S/P for ONU $serial";
+    if (!preg_match('/ONT-ID\s*:\s*(\d+)/', $out, $matchOnt)) return "Could not find ONT ID";
+
+    $frame = $fsp[1];
+    $slot  = $fsp[2];
+    $port  = $fsp[3];
+    $ontId = $matchOnt[1];
+
+    // 2) List service ports for this ONU
+    $spList = sendCmd($stream, "display service-port all | include $frame/$slot/$port");
+    preg_match_all('/^\s*(\d+)\s+vlan\s+/', $spList, $matches);
+
+    // 3) Delete service-ports
+    foreach ($matches[1] as $spId) {
+        sendCmd($stream, "undo service-port $spId");
+    }
+
+    // 4) Delete the ONT
+    sendCmd($stream, "interface gpon $frame/$slot");
+    $delOut = sendCmd($stream, "ont delete $port $ontId");
+
+    fclose($stream);
+
+    return "Output:\n$delOut";
+}
+
+// Usage example:
+$oltIp    = "192.168.1.1";
+$username = "admin";
+$password = "PASSWORD";
+$serial   = "48575443F1093979";
+
+echo deleteHuaweiONT($oltIp, $username, $password, $serial);
+
+?>
+🧠 How it Works
+
+SSH connects to your OLT
+
+Disables pagination so outputs are not cut
+
+Reads the F/S/P and ONT ID for the serial you provided
+
+Finds service-ports tied to that ONT
+
+Deletes those service-ports
+
+Deletes the ONU once no ports remain
+
+This exactly mirrors the steps from the linked guide, but wrapped in automation.

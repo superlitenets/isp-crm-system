@@ -9482,28 +9482,31 @@ class HuaweiOLT {
                 ]);
                 sleep(3);
                 
-                // Step 1: Find and remove service-ports
+                // Step 1: Find service-ports using pipe filter (avoids interactive sub-prompt)
                 $spResult = $this->callOLTService('/execute-raw', [
                     'oltId' => (string)$oltId,
-                    'script' => "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}",
+                    'script' => "display service-port all | include {$frame}/{$slot}/{$port}",
                     'timeout' => 30000
                 ]);
                 $spOutput = $spResult['output'] ?? '';
                 
+                // Parse service-port IDs: lines like "  1001  vlan 660  gpon 0/1/3  ont 12 ..."
+                // Filter to only matching ONT ID
                 $servicePortIds = [];
-                if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
-                    $servicePortIds = array_map('intval', $matches[1]);
+                $lines = explode("\n", $spOutput);
+                foreach ($lines as $line) {
+                    if (preg_match('/^\s*(\d+)\s+.*ont\s+' . preg_quote($onuIdNum, '/') . '\b/i', $line, $m)) {
+                        $servicePortIds[] = (int)$m[1];
+                    }
                 }
                 
-                // Step 2: Build single script — all in config mode per Huawei procedure
-                // config → undo service-port(s) → interface gpon → ont delete → quit → quit
-                $scriptLines = ["config"];
+                // Step 2: undo service-ports → interface gpon → ont delete
+                $scriptLines = [];
                 foreach ($servicePortIds as $spId) {
                     $scriptLines[] = "undo service-port {$spId}";
                 }
                 $scriptLines[] = "interface gpon {$frame}/{$slot}";
                 $scriptLines[] = "ont delete {$port} {$onuIdNum}";
-                $scriptLines[] = "quit";
                 $scriptLines[] = "quit";
                 $deleteScript = implode("\n", $scriptLines);
                 $result = $this->callOLTService('/execute-raw', [
