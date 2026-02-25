@@ -57,6 +57,13 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Live Traffic Monitoring**: Real-time traffic graph for PPPoE, DHCP, and Static IP subscribers with on-demand Chart.js visualization polling MikroTik every 2 seconds.
 - **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers). License settings configurable via Settings > License page (server URL, key, activation, renewal) with database persistence. Config priority: DB settings > environment variables > defaults.
 - **Hotspot Captive Portal**: URL-based NAS routing (`/hotspot/{nas_ip}`) for per-NAS package selection, MAC-based auto-login, M-Pesa STK Push, voucher redemption, and MikroTik CHAP integration. PHP built-in server uses `public/router.php` for URL path routing; Apache uses `.htaccess` rewrite rules.
+- **Core Network Monitoring**: Ping-based uptime monitoring for core equipment (routers, switches, OLTs, UPS, etc.) with WhatsApp notifications.
+  - **Ping Status**: Real-time ICMP ping checks with online/offline/unknown status badges.
+  - **Auto-Polling**: Equipment status checked every 2 minutes on the Core Network page.
+  - **WhatsApp Alerts**: Status change notifications (down/recovered) sent to the Dying Gasp WhatsApp group.
+  - **Uptime Logging**: All status changes logged to `isp_equipment_uptime_log` for historical reporting.
+  - **Per-Equipment Toggle**: Enable/disable monitoring per device via the equipment form.
+  - **API Endpoint**: `/api/core-monitor.php` for ping_all, ping_one, get_status, uptime_report.
 - **Fleet Management (Protrack365 GPS)**: Vehicle fleet tracking integrated as a tab within the Inventory module.
   - **Vehicle Management**: CRUD for vehicles with IMEI, plate number, type, make/model, employee assignment tracking.
   - **Real-Time GPS Tracking**: Live map view with auto-refresh using Leaflet.js and OpenStreetMap tiles via Protrack365 API.

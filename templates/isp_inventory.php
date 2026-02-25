@@ -33,6 +33,9 @@ $olts = $ispInv->getOLTs();
             --inv-top-bar-height: 40px;
             --inv-border: rgba(255,255,255,0.08);
         }
+        
+        @keyframes spin-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spin-animation { animation: spin-anim 1s linear infinite; }
 
         body {
             padding-top: var(--inv-top-bar-height);
@@ -737,7 +740,14 @@ $olts = $ispInv->getOLTs();
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-12">
+                    <div class="col-md-4">
+                        <label class="form-label">Uptime Monitoring</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" name="monitor_enabled" id="monitorEnabled" value="1" <?= ($item['monitor_enabled'] ?? true) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="monitorEnabled">Enable ping monitoring</label>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
                         <label class="form-label">Notes</label>
                         <textarea name="notes" class="form-control" rows="2"><?= htmlspecialchars($item['notes'] ?? '') ?></textarea>
                     </div>
@@ -754,6 +764,23 @@ $olts = $ispInv->getOLTs();
         $eqStatus = $_GET['eq_status'] ?? '';
         $coreList = $ispInv->getCoreEquipment(['equipment_type'=>$eqType, 'status'=>$eqStatus, 'search'=>$search]);
     ?>
+    <?php
+        $onlineCount = 0; $offlineCount = 0; $unknownCount = 0;
+        foreach ($coreList as $eq) {
+            if (empty($eq['management_ip'])) continue;
+            if (($eq['ping_status'] ?? 'unknown') === 'online') $onlineCount++;
+            elseif (($eq['ping_status'] ?? 'unknown') === 'offline') $offlineCount++;
+            else $unknownCount++;
+        }
+    ?>
+    <div class="row g-3 mb-3">
+        <div class="col-auto"><span class="badge bg-primary fs-6"><?= count($coreList) ?> Total</span></div>
+        <div class="col-auto"><span class="badge bg-success fs-6" id="coreOnlineCount"><i class="bi bi-check-circle me-1"></i><?= $onlineCount ?> Online</span></div>
+        <div class="col-auto"><span class="badge bg-danger fs-6" id="coreOfflineCount"><i class="bi bi-x-circle me-1"></i><?= $offlineCount ?> Offline</span></div>
+        <?php if ($unknownCount > 0): ?>
+        <div class="col-auto"><span class="badge bg-secondary fs-6" id="coreUnknownCount"><i class="bi bi-question-circle me-1"></i><?= $unknownCount ?> Unknown</span></div>
+        <?php endif; ?>
+    </div>
     <div class="d-flex justify-content-between mb-3 flex-wrap gap-2">
         <form class="d-flex gap-2 flex-wrap" method="GET">
             <input type="hidden" name="page" value="isp_inventory"><input type="hidden" name="tab" value="core">
@@ -772,24 +799,56 @@ $olts = $ispInv->getOLTs();
             </select>
             <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
         </form>
-        <a href="?page=isp_inventory&tab=core&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Equipment</a>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-success btn-sm" id="pingAllBtn" onclick="pingAllEquipment()">
+                <i class="bi bi-broadcast me-1" id="pingAllIcon"></i> Ping All
+            </button>
+            <a href="?page=isp_inventory&tab=core&action=form" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Equipment</a>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table table-striped table-hover">
-            <thead><tr><th>Name</th><th>Type</th><th>Site</th><th>Model</th><th>Serial</th><th>IP</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Type</th><th>Site</th><th>Model</th><th>Serial</th><th>IP</th><th>Ping</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php if (empty($coreList)): ?>
-                <tr><td colspan="8" class="text-center text-muted">No equipment found.</td></tr>
-            <?php else: foreach ($coreList as $eq): ?>
-                <tr>
+                <tr><td colspan="9" class="text-center text-muted">No equipment found.</td></tr>
+            <?php else: foreach ($coreList as $eq): 
+                $pingStatus = $eq['ping_status'] ?? 'unknown';
+                $pingClass = $pingStatus === 'online' ? 'success' : ($pingStatus === 'offline' ? 'danger' : 'secondary');
+                $pingIcon = $pingStatus === 'online' ? 'check-circle-fill' : ($pingStatus === 'offline' ? 'x-circle-fill' : 'question-circle');
+                $lastSeen = !empty($eq['last_seen_online']) ? date('M j H:i', strtotime($eq['last_seen_online'])) : 'Never';
+                $downSince = '';
+                if ($pingStatus === 'offline' && !empty($eq['downtime_started'])) {
+                    $start = new DateTime($eq['downtime_started']);
+                    $now = new DateTime();
+                    $diff = $now->diff($start);
+                    if ($diff->days > 0) $downSince = $diff->days . 'd ' . $diff->h . 'h';
+                    elseif ($diff->h > 0) $downSince = $diff->h . 'h ' . $diff->i . 'm';
+                    else $downSince = $diff->i . 'm';
+                }
+            ?>
+                <tr id="eq-row-<?= $eq['id'] ?>">
                     <td><strong><?= htmlspecialchars($eq['name']) ?></strong><?php if ($eq['olt_name']): ?><br><small class="text-muted">OLT: <?= htmlspecialchars($eq['olt_name']) ?></small><?php endif; ?></td>
                     <td><span class="badge bg-info"><?= htmlspecialchars($eq['equipment_type']) ?></span></td>
                     <td><?= htmlspecialchars($eq['site_name'] ?? '') ?></td>
                     <td><?= htmlspecialchars(($eq['manufacturer'] ?? '') . ' ' . ($eq['model'] ?? '')) ?></td>
                     <td><small><?= htmlspecialchars($eq['serial_number'] ?? '') ?></small></td>
                     <td><code><?= htmlspecialchars($eq['management_ip'] ?? '') ?></code></td>
+                    <td>
+                        <?php if (!empty($eq['management_ip'])): ?>
+                        <span class="ping-badge badge bg-<?= $pingClass ?>" id="ping-<?= $eq['id'] ?>" title="Last seen: <?= $lastSeen ?>">
+                            <i class="bi bi-<?= $pingIcon ?>"></i>
+                            <?= $pingStatus === 'offline' && $downSince ? $downSince : ucfirst($pingStatus) ?>
+                        </span>
+                        <?php else: ?>
+                        <span class="badge bg-light text-muted">No IP</span>
+                        <?php endif; ?>
+                    </td>
                     <td><span class="badge bg-<?= $eq['status']==='active'?'success':($eq['status']==='faulty'?'danger':($eq['status']==='maintenance'?'warning':'secondary')) ?>"><?= $eq['status'] ?></span></td>
                     <td>
+                        <?php if (!empty($eq['management_ip'])): ?>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="pingOne(<?= $eq['id'] ?>)" title="Ping"><i class="bi bi-broadcast"></i></button>
+                        <?php endif; ?>
                         <a href="?page=isp_inventory&tab=core&action=form&id=<?= $eq['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
                         <form method="POST" action="?page=isp_inventory&tab=core&action=delete" class="d-inline" onsubmit="return confirm('Delete?')">
                             <input type="hidden" name="id" value="<?= $eq['id'] ?>">
@@ -801,6 +860,94 @@ $olts = $ispInv->getOLTs();
             </tbody>
         </table>
     </div>
+    
+    <script>
+    let pingInProgress = false;
+    
+    async function pingAllEquipment() {
+        if (pingInProgress) return;
+        pingInProgress = true;
+        const btn = document.getElementById('pingAllBtn');
+        const icon = document.getElementById('pingAllIcon');
+        btn.disabled = true;
+        icon.className = 'bi bi-arrow-repeat me-1 spin-animation';
+        btn.innerHTML = '<i class="bi bi-arrow-repeat me-1 spin-animation"></i> Pinging...';
+        
+        try {
+            const resp = await fetch('/api/core-monitor.php?action=ping_all');
+            const data = await resp.json();
+            if (data.success) {
+                data.results.forEach(r => {
+                    const badge = document.getElementById('ping-' + r.id);
+                    if (badge) {
+                        const cls = r.status === 'online' ? 'success' : 'danger';
+                        const ico = r.status === 'online' ? 'check-circle-fill' : 'x-circle-fill';
+                        badge.className = 'ping-badge badge bg-' + cls;
+                        badge.innerHTML = '<i class="bi bi-' + ico + '"></i> ' + (r.status.charAt(0).toUpperCase() + r.status.slice(1));
+                        if (r.changed) badge.classList.add('border', 'border-2', 'border-warning');
+                    }
+                });
+                const onlineEl = document.getElementById('coreOnlineCount');
+                const offlineEl = document.getElementById('coreOfflineCount');
+                if (onlineEl) onlineEl.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + data.online + ' Online';
+                if (offlineEl) offlineEl.innerHTML = '<i class="bi bi-x-circle me-1"></i>' + data.offline + ' Offline';
+                
+                let msg = data.online + ' online, ' + data.offline + ' offline';
+                if (data.changes > 0) msg += ' (' + data.changes + ' changed)';
+                showInventoryToast(msg, data.offline > 0 ? 'warning' : 'success');
+            }
+        } catch (e) {
+            showInventoryToast('Ping check failed: ' + e.message, 'danger');
+        } finally {
+            pingInProgress = false;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-broadcast me-1"></i> Ping All';
+        }
+    }
+    
+    async function pingOne(id) {
+        const badge = document.getElementById('ping-' + id);
+        if (badge) badge.innerHTML = '<i class="bi bi-arrow-repeat spin-animation"></i>';
+        try {
+            const resp = await fetch('/api/core-monitor.php?action=ping_one&id=' + id);
+            const data = await resp.json();
+            if (data.success && badge) {
+                const cls = data.status === 'online' ? 'success' : 'danger';
+                const ico = data.status === 'online' ? 'check-circle-fill' : 'x-circle-fill';
+                badge.className = 'ping-badge badge bg-' + cls;
+                badge.innerHTML = '<i class="bi bi-' + ico + '"></i> ' + (data.status.charAt(0).toUpperCase() + data.status.slice(1));
+            }
+        } catch (e) {
+            if (badge) badge.innerHTML = '<i class="bi bi-question-circle"></i> Error';
+        }
+    }
+    
+    function showInventoryToast(msg, type) {
+        const container = document.getElementById('toastContainer') || createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = 'toast align-items-center text-bg-' + type + ' border-0 show';
+        toast.setAttribute('role', 'alert');
+        toast.innerHTML = '<div class="d-flex"><div class="toast-body">' + msg + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+    
+    function createToastContainer() {
+        const c = document.createElement('div');
+        c.id = 'toastContainer';
+        c.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        c.style.zIndex = '9999';
+        document.body.appendChild(c);
+        return c;
+    }
+    
+    setInterval(pingAllEquipment, 120000);
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        const unknowns = document.querySelectorAll('.ping-badge.bg-secondary');
+        if (unknowns.length > 0) pingAllEquipment();
+    });
+    </script>
     <?php endif; ?>
 
     <?php

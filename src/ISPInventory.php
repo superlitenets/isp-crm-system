@@ -97,7 +97,8 @@ class ISPInventory {
     // ==================== CORE EQUIPMENT ====================
 
     public function getCoreEquipment(array $filters = []): array {
-        $sql = "SELECT e.*, s.name as site_name, r.name as rack_name, o.name as olt_name
+        $sql = "SELECT e.*, s.name as site_name, r.name as rack_name, o.name as olt_name,
+                       e.ping_status, e.last_ping_at, e.last_seen_online, e.downtime_started, e.monitor_enabled
                 FROM isp_core_equipment e
                 LEFT JOIN isp_network_sites s ON e.site_id = s.id
                 LEFT JOIN isp_racks r ON e.rack_id = r.id
@@ -135,11 +136,17 @@ class ISPInventory {
     }
 
     public function saveCoreEquipment(array $data, ?int $id = null): int {
-        $fields = ['site_id', 'rack_id', 'olt_id', 'equipment_type', 'name', 'manufacturer', 'model', 'serial_number', 'mac_address', 'management_ip', 'os_version', 'firmware_version', 'rack_position', 'capacity', 'purchase_date', 'warranty_expiry', 'supplier', 'purchase_price', 'notes', 'status'];
+        $data['monitor_enabled'] = isset($data['monitor_enabled']) ? true : false;
+        $fields = ['site_id', 'rack_id', 'olt_id', 'equipment_type', 'name', 'manufacturer', 'model', 'serial_number', 'mac_address', 'management_ip', 'os_version', 'firmware_version', 'rack_position', 'capacity', 'purchase_date', 'warranty_expiry', 'supplier', 'purchase_price', 'notes', 'status', 'monitor_enabled'];
+        $boolFields = ['monitor_enabled'];
+        $paramMapper = function($f) use ($data, $boolFields) {
+            if (in_array($f, $boolFields)) return $data[$f] ?? false;
+            return (!empty($data[$f]) ? $data[$f] : null);
+        };
         if ($id) {
             $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
             $sql = "UPDATE isp_core_equipment SET $sets, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params = array_map($paramMapper, $fields);
             $params[] = $id;
             $this->db->prepare($sql)->execute($params);
             return $id;
@@ -147,7 +154,7 @@ class ISPInventory {
             $cols = implode(', ', $fields);
             $placeholders = implode(', ', array_fill(0, count($fields), '?'));
             $stmt = $this->db->prepare("INSERT INTO isp_core_equipment ($cols) VALUES ($placeholders) RETURNING id");
-            $params = array_map(fn($f) => (!empty($data[$f]) ? $data[$f] : null), $fields);
+            $params = array_map($paramMapper, $fields);
             $stmt->execute($params);
             return (int) $stmt->fetchColumn();
         }
