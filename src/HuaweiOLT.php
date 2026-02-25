@@ -9480,7 +9480,15 @@ class HuaweiOLT {
         
         $allOutput = '';
         
-        // Step 1: Find all service-ports for this ONU (global config level command)
+        // Step 1: Return to enable mode to ensure clean state
+        $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => "quit\nquit\nquit",
+            'timeout' => 5000
+        ]);
+        usleep(500000);
+        
+        // Step 2: Find all service-ports for this ONU (global config level command)
         $spQueryScript = "config\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
         $spResult = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
@@ -9496,29 +9504,57 @@ class HuaweiOLT {
             $servicePortIds = array_map('intval', $matches[1]);
         }
         
-        // Step 2: Delete service-ports if found
+        // Step 3: Delete service-ports if found (one at a time for reliability)
         $spCount = count($servicePortIds);
         if ($spCount > 0) {
-            $undoLines = ["config"];
             foreach ($servicePortIds as $spId) {
-                $undoLines[] = "undo service-port {$spId}";
+                $undoResult = $this->callOLTService('/execute-raw', [
+                    'oltId' => (string)$oltId,
+                    'script' => "config\nundo service-port {$spId}",
+                    'timeout' => 15000
+                ]);
+                $allOutput .= "[Remove SP {$spId}]\n" . ($undoResult['output'] ?? '') . "\n";
+                usleep(500000);
             }
-            $undoScript = implode("\n", $undoLines);
-            $undoResult = $this->callOLTService('/execute-raw', [
-                'oltId' => (string)$oltId,
-                'script' => $undoScript,
-                'timeout' => 30000
-            ]);
-            $undoOutput = $undoResult['output'] ?? '';
-            $allOutput .= "[Remove Service-Ports]\n{$undoOutput}\n";
         }
         
-        // Step 3: Delete the ONU from the OLT
-        $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit";
+        // Step 4: Return to clean state before delete
+        $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => "quit\nquit\nquit",
+            'timeout' => 5000
+        ]);
+        usleep(500000);
+        
+        // Step 5: Delete the ONU from the OLT (each command separately for reliability)
+        $enterConfig = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => "config",
+            'timeout' => 10000
+        ]);
+        $allOutput .= "[Enter Config]\n" . ($enterConfig['output'] ?? '') . "\n";
+        usleep(300000);
+        
+        $enterIf = $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => "interface gpon {$frame}/{$slot}",
+            'timeout' => 10000
+        ]);
+        $allOutput .= "[Enter Interface]\n" . ($enterIf['output'] ?? '') . "\n";
+        usleep(300000);
+        
+        $deleteCmd = "ont delete {$port} {$onuIdNum}";
         $result = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
-            'script' => $deleteScript,
-            'timeout' => 45000
+            'script' => $deleteCmd,
+            'timeout' => 30000
+        ]);
+        
+        // Exit interface
+        $this->callOLTService('/execute-raw', [
+            'oltId' => (string)$oltId,
+            'script' => "quit",
+            'timeout' => 5000
         ]);
         
         $output = $result['output'] ?? '';
@@ -9547,7 +9583,7 @@ class HuaweiOLT {
             'action' => 'delete',
             'status' => $success ? 'success' : 'failed',
             'message' => $message,
-            'command_sent' => $deleteScript,
+            'command_sent' => $deleteCmd,
             'command_response' => $allOutput,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
