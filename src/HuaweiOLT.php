@@ -9504,13 +9504,12 @@ class HuaweiOLT {
             }
             $spCount = count($servicePortIds);
             
-            // Step 2: Delete service-ports first (must succeed before ONU delete)
+            // Step 2: Delete service-ports at enable level (no config/system-view needed)
             if ($spCount > 0) {
-                $undoLines = ["config"];
+                $undoLines = [];
                 foreach ($servicePortIds as $spId) {
                     $undoLines[] = "undo service-port {$spId}";
                 }
-                $undoLines[] = "quit";
                 $undoScript = implode("\n", $undoLines);
                 $undoResult = $this->callOLTService('/execute-raw', [
                     'oltId' => (string)$oltId,
@@ -9527,9 +9526,29 @@ class HuaweiOLT {
                     $result = $undoResult;
                     throw new \RuntimeException("Service-port removal failed — aborting ONU delete");
                 }
+                
+                // Verify service-ports are gone
+                $verifyResult = $this->callOLTService('/execute-raw', [
+                    'oltId' => (string)$oltId,
+                    'script' => "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}",
+                    'timeout' => 15000
+                ]);
+                $verifyOutput = $verifyResult['output'] ?? '';
+                $allOutput .= "[Verify SP Removed]\n{$verifyOutput}\n";
+                
+                $remainingSPs = [];
+                if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $verifyOutput, $vm)) {
+                    $remainingSPs = $vm[1];
+                }
+                if (count($remainingSPs) > 0) {
+                    $output = $verifyOutput;
+                    $result = ['success' => false];
+                    throw new \RuntimeException("Service-ports still exist after removal — aborting ONU delete");
+                }
             }
             
             // Step 3: Delete the ONU (only after service-ports are confirmed removed)
+            // interface gpon {frame}/{slot} → ont delete {port} {onuId}
             $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit\nquit";
             $result = $this->callOLTService('/execute-raw', [
                 'oltId' => (string)$oltId,
