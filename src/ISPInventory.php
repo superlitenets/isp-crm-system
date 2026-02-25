@@ -145,9 +145,13 @@ class ISPInventory {
         $data['monitor_enabled'] = isset($data['monitor_enabled']) ? true : false;
         $fields = ['site_id', 'rack_id', 'olt_id', 'equipment_type', 'name', 'manufacturer', 'model', 'serial_number', 'mac_address', 'management_ip', 'os_version', 'firmware_version', 'rack_position', 'capacity', 'purchase_date', 'warranty_expiry', 'supplier', 'purchase_price', 'notes', 'status', 'monitor_enabled'];
         $boolFields = ['monitor_enabled'];
-        $paramMapper = function($f) use ($data, $boolFields) {
+        $numericFields = ['site_id', 'rack_id', 'olt_id', 'purchase_price'];
+        $paramMapper = function($f) use ($data, $boolFields, $numericFields) {
             if (in_array($f, $boolFields)) return $data[$f] ?? false;
-            return (!empty($data[$f]) ? $data[$f] : null);
+            $val = $data[$f] ?? null;
+            if ($val === '' || $val === null) return null;
+            if (in_array($f, $numericFields)) return is_numeric($val) ? $val : null;
+            return $val;
         };
         if ($id) {
             $sets = implode(', ', array_map(fn($f) => "$f = ?", $fields));
