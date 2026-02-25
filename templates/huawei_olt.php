@@ -1341,10 +1341,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = 'success';
                 break;
             case 'delete_onu_type':
-                $stmt = $db->prepare("UPDATE huawei_onu_types SET is_active = FALSE WHERE id = ?");
-                $stmt->execute([(int)$_POST['id']]);
-                $message = 'ONU type deleted successfully';
-                $messageType = 'success';
+                try {
+                    $stmt = $db->prepare("UPDATE huawei_onu_types SET is_active = FALSE WHERE id = ?");
+                    $stmt->execute([(int)$_POST['id']]);
+                    if ($stmt->rowCount() === 0) {
+                        $stmt = $db->prepare("DELETE FROM huawei_onu_types WHERE id = ? AND NOT EXISTS (SELECT 1 FROM huawei_onus WHERE onu_type_id = ?)");
+                        $deleteId = (int)$_POST['id'];
+                        $stmt->execute([$deleteId, $deleteId]);
+                        if ($stmt->rowCount() > 0) {
+                            $message = 'ONU type deleted successfully';
+                        } else {
+                            $message = 'ONU type not found or is in use by existing ONUs';
+                            $messageType = 'warning';
+                            break;
+                        }
+                    }
+                    $message = $message ?? 'ONU type deleted successfully';
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = 'Failed to delete ONU type: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
                 break;
             // Location Management
             case 'add_zone':
