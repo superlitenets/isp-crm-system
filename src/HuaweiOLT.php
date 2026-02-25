@@ -9480,16 +9480,8 @@ class HuaweiOLT {
         
         $allOutput = '';
         
-        // Step 1: Return to enable mode to ensure clean state
-        $this->callOLTService('/execute-raw', [
-            'oltId' => (string)$oltId,
-            'script' => "quit\nquit\nquit",
-            'timeout' => 5000
-        ]);
-        usleep(500000);
-        
-        // Step 2: Find all service-ports for this ONU (global config level command)
-        $spQueryScript = "config\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
+        // Step 1: Find all service-ports for this ONU
+        $spQueryScript = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
         $spResult = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
             'script' => $spQueryScript,
@@ -9504,57 +9496,29 @@ class HuaweiOLT {
             $servicePortIds = array_map('intval', $matches[1]);
         }
         
-        // Step 3: Delete service-ports if found (one at a time for reliability)
+        // Step 2: Delete service-ports if found
         $spCount = count($servicePortIds);
         if ($spCount > 0) {
+            $undoLines = [];
             foreach ($servicePortIds as $spId) {
-                $undoResult = $this->callOLTService('/execute-raw', [
-                    'oltId' => (string)$oltId,
-                    'script' => "config\nundo service-port {$spId}",
-                    'timeout' => 15000
-                ]);
-                $allOutput .= "[Remove SP {$spId}]\n" . ($undoResult['output'] ?? '') . "\n";
-                usleep(500000);
+                $undoLines[] = "undo service-port {$spId}";
             }
+            $undoScript = implode("\n", $undoLines);
+            $undoResult = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => $undoScript,
+                'timeout' => 30000
+            ]);
+            $allOutput .= "[Remove Service-Ports]\n" . ($undoResult['output'] ?? '') . "\n";
         }
         
-        // Step 4: Return to clean state before delete
-        $this->callOLTService('/execute-raw', [
-            'oltId' => (string)$oltId,
-            'script' => "quit\nquit\nquit",
-            'timeout' => 5000
-        ]);
-        usleep(500000);
-        
-        // Step 5: Delete the ONU from the OLT (each command separately for reliability)
-        $enterConfig = $this->callOLTService('/execute-raw', [
-            'oltId' => (string)$oltId,
-            'script' => "config",
-            'timeout' => 10000
-        ]);
-        $allOutput .= "[Enter Config]\n" . ($enterConfig['output'] ?? '') . "\n";
-        usleep(300000);
-        
-        $enterIf = $this->callOLTService('/execute-raw', [
-            'oltId' => (string)$oltId,
-            'script' => "interface gpon {$frame}/{$slot}",
-            'timeout' => 10000
-        ]);
-        $allOutput .= "[Enter Interface]\n" . ($enterIf['output'] ?? '') . "\n";
-        usleep(300000);
-        
+        // Step 3: Delete the ONU from the OLT
         $deleteCmd = "ont delete {$port} {$onuIdNum}";
+        $deleteScript = "interface gpon {$frame}/{$slot}\n{$deleteCmd}\nquit";
         $result = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
-            'script' => $deleteCmd,
-            'timeout' => 30000
-        ]);
-        
-        // Exit interface
-        $this->callOLTService('/execute-raw', [
-            'oltId' => (string)$oltId,
-            'script' => "quit",
-            'timeout' => 5000
+            'script' => $deleteScript,
+            'timeout' => 45000
         ]);
         
         $output = $result['output'] ?? '';
