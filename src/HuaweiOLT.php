@@ -9480,8 +9480,8 @@ class HuaweiOLT {
         
         $allOutput = '';
         
-        // Step 1: Find all service-ports for this ONU inside interface gpon
-        $spQueryScript = "config\ninterface gpon {$frame}/{$slot}\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}\nquit";
+        // Step 1: Find all service-ports for this ONU (global config level command)
+        $spQueryScript = "config\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
         $spResult = $this->callOLTService('/execute-raw', [
             'oltId' => (string)$oltId,
             'script' => $spQueryScript,
@@ -9523,10 +9523,13 @@ class HuaweiOLT {
         
         $output = $result['output'] ?? '';
         $allOutput .= "[Delete ONU]\n{$output}";
-        $success = ($result['success'] ?? false) && !preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command|Unknown command|Parameter error|Too many parameters)/i', $output);
         
-        // Also check for success indicators
-        if (!$success && preg_match('/success/i', $output)) {
+        $hasError = preg_match('/(?:does not exist|is not valid|Unrecognized command|Unknown command|Parameter error|Too many parameters)/i', $output);
+        $hasFailure = preg_match('/Failure:\s*(\d+)/i', $output, $failMatch) && isset($failMatch[1]) && (int)$failMatch[1] > 0;
+        $hasSuccess = preg_match('/Number of ONTs that have been deleted|success/i', $output);
+        
+        $success = ($result['success'] ?? false) && !$hasError && !$hasFailure;
+        if ($hasSuccess && !$hasError) {
             $success = true;
         }
         
@@ -9536,7 +9539,7 @@ class HuaweiOLT {
         
         $message = $success 
             ? "ONU {$onu['sn']} deleted from OLT" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
-            : ($result['error'] ?? $result['message'] ?? 'Delete command failed');
+            : "Delete failed: " . ($result['error'] ?? trim(preg_replace('/\s+/', ' ', substr($output, -200))) ?: 'Unknown error');
         
         $this->addLog([
             'olt_id' => $oltId,
@@ -9544,7 +9547,7 @@ class HuaweiOLT {
             'action' => 'delete',
             'status' => $success ? 'success' : 'failed',
             'message' => $message,
-            'command_sent' => $script,
+            'command_sent' => $deleteScript,
             'command_response' => $allOutput,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
