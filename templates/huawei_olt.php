@@ -16439,8 +16439,8 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             } catch (Exception $e) {}
             
             $defaultDiscoveryTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n⏰ *Time:* {discovery_time}\n\n🔢 *Serial:* {onu_serials}\n🔧 *Type:* {onu_type}\n\n💡 Please authorize this ONU in the OMS panel.";
-            $defaultLosTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
-            $defaultDyingGaspTemplate = "🔴 *DYING GASP — POWER FAILURE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n📞 *Phone:* {customer_phone}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n🔋 *Current Status:* Dying Gasp (Power Failure)\n\n💡 Customer may have a power outage. Check power supply.";
+            $defaultLosTemplate = "⚠️ *ONU LOS ALERT — {fault_count} ONU(s)*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n⏰ *Time:* {alert_time}\n\n{onu_table}\n\n🔧 Please check fiber connection and customer site.";
+            $defaultDyingGaspTemplate = "🔴 *DYING GASP — {fault_count} ONU(s) POWER FAILURE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n⏰ *Time:* {alert_time}\n\n{onu_table}\n\n💡 Customers may have a power outage. Check power supply.";
             $defaultAuthorizedTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n👤 *Customer:* {customer_name}\n👷 *By:* {authorized_by}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
             $defaultWifiChangedTemplate = "📶 *WiFi Credentials Updated*\n\nHello {customer_name},\n\nYour WiFi settings have been updated:\n\n📡 *Network Name (SSID):* {ssid}\n🔑 *Password:* {password}\n📻 *Band:* {band}\n\n🔌 *ONU:* {onu_name}\n⏰ *Time:* {change_time}\n\nPlease reconnect your devices using the new credentials.\n\nThank you!";
             
@@ -16719,7 +16719,8 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                 ONU LOS (Loss of Signal) Alert Template
                                             </label>
                                             <textarea name="wa_template_oms_los_alert" class="form-control font-monospace" rows="8" placeholder="Enter LOS alert template..."><?= htmlspecialchars($templateSettings['wa_template_oms_los_alert'] ?? $defaultLosTemplate) ?></textarea>
-                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {alert_time}, {previous_status}, {customer_name}, {customer_phone}</small>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {alert_time}, {fault_count}, {onu_table}</small>
+                                            <small class="d-block text-muted mt-1">The <code>{onu_table}</code> placeholder is auto-generated with numbered rows showing ONU name, port, serial, customer name &amp; phone for each affected ONU.</small>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_los_alert]').value = <?= htmlspecialchars(json_encode($defaultLosTemplate)) ?>">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
@@ -16732,7 +16733,8 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                 Dying Gasp (Power Failure) Alert Template
                                             </label>
                                             <textarea name="wa_template_oms_dying_gasp" class="form-control font-monospace" rows="8" placeholder="Enter Dying Gasp alert template..."><?= htmlspecialchars($templateSettings['wa_template_oms_dying_gasp'] ?? $defaultDyingGaspTemplate) ?></textarea>
-                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {alert_time}, {previous_status}, {current_status}, {action_message}, {customer_name}, {customer_phone}</small>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {alert_time}, {fault_count}, {onu_table}</small>
+                                            <small class="d-block text-muted mt-1">The <code>{onu_table}</code> placeholder is auto-generated with numbered rows showing ONU name, port, serial, customer name &amp; phone for each affected ONU.</small>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_dying_gasp]').value = <?= htmlspecialchars(json_encode($defaultDyingGaspTemplate)) ?>">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default

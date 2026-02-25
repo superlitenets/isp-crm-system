@@ -163,62 +163,71 @@ try {
         }
         
         $losTemplate = $settings->get('wa_template_oms_los_alert', 
-            "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* {current_status}\n\n🔧 {action_message}"
+            "⚠️ *ONU LOS ALERT — {fault_count} ONU(s)*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n⏰ *Time:* {alert_time}\n\n{onu_table}\n\n🔧 Please check fiber connection and customer site."
         );
         $dyingGaspTemplate = $settings->get('wa_template_oms_dying_gasp',
-            "🔴 *DYING GASP — POWER FAILURE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n📞 *Phone:* {customer_phone}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n🔋 *Current Status:* {current_status}\n\n💡 {action_message}"
+            "🔴 *DYING GASP — {fault_count} ONU(s) POWER FAILURE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n⏰ *Time:* {alert_time}\n\n{onu_table}\n\n💡 Customers may have a power outage. Check power supply."
         );
         $offlineTemplate = $settings->get('wa_template_oms_offline_alert',
-            "📴 *ONU OFFLINE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* {current_status}"
+            "📴 *ONU OFFLINE — {fault_count} ONU(s)*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n⏰ *Time:* {alert_time}\n\n{onu_table}"
         );
         
-        $messages = [];
+        $grouped = ['los' => [], 'dying-gasp' => [], 'offline' => []];
         foreach ($faults as $f) {
-            $onuPort = "0/{$f['slot']}/{$f['port']}:{$f['onu_id']}";
-            $newStatus = $f['new_status'] ?? 'offline';
+            $status = $f['new_status'] ?? 'offline';
+            $key = isset($grouped[$status]) ? $status : 'offline';
+            $grouped[$key][] = $f;
+        }
+        
+        $messages = [];
+        foreach ($grouped as $statusType => $typeFaults) {
+            if (empty($typeFaults)) continue;
             
-            if ($newStatus === 'los') {
+            if ($statusType === 'los') {
                 $template = $losTemplate;
-                $currentStatus = 'LOS (Loss of Signal)';
-                $actionMessage = 'Please check fiber connection and customer site.';
-            } elseif ($newStatus === 'dying-gasp') {
+            } elseif ($statusType === 'dying-gasp') {
                 $template = $dyingGaspTemplate;
-                $currentStatus = 'Dying Gasp (Power Failure)';
-                $actionMessage = 'Customer may have a power outage. Check power supply.';
             } else {
                 $template = $offlineTemplate;
-                $currentStatus = 'Offline';
-                $actionMessage = '';
             }
+            
+            $tableRows = [];
+            $idx = 1;
+            foreach ($typeFaults as $f) {
+                $onuPort = "0/{$f['slot']}/{$f['port']}:{$f['onu_id']}";
+                $onuName = $f['name'] ?: $f['sn'];
+                $customerName = $f['customer_name'] ?? '';
+                $customerPhone = $f['customer_phone'] ?? '';
+                
+                $row = "*{$idx}.* {$onuName}\n" .
+                       "    📡 Port: {$onuPort} | SN: {$f['sn']}";
+                if (!empty($customerName) && $customerName !== 'Unknown') {
+                    $row .= "\n    👤 {$customerName}";
+                    if (!empty($customerPhone)) {
+                        $row .= " | 📞 {$customerPhone}";
+                    }
+                }
+                $tableRows[] = $row;
+                $idx++;
+            }
+            $onuTable = implode("\n\n", $tableRows);
             
             $message = str_replace([
                 '{olt_name}',
                 '{olt_ip}',
                 '{branch_name}',
                 '{branch_code}',
-                '{onu_name}',
-                '{onu_sn}',
-                '{onu_port}',
                 '{alert_time}',
-                '{previous_status}',
-                '{current_status}',
-                '{action_message}',
-                '{customer_name}',
-                '{customer_phone}'
+                '{fault_count}',
+                '{onu_table}'
             ], [
                 $oltName,
                 $oltIp,
                 $branchName,
                 $input['branch_code'] ?? '',
-                $f['name'] ?: $f['sn'],
-                $f['sn'],
-                $onuPort,
                 date('Y-m-d H:i:s'),
-                $f['prev_status'] ?? 'online',
-                $currentStatus,
-                $actionMessage,
-                $f['customer_name'] ?? 'Unknown',
-                $f['customer_phone'] ?? ''
+                count($typeFaults),
+                $onuTable
             ], $template);
             $messages[] = $message;
         }
