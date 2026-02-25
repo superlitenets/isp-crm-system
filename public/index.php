@@ -8134,6 +8134,11 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['ajax'] ??
         $input = json_decode(file_get_contents('php://input'), true);
         $target = $input['target'] ?? 'all';
 
+        try {
+            $db->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(64)");
+            $db->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP");
+        } catch (\Exception $e) {}
+
         $settingsObj = new \App\Settings();
         $baseUrl = $settingsObj->get('system_url', $_ENV['APP_URL'] ?? 'https://crm.superlite.co.ke');
         $baseUrl = rtrim($baseUrl, '/');

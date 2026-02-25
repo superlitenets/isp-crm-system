@@ -9,7 +9,24 @@ $messageType = '';
 $validToken = false;
 $userEmail = '';
 
-if (!empty($token)) {
+$hasResetColumns = false;
+try {
+    $chk = $db->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'reset_token'");
+    $hasResetColumns = (bool)$chk->fetchColumn();
+} catch (\Exception $e) {}
+
+if (!$hasResetColumns) {
+    try {
+        $db->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(64)");
+        $db->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP");
+        $hasResetColumns = true;
+    } catch (\Exception $e) {
+        $message = 'Password reset is not yet configured. Please contact your administrator.';
+        $messageType = 'warning';
+    }
+}
+
+if ($hasResetColumns && !empty($token)) {
     $stmt = $db->prepare("SELECT id, email, name FROM users WHERE reset_token = ? AND reset_token_expires > NOW()");
     $stmt->execute([$token]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -22,7 +39,7 @@ if (!empty($token)) {
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
+if ($hasResetColumns && $_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
     $postToken = $_POST['token'];
     $newPassword = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
