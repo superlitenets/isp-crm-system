@@ -521,7 +521,19 @@ try {
                     </tr>
                     <tr>
                         <th>Salary</th>
-                        <td><?= $employeeData['salary'] ? $currencySymbol . ' ' . number_format($employeeData['salary'], 2) : 'N/A' ?></td>
+                        <td>
+                            <?php if ($employeeData['salary']): ?>
+                            <span id="salaryBlurred" style="filter: blur(5px); user-select: none; cursor: pointer;" onclick="document.getElementById('salaryBlurred').style.display='none'; document.getElementById('salaryRevealed').style.display='inline';" title="Click to reveal">
+                                <?= $currencySymbol ?> <?= number_format($employeeData['salary'], 2) ?>
+                            </span>
+                            <span id="salaryRevealed" style="display:none;">
+                                <?= $currencySymbol ?> <?= number_format($employeeData['salary'], 2) ?>
+                                <i class="bi bi-eye-slash ms-1 text-muted" style="cursor:pointer;" onclick="document.getElementById('salaryRevealed').style.display='none'; document.getElementById('salaryBlurred').style.display='inline';" title="Hide salary"></i>
+                            </span>
+                            <?php else: ?>
+                            N/A
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 </table>
             </div>

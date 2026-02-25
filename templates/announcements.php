@@ -41,7 +41,9 @@ $announcements = $announcementClass->getAll();
             <div class="row">
                 <div class="col-md-4">
                     <strong>Target:</strong> 
-                    <?php if ($announcement['target_audience'] === 'branch'): ?>
+                    <?php if ($announcement['target_audience'] === 'individual'): ?>
+                        Employee: <?= htmlspecialchars($announcement['employee_name'] ?? 'Unknown') ?>
+                    <?php elseif ($announcement['target_audience'] === 'branch'): ?>
                         Branch: <?= htmlspecialchars($announcement['branch_name'] ?? 'Unknown') ?>
                     <?php elseif ($announcement['target_audience'] === 'team'): ?>
                         Team: <?= htmlspecialchars($announcement['team_name'] ?? 'Unknown') ?>
@@ -130,7 +132,9 @@ $announcements = $announcementClass->getAll();
                                 </span>
                             </td>
                             <td>
-                                <?php if ($a['target_audience'] === 'branch'): ?>
+                                <?php if ($a['target_audience'] === 'individual'): ?>
+                                    <i class="bi bi-person"></i> <?= htmlspecialchars($a['employee_name'] ?? '') ?>
+                                <?php elseif ($a['target_audience'] === 'branch'): ?>
                                     <i class="bi bi-building"></i> <?= htmlspecialchars($a['branch_name'] ?? '') ?>
                                 <?php elseif ($a['target_audience'] === 'team'): ?>
                                     <i class="bi bi-people"></i> <?= htmlspecialchars($a['team_name'] ?? '') ?>
@@ -218,12 +222,22 @@ $announcements = $announcementClass->getAll();
                             <label class="form-label">Target Audience</label>
                             <select class="form-select" name="target_audience" id="targetAudience" onchange="toggleTargetFields()">
                                 <option value="all">All Employees</option>
+                                <option value="individual">Individual Employee</option>
                                 <option value="branch">Specific Branch</option>
                                 <option value="team">Specific Team</option>
                             </select>
                         </div>
                     </div>
                     <div class="row">
+                        <div class="col-md-6 mb-3" id="employeeField" style="display:none;">
+                            <label class="form-label">Select Employee</label>
+                            <select class="form-select" name="target_employee_id">
+                                <option value="">-- Select Employee --</option>
+                                <?php foreach ($allEmployees as $e): ?>
+                                <option value="<?= $e['id'] ?>"><?= htmlspecialchars($e['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-md-6 mb-3" id="branchField" style="display:none;">
                             <label class="form-label">Select Branch</label>
                             <select class="form-select" name="target_branch_id">
@@ -275,6 +289,7 @@ $announcements = $announcementClass->getAll();
 <script>
 function toggleTargetFields() {
     const audience = document.getElementById('targetAudience').value;
+    document.getElementById('employeeField').style.display = audience === 'individual' ? 'block' : 'none';
     document.getElementById('branchField').style.display = audience === 'branch' ? 'block' : 'none';
     document.getElementById('teamField').style.display = audience === 'team' ? 'block' : 'none';
 }

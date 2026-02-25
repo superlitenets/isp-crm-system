@@ -17,8 +17,8 @@ class Announcement {
     
     public function create(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO announcements (title, message, priority, target_audience, target_branch_id, target_team_id, send_sms, send_notification, scheduled_at, status, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO announcements (title, message, priority, target_audience, target_branch_id, target_team_id, target_employee_id, send_sms, send_notification, scheduled_at, status, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -28,6 +28,7 @@ class Announcement {
             $data['target_audience'] ?? 'all',
             $data['target_branch_id'] ?: null,
             $data['target_team_id'] ?: null,
+            $data['target_employee_id'] ?: null,
             isset($data['send_sms']) ? (bool)$data['send_sms'] : false,
             isset($data['send_notification']) ? (bool)$data['send_notification'] : true,
             $data['scheduled_at'] ?: null,
@@ -40,13 +41,14 @@ class Announcement {
     
     public function getAll(array $filters = []): array {
         $sql = "SELECT a.*, u.name as created_by_name, 
-                       b.name as branch_name, t.name as team_name,
+                       b.name as branch_name, t.name as team_name, emp.name as employee_name,
                        (SELECT COUNT(*) FROM announcement_recipients WHERE announcement_id = a.id) as recipient_count,
                        (SELECT COUNT(*) FROM announcement_recipients WHERE announcement_id = a.id AND notification_read = TRUE) as read_count
                 FROM announcements a
                 LEFT JOIN users u ON a.created_by = u.id
                 LEFT JOIN branches b ON a.target_branch_id = b.id
                 LEFT JOIN teams t ON a.target_team_id = t.id
+                LEFT JOIN employees emp ON a.target_employee_id = emp.id
                 WHERE 1=1";
         $params = [];
         
@@ -69,11 +71,12 @@ class Announcement {
     public function getById(int $id): ?array {
         $stmt = $this->db->prepare("
             SELECT a.*, u.name as created_by_name,
-                   b.name as branch_name, t.name as team_name
+                   b.name as branch_name, t.name as team_name, emp.name as employee_name
             FROM announcements a
             LEFT JOIN users u ON a.created_by = u.id
             LEFT JOIN branches b ON a.target_branch_id = b.id
             LEFT JOIN teams t ON a.target_team_id = t.id
+            LEFT JOIN employees emp ON a.target_employee_id = emp.id
             WHERE a.id = ?
         ");
         $stmt->execute([$id]);
@@ -115,7 +118,12 @@ class Announcement {
                 WHERE $statusCondition";
         $params = [];
         
-        if ($announcement['target_audience'] === 'branch' && $announcement['target_branch_id']) {
+        if ($announcement['target_audience'] === 'individual' && $announcement['target_employee_id']) {
+            $sql = "SELECT e.id, e.name, e.phone, e.email 
+                    FROM employees e 
+                    WHERE e.id = ?";
+            $params[] = $announcement['target_employee_id'];
+        } elseif ($announcement['target_audience'] === 'branch' && $announcement['target_branch_id']) {
             $sql = "SELECT DISTINCT e.id, e.name, e.phone, e.email 
                     FROM employees e 
                     JOIN employee_branches eb ON e.id = eb.employee_id

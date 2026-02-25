@@ -4956,6 +4956,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'target_audience' => $_POST['target_audience'] ?? 'all',
                         'target_branch_id' => $_POST['target_branch_id'] ?: null,
                         'target_team_id' => $_POST['target_team_id'] ?: null,
+                        'target_employee_id' => $_POST['target_employee_id'] ?: null,
                         'send_sms' => isset($_POST['send_sms']),
                         'send_notification' => isset($_POST['send_notification']),
                         'status' => 'draft',

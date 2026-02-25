@@ -40,6 +40,8 @@ class Ticket {
         
         $slaData = $this->getSLA()->calculateSLAForTicket($priority);
         
+        $initialStatus = ($assignedTo || $teamId) ? 'in_progress' : 'open';
+        
         $stmt = $this->db->prepare("
             INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, branch_id, subject, description, category, priority, status, sla_policy_id, sla_response_due, sla_resolution_due, created_by)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -55,7 +57,7 @@ class Ticket {
             $data['description'],
             $data['category'],
             $priority,
-            'open',
+            $initialStatus,
             $slaData['policy_id'],
             $slaData['response_due'] ? $slaData['response_due']->format('Y-m-d H:i:s') : null,
             $slaData['resolution_due'] ? $slaData['resolution_due']->format('Y-m-d H:i:s') : null,
