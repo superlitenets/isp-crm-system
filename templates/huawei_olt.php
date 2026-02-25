@@ -1308,38 +1308,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = 'success';
                 break;
             case 'save_onu_type':
-                $typeId = !empty($_POST['id']) ? (int)$_POST['id'] : null;
-                $typeData = [
+                $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+                $data = [
                     'name' => trim($_POST['name'] ?? ''),
                     'model' => trim($_POST['model'] ?? '') ?: trim($_POST['name'] ?? ''),
-                    'eth_ports' => (int)($_POST['eth_ports'] ?? 4),
+                    'eth_ports' => (int)($_POST['eth_ports'] ?? 1),
                     'pots_ports' => (int)($_POST['pots_ports'] ?? 0),
+                    'default_mode' => $_POST['default_mode'] ?? 'bridge',
+                    'tcont_count' => (int)($_POST['tcont_count'] ?? 1),
+                    'gemport_count' => (int)($_POST['gemport_count'] ?? 1),
                     'wifi_capable' => isset($_POST['wifi_capable']),
-                    'default_mode' => $_POST['default_mode'] ?? 'bridge'
+                    'omci_capable' => isset($_POST['omci_capable']),
+                    'tr069_capable' => isset($_POST['tr069_capable']),
+                    'description' => $_POST['description'] ?? ''
                 ];
-                if ($typeId) {
-                    $stmt = $db->prepare("UPDATE huawei_onu_types SET name = ?, model = ?, eth_ports = ?, pots_ports = ?, wifi_capable = ?, default_mode = ? WHERE id = ?");
-                    $stmt->execute([$typeData['name'], $typeData['model'], $typeData['eth_ports'], $typeData['pots_ports'], $typeData['wifi_capable'], $typeData['default_mode'], $typeId]);
+                if ($id) {
+                    $stmt = $db->prepare("UPDATE huawei_onu_types SET name=?, model=?, eth_ports=?, pots_ports=?, default_mode=?, tcont_count=?, gemport_count=?, wifi_capable=?, omci_capable=?, tr069_capable=?, description=?, updated_at=CURRENT_TIMESTAMP WHERE id=?");
+                    $stmt->execute([$data['name'], $data['model'], $data['eth_ports'], $data['pots_ports'], $data['default_mode'], $data['tcont_count'], $data['gemport_count'], $data['wifi_capable'], $data['omci_capable'], $data['tr069_capable'], $data['description'], $id]);
                     $message = 'ONU type updated successfully';
                 } else {
-                    $stmt = $db->prepare("INSERT INTO huawei_onu_types (name, model, eth_ports, pots_ports, wifi_capable, default_mode) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$typeData['name'], $typeData['model'], $typeData['eth_ports'], $typeData['pots_ports'], $typeData['wifi_capable'], $typeData['default_mode']]);
+                    $existsStmt = $db->prepare("SELECT id FROM huawei_onu_types WHERE (LOWER(name) = LOWER(?) OR LOWER(model) = LOWER(?)) AND is_active = true LIMIT 1");
+                    $existsStmt->execute([$data['name'], $data['model']]);
+                    if ($existsStmt->fetch()) {
+                        $message = 'An ONU type with this name or model already exists';
+                        $messageType = 'danger';
+                        break;
+                    }
+                    $stmt = $db->prepare("INSERT INTO huawei_onu_types (name, model, eth_ports, pots_ports, default_mode, tcont_count, gemport_count, wifi_capable, omci_capable, tr069_capable, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$data['name'], $data['model'], $data['eth_ports'], $data['pots_ports'], $data['default_mode'], $data['tcont_count'], $data['gemport_count'], $data['wifi_capable'], $data['omci_capable'], $data['tr069_capable'], $data['description']]);
                     $message = 'ONU type added successfully';
                 }
                 $messageType = 'success';
                 break;
             case 'delete_onu_type':
-                $typeId = (int)$_POST['id'];
-                $checkStmt = $db->prepare("SELECT COUNT(*) FROM huawei_onus WHERE onu_type_id = ?");
-                $checkStmt->execute([$typeId]);
-                if ($checkStmt->fetchColumn() > 0) {
-                    $message = 'Cannot delete ONU type - it is being used by existing ONUs';
-                    $messageType = 'danger';
-                } else {
-                    $db->prepare("DELETE FROM huawei_onu_types WHERE id = ?")->execute([$typeId]);
-                    $message = 'ONU type deleted successfully';
-                    $messageType = 'success';
-                }
+                $stmt = $db->prepare("UPDATE huawei_onu_types SET is_active = FALSE WHERE id = ?");
+                $stmt->execute([(int)$_POST['id']]);
+                $message = 'ONU type deleted successfully';
+                $messageType = 'success';
                 break;
             // Location Management
             case 'add_zone':
@@ -3214,38 +3219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Location: ?page=huawei-olt&view=settings&tab=smartolt&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
                 break;
-            case 'save_onu_type':
-                $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
-                $data = [
-                    'name' => $_POST['name'] ?? '',
-                    'model' => $_POST['model'] ?? '',
-                    'eth_ports' => (int)($_POST['eth_ports'] ?? 1),
-                    'pots_ports' => (int)($_POST['pots_ports'] ?? 0),
-                    'default_mode' => $_POST['default_mode'] ?? 'bridge',
-                    'tcont_count' => (int)($_POST['tcont_count'] ?? 1),
-                    'gemport_count' => (int)($_POST['gemport_count'] ?? 1),
-                    'wifi_capable' => isset($_POST['wifi_capable']),
-                    'omci_capable' => isset($_POST['omci_capable']),
-                    'tr069_capable' => isset($_POST['tr069_capable']),
-                    'description' => $_POST['description'] ?? ''
-                ];
-                if ($id) {
-                    $stmt = $db->prepare("UPDATE huawei_onu_types SET name=?, model=?, eth_ports=?, pots_ports=?, default_mode=?, tcont_count=?, gemport_count=?, wifi_capable=?, omci_capable=?, tr069_capable=?, description=?, updated_at=CURRENT_TIMESTAMP WHERE id=?");
-                    $stmt->execute([$data['name'], $data['model'], $data['eth_ports'], $data['pots_ports'], $data['default_mode'], $data['tcont_count'], $data['gemport_count'], $data['wifi_capable'], $data['omci_capable'], $data['tr069_capable'], $data['description'], $id]);
-                    $message = 'ONU type updated successfully';
-                } else {
-                    $stmt = $db->prepare("INSERT INTO huawei_onu_types (name, model, eth_ports, pots_ports, default_mode, tcont_count, gemport_count, wifi_capable, omci_capable, tr069_capable, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$data['name'], $data['model'], $data['eth_ports'], $data['pots_ports'], $data['default_mode'], $data['tcont_count'], $data['gemport_count'], $data['wifi_capable'], $data['omci_capable'], $data['tr069_capable'], $data['description']]);
-                    $message = 'ONU type added successfully';
-                }
-                $messageType = 'success';
-                break;
-            case 'delete_onu_type':
-                $stmt = $db->prepare("UPDATE huawei_onu_types SET is_active = FALSE WHERE id = ?");
-                $stmt->execute([(int)$_POST['id']]);
-                $message = 'ONU type deleted successfully';
-                $messageType = 'success';
-                break;
+            
             case 'save_vpn_settings':
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
@@ -12937,177 +12911,7 @@ try {
             </script>
             
             <?php elseif ($view === 'onu_types'): ?>
-            <?php
-            $onuTypes = $db->query("SELECT * FROM huawei_onu_types ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
-            $onuCountsByType = [];
-            $countStmt = $db->query("SELECT onu_type_id, COUNT(*) as cnt FROM huawei_onus WHERE onu_type_id IS NOT NULL GROUP BY onu_type_id");
-            foreach ($countStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $onuCountsByType[$row['onu_type_id']] = $row['cnt'];
-            }
-            ?>
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="mb-0"><i class="bi bi-cpu me-2"></i>ONU Types</h4>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#onuTypeModal" onclick="resetOnuTypeForm()">
-                    <i class="bi bi-plus-circle me-1"></i> Add ONU Type
-                </button>
-            </div>
-            
-            <div class="card shadow-sm">
-                <div class="card-body p-0">
-                    <?php if (empty($onuTypes)): ?>
-                    <div class="p-4 text-center text-muted">
-                        <i class="bi bi-cpu fs-1 mb-2 d-block"></i>
-                        No ONU types configured
-                    </div>
-                    <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Name / Model</th>
-                                    <th>ETH Ports</th>
-                                    <th>POTS</th>
-                                    <th>WiFi</th>
-                                    <th>Default Mode</th>
-                                    <th>ONUs Using</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($onuTypes as $type): ?>
-                                <tr>
-                                    <td>
-                                        <strong><?= htmlspecialchars($type['name']) ?></strong>
-                                        <?php if ($type['model'] && $type['model'] !== $type['name']): ?>
-                                        <br><small class="text-muted"><?= htmlspecialchars($type['model']) ?></small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><span class="badge bg-primary"><?= (int)$type['eth_ports'] ?></span></td>
-                                    <td><span class="badge bg-secondary"><?= (int)$type['pots_ports'] ?></span></td>
-                                    <td>
-                                        <?php if ($type['wifi_capable']): ?>
-                                        <i class="bi bi-wifi text-success"></i> Yes
-                                        <?php else: ?>
-                                        <i class="bi bi-wifi-off text-muted"></i> No
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><span class="badge bg-<?= $type['default_mode'] === 'router' ? 'info' : 'secondary' ?>"><?= ucfirst($type['default_mode'] ?? 'bridge') ?></span></td>
-                                    <td>
-                                        <?php $count = $onuCountsByType[$type['id']] ?? 0; ?>
-                                        <?php if ($count > 0): ?>
-                                        <span class="badge bg-success"><?= $count ?> ONUs</span>
-                                        <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-secondary" onclick="editOnuType(<?= htmlspecialchars(json_encode($type)) ?>)">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                            <button class="btn btn-outline-danger" onclick="deleteOnuType(<?= $type['id'] ?>)" <?= ($onuCountsByType[$type['id']] ?? 0) > 0 ? 'disabled title="Cannot delete - ONUs are using this type"' : '' ?>>
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <div class="modal fade" id="onuTypeModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <form method="POST">
-                            <input type="hidden" name="action" value="save_onu_type">
-                            <input type="hidden" name="id" id="onuTypeId">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="onuTypeModalTitle">Add ONU Type</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="mb-3">
-                                    <label class="form-label">Name (Equipment ID)</label>
-                                    <input type="text" name="name" id="onuTypeName" class="form-control" required placeholder="e.g. HG8546M">
-                                    <small class="text-muted">This should match the Equipment ID reported by the ONU</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Model</label>
-                                    <input type="text" name="model" id="onuTypeModel" class="form-control" placeholder="e.g. HG8546M">
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">ETH Ports</label>
-                                        <input type="number" name="eth_ports" id="onuTypeEthPorts" class="form-control" value="4" min="0" max="8">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">POTS Ports</label>
-                                        <input type="number" name="pots_ports" id="onuTypePotsPorts" class="form-control" value="0" min="0" max="4">
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" name="wifi_capable" id="onuTypeWifi" class="form-check-input" value="1">
-                                            <label class="form-check-label" for="onuTypeWifi">WiFi Capable</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Default Mode</label>
-                                        <select name="default_mode" id="onuTypeMode" class="form-select">
-                                            <option value="bridge">Bridge</option>
-                                            <option value="router">Router</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer justify-content-between">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save ONU Type</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            
-            <script>
-            function resetOnuTypeForm() {
-                document.getElementById('onuTypeId').value = '';
-                document.getElementById('onuTypeName').value = '';
-                document.getElementById('onuTypeModel').value = '';
-                document.getElementById('onuTypeEthPorts').value = '4';
-                document.getElementById('onuTypePotsPorts').value = '0';
-                document.getElementById('onuTypeWifi').checked = false;
-                document.getElementById('onuTypeMode').value = 'bridge';
-                document.getElementById('onuTypeModalTitle').textContent = 'Add ONU Type';
-            }
-            
-            function editOnuType(type) {
-                document.getElementById('onuTypeId').value = type.id;
-                document.getElementById('onuTypeName').value = type.name || '';
-                document.getElementById('onuTypeModel').value = type.model || '';
-                document.getElementById('onuTypeEthPorts').value = type.eth_ports || 4;
-                document.getElementById('onuTypePotsPorts').value = type.pots_ports || 0;
-                document.getElementById('onuTypeWifi').checked = type.wifi_capable;
-                document.getElementById('onuTypeMode').value = type.default_mode || 'bridge';
-                document.getElementById('onuTypeModalTitle').textContent = 'Edit ONU Type';
-                new bootstrap.Modal(document.getElementById('onuTypeModal')).show();
-            }
-            
-            function deleteOnuType(id) {
-                if (confirm('Are you sure you want to delete this ONU type?')) {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.innerHTML = '<input type="hidden" name="action" value="delete_onu_type"><input type="hidden" name="id" value="' + id + '">';
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-            }
-            </script>
+            <?php header('Location: ?page=huawei-olt&view=settings&tab=onu_types'); exit; ?>
             
             <?php elseif ($view === 'locations'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
