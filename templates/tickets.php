@@ -1848,7 +1848,7 @@ $ticketTab = $_GET['tab'] ?? 'active';
         <a href="?page=tickets&tab=active&sla=breached" class="alert-link ms-2">View all</a>
     </div>
     <form method="POST" action="?page=tickets" onsubmit="return confirm('Resolve all <?= count($overdueTickets) ?> overdue tickets?')">
-        <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+        <input type="hidden" name="csrf_token" value="<?= \App\Auth::generateToken() ?>">
         <input type="hidden" name="action" value="resolve_all_overdue">
         <button type="submit" class="btn btn-sm btn-outline-danger">
             <i class="bi bi-check-all me-1"></i>Resolve All
