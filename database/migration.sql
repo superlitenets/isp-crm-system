@@ -17868,3 +17868,47 @@ UPDATE tickets SET status = 'resolved' WHERE status = 'closed';
 -- Update default allowed_statuses for status tokens (remove Closed)
 ALTER TABLE ticket_status_tokens ALTER COLUMN allowed_statuses SET DEFAULT 'In Progress,Resolved';
 UPDATE ticket_status_tokens SET allowed_statuses = REPLACE(allowed_statuses, ',Closed', '') WHERE allowed_statuses LIKE '%,Closed%';
+
+-- ============================================================================
+-- Core Network Equipment Uptime Monitoring
+-- ============================================================================
+DO $$ BEGIN
+    ALTER TABLE isp_core_equipment ADD COLUMN monitor_enabled BOOLEAN DEFAULT TRUE;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE isp_core_equipment ADD COLUMN ping_status VARCHAR(20) DEFAULT 'unknown';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE isp_core_equipment ADD COLUMN last_ping_at TIMESTAMP;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE isp_core_equipment ADD COLUMN last_seen_online TIMESTAMP;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE isp_core_equipment ADD COLUMN downtime_started TIMESTAMP;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE isp_core_equipment ADD COLUMN downtime_notified BOOLEAN DEFAULT FALSE;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS isp_equipment_uptime_log (
+    id SERIAL PRIMARY KEY,
+    equipment_id INTEGER REFERENCES isp_core_equipment(id) ON DELETE CASCADE,
+    prev_status VARCHAR(20),
+    new_status VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_uptime_log_equipment ON isp_equipment_uptime_log(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_uptime_log_created ON isp_equipment_uptime_log(created_at);
