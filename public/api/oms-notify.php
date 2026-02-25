@@ -165,6 +165,9 @@ try {
         $losTemplate = $settings->get('wa_template_oms_los_alert', 
             "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* {current_status}\n\n🔧 {action_message}"
         );
+        $dyingGaspTemplate = $settings->get('wa_template_oms_dying_gasp',
+            "🔴 *DYING GASP — POWER FAILURE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n📞 *Phone:* {customer_phone}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n🔋 *Current Status:* {current_status}\n\n💡 {action_message}"
+        );
         $offlineTemplate = $settings->get('wa_template_oms_offline_alert',
             "📴 *ONU OFFLINE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* {current_status}"
         );
@@ -179,7 +182,7 @@ try {
                 $currentStatus = 'LOS (Loss of Signal)';
                 $actionMessage = 'Please check fiber connection and customer site.';
             } elseif ($newStatus === 'dying-gasp') {
-                $template = $losTemplate;
+                $template = $dyingGaspTemplate;
                 $currentStatus = 'Dying Gasp (Power Failure)';
                 $actionMessage = 'Customer may have a power outage. Check power supply.';
             } else {

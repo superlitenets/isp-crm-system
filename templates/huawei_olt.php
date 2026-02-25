@@ -3139,6 +3139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $templates = [
                     'wa_template_oms_new_onu' => trim($_POST['wa_template_oms_new_onu'] ?? ''),
                     'wa_template_oms_los_alert' => trim($_POST['wa_template_oms_los_alert'] ?? ''),
+                    'wa_template_oms_dying_gasp' => trim($_POST['wa_template_oms_dying_gasp'] ?? ''),
                     'wa_template_oms_onu_authorized' => trim($_POST['wa_template_oms_onu_authorized'] ?? ''),
                     'wa_template_oms_wifi_changed' => trim($_POST['wa_template_oms_wifi_changed'] ?? '')
                 ];
@@ -16431,7 +16432,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             
             $templateSettings = [];
             try {
-                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_los_alert', 'wa_template_oms_onu_authorized', 'wa_template_oms_wifi_changed')");
+                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_los_alert', 'wa_template_oms_dying_gasp', 'wa_template_oms_onu_authorized', 'wa_template_oms_wifi_changed')");
                 while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
                     $templateSettings[$row['setting_key']] = $row['setting_value'];
                 }
@@ -16439,6 +16440,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             
             $defaultDiscoveryTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n⏰ *Time:* {discovery_time}\n\n🔢 *Serial:* {onu_serials}\n🔧 *Type:* {onu_type}\n\n💡 Please authorize this ONU in the OMS panel.";
             $defaultLosTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
+            $defaultDyingGaspTemplate = "🔴 *DYING GASP — POWER FAILURE*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n📞 *Phone:* {customer_phone}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n🔋 *Current Status:* Dying Gasp (Power Failure)\n\n💡 Customer may have a power outage. Check power supply.";
             $defaultAuthorizedTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n🗺️ *Zone:* {zone_name}\n📊 *Inventory:* {inventory_status}\n👤 *Customer:* {customer_name}\n👷 *By:* {authorized_by}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
             $defaultWifiChangedTemplate = "📶 *WiFi Credentials Updated*\n\nHello {customer_name},\n\nYour WiFi settings have been updated:\n\n📡 *Network Name (SSID):* {ssid}\n🔑 *Password:* {password}\n📻 *Band:* {band}\n\n🔌 *ONU:* {onu_name}\n⏰ *Time:* {change_time}\n\nPlease reconnect your devices using the new credentials.\n\nThank you!";
             
@@ -16720,6 +16722,19 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {alert_time}, {previous_status}, {customer_name}, {customer_phone}</small>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_los_alert]').value = <?= htmlspecialchars(json_encode($defaultLosTemplate)) ?>">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+                                        </button>
+                                    </div>
+                                    <div class="col-12 mb-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-lightning-charge text-danger me-1"></i>
+                                                Dying Gasp (Power Failure) Alert Template
+                                            </label>
+                                            <textarea name="wa_template_oms_dying_gasp" class="form-control font-monospace" rows="8" placeholder="Enter Dying Gasp alert template..."><?= htmlspecialchars($templateSettings['wa_template_oms_dying_gasp'] ?? $defaultDyingGaspTemplate) ?></textarea>
+                                            <small class="text-muted">Placeholders: {olt_name}, {olt_ip}, {branch_name}, {branch_code}, {onu_name}, {onu_sn}, {onu_port}, {alert_time}, {previous_status}, {current_status}, {action_message}, {customer_name}, {customer_phone}</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_dying_gasp]').value = <?= htmlspecialchars(json_encode($defaultDyingGaspTemplate)) ?>">
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
                                         </button>
                                     </div>
