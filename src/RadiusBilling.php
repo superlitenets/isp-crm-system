@@ -3177,6 +3177,26 @@ class RadiusBilling {
                 }
             } catch (\Exception $e) {
                 $errors[] = "NAS $nasIp: " . $e->getMessage();
+                
+                foreach ($sessions as $session) {
+                    $stmt = $this->db->prepare("
+                        UPDATE radius_sessions SET 
+                            status = 'closed',
+                            session_end = CURRENT_TIMESTAMP,
+                            terminate_cause = 'NAS-Unreachable'
+                        WHERE id = ? AND session_end IS NULL
+                    ");
+                    $stmt->execute([$session['id']]);
+                    $closed++;
+                    
+                    $this->db->prepare("
+                        UPDATE radius_subscriptions SET 
+                            online_status = 'offline',
+                            last_seen = CURRENT_TIMESTAMP,
+                            framed_ip_address = NULL
+                        WHERE id = ?
+                    ")->execute([$session['subscription_id']]);
+                }
             }
         }
         
