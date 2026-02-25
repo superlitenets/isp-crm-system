@@ -97,8 +97,14 @@ class ISPInventory {
     // ==================== CORE EQUIPMENT ====================
 
     public function getCoreEquipment(array $filters = []): array {
-        $sql = "SELECT e.*, s.name as site_name, r.name as rack_name, o.name as olt_name,
-                       e.ping_status, e.last_ping_at, e.last_seen_online, e.downtime_started, e.monitor_enabled
+        $monitorCols = '';
+        try {
+            $colCheck = $this->db->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'isp_core_equipment' AND column_name = 'ping_status'");
+            if ($colCheck->fetchColumn()) {
+                $monitorCols = ', e.ping_status, e.last_ping_at, e.last_seen_online, e.downtime_started, e.monitor_enabled';
+            }
+        } catch (\Exception $e) {}
+        $sql = "SELECT e.*, s.name as site_name, r.name as rack_name, o.name as olt_name{$monitorCols}
                 FROM isp_core_equipment e
                 LEFT JOIN isp_network_sites s ON e.site_id = s.id
                 LEFT JOIN isp_racks r ON e.rack_id = r.id
