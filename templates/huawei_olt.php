@@ -3119,6 +3119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'save_oms_notifications':
                 $notifSettings = [
                     'wa_provisioning_group' => trim($_POST['wa_provisioning_group'] ?? ''),
+                    'wa_dying_gasp_group' => trim($_POST['wa_dying_gasp_group'] ?? ''),
                     'onu_discovery_notify' => isset($_POST['onu_discovery_notify']) ? '1' : '0',
                     'onu_authorized_notify' => isset($_POST['onu_authorized_notify']) ? '1' : '0'
                 ];
@@ -16422,7 +16423,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             <?php
             $notifSettings = [];
             try {
-                $stmt = $db->query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('wa_provisioning_group', 'onu_discovery_notify', 'onu_authorized_notify')");
+                $stmt = $db->query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('wa_provisioning_group', 'wa_dying_gasp_group', 'onu_discovery_notify', 'onu_authorized_notify')");
                 while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
                     $notifSettings[$row['setting_key']] = $row['setting_value'];
                 }
@@ -16502,6 +16503,73 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             }
                                             
                                             select.innerHTML = '<option value="">-- Select a group --</option>';
+                                            
+                                            if (data.groups && data.groups.length > 0) {
+                                                data.groups.forEach(g => {
+                                                    const opt = document.createElement('option');
+                                                    opt.value = g.id;
+                                                    opt.textContent = g.name + ' (' + (g.participantsCount || 0) + ' members)';
+                                                    if (g.id === currentValue) opt.selected = true;
+                                                    select.appendChild(opt);
+                                                });
+                                                statusDiv.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' + data.groups.length + ' groups loaded</span>';
+                                            } else {
+                                                statusDiv.innerHTML = '<span class="text-muted">No groups found</span>';
+                                            }
+                                        } catch (err) {
+                                            statusDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Failed to load groups</span>';
+                                        } finally {
+                                            refreshBtn.disabled = false;
+                                        }
+                                    }
+                                    
+                                    refreshBtn.addEventListener('click', loadGroups);
+                                    loadGroups();
+                                })();
+                                </script>
+                                
+                                <hr class="my-3">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Dying Gasp / Power Failure WhatsApp Group</label>
+                                    <div class="input-group">
+                                        <select name="wa_dying_gasp_group" id="waDyingGaspGroup" class="form-select">
+                                            <option value="">-- Same as Provisioning Group --</option>
+                                            <?php if (!empty($notifSettings['wa_dying_gasp_group'])): ?>
+                                            <option value="<?= htmlspecialchars($notifSettings['wa_dying_gasp_group']) ?>" selected>
+                                                <?= htmlspecialchars($notifSettings['wa_dying_gasp_group']) ?> (current)
+                                            </option>
+                                            <?php endif; ?>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-secondary" id="refreshDyingGaspGroups" title="Refresh groups">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    </div>
+                                    <div class="form-text">Separate group for power failure / dying gasp alerts. Leave empty to use the provisioning group above.</div>
+                                    <div id="dyingGaspGroupsStatus" class="small text-muted mt-1"></div>
+                                </div>
+                                
+                                <script>
+                                (function() {
+                                    const select = document.getElementById('waDyingGaspGroup');
+                                    const refreshBtn = document.getElementById('refreshDyingGaspGroups');
+                                    const statusDiv = document.getElementById('dyingGaspGroupsStatus');
+                                    const currentValue = '<?= htmlspecialchars($notifSettings['wa_dying_gasp_group'] ?? '') ?>';
+                                    
+                                    async function loadGroups() {
+                                        statusDiv.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading groups...';
+                                        refreshBtn.disabled = true;
+                                        
+                                        try {
+                                            const resp = await fetch('/api/whatsapp-groups.php');
+                                            const data = await resp.json();
+                                            
+                                            if (data.error) {
+                                                statusDiv.innerHTML = '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>' + data.error + '</span>';
+                                                return;
+                                            }
+                                            
+                                            select.innerHTML = '<option value="">-- Same as Provisioning Group --</option>';
                                             
                                             if (data.groups && data.groups.length > 0) {
                                                 data.groups.forEach(g => {

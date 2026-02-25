@@ -1116,12 +1116,13 @@ class SNMPPollingWorker {
     async sendFaultNotifications(oltId, faults) {
         try {
             const provisioningGroup = await this.getProvisioningGroup();
-            if (!provisioningGroup) {
-                console.log(`[SNMP] No provisioning group configured, skipping fault notifications`);
+            const dyingGaspGroup = await this.getDyingGaspGroup();
+            
+            if (!provisioningGroup && !dyingGaspGroup) {
+                console.log(`[SNMP] No notification groups configured, skipping fault notifications`);
                 return;
             }
             
-            // Get OLT info
             const oltResult = await this.pool.query(`
                 SELECT o.name, o.ip_address, b.name as branch_name, b.code as branch_code
                 FROM huawei_olts o
@@ -1130,27 +1131,50 @@ class SNMPPollingWorker {
             `, [oltId]);
             const oltInfo = oltResult.rows[0];
             
-            console.log(`[SNMP] Sending ${faults.length} fault notifications...`);
+            const losFaults = faults.filter(f => f.new_status !== 'dying-gasp');
+            const dyingGaspFaults = faults.filter(f => f.new_status === 'dying-gasp');
             
-            const response = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
+            const basePayload = {
                 type: 'onu_fault',
-                group_id: provisioningGroup,
                 olt_name: oltInfo?.name || 'Unknown OLT',
                 olt_ip: oltInfo?.ip_address || '',
                 branch_name: oltInfo?.branch_name || 'Unassigned',
-                branch_code: oltInfo?.branch_code || '',
-                faults: faults
-            });
+                branch_code: oltInfo?.branch_code || ''
+            };
             
-            if (response.data && response.data.success) {
-                console.log(`[SNMP] Sent fault notifications for ${faults.length} ONUs`);
-                
-                // Log faults to database
-                for (const fault of faults) {
-                    await this.logFault(oltId, fault);
+            if (losFaults.length > 0 && provisioningGroup) {
+                console.log(`[SNMP] Sending ${losFaults.length} LOS fault notifications to provisioning group...`);
+                const resp = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
+                    ...basePayload,
+                    group_id: provisioningGroup,
+                    faults: losFaults
+                });
+                if (resp.data?.success) {
+                    console.log(`[SNMP] Sent LOS notifications for ${losFaults.length} ONUs`);
+                } else {
+                    console.error(`[SNMP] LOS notification failed:`, resp.data?.error || 'Unknown error');
                 }
-            } else {
-                console.error(`[SNMP] Fault notification failed:`, response.data?.error || 'Unknown error');
+            }
+            
+            if (dyingGaspFaults.length > 0) {
+                const targetGroup = dyingGaspGroup || provisioningGroup;
+                if (targetGroup) {
+                    console.log(`[SNMP] Sending ${dyingGaspFaults.length} Dying Gasp notifications to ${dyingGaspGroup ? 'dying gasp group' : 'provisioning group'}...`);
+                    const resp = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
+                        ...basePayload,
+                        group_id: targetGroup,
+                        faults: dyingGaspFaults
+                    });
+                    if (resp.data?.success) {
+                        console.log(`[SNMP] Sent Dying Gasp notifications for ${dyingGaspFaults.length} ONUs`);
+                    } else {
+                        console.error(`[SNMP] Dying Gasp notification failed:`, resp.data?.error || 'Unknown error');
+                    }
+                }
+            }
+            
+            for (const fault of faults) {
+                await this.logFault(oltId, fault);
             }
         } catch (error) {
             console.error(`[SNMP] Error sending fault notifications:`, error.message);
@@ -1161,6 +1185,17 @@ class SNMPPollingWorker {
         try {
             const result = await this.pool.query(`
                 SELECT setting_value FROM company_settings WHERE setting_key = 'wa_provisioning_group'
+            `);
+            return result.rows[0]?.setting_value || null;
+        } catch (error) {
+            return null;
+        }
+    }
+    
+    async getDyingGaspGroup() {
+        try {
+            const result = await this.pool.query(`
+                SELECT setting_value FROM company_settings WHERE setting_key = 'wa_dying_gasp_group'
             `);
             return result.rows[0]?.setting_value || null;
         } catch (error) {
