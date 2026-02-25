@@ -22,6 +22,12 @@ if (preg_match('#^/hotspot/([0-9.:]+)(?:/([^/?]+))?/?$#', $uri, $matches)) {
     return true;
 }
 
+if (preg_match('#^/reset-password(?:/(.+))?$#', $uri, $matches)) {
+    $_GET['token'] = $matches[1] ?? '';
+    require __DIR__ . '/reset-password.php';
+    return true;
+}
+
 if ($uri !== '/' && file_exists(__DIR__ . $uri)) {
     return false;
 }

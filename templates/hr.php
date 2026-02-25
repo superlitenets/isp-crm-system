@@ -1052,6 +1052,9 @@ function printJobCard() {
             </ul>
         </div>
         <?php endif; ?>
+        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#sendLoginDetailsModal">
+            <i class="bi bi-send"></i> Send Login Details
+        </button>
         <a href="?page=hr&action=create_employee" class="btn btn-primary">
             <i class="bi bi-person-plus"></i> Add Employee
         </a>
@@ -4014,5 +4017,105 @@ function setPasswordChangeEmployee(employeeId, employeeName) {
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="sendLoginDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-send"></i> Send Login Details to Employees</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>This will send each employee with a linked user account:</p>
+                <ul>
+                    <li>Their login username (email)</li>
+                    <li>A password reset link (valid for 72 hours)</li>
+                    <li>Link to the CRM system</li>
+                    <li>Link to the Mobile App</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Messages will be sent via both <strong>SMS</strong> and <strong>WhatsApp</strong>.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Send To</label>
+                    <select class="form-select" id="sendLoginTarget">
+                        <option value="all">All Employees with Accounts</option>
+                        <?php
+                        try {
+                            $empListForLogin = $db->query("SELECT e.id, e.name FROM employees e JOIN users u ON e.user_id = u.id WHERE e.employment_status IN ('active','Active') OR e.employment_status IS NULL ORDER BY e.name")->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($empListForLogin as $emp):
+                        ?>
+                        <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['name']) ?></option>
+                        <?php endforeach;
+                        } catch (\Exception $e) {} ?>
+                    </select>
+                </div>
+                <div id="sendLoginProgress" class="d-none">
+                    <div class="progress mb-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="sendLoginBar" style="width: 0%"></div>
+                    </div>
+                    <small id="sendLoginStatus" class="text-muted"></small>
+                </div>
+                <div id="sendLoginResult" class="d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="btnSendLoginDetails" onclick="sendLoginDetails()">
+                    <i class="bi bi-send me-1"></i> Send Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function sendLoginDetails() {
+    const target = document.getElementById('sendLoginTarget').value;
+    const btn = document.getElementById('btnSendLoginDetails');
+    const progress = document.getElementById('sendLoginProgress');
+    const bar = document.getElementById('sendLoginBar');
+    const status = document.getElementById('sendLoginStatus');
+    const result = document.getElementById('sendLoginResult');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending...';
+    progress.classList.remove('d-none');
+    result.classList.add('d-none');
+    bar.style.width = '10%';
+    status.textContent = 'Generating reset links and sending messages...';
+
+    fetch('?page=hr&ajax=send_login_details', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({target: target})
+    })
+    .then(r => r.json())
+    .then(data => {
+        bar.style.width = '100%';
+        bar.classList.remove('progress-bar-animated');
+        if (data.success) {
+            result.className = 'alert alert-success';
+            result.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + data.message;
+        } else {
+            result.className = 'alert alert-danger';
+            result.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>' + (data.error || 'Failed to send');
+        }
+        result.classList.remove('d-none');
+        status.textContent = 'Complete';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send me-1"></i> Send Now';
+    })
+    .catch(err => {
+        bar.style.width = '100%';
+        bar.classList.add('bg-danger');
+        result.className = 'alert alert-danger';
+        result.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>Error: ' + err.message;
+        result.classList.remove('d-none');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send me-1"></i> Send Now';
+    });
+}
+</script>
 
 <?php endif; ?>

@@ -8124,6 +8124,102 @@ if ($page === 'devices' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['ajax'] ?? '') === 'send_login_details') {
+    header('Content-Type: application/json');
+    if (!\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Admin access required']);
+        exit;
+    }
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $target = $input['target'] ?? 'all';
+
+        $settingsObj = new \App\Settings();
+        $baseUrl = $settingsObj->get('system_url', $_ENV['APP_URL'] ?? 'https://crm.superlite.co.ke');
+        $baseUrl = rtrim($baseUrl, '/');
+        $mobileUrl = $baseUrl . '/mobile/';
+        $companyName = $settingsObj->get('company_name', 'ISP Company');
+
+        if ($target === 'all') {
+            $empStmt = $db->query("
+                SELECT e.id, e.name, e.phone, u.id as user_id, u.email, u.phone as user_phone
+                FROM employees e
+                JOIN users u ON e.user_id = u.id
+                WHERE e.employment_status IN ('active','Active') OR e.employment_status IS NULL
+            ");
+        } else {
+            $empStmt = $db->prepare("
+                SELECT e.id, e.name, e.phone, u.id as user_id, u.email, u.phone as user_phone
+                FROM employees e
+                JOIN users u ON e.user_id = u.id
+                WHERE e.id = ?
+            ");
+            $empStmt->execute([(int)$target]);
+        }
+        $employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($employees)) {
+            echo json_encode(['success' => false, 'error' => 'No employees with linked user accounts found']);
+            exit;
+        }
+
+        $smsGateway = new \App\SMSGateway();
+        $whatsapp = new \App\WhatsApp($db);
+        $smsSent = 0;
+        $waSent = 0;
+        $errors = [];
+
+        foreach ($employees as $emp) {
+            $token = bin2hex(random_bytes(32));
+            $expires = date('Y-m-d H:i:s', strtotime('+72 hours'));
+            $stmt = $db->prepare("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?");
+            $stmt->execute([$token, $expires, $emp['user_id']]);
+
+            $resetLink = $baseUrl . '/reset-password/' . $token;
+
+            $msg = "Hi {$emp['name']},\n\n";
+            $msg .= "Here are your {$companyName} system login details:\n\n";
+            $msg .= "Username: {$emp['email']}\n";
+            $msg .= "CRM: {$baseUrl}\n";
+            $msg .= "Mobile App: {$mobileUrl}\n\n";
+            $msg .= "Set/Reset your password:\n{$resetLink}\n";
+            $msg .= "(Link valid for 72 hours)\n\n";
+            $msg .= "Thank you,\n{$companyName}";
+
+            $phone = $emp['phone'] ?: $emp['user_phone'];
+            if (empty($phone)) {
+                $errors[] = "{$emp['name']}: No phone number";
+                continue;
+            }
+
+            try {
+                $smsResult = $smsGateway->send($phone, $msg);
+                if ($smsResult) $smsSent++;
+            } catch (\Exception $e) {
+                $errors[] = "{$emp['name']} SMS: " . $e->getMessage();
+            }
+
+            try {
+                $waResult = $whatsapp->sendMessage($phone, $msg);
+                if ($waResult && $waResult['success']) $waSent++;
+            } catch (\Exception $e) {
+                $errors[] = "{$emp['name']} WhatsApp: " . $e->getMessage();
+            }
+        }
+
+        $total = count($employees);
+        $resultMsg = "Sent to {$total} employee(s): {$smsSent} SMS, {$waSent} WhatsApp";
+        if (!empty($errors)) {
+            $resultMsg .= ". Issues: " . implode('; ', array_slice($errors, 0, 5));
+        }
+
+        echo json_encode(['success' => true, 'message' => $resultMsg]);
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::validateToken($_POST['csrf_token'] ?? '')) {
     $action = $_POST['action'] ?? '';
     
