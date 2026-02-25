@@ -9453,7 +9453,6 @@ class HuaweiOLT {
     }
     
     public function deleteONUFromOLT(int $onuId, bool $async = true): array {
-        // Extend timeout for OLT operations
         set_time_limit(120);
         
         $onu = $this->getONU($onuId);
@@ -9467,62 +9466,73 @@ class HuaweiOLT {
         $onuIdNum = $onu['onu_id'];
         $oltId = $onu['olt_id'];
         
-        // Validate ONU ID exists
         if ($onuIdNum === null || $onuIdNum === '') {
-            // ONU not authorized on OLT, just delete from DB
             $this->deleteONU($onuId, false);
             return ['success' => true, 'message' => "ONU {$onu['sn']} deleted from database (was not authorized on OLT)"];
         }
         
-        // Pause discovery to prevent command interleaving on shared SSH session
-        $this->pauseDiscovery($oltId, 60000);
-        usleep(1000000); // Wait 1s for any in-flight commands to complete
+        // Lock the OLT exclusively — blocks ALL other CLI (SNMP poller, discovery, etc.)
+        $this->callOLTService('/lock-olt', [
+            'oltId' => (string)$oltId,
+            'duration' => 90000,
+            'reason' => 'ONU delete'
+        ]);
+        
+        // Wait for any in-flight commands to finish draining
+        sleep(3);
         
         $allOutput = '';
+        $spCount = 0;
         
-        // Step 1: Find all service-ports for this ONU
-        $spQueryScript = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
-        $spResult = $this->callOLTService('/execute-raw', [
-            'oltId' => (string)$oltId,
-            'script' => $spQueryScript,
-            'timeout' => 30000
-        ]);
-        $spOutput = $spResult['output'] ?? '';
-        $allOutput .= "[Find Service-Ports]\n{$spOutput}\n";
-        
-        // Parse service-port IDs from output
-        $servicePortIds = [];
-        if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
-            $servicePortIds = array_map('intval', $matches[1]);
-        }
-        
-        // Step 2: Delete service-ports if found
-        $spCount = count($servicePortIds);
-        if ($spCount > 0) {
-            $undoLines = [];
-            foreach ($servicePortIds as $spId) {
-                $undoLines[] = "undo service-port {$spId}";
-            }
-            $undoScript = implode("\n", $undoLines);
-            $undoResult = $this->callOLTService('/execute-raw', [
+        try {
+            // Build entire delete script as ONE atomic operation
+            // This ensures no other command can interleave on the session
+            $scriptLines = [];
+            
+            // Query service-ports first
+            $spQueryScript = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
+            $spResult = $this->callOLTService('/execute-raw', [
                 'oltId' => (string)$oltId,
-                'script' => $undoScript,
+                'script' => $spQueryScript,
                 'timeout' => 30000
             ]);
-            $allOutput .= "[Remove Service-Ports]\n" . ($undoResult['output'] ?? '') . "\n";
+            $spOutput = $spResult['output'] ?? '';
+            $allOutput .= "[Find Service-Ports]\n{$spOutput}\n";
+            
+            // Parse service-port IDs
+            $servicePortIds = [];
+            if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
+                $servicePortIds = array_map('intval', $matches[1]);
+            }
+            $spCount = count($servicePortIds);
+            
+            // Build the undo + delete as ONE atomic script
+            // Start with config to ensure we're at config level
+            $scriptLines[] = "config";
+            foreach ($servicePortIds as $spId) {
+                $scriptLines[] = "undo service-port {$spId}";
+            }
+            $scriptLines[] = "interface gpon {$frame}/{$slot}";
+            $scriptLines[] = "ont delete {$port} {$onuIdNum}";
+            $scriptLines[] = "quit";
+            $scriptLines[] = "quit";
+            
+            $fullScript = implode("\n", $scriptLines);
+            $result = $this->callOLTService('/execute-raw', [
+                'oltId' => (string)$oltId,
+                'script' => $fullScript,
+                'timeout' => 60000
+            ]);
+            
+            $output = $result['output'] ?? '';
+            $allOutput .= "[Delete ONU]\n{$output}";
+            
+        } finally {
+            // Always unlock the OLT
+            $this->callOLTService('/unlock-olt', [
+                'oltId' => (string)$oltId
+            ]);
         }
-        
-        // Step 3: Delete the ONU from the OLT
-        $deleteCmd = "ont delete {$port} {$onuIdNum}";
-        $deleteScript = "interface gpon {$frame}/{$slot}\n{$deleteCmd}\nquit";
-        $result = $this->callOLTService('/execute-raw', [
-            'oltId' => (string)$oltId,
-            'script' => $deleteScript,
-            'timeout' => 45000
-        ]);
-        
-        $output = $result['output'] ?? '';
-        $allOutput .= "[Delete ONU]\n{$output}";
         
         $hasError = preg_match('/(?:does not exist|is not valid|Unrecognized command|Unknown command|Parameter error|Too many parameters)/i', $output);
         $hasFailure = preg_match('/Failure:\s*(\d+)/i', $output, $failMatch) && isset($failMatch[1]) && (int)$failMatch[1] > 0;
@@ -9537,6 +9547,7 @@ class HuaweiOLT {
             $this->deleteONU($onuId, false);
         }
         
+        $deleteCmd = "ont delete {$port} {$onuIdNum}";
         $message = $success 
             ? "ONU {$onu['sn']} deleted from OLT" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
             : "Delete failed: " . ($result['error'] ?? trim(preg_replace('/\s+/', ' ', substr($output, -200))) ?: 'Unknown error');
@@ -9551,9 +9562,6 @@ class HuaweiOLT {
             'command_response' => $allOutput,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
-        
-        // Resume discovery after delete completes
-        $this->resumeDiscovery($oltId);
         
         return ['success' => $success, 'message' => $message, 'output' => $allOutput, 'service_ports_deleted' => $spCount];
     }
