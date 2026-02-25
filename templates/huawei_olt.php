@@ -3167,10 +3167,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 ];
                 foreach ($templates as $key => $value) {
                     if (empty($value)) continue;
-                    $stmt = $db->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+                    $stmt = $db->prepare("UPDATE company_settings SET setting_value = ? WHERE setting_key = ?");
                     $stmt->execute([$value, $key]);
                     if ($stmt->rowCount() === 0) {
-                        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value, setting_group) VALUES (?, ?, 'WhatsApp')");
+                        $stmt = $db->prepare("INSERT INTO company_settings (setting_key, setting_value, setting_type) VALUES (?, ?, 'text')");
                         $stmt->execute([$key, $value]);
                     }
                 }
@@ -16272,7 +16272,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             
             $templateSettings = [];
             try {
-                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_los_alert', 'wa_template_oms_dying_gasp', 'wa_template_oms_onu_authorized', 'wa_template_oms_wifi_changed')");
+                $stmt = $db->query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_los_alert', 'wa_template_oms_dying_gasp', 'wa_template_oms_onu_authorized', 'wa_template_oms_wifi_changed')");
                 while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
                     $templateSettings[$row['setting_key']] = $row['setting_value'];
                 }
