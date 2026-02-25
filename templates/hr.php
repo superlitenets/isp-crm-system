@@ -359,11 +359,92 @@ try {
     $leaveStmt->execute([$employeeData['id']]);
     $leaveStats = $leaveStmt->fetch(PDO::FETCH_ASSOC) ?: ['days_taken' => 0, 'pending_requests' => 0];
     
+    // Wallet / Earnings Statement
+    $walletData = ['basic_salary' => (float)($employeeData['salary'] ?? 0)];
+    
+    // Ticket commissions (all time + this month)
+    try {
+        $tcStmt = $statsDb->prepare("SELECT COALESCE(SUM(earned_amount), 0) as total FROM ticket_earnings WHERE employee_id = ?");
+        $tcStmt->execute([$employeeData['id']]);
+        $walletData['ticket_commissions_total'] = (float)$tcStmt->fetchColumn();
+        
+        $tcStmt = $statsDb->prepare("SELECT COALESCE(SUM(earned_amount), 0) as total FROM ticket_earnings WHERE employee_id = ? AND created_at >= DATE_TRUNC('month', CURRENT_DATE)");
+        $tcStmt->execute([$employeeData['id']]);
+        $walletData['ticket_commissions_month'] = (float)$tcStmt->fetchColumn();
+    } catch (\Exception $e) { $walletData['ticket_commissions_total'] = 0; $walletData['ticket_commissions_month'] = 0; }
+    
+    // Sales commissions
+    try {
+        $spStmt = $statsDb->prepare("SELECT id FROM salespersons WHERE employee_id = ? LIMIT 1");
+        $spStmt->execute([$employeeData['id']]);
+        $spId = $spStmt->fetchColumn();
+        if ($spId) {
+            $scStmt = $statsDb->prepare("SELECT COALESCE(SUM(commission_amount), 0) FROM sales_commissions WHERE salesperson_id = ?");
+            $scStmt->execute([$spId]);
+            $walletData['sales_commissions_total'] = (float)$scStmt->fetchColumn();
+            
+            $scStmt = $statsDb->prepare("SELECT COALESCE(SUM(commission_amount), 0) FROM sales_commissions WHERE salesperson_id = ? AND created_at >= DATE_TRUNC('month', CURRENT_DATE)");
+            $scStmt->execute([$spId]);
+            $walletData['sales_commissions_month'] = (float)$scStmt->fetchColumn();
+        } else {
+            $walletData['sales_commissions_total'] = 0;
+            $walletData['sales_commissions_month'] = 0;
+        }
+    } catch (\Exception $e) { $walletData['sales_commissions_total'] = 0; $walletData['sales_commissions_month'] = 0; }
+    
+    // Salary advances (outstanding)
+    try {
+        $advStmt = $statsDb->prepare("SELECT COALESCE(SUM(outstanding_balance), 0) FROM salary_advances WHERE employee_id = ? AND status IN ('disbursed','repaying','approved')");
+        $advStmt->execute([$employeeData['id']]);
+        $walletData['advances_outstanding'] = (float)$advStmt->fetchColumn();
+    } catch (\Exception $e) { $walletData['advances_outstanding'] = 0; }
+    
+    // Payroll history (last 6 months)
+    try {
+        $payStmt = $statsDb->prepare("
+            SELECT pay_period_start, pay_period_end, base_salary, COALESCE(overtime_pay,0) as overtime_pay, 
+                   COALESCE(bonuses,0) as bonuses, COALESCE(allowances,0) as allowances,
+                   COALESCE(deductions,0) as deductions, COALESCE(tax,0) as tax, net_pay, status
+            FROM payroll WHERE employee_id = ? ORDER BY pay_period_start DESC LIMIT 6
+        ");
+        $payStmt->execute([$employeeData['id']]);
+        $walletData['payroll_history'] = $payStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Exception $e) { $walletData['payroll_history'] = []; }
+    
+    // Ticket earnings breakdown (last 10)
+    try {
+        $teStmt = $statsDb->prepare("
+            SELECT te.earned_amount, te.category, te.status, te.created_at, t.ticket_number, t.subject
+            FROM ticket_earnings te
+            LEFT JOIN tickets t ON te.ticket_id = t.id
+            WHERE te.employee_id = ? ORDER BY te.created_at DESC LIMIT 10
+        ");
+        $teStmt->execute([$employeeData['id']]);
+        $walletData['ticket_earnings_list'] = $teStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Exception $e) { $walletData['ticket_earnings_list'] = []; }
+    
+    // Sales commissions breakdown (last 10)
+    try {
+        if (!empty($spId)) {
+            $scListStmt = $statsDb->prepare("
+                SELECT sc.commission_amount, sc.order_amount, sc.commission_rate, sc.commission_type, sc.status, sc.created_at
+                FROM sales_commissions sc WHERE sc.salesperson_id = ? ORDER BY sc.created_at DESC LIMIT 10
+            ");
+            $scListStmt->execute([$spId]);
+            $walletData['sales_commissions_list'] = $scListStmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $walletData['sales_commissions_list'] = [];
+        }
+    } catch (\Exception $e) { $walletData['sales_commissions_list'] = []; }
+    
+    $walletData['gross_month'] = $walletData['basic_salary'] + $walletData['ticket_commissions_month'] + $walletData['sales_commissions_month'];
+    
     $empStats = [
         'tickets' => $ticketStats,
         'attendance' => $attendanceStats,
         'advances' => $advanceStats,
-        'leave' => $leaveStats
+        'leave' => $leaveStats,
+        'wallet' => $walletData
     ];
 } catch (\Exception $e) {
     // Stats tables may not exist
@@ -634,6 +715,193 @@ try {
                         </td>
                     </tr>
                     <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Employee Wallet / Earnings Statement -->
+<?php $w = $empStats['wallet'] ?? []; ?>
+<div class="card mt-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-wallet2"></i> Employee Wallet Statement</h5>
+        <span class="badge bg-dark fs-6">
+            <?= date('F Y') ?>
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="border rounded p-3 text-center">
+                    <small class="text-muted d-block">Basic Salary</small>
+                    <span class="fs-5 fw-bold text-primary" id="walletBasic" style="filter: blur(5px); cursor: pointer;" onclick="this.style.filter=this.style.filter?'':'blur(5px)'">
+                        <?= $currencySymbol ?> <?= number_format($w['basic_salary'] ?? 0, 2) ?>
+                    </span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded p-3 text-center">
+                    <small class="text-muted d-block">Ticket Commissions (Month)</small>
+                    <span class="fs-5 fw-bold text-success">
+                        <?= $currencySymbol ?> <?= number_format($w['ticket_commissions_month'] ?? 0, 2) ?>
+                    </span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded p-3 text-center">
+                    <small class="text-muted d-block">Sales Commissions (Month)</small>
+                    <span class="fs-5 fw-bold text-info">
+                        <?= $currencySymbol ?> <?= number_format($w['sales_commissions_month'] ?? 0, 2) ?>
+                    </span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded p-3 text-center">
+                    <small class="text-muted d-block">Advances Outstanding</small>
+                    <span class="fs-5 fw-bold text-danger">
+                        <?= $currencySymbol ?> <?= number_format($w['advances_outstanding'] ?? 0, 2) ?>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive mb-4">
+            <h6 class="text-muted"><i class="bi bi-receipt"></i> Current Month Summary</h6>
+            <table class="table table-bordered mb-0">
+                <tbody>
+                    <tr>
+                        <td class="w-75">Basic Salary</td>
+                        <td class="text-end fw-bold"><?= $currencySymbol ?> <?= number_format($w['basic_salary'] ?? 0, 2) ?></td>
+                    </tr>
+                    <tr>
+                        <td><span class="text-success">+</span> Ticket Commissions</td>
+                        <td class="text-end text-success">+ <?= $currencySymbol ?> <?= number_format($w['ticket_commissions_month'] ?? 0, 2) ?></td>
+                    </tr>
+                    <tr>
+                        <td><span class="text-success">+</span> Sales Commissions</td>
+                        <td class="text-end text-success">+ <?= $currencySymbol ?> <?= number_format($w['sales_commissions_month'] ?? 0, 2) ?></td>
+                    </tr>
+                    <tr class="table-light">
+                        <td class="fw-bold">Gross Total</td>
+                        <td class="text-end fw-bold"><?= $currencySymbol ?> <?= number_format($w['gross_month'] ?? 0, 2) ?></td>
+                    </tr>
+                    <tr>
+                        <td><span class="text-danger">-</span> Salary Advances Outstanding</td>
+                        <td class="text-end text-danger">- <?= $currencySymbol ?> <?= number_format($w['advances_outstanding'] ?? 0, 2) ?></td>
+                    </tr>
+                    <tr class="table-dark">
+                        <td class="fw-bold">Estimated Net</td>
+                        <td class="text-end fw-bold fs-5"><?= $currencySymbol ?> <?= number_format(($w['gross_month'] ?? 0) - ($w['advances_outstanding'] ?? 0), 2) ?></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-muted mb-3"><i class="bi bi-ticket-detailed"></i> Recent Ticket Earnings</h6>
+                <?php if (empty($w['ticket_earnings_list'])): ?>
+                    <p class="text-muted small">No ticket earnings yet.</p>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr><th>Ticket</th><th>Category</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($w['ticket_earnings_list'] as $te): ?>
+                            <tr>
+                                <td><small><?= htmlspecialchars($te['ticket_number'] ?? '-') ?></small></td>
+                                <td><small><?= htmlspecialchars(ucfirst($te['category'] ?? '-')) ?></small></td>
+                                <td class="text-success fw-bold"><small><?= $currencySymbol ?> <?= number_format($te['earned_amount'], 2) ?></small></td>
+                                <td>
+                                    <span class="badge bg-<?= $te['status'] === 'paid' ? 'success' : 'warning' ?> badge-sm">
+                                        <?= ucfirst($te['status']) ?>
+                                    </span>
+                                </td>
+                                <td><small><?= date('M j', strtotime($te['created_at'])) ?></small></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-end small text-muted">
+                    All-time total: <strong><?= $currencySymbol ?> <?= number_format($w['ticket_commissions_total'] ?? 0, 2) ?></strong>
+                </div>
+                <?php endif; ?>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted mb-3"><i class="bi bi-graph-up-arrow"></i> Recent Sales Commissions</h6>
+                <?php if (empty($w['sales_commissions_list'])): ?>
+                    <p class="text-muted small">No sales commissions yet.</p>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr><th>Order Amount</th><th>Rate</th><th>Commission</th><th>Status</th><th>Date</th></tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($w['sales_commissions_list'] as $sc): ?>
+                            <tr>
+                                <td><small><?= $currencySymbol ?> <?= number_format($sc['order_amount'], 2) ?></small></td>
+                                <td><small><?= $sc['commission_type'] === 'percentage' ? number_format($sc['commission_rate'], 1) . '%' : $currencySymbol . ' ' . number_format($sc['commission_rate'], 2) ?></small></td>
+                                <td class="text-info fw-bold"><small><?= $currencySymbol ?> <?= number_format($sc['commission_amount'], 2) ?></small></td>
+                                <td>
+                                    <span class="badge bg-<?= $sc['status'] === 'paid' ? 'success' : 'warning' ?> badge-sm">
+                                        <?= ucfirst($sc['status']) ?>
+                                    </span>
+                                </td>
+                                <td><small><?= date('M j', strtotime($sc['created_at'])) ?></small></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-end small text-muted">
+                    All-time total: <strong><?= $currencySymbol ?> <?= number_format($w['sales_commissions_total'] ?? 0, 2) ?></strong>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if (!empty($w['payroll_history'])): ?>
+        <hr>
+        <h6 class="text-muted mb-3"><i class="bi bi-clock-history"></i> Payroll History (Last 6 Months)</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th>Base Salary</th>
+                        <th>Overtime</th>
+                        <th>Bonuses</th>
+                        <th>Allowances</th>
+                        <th>Deductions</th>
+                        <th>Tax</th>
+                        <th>Net Pay</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($w['payroll_history'] as $pay): ?>
+                    <tr>
+                        <td><small><?= date('M Y', strtotime($pay['pay_period_start'])) ?></small></td>
+                        <td><small><?= $currencySymbol ?> <?= number_format($pay['base_salary'], 2) ?></small></td>
+                        <td class="text-success"><small>+<?= $currencySymbol ?> <?= number_format($pay['overtime_pay'], 2) ?></small></td>
+                        <td class="text-success"><small>+<?= $currencySymbol ?> <?= number_format($pay['bonuses'], 2) ?></small></td>
+                        <td class="text-success"><small>+<?= $currencySymbol ?> <?= number_format($pay['allowances'], 2) ?></small></td>
+                        <td class="text-danger"><small>-<?= $currencySymbol ?> <?= number_format($pay['deductions'], 2) ?></small></td>
+                        <td class="text-danger"><small>-<?= $currencySymbol ?> <?= number_format($pay['tax'], 2) ?></small></td>
+                        <td class="fw-bold"><small><?= $currencySymbol ?> <?= number_format($pay['net_pay'], 2) ?></small></td>
+                        <td>
+                            <span class="badge bg-<?= $pay['status'] === 'paid' ? 'success' : ($pay['status'] === 'pending' ? 'warning' : 'secondary') ?>">
+                                <?= ucfirst($pay['status']) ?>
+                            </span>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
