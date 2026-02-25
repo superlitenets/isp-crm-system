@@ -7762,9 +7762,17 @@ try {
     <!-- Loading Overlay for OLT Operations -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner-container">
-            <div class="loading-spinner"></div>
             <div class="loading-text" id="loadingText">Connecting to OLT...</div>
             <div class="text-muted small mt-2" id="loadingSubtext">This may take a few seconds</div>
+            <div id="loadingProgress" class="mt-3" style="display:none; width: 320px;">
+                <div class="auth-progress-bar-container">
+                    <div class="auth-progress-bar" id="authProgressBar"></div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="text-muted small" id="authProgressStage"></span>
+                    <span class="fw-bold" id="authProgressPct" style="font-size: 1.1rem;">0%</span>
+                </div>
+            </div>
             <div id="loadingStages" class="mt-3 text-start" style="display:none; max-width: 350px;">
                 <div class="stage-item" id="stage1" data-stage="1">
                     <i class="bi bi-circle stage-icon me-2"></i>
@@ -7795,6 +7803,17 @@ try {
         .stage-item.error { color: #dc3545; }
         .stage-item.error .stage-icon:before { content: "\F62A"; }
         @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .auth-progress-bar-container {
+            width: 100%; height: 12px; background: #e9ecef; border-radius: 6px; overflow: hidden;
+        }
+        .auth-progress-bar {
+            height: 100%; width: 0%; border-radius: 6px;
+            background: linear-gradient(90deg, #0d6efd, #198754);
+            transition: width 0.4s ease;
+        }
+        .auth-progress-bar.error {
+            background: linear-gradient(90deg, #dc3545, #ff6b6b);
+        }
     </style>
     
     <!-- OMS Mobile Header -->
@@ -18451,109 +18470,99 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const loadingText = document.getElementById('loadingText');
         const loadingSubtext = document.getElementById('loadingSubtext');
         const loadingStages = document.getElementById('loadingStages');
+        const loadingProgress = document.getElementById('loadingProgress');
+        const progressBar = document.getElementById('authProgressBar');
+        const progressPct = document.getElementById('authProgressPct');
+        const progressStage = document.getElementById('authProgressStage');
         const loadingError = document.getElementById('loadingError');
-        const stageItems = loadingStages.querySelectorAll('.stage-item');
-        
-        // Show overlay with stages
-        loadingText.textContent = 'Authorizing ONU';
+
+        const stageLabels = {
+            1: 'Saving ONU details...',
+            2: 'Authorizing on OLT...',
+            3: 'Configuring service VLAN...',
+            4: 'Setting up TR-069 management...'
+        };
+        const stageWeights = { 1: 10, 2: 50, 3: 75, 4: 90 };
+
+        loadingText.textContent = 'Authorizing ONU and configuring TR-069...';
         loadingSubtext.textContent = 'Please wait while we configure the device...';
-        loadingStages.style.display = 'block';
+        loadingStages.style.display = 'none';
+        loadingProgress.style.display = 'block';
         loadingError.style.display = 'none';
-        
-        // Reset all stages
-        stageItems.forEach(item => {
-            item.className = 'stage-item';
-            item.querySelector('.stage-icon').className = 'bi bi-circle stage-icon me-2';
-        });
-        
+        progressBar.style.width = '0%';
+        progressBar.classList.remove('error');
+        progressPct.textContent = '0%';
+        progressStage.textContent = '';
+
         overlay.classList.add('active');
-        
-        // Close the modal
+
         const authModal = bootstrap.Modal.getInstance(document.getElementById('authModal'));
         if (authModal) authModal.hide();
-        
+
         let currentOnuId = formData.get('onu_id');
         let currentVlanId = formData.get('vlan_id');
         let currentOnuMode = formData.get('onu_mode') || 'router';
-        
+        let warnings = [];
+
+        function setProgress(pct, label) {
+            progressBar.style.width = pct + '%';
+            progressPct.textContent = pct + '%';
+            if (label) progressStage.textContent = label;
+        }
+
         for (let stage = 1; stage <= 4; stage++) {
-            const stageItem = document.getElementById('stage' + stage);
-            const stageIcon = stageItem.querySelector('.stage-icon');
-            
-            // Mark current stage as active
-            stageItem.className = 'stage-item active';
-            stageIcon.className = 'bi bi-arrow-right-circle-fill stage-icon me-2';
-            
+            setProgress(stageWeights[stage] - 5, stageLabels[stage]);
+
             try {
-                // Build stage-specific form data
                 const stageData = new FormData();
                 stageData.append('stage', stage);
-                
+
                 if (stage === 1) {
-                    // Pass all form data for stage 1
                     for (let [key, value] of formData.entries()) {
                         stageData.append(key, value);
                     }
                 } else {
-                    // For later stages, just pass essential data
                     stageData.append('onu_id', currentOnuId);
                     stageData.append('vlan_id', currentVlanId);
                     stageData.append('name', formData.get('name'));
                     stageData.append('sn', formData.get('sn'));
                     stageData.append('onu_mode', currentOnuMode);
                 }
-                
+
                 const response = await fetch('?page=huawei-olt&ajax=authorize_staged', {
                     method: 'POST',
                     body: stageData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (!result.success) {
-                    // Stage failed
-                    stageItem.className = 'stage-item error';
-                    stageIcon.className = 'bi bi-x-circle-fill stage-icon me-2';
-                    
-                    loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i><strong>Stage ' + stage + ' Failed:</strong> ' + (result.error || 'Unknown error');
-                    loadingError.style.display = 'block';
+                    progressBar.classList.add('error');
+                    setProgress(stageWeights[stage], stageLabels[stage]);
                     loadingText.textContent = 'Authorization Failed';
-                    loadingSubtext.innerHTML = 'Closing in <span id="closeCountdown">3</span>s... <button class="btn btn-sm btn-outline-light ms-2" onclick="hideLoading()">Close Now</button>';
-                    
-                    // Auto-close after 3 seconds
-                    let countdown = 3;
-                    const countdownEl = document.getElementById('closeCountdown');
-                    const countdownInterval = setInterval(() => {
-                        countdown--;
-                        if (countdownEl) countdownEl.textContent = countdown;
-                        if (countdown <= 0) {
-                            clearInterval(countdownInterval);
-                            hideLoading();
-                        }
-                    }, 1000);
+                    loadingSubtext.innerHTML = '';
+                    loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>' + (result.error || 'Unknown error');
+                    loadingError.style.display = 'block';
+                    progressStage.textContent = 'Failed at: ' + stageLabels[stage];
+
+                    setTimeout(() => { hideLoading(); }, 5000);
                     return;
                 }
-                
-                // Stage succeeded
-                stageItem.className = 'stage-item success';
-                stageIcon.className = 'bi bi-check-circle-fill stage-icon me-2';
-                
-                // Update data for next stage
+
+                setProgress(stageWeights[stage], stageLabels[stage]);
+
                 if (result.onu_id) currentOnuId = result.onu_id;
                 if (result.vlan_id) currentVlanId = result.vlan_id;
                 if (result.onu_mode) currentOnuMode = result.onu_mode;
-                
-                // Show warning if any
-                if (result.warning) {
-                    const spanEl = stageItem.querySelector('span');
-                    spanEl.innerHTML += ' <small class="text-warning">(' + result.warning + ')</small>';
-                }
-                
-                // Check if we're done
+                if (result.warning) warnings.push(result.warning);
+
                 if (result.next_stage === null) {
+                    setProgress(100, 'Complete!');
                     loadingText.textContent = 'Authorization Complete!';
-                    loadingSubtext.innerHTML = 'Redirecting to ONU configuration...';
-                    
+                    loadingSubtext.textContent = warnings.length > 0
+                        ? 'Warnings: ' + warnings.join('; ')
+                        : 'Redirecting...';
+
                     setTimeout(() => {
                         if (result.redirect) {
                             window.location.href = result.redirect;
@@ -18561,30 +18570,19 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             hideLoading();
                             location.reload();
                         }
-                    }, 1500);
+                    }, 1200);
                     return;
                 }
-                
+
             } catch (err) {
-                stageItem.className = 'stage-item error';
-                stageIcon.className = 'bi bi-x-circle-fill stage-icon me-2';
-                
-                loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i><strong>Network Error:</strong> ' + err.message;
-                loadingError.style.display = 'block';
+                progressBar.classList.add('error');
                 loadingText.textContent = 'Authorization Failed';
-                loadingSubtext.innerHTML = 'Closing in <span id="closeCountdown">3</span>s... <button class="btn btn-sm btn-outline-light ms-2" onclick="hideLoading()">Close Now</button>';
-                
-                // Auto-close after 3 seconds
-                let countdown = 3;
-                const countdownEl = document.getElementById('closeCountdown');
-                const countdownInterval = setInterval(() => {
-                    countdown--;
-                    if (countdownEl) countdownEl.textContent = countdown;
-                    if (countdown <= 0) {
-                        clearInterval(countdownInterval);
-                        hideLoading();
-                    }
-                }, 1000);
+                loadingSubtext.innerHTML = '';
+                loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Network Error: ' + err.message;
+                loadingError.style.display = 'block';
+                progressStage.textContent = 'Failed at: ' + stageLabels[stage];
+
+                setTimeout(() => { hideLoading(); }, 5000);
                 return;
             }
         }
