@@ -9495,20 +9495,17 @@ class HuaweiOLT {
                     $servicePortIds = array_map('intval', $matches[1]);
                 }
                 
-                if (count($servicePortIds) > 0) {
-                    $undoLines = [];
-                    foreach ($servicePortIds as $spId) {
-                        $undoLines[] = "undo service-port {$spId}";
-                    }
-                    $this->callOLTService('/execute-raw', [
-                        'oltId' => (string)$oltId,
-                        'script' => implode("\n", $undoLines),
-                        'timeout' => 30000
-                    ]);
+                // Step 2: Build single script — all in config mode per Huawei procedure
+                // config → undo service-port(s) → interface gpon → ont delete → quit → quit
+                $scriptLines = ["config"];
+                foreach ($servicePortIds as $spId) {
+                    $scriptLines[] = "undo service-port {$spId}";
                 }
-                
-                // Step 2: Delete ONU
-                $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit\nquit";
+                $scriptLines[] = "interface gpon {$frame}/{$slot}";
+                $scriptLines[] = "ont delete {$port} {$onuIdNum}";
+                $scriptLines[] = "quit";
+                $scriptLines[] = "quit";
+                $deleteScript = implode("\n", $scriptLines);
                 $result = $this->callOLTService('/execute-raw', [
                     'oltId' => (string)$oltId,
                     'script' => $deleteScript,
