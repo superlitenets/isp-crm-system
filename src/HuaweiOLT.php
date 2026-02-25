@@ -9483,13 +9483,11 @@ class HuaweiOLT {
         
         $allOutput = '';
         $spCount = 0;
+        $output = '';
+        $result = ['success' => false];
         
         try {
-            // Build entire delete script as ONE atomic operation
-            // This ensures no other command can interleave on the session
-            $scriptLines = [];
-            
-            // Query service-ports first
+            // Step 1: Query service-ports
             $spQueryScript = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
             $spResult = $this->callOLTService('/execute-raw', [
                 'oltId' => (string)$oltId,
@@ -9506,21 +9504,36 @@ class HuaweiOLT {
             }
             $spCount = count($servicePortIds);
             
-            // Build the undo + delete as ONE atomic script
-            // Start with config to ensure we're at config level
-            $scriptLines[] = "config";
-            foreach ($servicePortIds as $spId) {
-                $scriptLines[] = "undo service-port {$spId}";
+            // Step 2: Delete service-ports first (must succeed before ONU delete)
+            if ($spCount > 0) {
+                $undoLines = ["config"];
+                foreach ($servicePortIds as $spId) {
+                    $undoLines[] = "undo service-port {$spId}";
+                }
+                $undoLines[] = "quit";
+                $undoScript = implode("\n", $undoLines);
+                $undoResult = $this->callOLTService('/execute-raw', [
+                    'oltId' => (string)$oltId,
+                    'script' => $undoScript,
+                    'timeout' => 30000
+                ]);
+                $undoOutput = $undoResult['output'] ?? '';
+                $allOutput .= "[Remove Service-Ports]\n{$undoOutput}\n";
+                
+                // Check if any service-port removal failed
+                $undoFailed = preg_match('/Failure:\s*(\d+)/i', $undoOutput, $ufm) && isset($ufm[1]) && (int)$ufm[1] > 0;
+                if ($undoFailed) {
+                    $output = $undoOutput;
+                    $result = $undoResult;
+                    throw new \RuntimeException("Service-port removal failed — aborting ONU delete");
+                }
             }
-            $scriptLines[] = "interface gpon {$frame}/{$slot}";
-            $scriptLines[] = "ont delete {$port} {$onuIdNum}";
-            $scriptLines[] = "quit";
-            $scriptLines[] = "quit";
             
-            $fullScript = implode("\n", $scriptLines);
+            // Step 3: Delete the ONU (only after service-ports are confirmed removed)
+            $deleteScript = "config\ninterface gpon {$frame}/{$slot}\nont delete {$port} {$onuIdNum}\nquit\nquit";
             $result = $this->callOLTService('/execute-raw', [
                 'oltId' => (string)$oltId,
-                'script' => $fullScript,
+                'script' => $deleteScript,
                 'timeout' => 60000
             ]);
             
