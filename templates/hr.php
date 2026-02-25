@@ -437,6 +437,16 @@ try {
         }
     } catch (\Exception $e) { $walletData['sales_commissions_list'] = []; }
     
+    // Late deductions (current month)
+    try {
+        $lateCalc = new \App\LateDeductionCalculator($statsDb);
+        $lateData = $lateCalc->calculateMonthlyDeductions($employeeData['id'], date('Y-m'));
+        $walletData['late_deduction_total'] = (float)($lateData['total_deduction'] ?? 0);
+        $walletData['late_days'] = (int)($lateData['total_late_days'] ?? 0);
+        $walletData['late_minutes'] = (int)($lateData['total_late_minutes'] ?? 0);
+        $walletData['late_breakdown'] = $lateData['breakdown'] ?? [];
+    } catch (\Exception $e) { $walletData['late_deduction_total'] = 0; $walletData['late_days'] = 0; $walletData['late_minutes'] = 0; $walletData['late_breakdown'] = []; }
+    
     $walletData['gross_month'] = $walletData['basic_salary'] + $walletData['ticket_commissions_month'] + $walletData['sales_commissions_month'];
     
     $empStats = [
@@ -788,16 +798,50 @@ try {
                         <td class="text-end fw-bold"><?= $currencySymbol ?> <?= number_format($w['gross_month'] ?? 0, 2) ?></td>
                     </tr>
                     <tr>
+                        <td><span class="text-danger">-</span> Late Deductions (<?= $w['late_days'] ?? 0 ?> day<?= ($w['late_days'] ?? 0) != 1 ? 's' : '' ?>, <?= $w['late_minutes'] ?? 0 ?> mins)</td>
+                        <td class="text-end text-danger">- <?= $currencySymbol ?> <?= number_format($w['late_deduction_total'] ?? 0, 2) ?></td>
+                    </tr>
+                    <tr>
                         <td><span class="text-danger">-</span> Salary Advances Outstanding</td>
                         <td class="text-end text-danger">- <?= $currencySymbol ?> <?= number_format($w['advances_outstanding'] ?? 0, 2) ?></td>
                     </tr>
                     <tr class="table-dark">
                         <td class="fw-bold">Estimated Net</td>
-                        <td class="text-end fw-bold fs-5"><?= $currencySymbol ?> <?= number_format(($w['gross_month'] ?? 0) - ($w['advances_outstanding'] ?? 0), 2) ?></td>
+                        <td class="text-end fw-bold fs-5"><?= $currencySymbol ?> <?= number_format(($w['gross_month'] ?? 0) - ($w['late_deduction_total'] ?? 0) - ($w['advances_outstanding'] ?? 0), 2) ?></td>
                     </tr>
                 </tbody>
             </table>
         </div>
+
+        <?php if (!empty($w['late_breakdown'])): ?>
+        <div class="mb-4">
+            <h6 class="text-muted"><i class="bi bi-alarm"></i> Late Arrival Deductions — <?= date('F Y') ?></h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr><th>Date</th><th>Clock In</th><th>Late By</th><th>Deduction</th></tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($w['late_breakdown'] as $lb): ?>
+                        <tr>
+                            <td><small><?= date('D, M j', strtotime($lb['date'])) ?></small></td>
+                            <td><small><?= $lb['clock_in'] ? date('H:i', strtotime($lb['clock_in'])) : '-' ?></small></td>
+                            <td><small class="text-warning"><?= $lb['late_minutes'] ?> mins</small></td>
+                            <td class="text-danger fw-bold"><small>- <?= $currencySymbol ?> <?= number_format($lb['deduction'], 2) ?></small></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <td colspan="2" class="fw-bold">Total</td>
+                            <td class="fw-bold"><?= $w['late_minutes'] ?? 0 ?> mins</td>
+                            <td class="text-danger fw-bold">- <?= $currencySymbol ?> <?= number_format($w['late_deduction_total'] ?? 0, 2) ?></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="row">
             <div class="col-md-6">
