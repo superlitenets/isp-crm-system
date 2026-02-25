@@ -16,39 +16,61 @@ class Announcement {
     }
     
     public function create(array $data): int {
-        $stmt = $this->db->prepare("
-            INSERT INTO announcements (title, message, priority, target_audience, target_branch_id, target_team_id, target_employee_id, send_sms, send_notification, scheduled_at, status, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $stmt->execute([
+        $hasEmpCol = $this->hasTargetEmployeeColumn();
+        $cols = 'title, message, priority, target_audience, target_branch_id, target_team_id, send_sms, send_notification, scheduled_at, status, created_by';
+        $placeholders = '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?';
+        $params = [
             $data['title'],
             $data['message'],
             $data['priority'] ?? 'normal',
             $data['target_audience'] ?? 'all',
             $data['target_branch_id'] ?: null,
             $data['target_team_id'] ?: null,
-            $data['target_employee_id'] ?: null,
-            isset($data['send_sms']) ? (bool)$data['send_sms'] : false,
-            isset($data['send_notification']) ? (bool)$data['send_notification'] : true,
-            $data['scheduled_at'] ?: null,
-            $data['status'] ?? 'draft',
-            $data['created_by'] ?? null
-        ]);
+        ];
+        if ($hasEmpCol) {
+            $cols = 'title, message, priority, target_audience, target_branch_id, target_team_id, target_employee_id, send_sms, send_notification, scheduled_at, status, created_by';
+            $placeholders = '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?';
+            $params[] = $data['target_employee_id'] ?: null;
+        }
+        $params[] = isset($data['send_sms']) ? (bool)$data['send_sms'] : false;
+        $params[] = isset($data['send_notification']) ? (bool)$data['send_notification'] : true;
+        $params[] = $data['scheduled_at'] ?: null;
+        $params[] = $data['status'] ?? 'draft';
+        $params[] = $data['created_by'] ?? null;
+
+        $stmt = $this->db->prepare("INSERT INTO announcements ({$cols}) VALUES ({$placeholders})");
+        
+        $stmt->execute($params);
         
         return (int)$this->db->lastInsertId();
     }
     
+    private function hasTargetEmployeeColumn(): bool {
+        static $result = null;
+        if ($result === null) {
+            try {
+                $stmt = $this->db->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'target_employee_id'");
+                $result = (bool)$stmt->fetchColumn();
+            } catch (\Exception $e) {
+                $result = false;
+            }
+        }
+        return $result;
+    }
+
     public function getAll(array $filters = []): array {
+        $hasEmpCol = $this->hasTargetEmployeeColumn();
+        $empSelect = $hasEmpCol ? ', emp.name as employee_name' : ", NULL as employee_name";
+        $empJoin = $hasEmpCol ? 'LEFT JOIN employees emp ON a.target_employee_id = emp.id' : '';
         $sql = "SELECT a.*, u.name as created_by_name, 
-                       b.name as branch_name, t.name as team_name, emp.name as employee_name,
+                       b.name as branch_name, t.name as team_name{$empSelect},
                        (SELECT COUNT(*) FROM announcement_recipients WHERE announcement_id = a.id) as recipient_count,
                        (SELECT COUNT(*) FROM announcement_recipients WHERE announcement_id = a.id AND notification_read = TRUE) as read_count
                 FROM announcements a
                 LEFT JOIN users u ON a.created_by = u.id
                 LEFT JOIN branches b ON a.target_branch_id = b.id
                 LEFT JOIN teams t ON a.target_team_id = t.id
-                LEFT JOIN employees emp ON a.target_employee_id = emp.id
+                {$empJoin}
                 WHERE 1=1";
         $params = [];
         
@@ -69,14 +91,17 @@ class Announcement {
     }
     
     public function getById(int $id): ?array {
+        $hasEmpCol = $this->hasTargetEmployeeColumn();
+        $empSelect = $hasEmpCol ? ', emp.name as employee_name' : ", NULL as employee_name";
+        $empJoin = $hasEmpCol ? 'LEFT JOIN employees emp ON a.target_employee_id = emp.id' : '';
         $stmt = $this->db->prepare("
             SELECT a.*, u.name as created_by_name,
-                   b.name as branch_name, t.name as team_name, emp.name as employee_name
+                   b.name as branch_name, t.name as team_name{$empSelect}
             FROM announcements a
             LEFT JOIN users u ON a.created_by = u.id
             LEFT JOIN branches b ON a.target_branch_id = b.id
             LEFT JOIN teams t ON a.target_team_id = t.id
-            LEFT JOIN employees emp ON a.target_employee_id = emp.id
+            {$empJoin}
             WHERE a.id = ?
         ");
         $stmt->execute([$id]);
@@ -118,7 +143,7 @@ class Announcement {
                 WHERE $statusCondition";
         $params = [];
         
-        if ($announcement['target_audience'] === 'individual' && $announcement['target_employee_id']) {
+        if ($announcement['target_audience'] === 'individual' && !empty($announcement['target_employee_id'])) {
             $sql = "SELECT e.id, e.name, e.phone, e.email 
                     FROM employees e 
                     WHERE e.id = ?";
