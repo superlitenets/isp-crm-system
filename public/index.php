@@ -4047,6 +4047,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
             
+            case 'resolve_all_overdue':
+                if (!\App\Auth::isAdmin() && !\App\Auth::hasRole('support')) {
+                    $_SESSION['flash_message'] = 'Only administrators and support staff can bulk resolve tickets.';
+                    $_SESSION['flash_type'] = 'danger';
+                    header('Location: ?page=tickets');
+                    exit;
+                }
+                try {
+                    $db->beginTransaction();
+                    
+                    $overdueStmt = $db->query("
+                        SELECT t.id FROM tickets t
+                        WHERE t.status NOT IN ('resolved')
+                          AND (t.sla_resolution_breached = TRUE 
+                               OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))
+                        LIMIT 100
+                    ");
+                    $overdueIds = $overdueStmt->fetchAll(\PDO::FETCH_COLUMN);
+                    $resolvedCount = 0;
+                    
+                    foreach ($overdueIds as $tid) {
+                        $stmt = $db->prepare("
+                            UPDATE tickets 
+                            SET status = 'resolved', 
+                                resolved_at = CURRENT_TIMESTAMP,
+                                updated_at = CURRENT_TIMESTAMP 
+                            WHERE id = ?
+                        ");
+                        $stmt->execute([$tid]);
+                        
+                        $stmt = $db->prepare("
+                            INSERT INTO ticket_resolutions 
+                            (ticket_id, resolved_by, resolution_notes)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT (ticket_id) DO UPDATE SET
+                                resolved_by = EXCLUDED.resolved_by,
+                                resolution_notes = EXCLUDED.resolution_notes,
+                                updated_at = CURRENT_TIMESTAMP
+                        ");
+                        $stmt->execute([$tid, $currentUser['id'], 'Bulk resolved - overdue SLA breach']);
+                        
+                        $stmt = $db->prepare("
+                            INSERT INTO ticket_comments 
+                            (ticket_id, user_id, comment, is_internal, created_at) 
+                            VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP)
+                        ");
+                        $stmt->execute([
+                            $tid, 
+                            $currentUser['id'], 
+                            'Status changed to resolved (bulk overdue resolve)'
+                        ]);
+                        $resolvedCount++;
+                    }
+                    
+                    $db->commit();
+                    $_SESSION['flash_message'] = $resolvedCount . ' overdue ticket(s) resolved successfully.';
+                    $_SESSION['flash_type'] = 'success';
+                } catch (Exception $e) {
+                    if ($db->inTransaction()) {
+                        $db->rollBack();
+                    }
+                    $_SESSION['flash_message'] = 'Error resolving overdue tickets: ' . $e->getMessage();
+                    $_SESSION['flash_type'] = 'danger';
+                }
+                header('Location: ?page=tickets');
+                exit;
+            
             case 'escalate_ticket':
                 $ticketId = (int)($_POST['ticket_id'] ?? 0);
                 $reason = trim($_POST['reason'] ?? '');

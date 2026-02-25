@@ -1841,12 +1841,18 @@ $ticketTab = $_GET['tab'] ?? 'active';
 </div>
 
 <?php if (!empty($overdueTickets)): ?>
-<div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
-    <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+<div class="alert alert-danger d-flex align-items-center justify-content-between mb-4" role="alert">
     <div>
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
         <strong><?= count($overdueTickets) ?> overdue ticket(s) require immediate attention!</strong>
         <a href="?page=tickets&tab=active&sla=breached" class="alert-link ms-2">View all</a>
     </div>
+    <form method="POST" action="?page=tickets" onsubmit="return confirm('Resolve all <?= count($overdueTickets) ?> overdue tickets?')">
+        <input type="hidden" name="action" value="resolve_all_overdue">
+        <button type="submit" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-check-all me-1"></i>Resolve All
+        </button>
+    </form>
 </div>
 <?php endif; ?>
 
