@@ -118,6 +118,13 @@ if (getenv('REPLIT_DEV_DOMAIN') && !\App\Auth::isLoggedIn()) {
     }
 }
 
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+if (preg_match('#/reset-password(?:/(.+))?$#', $requestUri, $rpMatches) || ($page ?? '') === 'reset-password' || (isset($_GET['page']) && $_GET['page'] === 'reset-password')) {
+    $_GET['token'] = $rpMatches[1] ?? $_GET['token'] ?? '';
+    require __DIR__ . '/reset-password.php';
+    exit;
+}
+
 $page = $_GET['page'] ?? 'dashboard';
 $action = $_GET['action'] ?? 'list';
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
