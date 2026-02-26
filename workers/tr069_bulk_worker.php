@@ -8,7 +8,7 @@ if (!$jobId) {
     exit(1);
 }
 
-$db = getDbConnection();
+$db = Database::getConnection();
 
 $stmt = $db->prepare("SELECT * FROM background_jobs WHERE id = ? AND status = 'pending'");
 $stmt->execute([$jobId]);

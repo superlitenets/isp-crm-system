@@ -5,7 +5,7 @@ require_once __DIR__ . '/../src/SMSGateway.php';
 
 header('Content-Type: application/json');
 
-$db = getDbConnection();
+$db = Database::getConnection();
 $radiusBilling = new \App\RadiusBilling($db);
 
 $phone = $_POST['phone'] ?? $_GET['phone'] ?? '';

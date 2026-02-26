@@ -9,7 +9,7 @@ echo "[Job Runner] Starting" . ($runOnce ? " (single run)" : " (polling every {$
 
 function processJobs() {
     try {
-        $db = getDbConnection();
+        $db = Database::getConnection();
     } catch (Exception $e) {
         echo "[Job Runner] DB connection failed: " . $e->getMessage() . "\n";
         return;

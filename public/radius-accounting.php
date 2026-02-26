@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/database.php';
 
 header('Content-Type: application/json');
 
-$db = getDbConnection();
+$db = Database::getConnection();
 
 $input = file_get_contents('php://input');
 $data = json_decode($input, true) ?? $_POST;

@@ -3886,7 +3886,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($ticketId && $resolutionNotes) {
                     try {
-                        $pdo = getDbConnection();
+                        $pdo = Database::getConnection();
                         $pdo->beginTransaction();
                         
                         $stmt = $pdo->prepare("

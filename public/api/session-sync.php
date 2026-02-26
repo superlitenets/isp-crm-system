@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../src/RadiusBilling.php';
 
 try {
-    $db = getDbConnection();
+    $db = Database::getConnection();
     $radiusBilling = new \App\RadiusBilling($db);
     
     $syncResult = $radiusBilling->syncSessionsWithRouter();

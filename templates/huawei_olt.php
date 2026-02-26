@@ -9927,9 +9927,8 @@ try {
                                     </td>
                                     <td>
                                         <?php
-                                        $listOnuOnline = (strtolower($onu['status'] ?? '') === 'online');
-                                        $rx = ($listOnuOnline && $onu['rx_power'] !== null) ? (float)$onu['rx_power'] : null;
-                                        $tx = ($listOnuOnline && $onu['tx_power'] !== null) ? (float)$onu['tx_power'] : null;
+                                        $rx = ($onu['rx_power'] !== null) ? (float)$onu['rx_power'] : null;
+                                        $tx = ($onu['tx_power'] !== null) ? (float)$onu['tx_power'] : null;
                                         $rxClass = 'secondary';
                                         if ($rx !== null) {
                                             $rxClass = 'success';
@@ -10846,16 +10845,11 @@ try {
                             statusEl.className = statusEl.className.replace(/text-\w+/g, 'text-' + statusClass);
                             statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
                         });
-                        const isOnl = (onu.status === 'online');
-                        if (isOnl && rxEl && onu.rx_power !== null) {
+                        if (rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
-                        } else if (!isOnl && rxEl) {
-                            rxEl.textContent = '-';
                         }
-                        if (isOnl && txEl && onu.tx_power !== null) {
+                        if (txEl && onu.tx_power !== null) {
                             txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
-                        } else if (!isOnl && txEl) {
-                            txEl.textContent = '-';
                         }
                         
                         const tr069El = document.getElementById('tr069IpDisplay');
@@ -10867,7 +10861,7 @@ try {
                         const toast = document.createElement('div');
                         toast.className = 'position-fixed bottom-0 end-0 p-3';
                         toast.style.zIndex = '9999';
-                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (isOnl && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
                         document.body.appendChild(toast);
                         setTimeout(() => toast.remove(), 3000);
                     } else {
@@ -11808,7 +11802,7 @@ try {
                         const rxMeterR = document.getElementById('liveRxMeter');
                         const rxLabelR = document.getElementById('liveRxLabel');
                         
-                        if (isOnlineRef && rxEl && onu.rx_power !== null) {
+                        if (rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(1);
                             let rxCls = 'success', rxLbl = 'Excellent';
                             if (onu.rx_power <= -28) { rxCls = 'danger'; rxLbl = 'Critical'; }
@@ -11817,26 +11811,18 @@ try {
                             rxEl.className = `h4 text-${rxCls} fw-bold mb-0`;
                             if (rxMeterR) { rxMeterR.className = `signal-meter-fill bg-${rxCls}`; rxMeterR.style.width = Math.min(100, Math.max(0, ((onu.rx_power + 30) / 20) * 100)) + '%'; }
                             if (rxLabelR) { rxLabelR.className = `badge bg-${rxCls} mt-1`; rxLabelR.style.fontSize = '0.65rem'; rxLabelR.textContent = rxLbl; }
-                        } else if (!isOnlineRef) {
-                            if (rxEl) { rxEl.textContent = '-'; rxEl.className = 'h4 text-secondary fw-bold mb-0'; }
-                            if (rxMeterR) { rxMeterR.className = 'signal-meter-fill bg-secondary'; rxMeterR.style.width = '0%'; }
-                            if (rxLabelR) { rxLabelR.className = 'badge bg-secondary mt-1'; rxLabelR.style.fontSize = '0.65rem'; rxLabelR.textContent = 'Offline'; }
                         }
-                        if (isOnlineRef && txEl && onu.tx_power !== null) {
+                        if (txEl && onu.tx_power !== null) {
                             txEl.textContent = onu.tx_power.toFixed(1);
-                        } else if (!isOnlineRef && txEl) {
-                            txEl.textContent = '-';
                         }
                         
                         if (distEl && onu.distance !== null) {
                             const dist = parseInt(onu.distance);
                             distEl.textContent = dist >= 1000 ? (dist / 1000).toFixed(2) + ' km' : dist + ' m';
-                        } else if (!isOnlineRef && distEl) {
-                            distEl.textContent = '-';
                         }
                         
                         if (!silent) {
-                            showToast(`Status: ${onu.status}, RX: ${isOnlineRef && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-'}`, 'success', 3000);
+                            showToast(`Status: ${onu.status}, RX: ${onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-'}`, 'success', 3000);
                         }
                     } else if (!silent) {
                         showToast(data.error || 'Could not fetch live status', 'warning', 5000);
@@ -12333,21 +12319,17 @@ try {
                             statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
                         }
                         const isOnl2 = (onu.status === 'online');
-                        if (isOnl2 && rxEl && onu.rx_power !== null) {
+                        if (rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
-                        } else if (!isOnl2 && rxEl) {
-                            rxEl.textContent = '-';
                         }
-                        if (isOnl2 && txEl && onu.tx_power !== null) {
+                        if (txEl && onu.tx_power !== null) {
                             txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
-                        } else if (!isOnl2 && txEl) {
-                            txEl.textContent = '-';
                         }
                         
                         const toast = document.createElement('div');
                         toast.className = 'position-fixed bottom-0 end-0 p-3';
                         toast.style.zIndex = '9999';
-                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Live status updated: ' + (onu.status || 'Unknown') + ', RX: ' + (isOnl2 && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Live status updated: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
                         document.body.appendChild(toast);
                         setTimeout(() => toast.remove(), 3000);
                     } else {
@@ -24041,22 +24023,17 @@ function saveDeviceStatus() {
                     statusEl.className = 'text-' + statusClass + ' fw-bold';
                     statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
                 }
-                const isOnl3 = (onu.status === 'online');
-                if (isOnl3 && rxEl && onu.rx_power !== null) {
+                if (rxEl && onu.rx_power !== null) {
                     rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
-                } else if (!isOnl3 && rxEl) {
-                    rxEl.textContent = '-';
                 }
-                if (isOnl3 && txEl && onu.tx_power !== null) {
+                if (txEl && onu.tx_power !== null) {
                     txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
-                } else if (!isOnl3 && txEl) {
-                    txEl.textContent = '-';
                 }
                 
                 const toast = document.createElement('div');
                 toast.className = 'position-fixed bottom-0 end-0 p-3';
                 toast.style.zIndex = '9999';
-                toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (isOnl3 && onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
+                toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : '-') + '</div></div>';
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 3000);
             } else {
