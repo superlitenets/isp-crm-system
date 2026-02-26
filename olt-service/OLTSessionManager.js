@@ -27,7 +27,7 @@ class OLTSession {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
         this.buffer = '';
-        this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\]|[A-Z0-9_-]+(?:\([^)]+\))?[#>])\s*$/i;
+        this.promptPattern = /(?:<(?!cr>|K>)[^<>]+>|\[[^\[\]]+\]|[A-Z0-9_-]{3,}(?:\([^)]+\))?[#>])\s*$/i;
         this.dataListeners = [];
         this.commandLock = false;  // Mutex to prevent concurrent commands
         this.commandQueue = [];    // Queue for pending commands
@@ -349,11 +349,18 @@ class OLTSession {
                     response = response.replace(/Press any key.*$/gi, '');
                 }
                 
-                // Handle Huawei config lock prompt { <cr>|<K> }:
-                const lockPromptPattern = /\{[^}]*<K>\s*\}:/i;
-                if (lockPromptPattern.test(response)) {
+                const lockPromptPattern = /All\s.*by\s+other\s+user.*\{[^}]*<K>\s*\}:/i;
+                if (lockPromptPattern.test(response) && !confirmationSent) {
                     console.log(`[OLT ${this.oltId}] Config lock prompt detected, pressing Enter to take lock`);
                     this.socket.write('\r');
+                }
+                
+                if (/\{\s*<cr>/.test(response) && !confirmationSent) {
+                    confirmationSent = true;
+                    console.log(`[OLT ${this.oltId}] CR prompt detected, pressing Enter`);
+                    setTimeout(() => {
+                        this.socket.write('\r');
+                    }, 200);
                 }
                 
                 // Handle confirmation prompts (y/n) - auto-confirm for delete operations
