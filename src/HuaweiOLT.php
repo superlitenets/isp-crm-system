@@ -6742,6 +6742,8 @@ class HuaweiOLT {
             $result = $this->executeCommand($oltId, $cliScript);
             $output = $result['output'] ?? '';
             
+            error_log("[AuthStage1] OLT Response (" . strlen($output) . " bytes): " . substr(str_replace(["\r\n", "\n"], " | ", $output), 0, 500));
+            
             // Check for assigned ONU ID in response
             if (preg_match('/(?:ONTID|ONT-ID|Number)\s*[:\=]\s*(\d+)/i', $output, $m)) {
                 $assignedOnuId = (int)$m[1];
@@ -6749,7 +6751,6 @@ class HuaweiOLT {
             
             // Check for "already exist" - treat as success and extract existing ID
             if (preg_match('/ONT ID has already exist/i', $output)) {
-                // ONU exists with different ID - query to find it
                 $recheckResult = $this->executeCommand($oltId, "display ont info by-sn {$onu['sn']}");
                 $recheckOutput = $recheckResult['output'] ?? '';
                 if (preg_match('/ONT-ID\s*:\s*(\d+)/i', $recheckOutput, $m2)) {
@@ -6759,22 +6760,27 @@ class HuaweiOLT {
                 }
             }
             
-            // Check for real errors (not "already exist" or informational messages)
-            // Success: ONU ID assigned or already exists
-            $hasSuccess = preg_match('/(?:Number|ONTID|ONT-ID)\s*[:\=]\s*\d+|ont add|already exist/i', $output);
-            $hasRealError = preg_match('/(?:Failure:\s*\S|does not exist|is not valid|Unrecognized command|Wrong parameter)/i', $output)
-                        && !preg_match('/already exist/i', $output);
-            
-            if (!$alreadyAuthorized && !$hasSuccess && ($hasRealError || !$result['success'])) {
-                $this->addLog([
-                    'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
-                    'status' => 'failed', 'message' => "Stage 1 failed for {$onu['sn']}",
-                    'command_sent' => $cliScript, 'command_response' => $output,
-                    'user_id' => $_SESSION['user_id'] ?? null
-                ]);
-                $this->resumeDiscovery($oltId);
-                return ['success' => false, 'stage' => 1, 'message' => 'Authorization failed: ' . substr($output, 0, 200), 'output' => $output];
+            // Verify authorization actually worked by querying the OLT
+            if (!$alreadyAuthorized) {
+                usleep(500000);
+                $verifyResult = $this->executeCommand($oltId, "display ont info by-sn {$onu['sn']}");
+                $verifyOutput = $verifyResult['output'] ?? '';
+                error_log("[AuthStage1] Verify response: " . substr(str_replace(["\r\n", "\n"], " | ", $verifyOutput), 0, 500));
+                
+                if (preg_match('/F\/S\/P\s*:\s*(\d+)\/(\d+)\/(\d+).*?ONT-ID\s*:\s*(\d+)/is', $verifyOutput, $vm)) {
+                    $assignedOnuId = (int)$vm[4];
+                    error_log("[AuthStage1] Verified: ONU authorized as ONT-ID {$assignedOnuId}");
+                } else {
+                    error_log("[AuthStage1] FAILED: ONU not found on OLT after ont add command");
+                    $this->resumeDiscovery($oltId);
+                    return [
+                        'success' => false, 'stage' => 1,
+                        'message' => 'Authorization command sent but ONU not found on OLT. OLT response: ' . substr($output, 0, 300),
+                        'output' => $output . "\n[Verify]\n" . $verifyOutput
+                    ];
+                }
             }
+            
         }
         
         // Update ONU record with stage 1 data
