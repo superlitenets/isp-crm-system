@@ -200,6 +200,33 @@ class Auth {
         return false;
     }
     
+    public static function isBranchManager(): bool {
+        return ($_SESSION['user_role'] ?? '') === 'branch_manager';
+    }
+    
+    public static function getUserBranchId(): ?int {
+        if (isset($_SESSION['user_branch_id'])) {
+            return $_SESSION['user_branch_id'] ?: null;
+        }
+        try {
+            $db = \Database::getConnection();
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) return null;
+            $stmt = $db->prepare("SELECT eb.branch_id FROM employee_branches eb JOIN employees e ON eb.employee_id = e.id WHERE e.user_id = ? AND eb.is_primary = true LIMIT 1");
+            $stmt->execute([$userId]);
+            $branchId = $stmt->fetchColumn();
+            if (!$branchId) {
+                $stmt = $db->prepare("SELECT eb.branch_id FROM employee_branches eb JOIN employees e ON eb.employee_id = e.id WHERE e.user_id = ? LIMIT 1");
+                $stmt->execute([$userId]);
+                $branchId = $stmt->fetchColumn();
+            }
+            $_SESSION['user_branch_id'] = $branchId ?: null;
+            return $_SESSION['user_branch_id'];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+    
     public static function canAny(array $permissions): bool {
         foreach ($permissions as $permission) {
             if (self::can($permission)) {

@@ -695,6 +695,11 @@ class Ticket {
             $params[] = $filters['escalated'] === '1' || $filters['escalated'] === true;
         }
         
+        if (!empty($filters['branch_id'])) {
+            $sql .= " AND t.branch_id = ?";
+            $params[] = (int)$filters['branch_id'];
+        }
+        
         if (!empty($filters['sla_breached'])) {
             $sql .= " AND t.status NOT IN ('resolved') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
         }
@@ -765,6 +770,11 @@ class Ticket {
         if (isset($filters['escalated']) && $filters['escalated'] !== '') {
             $sql .= " AND t.is_escalated = ?";
             $params[] = $filters['escalated'] === '1' || $filters['escalated'] === true;
+        }
+        
+        if (!empty($filters['branch_id'])) {
+            $sql .= " AND t.branch_id = ?";
+            $params[] = (int)$filters['branch_id'];
         }
         
         if (!empty($filters['sla_breached'])) {

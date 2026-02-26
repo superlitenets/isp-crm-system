@@ -1940,7 +1940,12 @@ $ticketTab = $_GET['tab'] ?? 'active';
                     if ($escalatedFilter !== '') $filters['escalated'] = $escalatedFilter;
                     if (!empty($_GET['sla_breached']) || $slaFilter === 'breached') $filters['sla_breached'] = true;
                     if ($slaFilter === 'at_risk') $filters['sla_at_risk'] = true;
-                    if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
+                    if (\App\Auth::isBranchManager()) {
+                        $branchId = \App\Auth::getUserBranchId();
+                        if ($branchId) {
+                            $filters['branch_id'] = $branchId;
+                        }
+                    } elseif (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
                         $filters['user_id'] = $_SESSION['user_id'];
                     }
                     if (!$statusFilter) {
@@ -2079,7 +2084,12 @@ $ticketTab = $_GET['tab'] ?? 'active';
                     $resolvedFilters = ['only_resolved' => true];
                     if ($priorityFilter) $resolvedFilters['priority'] = $priorityFilter;
                     if ($search) $resolvedFilters['search'] = $search;
-                    if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
+                    if (\App\Auth::isBranchManager()) {
+                        $branchId = \App\Auth::getUserBranchId();
+                        if ($branchId) {
+                            $resolvedFilters['branch_id'] = $branchId;
+                        }
+                    } elseif (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
                         $resolvedFilters['user_id'] = $_SESSION['user_id'];
                     }
                     try {
