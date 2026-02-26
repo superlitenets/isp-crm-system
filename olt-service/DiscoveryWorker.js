@@ -617,7 +617,9 @@ class DiscoveryWorker {
                     (SELECT ip_address FROM huawei_olts WHERE id = d.olt_id) as olt_ip,
                     (SELECT b.name FROM huawei_olts o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.id = d.olt_id) as branch_name,
                     (SELECT b.code FROM huawei_olts o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.id = d.olt_id) as branch_code,
-                    (SELECT b.whatsapp_group FROM huawei_olts o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.id = d.olt_id) as whatsapp_group
+                    (SELECT b.whatsapp_group FROM huawei_olts o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.id = d.olt_id) as whatsapp_group,
+                    (SELECT t.name FROM huawei_onu_types t WHERE t.id = d.onu_type_id) as onu_type_name,
+                    (SELECT t.model FROM huawei_onu_types t WHERE t.id = d.onu_type_id) as onu_type_model
             `);
             
             await client.query('COMMIT');
@@ -643,6 +645,30 @@ class DiscoveryWorker {
 
         const provisioningGroup = await this.getProvisioningGroup();
 
+        let zoneMap = {};
+        try {
+            const zoneResult = await this.pool.query(`SELECT olt_id, frame, slot, port, zone_name FROM olt_port_zones`);
+            for (const z of zoneResult.rows) {
+                zoneMap[`${z.olt_id}_${z.frame}/${z.slot}/${z.port}`] = z.zone_name;
+            }
+        } catch (e) {}
+
+        let inventoryMap = {};
+        const allSerials = result.rows.map(r => r.serial_number);
+        if (allSerials.length > 0) {
+            try {
+                const invResult = await this.pool.query(
+                    `SELECT serial_number, status FROM isp_warehouse_serials WHERE serial_number = ANY($1)`,
+                    [allSerials]
+                );
+                for (const inv of invResult.rows) {
+                    if (inv.status === 'in_stock') inventoryMap[inv.serial_number] = 'Available';
+                    else if (inv.status === 'deployed') inventoryMap[inv.serial_number] = 'Deployed';
+                    else inventoryMap[inv.serial_number] = inv.status.charAt(0).toUpperCase() + inv.status.slice(1);
+                }
+            } catch (e) {}
+        }
+
         const discoveriesByGroup = {};
         for (const d of result.rows) {
             const groupId = provisioningGroup || d.whatsapp_group;
@@ -654,6 +680,19 @@ class DiscoveryWorker {
             if (!discoveriesByGroup[groupId]) {
                 discoveriesByGroup[groupId] = [];
             }
+
+            let zoneName = 'Unassigned';
+            if (d.frame_slot_port) {
+                const parts = d.frame_slot_port.split('/');
+                if (parts.length >= 3) {
+                    const zKey = `${d.olt_id}_${parts[0]}/${parts[1]}/${parts[2]}`;
+                    zoneName = zoneMap[zKey] || 'Unassigned';
+                }
+            }
+
+            const onuType = d.onu_type_name || d.onu_type_model || d.equipment_id || 'Unknown';
+            const inventoryStatus = inventoryMap[d.serial_number] || 'Customer-Owned';
+
             discoveriesByGroup[groupId].push({
                 id: d.id,
                 olt_name: d.olt_name,
@@ -663,7 +702,10 @@ class DiscoveryWorker {
                 serial_number: d.serial_number,
                 frame_slot_port: d.frame_slot_port,
                 equipment_id: d.equipment_id,
-                first_seen_at: d.first_seen_at
+                first_seen_at: d.first_seen_at,
+                zone_name: zoneName,
+                onu_type: onuType,
+                inventory_status: inventoryStatus
             });
         }
 

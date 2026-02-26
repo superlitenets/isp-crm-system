@@ -70,6 +70,12 @@ try {
         
         $locationsStr = implode("\n", $onuLocations);
         $serialsStr = implode("\n", $onuSerials);
+
+        $firstOnu = $discoveries[0];
+        $onuPort = $firstOnu['frame_slot_port'] ?? '';
+        $zoneName = $firstOnu['zone_name'] ?? 'Unassigned';
+        $inventoryStatus = $firstOnu['inventory_status'] ?? 'Unknown';
+        $onuType = $firstOnu['onu_type'] ?? $firstOnu['equipment_id'] ?? 'Unknown';
         
         $message = str_replace([
             '{olt_name}',
@@ -80,6 +86,10 @@ try {
             '{onu_locations}',
             '{onu_list}',
             '{onu_serials}',
+            '{onu_port}',
+            '{zone_name}',
+            '{inventory_status}',
+            '{onu_type}',
             '{discovery_time}'
         ], [
             $oltName,
@@ -90,6 +100,10 @@ try {
             $locationsStr,
             $locationsStr,
             $serialsStr,
+            $onuPort,
+            $zoneName,
+            $inventoryStatus,
+            $onuType,
             date('Y-m-d H:i:s')
         ], $template);
         
