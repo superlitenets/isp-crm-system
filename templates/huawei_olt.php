@@ -1403,14 +1403,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'delete_onu':
                 $result = $huaweiOLT->deleteONU((int)$_POST['id']);
                 if ($result['success']) {
-                    $message = 'ONU deleted from database';
+                    $msg = 'ONU deleted from database';
                     if ($result['deauthorized'] ?? false) {
-                        $message .= ' and deauthorized from OLT';
+                        $msg .= ' and deauthorized from OLT';
                     }
-                    $messageType = 'success';
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true, 'message' => $msg, 'deauthorized' => $result['deauthorized'] ?? false]);
+                    exit;
                 } else {
-                    $message = $result['deauth_message'] ?? $result['error'] ?? 'Failed to delete ONU';
-                    $messageType = 'danger';
+                    $msg = $result['deauth_message'] ?? $result['error'] ?? 'Failed to delete ONU';
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => $msg]);
+                    exit;
                 }
                 break;
             case 'cleanup_stale_pending':
