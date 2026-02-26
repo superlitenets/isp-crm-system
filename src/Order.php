@@ -377,6 +377,13 @@ class Order {
         
         $this->linkTicket($orderId, $ticketId);
         
+        try {
+            $stmt = $this->db->prepare("UPDATE sales_commissions SET status = 'approved' WHERE order_id = ? AND status = 'pending'");
+            $stmt->execute([$orderId]);
+        } catch (\Throwable $e) {
+            error_log("Failed to approve commission for order $orderId: " . $e->getMessage());
+        }
+        
         // Send SMS/WhatsApp notification to customer about ticket creation
         if (!empty($order['customer_phone'])) {
             try {

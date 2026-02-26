@@ -318,6 +318,9 @@ class Ticket {
                     if ($commissionResult['success']) {
                         $this->activityLog->log('commission', 'ticket', $id, $ticket['ticket_number'], $commissionResult['message']);
                     }
+                    
+                    $scStmt = $this->db->prepare("UPDATE sales_commissions SET status = 'realized' WHERE order_id IN (SELECT id FROM orders WHERE ticket_id = ?) AND status = 'approved'");
+                    $scStmt->execute([$id]);
                 }
             } catch (\Throwable $e) {
                 error_log("Failed to process ticket commission: " . $e->getMessage());
