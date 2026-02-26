@@ -10489,20 +10489,37 @@ try {
             </style>
             
             <?php 
-            // Calculate uptime for display
             $uptimeDisplay = '';
-            if (!empty($currentOnu['online_since']) && $currentOnu['status'] === 'online') {
-                $tz = new DateTimeZone(date_default_timezone_get());
+            $durationSource = '';
+            $tz = new DateTimeZone(date_default_timezone_get());
+            $now = new DateTime('now', $tz);
+            $effectiveStatus = \App\HuaweiOLT::resolveEffectiveStatus($currentOnu['status'] ?? 'offline', $currentOnu['last_down_cause'] ?? null);
+            if ($effectiveStatus === 'online' && !empty($currentOnu['online_since'])) {
                 $onlineSince = new DateTime($currentOnu['online_since'], $tz);
-                $now = new DateTime('now', $tz);
                 $diff = $now->diff($onlineSince);
-                if ($diff->d > 0) {
+                if ($diff->m > 0 || $diff->y > 0) {
+                    $uptimeDisplay = ($diff->y > 0 ? $diff->y . 'y ' : '') . $diff->m . 'mo ' . $diff->d . 'd';
+                } elseif ($diff->d > 0) {
                     $uptimeDisplay = $diff->d . 'd ' . $diff->h . 'h ' . $diff->i . 'm';
                 } elseif ($diff->h > 0) {
                     $uptimeDisplay = $diff->h . 'h ' . $diff->i . 'm';
                 } else {
-                    $uptimeDisplay = $diff->i . 'm';
+                    $uptimeDisplay = max(1, $diff->i) . 'm';
                 }
+                $durationSource = 'uptime';
+            } elseif ($effectiveStatus !== 'online' && !empty($currentOnu['updated_at'])) {
+                $lastChange = new DateTime($currentOnu['updated_at'], $tz);
+                $diff = $now->diff($lastChange);
+                if ($diff->m > 0 || $diff->y > 0) {
+                    $uptimeDisplay = ($diff->y > 0 ? $diff->y . 'y ' : '') . $diff->m . 'mo ' . $diff->d . 'd';
+                } elseif ($diff->d > 0) {
+                    $uptimeDisplay = $diff->d . 'd ' . $diff->h . 'h ' . $diff->i . 'm';
+                } elseif ($diff->h > 0) {
+                    $uptimeDisplay = $diff->h . 'h ' . $diff->i . 'm';
+                } else {
+                    $uptimeDisplay = max(1, $diff->i) . 'm';
+                }
+                $durationSource = 'downtime';
             }
             ?>
             
@@ -10615,6 +10632,11 @@ try {
                             <span id="onuStatusBadge" class="badge bg-<?= $statusClass ?> fs-6" data-live-status>
                                 <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= $statusLabel ?>
                             </span>
+                            <?php if ($uptimeDisplay): ?>
+                            <span id="onuDurationDisplay" class="badge bg-<?= $durationSource === 'uptime' ? 'success' : 'secondary' ?> bg-opacity-25 text-<?= $durationSource === 'uptime' ? 'success' : 'secondary' ?> ms-1" style="font-size: 0.7rem;" title="<?= $durationSource === 'uptime' ? 'Online since ' . ($currentOnu['online_since'] ?? '') : 'Offline since ' . ($currentOnu['updated_at'] ?? '') ?>">
+                                <i class="bi bi-<?= $durationSource === 'uptime' ? 'arrow-up' : 'arrow-down' ?> me-1"></i><?= $uptimeDisplay ?>
+                            </span>
+                            <?php endif; ?>
                             <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="pollOnuLive()" title="Refresh">
                                 <i class="bi bi-arrow-clockwise" id="liveStatusRefreshIcon"></i>
                             </button>
@@ -10839,12 +10861,22 @@ try {
                         const rxEl = document.querySelector('[data-live-rx]');
                         const txEl = document.querySelector('[data-live-tx]');
                         
-                        // Update ALL status elements
                         statusEls.forEach(statusEl => {
                             const statusClass = {'online': 'success', 'offline': 'secondary', 'los': 'danger'}[onu.status] || 'secondary';
                             statusEl.className = statusEl.className.replace(/text-\w+/g, 'text-' + statusClass);
                             statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
                         });
+                        const durEl = document.getElementById('onuDurationDisplay');
+                        if (durEl) {
+                            const isOnline = onu.status === 'online';
+                            const durText = isOnline ? (onu.online_duration || '') : (onu.down_since || '');
+                            if (durText) {
+                                durEl.className = 'badge bg-' + (isOnline ? 'success' : 'secondary') + ' bg-opacity-25 text-' + (isOnline ? 'success' : 'secondary') + ' ms-1';
+                                durEl.style.fontSize = '0.7rem';
+                                durEl.innerHTML = '<i class="bi bi-arrow-' + (isOnline ? 'up' : 'down') + ' me-1"></i>' + durText;
+                                durEl.style.display = '';
+                            }
+                        }
                         if (rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
                         }
