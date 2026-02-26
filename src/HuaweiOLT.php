@@ -6312,8 +6312,7 @@ class HuaweiOLT {
         
         $oltId = $onu['olt_id'];
         
-        // Pause discovery during authorization to prevent command interleaving
-        $this->pauseDiscovery($oltId, 90000);
+        $this->pauseDiscovery($oltId, 45000);
         
         $equipmentId = $this->getOnuEquipmentId($onuId);
         
@@ -6639,8 +6638,7 @@ class HuaweiOLT {
         
         $oltId = $onu['olt_id'];
         
-        // Pause discovery during authorization to prevent command interleaving
-        $this->pauseDiscovery($oltId, 90000);
+        $this->pauseDiscovery($oltId, 45000);
         
         $equipmentId = $this->getOnuEquipmentId($onuId);
         
@@ -7089,8 +7087,7 @@ class HuaweiOLT {
             $errors[] = "TR-069 OMCI config had issues";
         }
         
-        // Pause to let OLT process OMCI config before service-port creation
-        usleep(1500000);
+        usleep(500000);
         
         // Step 3: Create service-port for TR-069 VLAN
         // Determine gemport based on line profile (profile 2 has gemport 2 for TR-069)
@@ -7112,8 +7109,7 @@ class HuaweiOLT {
         }
         // Note: "Failure: Service virtual port has existed already" is SUCCESS (already configured)
         
-        // Pause before bridge mode config
-        usleep(1500000);
+        usleep(500000);
         
         // Step 4: For BRIDGE mode, set native VLAN on ALL ETH ports (1-4)
         // Bridge mode passes traffic transparently through all ports

@@ -272,7 +272,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
     
     try {
         switch ($stage) {
-            case 1: // Save ONU details
+            case 1: // Save ONU details to database
                 $onuId = (int)$_POST['onu_id'];
                 $sn = trim($_POST['sn'] ?? '');
                 $name = trim($_POST['name'] ?? '');
@@ -287,11 +287,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $onuTypeId = !empty($_POST['onu_type_id']) ? (int)$_POST['onu_type_id'] : null;
                 $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
                 $pppoePassword = trim($_POST['pppoe_password'] ?? '');
-                $onuMode = $_POST['onu_mode'] ?? 'router'; // 'router' or 'bridge'
+                $onuMode = $_POST['onu_mode'] ?? 'router';
                 $oltIdInput = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $frameSlotPort = trim($_POST['frame_slot_port'] ?? '');
                 
-                // Ensure ONU exists in database
                 $onu = $onuId ? $huaweiOLT->getONU($onuId) : null;
                 
                 if (!$onu && !empty($sn)) {
@@ -338,7 +337,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                     throw new Exception('ONU record not found. Please try again.');
                 }
                 
-                // Update ONU record with all fields
                 $updateFields = ['name' => $name ?: $sn];
                 if (!empty($zone)) $updateFields['zone'] = $zone;
                 if ($zoneId) $updateFields['zone_id'] = $zoneId;
@@ -362,14 +360,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $response['onu_mode'] = $onuMode;
                 break;
                 
-            case 2: // Authorize on OLT
+            case 2: // Authorize + Service Port + TR-069 (all in one)
                 $onuId = (int)$_POST['onu_id'];
                 $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
                 $name = trim($_POST['name'] ?? '');
                 $sn = trim($_POST['sn'] ?? '');
                 $onuMode = $_POST['onu_mode'] ?? null;
                 
-                // If onu_mode not in POST, read from database
                 if (!$onuMode) {
                     $onuData = $huaweiOLT->getONU($onuId);
                     $onuMode = $onuData['onu_mode'] ?? 'router';
@@ -387,80 +384,25 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $result = $huaweiOLT->authorizeONUStage1($onuId, $defaultProfile['id'], [
                     'description' => $name ?: $sn,
                     'vlan_id' => $vlanId,
-                    'onu_mode' => $onuMode,
-                    'skip_service_port' => true // We'll do this in stage 3
+                    'onu_mode' => $onuMode
                 ]);
                 
-                $debugLog(2, 'Authorization result', [
+                $debugLog(2, 'Full authorization result', [
                     'success' => $result['success'] ?? false,
                     'message' => $result['message'] ?? null,
-                    'onu_id' => $result['onu_id'] ?? null
+                    'onu_id' => $result['onu_id'] ?? null,
+                    'service_port' => $result['service_port_success'] ?? null,
+                    'tr069' => $result['tr069_status'] ?? null
                 ]);
                 
                 if (!$result['success']) {
                     throw new Exception($result['message'] ?? 'Failed to authorize ONU on OLT');
                 }
                 
-                // Verify DB was updated
-                $onuAfter = $huaweiOLT->getONU($onuId);
-                $debugLog(2, 'ONU after authorization', [
-                    'is_authorized' => $onuAfter['is_authorized'] ?? null,
-                    'olt_onu_id' => $onuAfter['onu_id'] ?? null
-                ]);
                 $response['success'] = true;
-                $response['message'] = 'ONU authorized as ID ' . ($result['onu_id'] ?? 'N/A');
-                $response['next_stage'] = 3;
+                $response['message'] = $result['message'] ?? 'ONU fully configured';
+                $response['next_stage'] = null;
                 $response['olt_onu_id'] = $result['onu_id'] ?? null;
-                break;
-                
-            case 3: // Configure service VLAN
-                $onuId = (int)$_POST['onu_id'];
-                $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
-                
-                if ($vlanId) {
-                    $onu = $huaweiOLT->getONU($onuId);
-                    if ($onu) {
-                        $result = $huaweiOLT->attachVlanToONU($onuId, $vlanId);
-                        if (!$result['success']) {
-                            $response['warning'] = 'Service port config: ' . ($result['message'] ?? 'Check manually');
-                        }
-                    }
-                }
-                
-                $response['success'] = true;
-                $response['message'] = $vlanId ? "Service VLAN $vlanId configured" : 'No VLAN specified';
-                $response['next_stage'] = 4;
-                break;
-                
-            case 4: // Configure TR-069
-                $onuId = (int)$_POST['onu_id'];
-                
-                // Get ONU data before calling TR-069 config
-                $onuDataBefore = $huaweiOLT->getONU($onuId);
-                $debugLog(4, 'Before TR-069 config', [
-                    'onu_id' => $onuId,
-                    'is_authorized' => $onuDataBefore['is_authorized'] ?? null,
-                    'olt_onu_id' => $onuDataBefore['onu_id'] ?? null,
-                    'olt_id' => $onuDataBefore['olt_id'] ?? null,
-                    'frame_slot_port' => ($onuDataBefore['frame'] ?? '?') . '/'. ($onuDataBefore['slot'] ?? '?') . '/'. ($onuDataBefore['port'] ?? '?')
-                ]);
-                
-                $tr069Result = $huaweiOLT->configureONUStage2TR069($onuId, [
-                    'tr069_vlan' => 69,
-                    'tr069_gem_port' => 2,
-                    'tr069_profile_id' => 3
-                ]);
-                
-                $debugLog(4, 'TR-069 result', $tr069Result);
-                $response['success'] = $tr069Result['success'];
-                if ($tr069Result['success']) {
-                    $response['message'] = 'TR-069 management configured on VLAN 69';
-                } else {
-                    $response['message'] = 'TR-069 config failed: ' . ($tr069Result['message'] ?? 'Unknown error');
-                    $response['error'] = $tr069Result['message'] ?? 'TR-069 configuration failed';
-                    $response['debug'] = $tr069Result['output'] ?? '';
-                }
-                $response['next_stage'] = null; // Done
                 $response['redirect'] = '?page=huawei-olt&view=onu_detail&onu_id=' . $onuId;
                 break;
         }
@@ -7780,15 +7722,7 @@ try {
                 </div>
                 <div class="stage-item" id="stage2" data-stage="2">
                     <i class="bi bi-circle stage-icon me-2"></i>
-                    <span>Authorizing on OLT...</span>
-                </div>
-                <div class="stage-item" id="stage3" data-stage="3">
-                    <i class="bi bi-circle stage-icon me-2"></i>
-                    <span>Configuring service VLAN...</span>
-                </div>
-                <div class="stage-item" id="stage4" data-stage="4">
-                    <i class="bi bi-circle stage-icon me-2"></i>
-                    <span>Setting up TR-069 management...</span>
+                    <span>Authorizing + Service Port + TR-069...</span>
                 </div>
             </div>
             <div id="loadingError" class="alert alert-danger mt-3" style="display:none; max-width: 350px;"></div>
@@ -18478,11 +18412,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
 
         const stageLabels = {
             1: 'Saving ONU details...',
-            2: 'Authorizing on OLT...',
-            3: 'Configuring service VLAN...',
-            4: 'Setting up TR-069 management...'
+            2: 'Authorizing + configuring OLT...'
         };
-        const stageWeights = { 1: 10, 2: 50, 3: 75, 4: 90 };
+        const stageWeights = { 1: 15, 2: 90 };
 
         loadingText.textContent = 'Authorizing ONU and configuring TR-069...';
         loadingSubtext.textContent = 'Please wait while we configure the device...';
@@ -18510,7 +18442,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             if (label) progressStage.textContent = label;
         }
 
-        for (let stage = 1; stage <= 4; stage++) {
+        for (let stage = 1; stage <= 2; stage++) {
             setProgress(stageWeights[stage] - 5, stageLabels[stage]);
 
             try {
