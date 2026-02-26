@@ -198,8 +198,13 @@ class SSHSession {
     async flushBuffer() {
         this.buffer = '';
         this.dataListeners = [];
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 200));
         this.buffer = '';
+        if (this.stream && this.connected) {
+            this.stream.write('\r');
+            await new Promise(r => setTimeout(r, 500));
+            this.buffer = '';
+        }
     }
     
     stripAnsi(str) {
@@ -241,8 +246,8 @@ class SSHSession {
                 }
                 
                 const strippedChunk = this.stripAnsi(chunk);
-                const lockPromptPattern = /\{\s*<cr>\s*\|\s*<K>\s*\}:/;
-                const subPromptPattern = /\{[^}]*<cr>[^}]*\}:/i;
+                const lockPromptPattern = /All.*by.*other.*user.*\{\s*<cr>/;
+                const subPromptPattern = /\{\s*<cr>/i;
                 if (lockPromptPattern.test(strippedChunk)) {
                     console.log(`[OLT ${this.oltId}] SSH config lock prompt detected, pressing Enter`);
                     lockPending = true;
@@ -326,6 +331,7 @@ class SSHSession {
 
     async sendRawScript(script, timeout = 60000) {
         await this.flushBuffer();
+        await new Promise(r => setTimeout(r, 300));
         
         return new Promise((resolve, reject) => {
             if (!this.stream || !this.connected) {
@@ -348,8 +354,8 @@ class SSHSession {
                 /delete this ont/i, /to delete\?/i
             ];
 
-            const lockPromptPattern = /\{\s*<cr>\s*\|\s*<K>\s*\}:/;
-            const subPromptPattern = /\{[^}]*<cr>[^}]*\}:/i;
+            const lockPromptPattern = /All.*by.*other.*user.*\{\s*<cr>/;
+            const subPromptPattern = /\{\s*<cr>/i;
 
             const lines = script.split(/\r?\n/).filter(l => l.trim());
             console.log(`[OLT ${this.oltId}] SSH raw script: sending ${lines.length} commands`);

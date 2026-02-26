@@ -9526,11 +9526,15 @@ class HuaweiOLT {
                 foreach ($servicePortIds as $spId) {
                     $undoOut = $sendRaw("undo service-port {$spId}");
                     error_log("[DeleteONU] undo service-port {$spId}: " . substr(str_replace(["\r\n", "\n"], " ", $undoOut), 0, 200));
+                    sleep(1);
                 }
                 
+                sleep(1);
                 $enterOut = $sendRaw("interface gpon {$frame}/{$slot}");
+                sleep(1);
                 $deleteOut = $sendRaw("ont delete {$port} {$onuIdNum}");
                 error_log("[DeleteONU] ont delete response: " . substr(str_replace(["\r\n", "\n"], " | ", $deleteOut), 0, 300));
+                sleep(1);
                 $quitOut = $sendRaw("quit");
                 
                 $output = $deleteOut;
