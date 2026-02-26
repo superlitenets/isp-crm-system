@@ -517,9 +517,26 @@ class GenieACS {
             }
         }
         
+        $this->deletePendingTasks($deviceId);
+        $queueResult = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
+        $queueCode = $queueResult['http_code'] ?? 0;
+        
+        if ($queueCode == 200 || $queueCode == 202) {
+            if ($serial) {
+                $this->triggerInformViaOLT($serial);
+            }
+            return [
+                'success' => true,
+                'queued' => true,
+                'message' => 'Device unreachable for instant push. Task queued for next inform (usually within 60s).',
+                'connection_request_url' => $connReqUrl,
+                'http_code' => $queueCode
+            ];
+        }
+        
         return [
             'success' => false,
-            'message' => "Device unreachable after {$maxRetries} retries",
+            'message' => "Device unreachable and failed to queue task",
             'connection_request_url' => $connReqUrl,
             'http_code' => $retryCode ?? $httpCode,
             'queued' => false
@@ -777,20 +794,19 @@ class GenieACS {
         } else {
             $serial = $this->extractSerialFromDeviceId($deviceId);
             $hasCRCredentials = !empty($this->crUsername) && $this->crUsername !== 'genieacs';
-            $maxRetries = 3;
             $delivered = false;
             
-            error_log("[GenieACS] setParameterValues got HTTP {$httpCode} for {$deviceId}, retrying up to {$maxRetries} times");
+            error_log("[GenieACS] setParameterValues got HTTP {$httpCode} for {$deviceId}, attempting recovery");
             
             if ($serial && !$hasCRCredentials) {
                 $this->clearCRCredentialsViaOLT($serial);
                 error_log("[GenieACS] CR credentials cleared via OLT for {$serial}");
             }
             
-            for ($retry = 1; $retry <= $maxRetries; $retry++) {
-                sleep(3);
-                error_log("[GenieACS] Retry {$retry}/{$maxRetries} for {$deviceId}");
-                $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
+            for ($retry = 1; $retry <= 3; $retry++) {
+                sleep(3 + $retry);
+                error_log("[GenieACS] Retry {$retry}/3 for {$deviceId}");
+                $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=20000", $task);
                 $retryCode = $retryResult['http_code'] ?? 0;
                 if ($retryCode == 200) {
                     $result = $retryResult;
@@ -803,9 +819,26 @@ class GenieACS {
             }
             
             if (!$delivered) {
-                $result['success'] = false;
-                $result['error'] = "Failed to deliver changes after {$maxRetries} retries (last HTTP {$retryCode}). Device may be unreachable.";
-                error_log("[GenieACS] FAILED to deliver setParameterValues to {$deviceId} after {$maxRetries} retries");
+                error_log("[GenieACS] Connection request failed, queuing task for next inform for {$deviceId}");
+                $this->deletePendingTasks($deviceId);
+                $queueResult = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
+                $queueCode = $queueResult['http_code'] ?? 0;
+                
+                if ($queueCode == 200 || $queueCode == 202) {
+                    $result['success'] = true;
+                    $result['queued'] = true;
+                    $result['error'] = null;
+                    $result['message'] = 'Device unreachable for instant push. Changes queued and will apply on next device inform (usually within 60s).';
+                    error_log("[GenieACS] Task queued for next inform for {$deviceId}");
+                    
+                    if ($serial) {
+                        $this->triggerInformViaOLT($serial);
+                    }
+                } else {
+                    $result['success'] = false;
+                    $result['error'] = "Failed to deliver or queue changes. Device may be offline.";
+                    error_log("[GenieACS] FAILED to queue task for {$deviceId}, HTTP {$queueCode}");
+                }
             }
         }
         
@@ -5097,7 +5130,6 @@ PROVISION;
     public function queueClearAuth(string $deviceId): array {
         $encodedId = rawurlencode($deviceId);
         
-        // Queue WITHOUT connection_request - executes on next inform
         $result = $this->request('POST', "/devices/{$encodedId}/tasks", [
             'name' => 'setParameterValues',
             'parameterValues' => [
@@ -5113,5 +5145,61 @@ PROVISION;
             'message' => 'Auth clear queued - will execute on next device inform (usually within 60 seconds)',
             'result' => $result
         ];
+    }
+
+    public function deletePendingTasks(string $deviceId): int {
+        $tasks = $this->getTasks($deviceId);
+        $deleted = 0;
+        if (!empty($tasks['data']) && is_array($tasks['data'])) {
+            foreach ($tasks['data'] as $task) {
+                $taskId = $task['_id'] ?? null;
+                if ($taskId) {
+                    $this->deleteTask($taskId);
+                    $deleted++;
+                }
+            }
+        }
+        if ($deleted > 0) {
+            error_log("[GenieACS] Deleted {$deleted} pending tasks for {$deviceId}");
+        }
+        return $deleted;
+    }
+
+    public function triggerInformViaOLT(string $serial): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT o.olt_id, o.frame, o.slot, o.port, o.onu_id 
+                FROM huawei_onus o 
+                WHERE (o.sn = ? OR o.tr069_serial = ?) AND o.olt_id IS NOT NULL
+                LIMIT 1
+            ");
+            $stmt->execute([$serial, $serial]);
+            $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$onu) {
+                return ['success' => false, 'error' => 'ONU not found'];
+            }
+            
+            $frame = $onu['frame'] ?? 0;
+            $slot = $onu['slot'];
+            $port = $onu['port'];
+            $onuId = $onu['onu_id'];
+            $oltId = $onu['olt_id'];
+            
+            require_once __DIR__ . '/HuaweiOLT.php';
+            $huaweiOLT = new HuaweiOLT($this->db);
+            
+            $cmd = "interface gpon {$frame}/{$slot}\r\n";
+            $cmd .= "ont tr069-server-config {$port} {$onuId} inform-interval 30\r\n";
+            $cmd .= "quit";
+            
+            $result = $huaweiOLT->executeCommand($oltId, $cmd);
+            error_log("[GenieACS] Triggered inform via OLT for {$serial}: " . ($result['success'] ? 'OK' : 'FAILED'));
+            
+            return $result;
+        } catch (\Exception $e) {
+            error_log("[GenieACS] triggerInformViaOLT error for {$serial}: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
 }
