@@ -7708,17 +7708,19 @@ try {
     <!-- Loading Overlay for OLT Operations -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner-container">
-            <div class="loading-text" id="loadingText">Connecting to OLT...</div>
-            <div class="text-muted small mt-2" id="loadingSubtext">This may take a few seconds</div>
-            <div id="loadingProgress" class="mt-3" style="display:none; width: 320px;">
-                <div class="auth-progress-bar-container">
-                    <div class="auth-progress-bar" id="authProgressBar"></div>
-                </div>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <span class="text-muted small" id="authProgressStage"></span>
-                    <span class="fw-bold" id="authProgressPct" style="font-size: 1.1rem;">0%</span>
+            <div id="loadingProgress" style="display:none;">
+                <div class="circular-progress" id="circularProgress">
+                    <svg class="circular-progress-svg" viewBox="0 0 120 120">
+                        <circle class="circular-track" cx="60" cy="60" r="52"></circle>
+                        <circle class="circular-fill" id="circularFill" cx="60" cy="60" r="52"></circle>
+                    </svg>
+                    <div class="circular-progress-pct" id="authProgressPct">0%</div>
+                    <div class="circular-glow" id="circularGlow"></div>
                 </div>
             </div>
+            <div class="loading-text mt-3" id="loadingText">Connecting to OLT...</div>
+            <div class="text-muted small mt-1" id="loadingSubtext">This may take a few seconds</div>
+            <div id="authProgressStage" class="auth-stage-label mt-2"></div>
             <div id="loadingStages" class="mt-3 text-start" style="display:none; max-width: 350px;">
                 <div class="stage-item" id="stage1" data-stage="1">
                     <i class="bi bi-circle stage-icon me-2"></i>
@@ -7730,6 +7732,7 @@ try {
                 </div>
             </div>
             <div id="loadingError" class="alert alert-danger mt-3" style="display:none; max-width: 350px;"></div>
+            <div id="authProgressBar" style="display:none;"></div>
         </div>
     </div>
     <style>
@@ -7741,18 +7744,100 @@ try {
         .stage-item.error { color: #dc3545; }
         .stage-item.error .stage-icon:before { content: "\F62A"; }
         @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .auth-progress-bar-container {
-            width: 100%; height: 12px; background: #e9ecef; border-radius: 6px; overflow: hidden;
+
+        .circular-progress {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            margin: 0 auto;
         }
-        .auth-progress-bar {
-            height: 100%; width: 0%; border-radius: 6px;
-            background: linear-gradient(90deg, #0d6efd, #198754);
-            transition: width 0.4s ease;
+        .circular-progress-svg {
+            width: 140px;
+            height: 140px;
+            transform: rotate(-90deg);
         }
-        .auth-progress-bar.error {
-            background: linear-gradient(90deg, #dc3545, #ff6b6b);
+        .circular-track {
+            fill: none;
+            stroke: #e9ecef;
+            stroke-width: 8;
+        }
+        .circular-fill {
+            fill: none;
+            stroke: url(#progressGradient);
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 326.73;
+            stroke-dashoffset: 326.73;
+            transition: stroke-dashoffset 0.6s ease;
+            filter: drop-shadow(0 0 6px rgba(13, 110, 253, 0.4));
+        }
+        .circular-fill.error {
+            stroke: #dc3545;
+            filter: drop-shadow(0 0 6px rgba(220, 53, 69, 0.4));
+        }
+        .circular-fill.complete {
+            stroke: #198754;
+            filter: drop-shadow(0 0 8px rgba(25, 135, 84, 0.5));
+        }
+        .circular-progress-pct {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #0d6efd;
+            letter-spacing: -0.5px;
+        }
+        .circular-progress-pct.error { color: #dc3545; }
+        .circular-progress-pct.complete { color: #198754; }
+        .circular-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100px;
+            height: 100px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(13,110,253,0.08) 0%, transparent 70%);
+            pointer-events: none;
+            animation: glowPulse 2s ease-in-out infinite;
+        }
+        .circular-glow.error {
+            background: radial-gradient(circle, rgba(220,53,69,0.08) 0%, transparent 70%);
+        }
+        .circular-glow.complete {
+            background: radial-gradient(circle, rgba(25,135,84,0.1) 0%, transparent 70%);
+        }
+        @keyframes glowPulse {
+            0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+        }
+        @keyframes spinnerRotate {
+            0% { transform: rotate(-90deg); }
+            100% { transform: rotate(270deg); }
+        }
+        .circular-progress-svg.indeterminate {
+            animation: spinnerRotate 1.4s linear infinite;
+        }
+        .circular-progress-svg.indeterminate .circular-fill {
+            stroke-dashoffset: 245;
+            transition: none;
+        }
+        .auth-stage-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            min-height: 1.2em;
         }
     </style>
+    <svg style="position:absolute;width:0;height:0;">
+        <defs>
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#0d6efd"/>
+                <stop offset="100%" stop-color="#198754"/>
+            </linearGradient>
+        </defs>
+    </svg>
     
     <!-- OMS Mobile Header -->
     <!-- OMS Mobile Overlay -->
@@ -18427,15 +18512,17 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         };
         const stageWeights = { 1: 15, 2: 90 };
 
-        loadingText.textContent = 'Authorizing ONU and configuring TR-069...';
-        loadingSubtext.textContent = 'Please wait while we configure the device...';
+        loadingText.textContent = 'Authorizing ONU...';
+        loadingSubtext.textContent = 'Please wait while we configure the device';
         loadingStages.style.display = 'none';
         loadingProgress.style.display = 'block';
         loadingError.style.display = 'none';
-        progressBar.style.width = '0%';
-        progressBar.classList.remove('error');
         progressPct.textContent = '0%';
+        progressPct.classList.remove('error', 'complete');
         progressStage.textContent = '';
+        document.getElementById('circularFill').classList.remove('error', 'complete');
+        document.getElementById('circularFill').style.strokeDashoffset = 326.73;
+        document.getElementById('circularGlow').classList.remove('error', 'complete');
 
         overlay.classList.add('active');
 
@@ -18447,9 +18534,14 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         let currentOnuMode = formData.get('onu_mode') || 'router';
         let warnings = [];
 
+        const circularFill = document.getElementById('circularFill');
+        const circularGlow = document.getElementById('circularGlow');
+        const circumference = 2 * Math.PI * 52;
+
         function setProgress(pct, label) {
-            progressBar.style.width = pct + '%';
-            progressPct.textContent = pct + '%';
+            const offset = circumference - (pct / 100) * circumference;
+            circularFill.style.strokeDashoffset = offset;
+            progressPct.textContent = Math.round(pct) + '%';
             if (label) progressStage.textContent = label;
         }
 
@@ -18480,7 +18572,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 const result = await response.json();
 
                 if (!result.success) {
-                    progressBar.classList.add('error');
+                    circularFill.classList.add('error');
+                    circularGlow.classList.add('error');
+                    progressPct.classList.add('error');
                     setProgress(stageWeights[stage], stageLabels[stage]);
                     loadingText.textContent = 'Authorization Failed';
                     loadingSubtext.innerHTML = '';
@@ -18500,6 +18594,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 if (result.warning) warnings.push(result.warning);
 
                 if (result.next_stage === null) {
+                    circularFill.classList.add('complete');
+                    circularGlow.classList.add('complete');
+                    progressPct.classList.add('complete');
                     setProgress(100, 'Complete!');
                     loadingText.textContent = 'Authorization Complete!';
                     loadingSubtext.textContent = warnings.length > 0
@@ -18518,7 +18615,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 }
 
             } catch (err) {
-                progressBar.classList.add('error');
+                circularFill.classList.add('error');
+                circularGlow.classList.add('error');
+                progressPct.classList.add('error');
                 loadingText.textContent = 'Authorization Failed';
                 loadingSubtext.innerHTML = '';
                 loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Network Error: ' + err.message;
@@ -21632,6 +21731,13 @@ function saveDeviceStatus() {
     
     function hideLoading() {
         document.getElementById('loadingOverlay').classList.remove('active');
+        const fill = document.getElementById('circularFill');
+        const glow = document.getElementById('circularGlow');
+        const pct = document.getElementById('authProgressPct');
+        if (fill) fill.classList.remove('error', 'complete');
+        if (glow) glow.classList.remove('error', 'complete');
+        if (pct) { pct.classList.remove('error', 'complete'); pct.textContent = '0%'; }
+        if (fill) fill.style.strokeDashoffset = 326.73;
     }
     
     // Intercept all form submissions that involve OLT operations
