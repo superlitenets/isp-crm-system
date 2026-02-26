@@ -358,6 +358,27 @@ class Order {
                 }
             }
         }
+        
+        if (!$assignedTo && $createdBy) {
+            $assignedTo = $createdBy;
+        }
+        if (!$teamId && $assignedTo) {
+            try {
+                $empStmt = $this->db->prepare("SELECT e.id FROM employees e WHERE e.user_id = ? LIMIT 1");
+                $empStmt->execute([$assignedTo]);
+                $empId = $empStmt->fetchColumn();
+                if ($empId) {
+                    $tmStmt = $this->db->prepare("SELECT team_id FROM team_members WHERE employee_id = ? LIMIT 1");
+                    $tmStmt->execute([$empId]);
+                    $fallbackTeamId = $tmStmt->fetchColumn();
+                    if ($fallbackTeamId) {
+                        $teamId = (int) $fallbackTeamId;
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log("Fallback team lookup failed: " . $e->getMessage());
+            }
+        }
 
         $stmt = $this->db->prepare("
             INSERT INTO tickets (ticket_number, customer_id, subject, description, category, priority, status, assigned_to, team_id, created_by)
