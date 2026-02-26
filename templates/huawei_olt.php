@@ -10496,9 +10496,16 @@ try {
                         </button>
                     </div>
                     
-                    <!-- Delete -->
-                    <div class="ms-auto">
-                        <form method="post" class="d-inline" onsubmit="return confirm('DELETE this ONU from OLT?')">
+                    <!-- Reset & Delete -->
+                    <div class="ms-auto d-flex gap-1">
+                        <form method="post" class="d-inline" onsubmit="return confirm('Reset this ONU to factory defaults?\n\nThis will restore the ONU configuration to its default state. The device will reboot and temporarily go offline.')">
+                            <input type="hidden" name="action" value="reset_onu_config">
+                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                            <button type="submit" class="btn btn-outline-warning btn-sm" title="Factory Reset ONU">
+                                <i class="bi bi-arrow-repeat"></i><span class="d-none d-md-inline ms-1">Reset</span>
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline" onsubmit="return confirm('DELETE this ONU from OLT?\n\nThis will remove all service-ports and delete the ONU from the OLT.')">
                             <input type="hidden" name="action" value="delete_onu_olt">
                             <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                             <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete from OLT">
