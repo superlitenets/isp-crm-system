@@ -6928,22 +6928,39 @@ class HuaweiOLT {
                 'script' => implode("\n", $tr069ScriptLines),
                 'timeout' => 30000
             ]);
-            $output .= "\n[TR-069 OMCI]\n" . ($tr069OmciResult['output'] ?? '');
+            $omciOutput = $tr069OmciResult['output'] ?? '';
+            $output .= "\n[TR-069 OMCI]\n" . $omciOutput;
+            error_log("[AuthStage1] TR-069 OMCI response: " . substr(str_replace(["\r\n", "\n"], " | ", $omciOutput), 0, 300));
             
-            // TR-069 Service-port (CRITICAL - without this, ONU cannot reach ACS via VLAN 69)
             $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
             $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
-            $output .= "\n[TR-069 Service-Port]\n" . ($tr069SpResult['output'] ?? '');
+            $spOutput = $tr069SpResult['output'] ?? '';
+            $output .= "\n[TR-069 Service-Port]\n" . $spOutput;
+            error_log("[AuthStage1] TR-069 Service-Port response: " . substr(str_replace(["\r\n", "\n"], " | ", $spOutput), 0, 300));
+            
+            $omciOk = !preg_match('/does not exist|is not valid|Unrecognized command/i', $omciOutput);
+            $spOk = empty($spOutput) || !preg_match('/does not exist|is not valid|Unrecognized command/i', $spOutput) || preg_match('/already exist|existed|service-port\s+\d+/i', $spOutput);
             
             $tr069Status = [
                 'attempted' => true,
-                'success' => !preg_match('/does not exist|is not valid|Unrecognized command/i', $tr069SpResult['output'] ?? ''),
+                'success' => $omciOk && $spOk,
                 'vlan' => $tr069Vlan,
                 'gem_port' => $tr069GemPort
             ];
         }
         
-        // Mark discovery log entry as authorized
+        if ($tr069Status['attempted'] && $tr069Status['success']) {
+            $this->updateONU($onuId, [
+                'tr069_status' => 'configured',
+                'provisioning_stage' => 2
+            ]);
+        } elseif ($tr069Status['attempted']) {
+            $this->updateONU($onuId, [
+                'tr069_status' => 'partial',
+                'provisioning_stage' => 2
+            ]);
+        }
+        
         try {
             $stmt = $this->db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = CURRENT_TIMESTAMP WHERE serial_number = ? AND olt_id = ?");
             $stmt->execute([$onu['sn'], $oltId]);
