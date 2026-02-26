@@ -9350,6 +9350,28 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
             } elseif ($orderId) {
+                $canViewAllOrders = \App\Auth::can('orders.view_all') || \App\Auth::isAdmin();
+                if (!$canViewAllOrders) {
+                    $targetOrder = $orderModel->getById($orderId);
+                    $isOwner = false;
+                    if ($targetOrder) {
+                        $isOwner = ($targetOrder['created_by'] == $currentUser['id']);
+                        if (!$isOwner) {
+                            try {
+                                $spModel = new \App\Salesperson($db);
+                                $mySp = $spModel->getByUserIdOrCreate($currentUser['id']);
+                                if ($mySp && $targetOrder['salesperson_id'] == $mySp['id']) {
+                                    $isOwner = true;
+                                }
+                            } catch (\Throwable $e) {}
+                        }
+                    }
+                    if (!$isOwner) {
+                        $_SESSION['error_message'] = 'You do not have permission to manage this order.';
+                        header('Location: ?page=orders');
+                        exit;
+                    }
+                }
                 switch ($orderAction) {
                     case 'confirm':
                         $orderModel->updateStatus($orderId, 'confirmed');

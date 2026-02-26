@@ -54,6 +54,7 @@ if ($currentUserId && isset($salespersonModel)) {
                 <option value="converted" <?= ($_GET['status'] ?? '') === 'converted' ? 'selected' : '' ?>>Converted</option>
                 <option value="cancelled" <?= ($_GET['status'] ?? '') === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
             </select>
+            <?php if ($canViewAllOrders): ?>
             <select name="salesperson" class="form-select form-select-sm flex-grow-1 d-none d-sm-block" style="min-width: 130px;" onchange="this.form.submit()">
                 <option value="">All Leads</option>
                 <?php foreach ($activeSalespersons as $sp): ?>
@@ -62,6 +63,7 @@ if ($currentUserId && isset($salespersonModel)) {
                 </option>
                 <?php endforeach; ?>
             </select>
+            <?php endif; ?>
             <div class="input-group flex-grow-1" style="min-width: 150px;">
                 <input type="text" class="form-control form-control-sm" name="search" 
                        placeholder="Search..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
@@ -190,6 +192,7 @@ $customers = $db->query("SELECT id, name, phone, email, account_number FROM cust
                             </select>
                         </div>
                         <div class="col-md-6">
+                            <?php if ($canViewAllOrders): ?>
                             <label class="form-label">Assigned Salesperson</label>
                             <select name="salesperson_id" class="form-select">
                                 <option value="">-- No Salesperson --</option>
@@ -199,6 +202,9 @@ $customers = $db->query("SELECT id, name, phone, email, account_number FROM cust
                             </select>
                             <?php if ($mySalespersonId): ?>
                             <small class="text-muted">Auto-assigned to you. Change if needed.</small>
+                            <?php endif; ?>
+                            <?php else: ?>
+                            <input type="hidden" name="salesperson_id" value="<?= $mySalespersonId ?? '' ?>">
                             <?php endif; ?>
                         </div>
                     </div>
@@ -243,6 +249,19 @@ function fillCustomerDetails() {
 </script>
 
 <?php elseif ($action === 'view' && $order): ?>
+<?php
+if (!$canViewAllOrders && $currentUserId) {
+    $isMyOrder = ($order['created_by'] == $currentUserId);
+    if (!$isMyOrder && $mySalespersonId) {
+        $isMyOrder = ($order['salesperson_id'] == $mySalespersonId);
+    }
+    if (!$isMyOrder) {
+        echo '<div class="alert alert-danger"><i class="bi bi-shield-exclamation"></i> You do not have permission to view this order.</div>';
+        echo '<a href="?page=orders" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to Orders</a>';
+        return;
+    }
+}
+?>
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
