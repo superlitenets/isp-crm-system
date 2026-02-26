@@ -736,6 +736,10 @@ try {
 <?php
     $empContracts = [];
     try {
+        $colCheck = $db->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'employee_contracts' AND column_name = 'title'");
+        if (!$colCheck->fetch()) {
+            $db->exec("DROP TABLE IF EXISTS employee_contracts");
+        }
         $db->exec("CREATE TABLE IF NOT EXISTS employee_contracts (
             id SERIAL PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
             title VARCHAR(255) NOT NULL, description TEXT, contract_type VARCHAR(50) DEFAULT 'employment',

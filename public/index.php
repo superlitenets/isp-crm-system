@@ -4339,6 +4339,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 } else {
                     try {
+                        $colCheck = $db->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'employee_contracts' AND column_name = 'title'");
+                        if (!$colCheck->fetch()) {
+                            $db->exec("DROP TABLE IF EXISTS employee_contracts");
+                        }
                         $db->exec("
                             CREATE TABLE IF NOT EXISTS employee_contracts (
                                 id SERIAL PRIMARY KEY,
