@@ -4339,6 +4339,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 } else {
                     try {
+                        $db->exec("
+                            CREATE TABLE IF NOT EXISTS employee_contracts (
+                                id SERIAL PRIMARY KEY,
+                                employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+                                title VARCHAR(255) NOT NULL,
+                                description TEXT,
+                                contract_type VARCHAR(50) DEFAULT 'employment',
+                                content TEXT,
+                                file_path VARCHAR(500),
+                                status VARCHAR(30) DEFAULT 'pending',
+                                created_by INTEGER REFERENCES users(id),
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                sent_at TIMESTAMP,
+                                viewed_at TIMESTAMP,
+                                signed_at TIMESTAMP,
+                                signature_data TEXT,
+                                signer_ip VARCHAR(45),
+                                signer_name VARCHAR(255),
+                                expires_at TIMESTAMP,
+                                notes TEXT
+                            )
+                        ");
                         $filePath = null;
                         if (!empty($_FILES['contract_file']['name']) && $_FILES['contract_file']['error'] === UPLOAD_ERR_OK) {
                             $uploadDir = __DIR__ . '/uploads/contracts/';

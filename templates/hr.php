@@ -736,6 +736,14 @@ try {
 <?php
     $empContracts = [];
     try {
+        $db->exec("CREATE TABLE IF NOT EXISTS employee_contracts (
+            id SERIAL PRIMARY KEY, employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL, description TEXT, contract_type VARCHAR(50) DEFAULT 'employment',
+            content TEXT, file_path VARCHAR(500), status VARCHAR(30) DEFAULT 'pending',
+            created_by INTEGER REFERENCES users(id), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            sent_at TIMESTAMP, viewed_at TIMESTAMP, signed_at TIMESTAMP, signature_data TEXT,
+            signer_ip VARCHAR(45), signer_name VARCHAR(255), expires_at TIMESTAMP, notes TEXT
+        )");
         $ecStmt = $db->prepare("SELECT ec.*, u.username as created_by_name FROM employee_contracts ec LEFT JOIN users u ON ec.created_by = u.id WHERE ec.employee_id = ? ORDER BY ec.created_at DESC");
         $ecStmt->execute([$employeeData['id']]);
         $empContracts = $ecStmt->fetchAll(PDO::FETCH_ASSOC);
