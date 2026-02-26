@@ -9324,8 +9324,8 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
                 $notes = trim($_POST['notes'] ?? '');
                 
-                if (empty($customerName) || empty($customerPhone)) {
-                    $_SESSION['error_message'] = 'Customer name and phone are required.';
+                if (empty($customerName) || empty($customerPhone) || empty($packageId)) {
+                    $_SESSION['error_message'] = 'Customer name, phone, and service package are required.';
                 } else {
                     $orderData = [
                         'customer_name' => $customerName,

@@ -181,9 +181,9 @@ $customers = $db->query("SELECT id, name, phone, email, account_number FROM cust
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">Service Package</label>
-                            <select name="package_id" class="form-select">
-                                <option value="">-- No Package Selected --</option>
+                            <label class="form-label">Service Package <span class="text-danger">*</span></label>
+                            <select name="package_id" class="form-select" required>
+                                <option value="">-- Select Package --</option>
                                 <?php foreach ($packages as $pkg): ?>
                                 <option value="<?= $pkg['id'] ?>">
                                     <?= htmlspecialchars($pkg['name']) ?> - <?= $pkg['speed'] ?> <?= $pkg['speed_unit'] ?? 'Mbps' ?> (KES <?= number_format($pkg['price'], 2) ?>)
