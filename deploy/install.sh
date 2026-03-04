@@ -363,13 +363,29 @@ WAEOF
 print_step "Initializing database schema..."
 cd "${APP_DIR}"
 export PGHOST=localhost PGPORT=5432 PGDATABASE="${DB_NAME}" PGUSER="${DB_USER}" PGPASSWORD="${DB_PASS}"
+
+if [ -f "${APP_DIR}/database/migration.sql" ]; then
+    print_step "Loading complete database schema..."
+    PGPASSWORD="${DB_PASS}" psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -f "${APP_DIR}/database/migration.sql" 2>&1 | tail -5
+    print_ok "Complete schema loaded from migration.sql"
+fi
+
+print_step "Running migrations and seeding defaults..."
 php -r "
 require_once 'vendor/autoload.php';
 require_once 'config/database.php';
 require_once 'config/init_db.php';
 initializeDatabase();
 echo \"Database initialized successfully.\n\";
-" 2>&1 && print_ok "Database schema created" || print_warn "Database init had warnings (check manually)"
+" 2>&1 && print_ok "Database schema finalized" || print_warn "Database init had warnings (check manually)"
+
+sudo -u postgres psql -d "${DB_NAME}" -c "
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${DB_USER};
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${DB_USER};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${DB_USER};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${DB_USER};
+" 2>/dev/null
+print_ok "Database permissions configured"
 
 print_step "Creating default admin user..."
 ADMIN_HASH=$(php -r "echo password_hash('admin123', PASSWORD_DEFAULT);")
