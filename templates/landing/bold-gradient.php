@@ -1211,7 +1211,7 @@
                     <div class="hero-visual">
                         <div class="hero-glass-card">
                             <div class="speed-display">
-                                <div class="speed-number">1 Gbps</div>
+                                <div class="speed-number">10 Gbps</div>
                                 <div class="speed-unit">Download Speed</div>
                             </div>
                             <div class="hero-metrics">
@@ -1263,7 +1263,7 @@
                             <i class="bi bi-lightning-charge-fill"></i>
                         </div>
                         <h4>Ultra-Fast Speeds</h4>
-                        <p>Blazing fast fiber connections up to 1 Gbps. Perfect for streaming, gaming, and working from home.</p>
+                        <p>Blazing fast fiber connections up to 10 Gbps. Perfect for streaming, gaming, and working from home.</p>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">

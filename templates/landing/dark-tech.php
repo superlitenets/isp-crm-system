@@ -1600,7 +1600,7 @@
                                     <circle cx="100" cy="100" r="90" class="speed-ring-fill"/>
                                 </svg>
                                 <div class="speed-ring-value">
-                                    <strong>1 Gbps</strong>
+                                    <strong>10 Gbps</strong>
                                     <span>Download</span>
                                 </div>
                             </div>
@@ -1734,7 +1734,7 @@
                         <div class="service-card-body">
                             <div class="service-icon blue"><i class="bi bi-router"></i></div>
                             <h4 class="service-title">Fiber Internet</h4>
-                            <p class="service-desc">Blazing fast fiber optic internet with speeds up to 1Gbps for seamless streaming and gaming.</p>
+                            <p class="service-desc">Blazing fast fiber optic internet with speeds up to 10Gbps for seamless streaming and gaming.</p>
                         </div>
                     </div>
                 </div>
@@ -1789,7 +1789,7 @@
                                 <div class="f-icon"><i class="bi bi-lightning-charge"></i></div>
                                 <div>
                                     <h5>Fastest Speeds</h5>
-                                    <p>Get speeds up to 1Gbps with our cutting-edge fiber network infrastructure.</p>
+                                    <p>Get speeds up to 10Gbps with our cutting-edge fiber network infrastructure.</p>
                                 </div>
                             </li>
                             <li>
@@ -2068,7 +2068,7 @@
                                 <i class="bi bi-chevron-down"></i>
                             </button>
                             <div id="faq1" class="collapse show">
-                                <div class="faq-answer">We offer a range of speeds from 10 Mbps to 1 Gbps, depending on your location and package. Our fiber plans deliver symmetrical upload and download speeds, perfect for working from home, streaming, and gaming.</div>
+                                <div class="faq-answer">We offer a range of speeds from 10 Mbps to 10 Gbps, depending on your location and package. Our fiber plans deliver symmetrical upload and download speeds, perfect for working from home, streaming, and gaming.</div>
                             </div>
                         </div>
                         <div class="faq-item">

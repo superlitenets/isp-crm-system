@@ -604,7 +604,7 @@
                         <div class="feature-icon"><i class="bi bi-lightning"></i></div>
                         <div class="feature-content">
                             <h4>Blazing Fast Speeds</h4>
-                            <p>Fiber optic connections delivering symmetrical upload and download speeds up to 1 Gbps.</p>
+                            <p>Fiber optic connections delivering symmetrical upload and download speeds up to 10 Gbps.</p>
                         </div>
                     </div>
                     <div class="feature-item fade-in">

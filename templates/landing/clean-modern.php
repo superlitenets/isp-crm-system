@@ -1124,7 +1124,7 @@
                     <div class="hero-visual">
                         <div class="hero-stats-card">
                             <div class="text-center mb-4">
-                                <div style="font-size: 3.5rem; font-weight: 800; color: var(--primary);">1 Gbps</div>
+                                <div style="font-size: 3.5rem; font-weight: 800; color: var(--primary);">10 Gbps</div>
                                 <div style="color: var(--gray-500); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px;">Maximum Speed</div>
                             </div>
                             <div class="hero-stats-grid">
@@ -1167,7 +1167,7 @@
                     <div class="feature-card animate-on-scroll">
                         <div class="feature-icon"><i class="bi bi-lightning-charge"></i></div>
                         <h4 class="feature-title">Blazing Fast Speed</h4>
-                        <p class="feature-desc">Fiber-optic speeds up to 1 Gbps with symmetrical upload and download for seamless performance.</p>
+                        <p class="feature-desc">Fiber-optic speeds up to 10 Gbps with symmetrical upload and download for seamless performance.</p>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6">
