@@ -3821,7 +3821,111 @@ if ($action === 'edit_package' && $id) {
 
 <?php
 $landingSettings = $settings->getLandingPageSettings();
+$currentTemplate = $landingSettings['template'] ?? 'dark-tech';
+$templateOptions = [
+    'dark-tech' => [
+        'name' => 'Dark Tech',
+        'description' => 'Dark hero with animated particle network, floating orbs, and modern tech feel',
+        'icon' => 'bi-moon-stars-fill',
+        'color' => '#4F46E5',
+        'tags' => ['Dark', 'Animated', 'Tech']
+    ],
+    'clean-modern' => [
+        'name' => 'Clean Modern',
+        'description' => 'Light, professional design with soft shadows, wave backgrounds, and clean layout',
+        'icon' => 'bi-sun-fill',
+        'color' => '#2563EB',
+        'tags' => ['Light', 'Professional', 'Clean']
+    ],
+    'bold-gradient' => [
+        'name' => 'Bold Gradient',
+        'description' => 'Vibrant gradients with glassmorphism cards, bold typography, and animated elements',
+        'icon' => 'bi-palette-fill',
+        'color' => '#7C3AED',
+        'tags' => ['Colorful', 'Bold', 'Modern']
+    ],
+    'minimalist' => [
+        'name' => 'Minimalist',
+        'description' => 'Clean whitespace-heavy design with minimal colors and elegant simplicity',
+        'icon' => 'bi-grid-1x2-fill',
+        'color' => '#111827',
+        'tags' => ['Minimal', 'Elegant', 'Simple']
+    ]
+];
 ?>
+
+<div class="row g-4">
+    <div class="col-12">
+        <form method="POST" id="templateForm">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_landing_settings">
+            <input type="hidden" name="landing_template" id="selectedTemplate" value="<?= htmlspecialchars($currentTemplate) ?>">
+
+            <div class="card mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-layout-text-window-reverse"></i> Choose Template</h5>
+                    <a href="?page=landing" target="_blank" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> Preview Live
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <?php foreach ($templateOptions as $tplKey => $tpl): ?>
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card h-100 template-card <?= $currentTemplate === $tplKey ? 'border-primary shadow' : 'border' ?>"
+                                 style="cursor:pointer; transition: all 0.2s ease;"
+                                 onclick="selectTemplate('<?= $tplKey ?>')" id="tpl-<?= $tplKey ?>">
+                                <div class="card-body text-center p-3">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                                         style="width:56px;height:56px;background:<?= $tpl['color'] ?>20;">
+                                        <i class="<?= $tpl['icon'] ?> fs-4" style="color:<?= $tpl['color'] ?>;"></i>
+                                    </div>
+                                    <h6 class="mb-1"><?= $tpl['name'] ?></h6>
+                                    <p class="text-muted small mb-2" style="font-size:0.8rem;"><?= $tpl['description'] ?></p>
+                                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                                        <?php foreach ($tpl['tags'] as $tag): ?>
+                                        <span class="badge bg-light text-dark" style="font-size:0.7rem;"><?= $tag ?></span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <?php if ($currentTemplate === $tplKey): ?>
+                                    <div class="mt-2"><span class="badge bg-primary"><i class="bi bi-check-circle me-1"></i>Active</span></div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.template-card:hover { border-color: var(--bs-primary) !important; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.template-card.border-primary { border-width: 2px !important; }
+</style>
+
+<script>
+function selectTemplate(tplKey) {
+    document.getElementById('selectedTemplate').value = tplKey;
+    document.querySelectorAll('.template-card').forEach(c => {
+        c.classList.remove('border-primary', 'shadow');
+        c.classList.add('border');
+        const badge = c.querySelector('.badge.bg-primary');
+        if (badge) badge.closest('.mt-2').remove();
+    });
+    const card = document.getElementById('tpl-' + tplKey);
+    card.classList.remove('border');
+    card.classList.add('border-primary', 'shadow');
+    const body = card.querySelector('.card-body');
+    const activeDiv = document.createElement('div');
+    activeDiv.className = 'mt-2';
+    activeDiv.innerHTML = '<span class="badge bg-primary"><i class="bi bi-check-circle me-1"></i>Active</span>';
+    body.appendChild(activeDiv);
+    document.getElementById('templateForm').submit();
+}
+</script>
 
 <div class="row g-4">
     <div class="col-lg-8">

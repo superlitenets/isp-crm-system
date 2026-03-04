@@ -2074,7 +2074,16 @@ if ($page === 'landing' || $isHomepage) {
     $company = $settingsObj->getCompanyInfo();
     $landingSettings = $settingsObj->getLandingPageSettings();
     $contactSettings = $settingsObj->getContactSettings();
-    include __DIR__ . '/../templates/landing.php';
+    $landingTemplate = $landingSettings['template'] ?? 'dark-tech';
+    $allowedTemplates = ['dark-tech', 'clean-modern', 'bold-gradient', 'minimalist'];
+    if (!in_array($landingTemplate, $allowedTemplates)) {
+        $landingTemplate = 'dark-tech';
+    }
+    $templateFile = __DIR__ . '/../templates/landing/' . $landingTemplate . '.php';
+    if (!file_exists($templateFile)) {
+        $templateFile = __DIR__ . '/../templates/landing/dark-tech.php';
+    }
+    include $templateFile;
     exit;
 }
 

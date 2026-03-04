@@ -548,6 +548,7 @@ class Settings {
 
     public function getLandingPageSettings(): array {
         return [
+            'template' => $this->get('landing_template', 'dark-tech'),
             'hero_title' => $this->get('landing_hero_title', 'Lightning Fast Internet'),
             'hero_subtitle' => $this->get('landing_hero_subtitle', 'Experience blazing fast fiber internet for your home and business'),
             'hero_cta_text' => $this->get('landing_hero_cta', 'Get Started'),
@@ -565,6 +566,7 @@ class Settings {
 
     public function saveLandingPageSettings(array $data): bool {
         $fields = [
+            'landing_template',
             'landing_hero_title', 'landing_hero_subtitle', 'landing_hero_cta', 'landing_hero_cta_link',
             'landing_about_title', 'landing_about_description', 'landing_footer_text',
             'landing_primary_color', 'landing_show_testimonials'
