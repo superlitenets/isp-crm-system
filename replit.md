@@ -97,7 +97,9 @@ The system features a clean, responsive design, including a mobile PWA for field
 
 ## VPS Deployment
 The `deploy/` directory contains production deployment scripts:
-- **`deploy/install.sh`**: Full automated VPS installer — installs PHP 8.2, Node.js 20, PostgreSQL, Nginx, SSL (Let's Encrypt), creates systemd services for OLT and WhatsApp workers, initializes the database, and sets up cron jobs. Run with `sudo bash install.sh` on a fresh Ubuntu/Debian VPS.
+- **`deploy/install.sh`**: Full automated VPS installer — installs PHP 8.2, Node.js 20, PostgreSQL, Nginx, SSL (Let's Encrypt), creates systemd services for OLT, WhatsApp, and SNMP workers, initializes the database (migration.sql + init_db.php + fix_missing_columns.sql), sets up comprehensive cron jobs, and configures all required directories/permissions. Run with `sudo bash install.sh` on a fresh Ubuntu/Debian VPS.
 - **`deploy/update.sh`**: Code update script — backs up DB, syncs files, installs dependencies, runs migrations, restarts services. Run with `sudo bash update.sh`.
-- Production services: `isp-olt` (port 3002), `isp-whatsapp` (port 3001), PHP-FPM (unix socket), Nginx (80/443).
+- **`database/fix_missing_columns.sql`**: Comprehensive SQL fix script (474 lines) that adds all missing columns and tables not in migration.sql — covers ISP inventory, fleet management, radius, employees, TR069, and more. Safe to run multiple times.
+- Production services: `isp-olt` (port 3002), `isp-whatsapp` (port 3001), `isp-snmp` (port 3003), PHP-FPM (unix socket), Nginx (80/443).
+- Cron jobs: schedule checker (5min), SLA notifications (15min), recurring billing (hourly), daily summary (6AM), attendance sync (30min workdays), leave accrual (monthly), DB backup (2AM), cleanup (weekly).
 - Credentials saved to `deploy/credentials.txt` after installation.

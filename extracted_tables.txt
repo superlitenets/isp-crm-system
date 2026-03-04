@@ -1,0 +1,918 @@
+.
+                    $addresult = $this->updateuser($employeeno, $name, $cardno)
+            $addresult = $this->updateuser($employeeno, $name, $cardno)
+            $cached = $this->getfromcache($cachekey)
+            $cell = \phpoffice\phpspreadsheet\cell\coordinate::stringfromcolumnindex($col + 1) . 1
+            $coaresult = $this->sendspeedupdatecoa($id)
+                    $coaresult = $this->sendspeedupdatecoa($sub[id])
+            $coaresult = $this->sendspeedupdatecoa($subscriptionid)
+            $critical = !empty($update[is_critical]) ?  <span class=badge bg-danger>critical</span> : 
+            $customermessage = $this->buildsmsfromtemplate(sms_template_team_assigned, $customerplaceholders)
+                $customermessage = $this->buildsmsfromtemplate(sms_template_ticket_assigned, $customerplaceholders)
+            $data[reference_number] ?? null, $data[from_location] ?? null,
+        $datefrom = $datefrom ?? date(y-m-d, strtotime(-30 days))
+        $datefrom = $filters[date_from] ?? date(y-m-01)
+        $datefrom = $filters[date_from] ?? date(y-m-d, strtotime(-30 days))
+            $deauthresult = $this->deleteonufromolt($id, $async)
+        $defaultsubject = invoice {$invoice[invoice_number]} from {$companyname}
+        $defaultsubject = quote {$quote[quote_number]} from {$companyname}
+        $defaultsubject = receipt {$receiptnumber} from {$companyname}
+            $defaulttemplate = 📶 *wifi credentials updated*\n\nhello {customer_name},\n\nyour wifi settings have been updated:\n\n📡 *network name (ssid):* {ssid}\n🔑 *password:* {password}\n📻 *band:* {band}\n\n🔌 *onu:* {onu_name}\n⏰ *time:* {change_time}\n\nplease reconnect your devices using the new credentials.\n\nthank you!
+        $deleteresult = $this->deleteonufromolt($onuid)
+                {$empjoin}
+            {$empjoin}
+        $employeeid = $this->getemployeeidfromdeviceuser($deviceid, $deviceuserid)
+        $employeeid = $this->getemployeeidfromdeviceuser($deviceid, $log[device_user_id])
+                    $errors[] = failed to update {$sn}:  . $e->getmessage()
+        $fields[] = updated_at = current_timestamp
+            $from = 
+        $from = 
+        $from = $fromdate ? new \datetime($fromdate) : new \datetime()
+                $from->modify(+1 month)
+                $from->modify(+1 week)
+                $from->modify(+1 year)
+                $from->modify(+2 weeks)
+                $from->modify(+3 months)
+                $from->modify(+6 months)
+        $geniedata = $this->getonustatusfromgenieacs($onu[sn])
+        $headers[] = from: {$this->config[from_name]} <{$this->config[from_email]}>
+        $headers[] = reply-to: {$this->config[from_email]}
+            $lastupdate = strtotime($onu[optical_updated_at])
+                        $message = $this->buildsmsfromtemplate($templatekey, $placeholders)
+                $message = $this->buildsmsfromtemplate(sms_template_technician_assigned, [
+            $message = $this->buildsmsfromtemplate(sms_template_technician_assigned, $placeholders)
+            $message = $this->buildsmsfromtemplate(sms_template_ticket_created, $placeholders)
+        $message = $this->buildsmsfromtemplate(wa_template_branch_ticket_assigned, $placeholders)
+            $messagedata[fromme] ?? false ? outgoing : incoming,
+            $messagedata[fromme] ?? false ? t : f,
+                    $message .=  update:  . $statuslink
+                $message .=  update:  . $statuslink
+                    $mikrotik->removefromblockedlist($ipaddress, $listname)
+                $mikrotik->updatescheduler(isp-crm-process-expired, [
+                $mikrotik->updatescheduler(isp-crm-sync-blocked, [
+                $mikrotik->updatescript(isp-crm-process-expired, $expiredsource)
+                $mikrotik->updatescript(isp-crm-sync-blocked, $syncsource)
+                        $mikrotik->updatesimplequeue($target, [
+                $newinvoiceid = $this->createinvoicefromrecurring($template)
+        $ontip = $this->parseontipfromclioutput($output)
+        $output .= \n\n[delete from {$frame}/{$oldslot}/{$oldport}:{$oldonuid}]\n . ($deleteresult[output] ?? )
+                $params[] = $datefrom
+            $params[] = $datefrom
+                $params[] = $filters[date_from]
+            $params[] = $filters[date_from]
+            $params[] = $filters[date_from] .  00:00:00
+            $params[] = $filters[from_date]
+        $params = array_merge([.id => $queues[0][.id]], $updates)
+        $params = array_merge([.id => $scheduler[.id]], $updates)
+            $params = array_merge([.id => $secrets[0][.id]], $updates)
+            $params[date_from] = $filters[date_from]
+        $plaintoken = bin2hex(random_bytes(32))
+            $resolvedat = new \datetime($ticket[resolved_at] ?? $ticket[updated_at])
+                $result = $mikrotik->removefromblockedlist($ipaddress, $listname)
+            $result = $this->callserver(check-update, [
+        $result = $updatestmt->execute([$passwordhash, $employee[user_id]])
+        $result = $updatestmt->execute([$passwordhash, $userid])
+                $results[expired_scheduler] = updated
+                $results[expired_script] = updated
+        $result = @\socket_recvfrom($socket, $response, 4096, 0, $from, $port)
+            $result = @\socket_recvfrom($this->socket, $buffer, 65536, 0, $from, $port)
+        $result = @\socket_recvfrom($this->socket, $buffer, 65536, 0, $from, $port)
+                        $results[queue] = updated
+                $results[] = [step => update_existing_vlan, result => $setvlanresult]
+                $results[sync_scheduler] = updated
+                $results[sync_script] = updated
+            $serial = $this->extractserialfromdeviceid($deviceid)
+        $sets = [updated_at = now()]
+                    $since = $onu[updated_at] ? date(m d h:i, strtotime($onu[updated_at])) : unknown
+            $stateupdatedts = strtotime($state[updated_at] ?? now)
+                    $statuslink = $statuslinkservice->generatestatusupdateurl($ticketid, $member[id])
+                $statuslink = $statuslinkservice->generatestatusupdateurl($ticketid, $technicianid)
+        $stmt->execute([$datefrom, $limit])
+        $stmt->execute([$fromdate, $todate])
+        $subject = invoice #{$invoice[invoice_number]} from {$companyname}
+        $subject = quote #{$quote[quote_number]} from {$companyname}
+            $template = $settings->get(sms_template_status_update, 
+        $template = $settings->get(sms_template_ticket_updated, isp support - ticket #{ticket_number} status: {status}. {message})
+        $template = $settings->get(wa_template_ticket_updated, $settings->get(sms_template_ticket_updated, isp support - ticket #{ticket_number} status: {status}. {message}))
+                        $templatekey = $data[status] === resolved ? sms_template_ticket_resolved : sms_template_ticket_updated
+            $template .=  update: {status_link}
+                    $this->activitylog->log(update, ticket, $id, $ticket[ticket_number], priority changed to:  . ucfirst($data[priority]))
+                    $this->activitylog->log(update, ticket, $id, $ticket[ticket_number], status changed to:  . ucfirst($data[status]))
+            $this->addcomment($ticketid, $userid, status changed from {$oldstatus} to {$newstatus}, true)
+                $this->applypaymenttoinvoicefromcallback($checkoutrequestid, $amount, $receiptnumber)
+            $this->callserver(report-update, [
+        $this->fromnumber = getenv(twilio_phone_number)
+        $this->sendcommand($socket, mail from:<{$this->config[from_email]}>)
+        $this->senderparam = from
+                $this->sendonuauthorizednotification($updatedonu, $olt, $authorizedby)
+        $this->sessionapisecret = $settings->get(whatsapp_session_secret, ) ?: $this->loadsessionsecretfromfile()
+                        $this->sms->logsms($id, $customer[phone], customer, status update: {$data[status]}, $smsresult[success] ? sent : failed)
+            $this->update($id, [status => sent])
+        $this->updateauthprogress($onuid, 100, complete, authorization finished successfully)
+        $this->updateauthprogress($onuid, 10, checking olt, querying olt for sn {$onu[sn]}...)
+            $this->updateauthprogress($onuid, 20, authorizing onu, sending ont add command to olt (id: {$assignedonuid})...)
+                $this->updateauthprogress($onuid, 30, verifying, confirming onu is registered on olt...)
+            $this->updateauthprogress($onuid, 40, service port, creating service-port for vlan {$vlanid}...)
+            $this->updateauthprogress($onuid, 55, native vlan, binding vlan {$vlanid} to {$ethportcount} eth ports (bridge)...)
+            $this->updateauthprogress($onuid, 55, native vlan, binding vlan {$vlanid} to eth 1 (router)...)
+        $this->updateauthprogress($onuid, 5, preparing, pausing discovery, looking up profiles...)
+            $this->updateauthprogress($onuid, 65, tr-069 omci, configuring ipconfig + server profile on vlan {$tr069vlan}...)
+            $this->updateauthprogress($onuid, 80, tr-069 service port, creating service-port for tr-069 vlan {$tr069vlan}...)
+        $this->updateauthprogress($onuid, 95, finalizing, saving configuration and resuming discovery...)
+            $this->updateequipmentstatus($assignment[equipment_id], available)
+            $this->updateequipmentstatus($data[equipment_id], assigned)
+            $this->updateequipmentstatus($data[equipment_id], faulty)
+            $this->updateequipmentstatus($data[equipment_id], on_loan)
+            $this->updateequipmentstatus($equipmentid, assigned)
+                $this->updateequipmentstatus($equipmentid, available)
+            $this->updateequipmentstatus($fault[equipment_id], available)
+            $this->updateequipmentstatus($loan[equipment_id], available)
+                $this->updateonu($dbonu[id], [ip_address => $ontip])
+                    $this->updateonu($dbonu[id], [tr069_ip => $ontip])
+                $this->updateonu($dbonu[id], [tr069_ip => $tr069ip])
+                    $this->updateonu($existing[id], $data)
+            $this->updateonu($onudbid, [
+        $this->updateonu($onudbid, [
+            $this->updateonu($onudbid, $updatedata)
+        $this->updateonu($onudbid, $updatedata)
+                $this->updateonu($onudbid, [onu_type_id => $type[id]])
+                $this->updateonu($onudbid, [tr069_ip => $ip])
+                    $this->updateonu($onu[id], [
+                $this->updateonu($onuid, [
+            $this->updateonu($onuid, [
+        $this->updateonu($onuid, [
+        $this->updateonu($onuid, $updatedata)
+            $this->updateonu($onuid, [description => $description])
+            $this->updateonu($onuid, [ip_address => $ontip, tr069_ip => $ontip])
+            $this->updateonu($onuid, [onu_mode => bridge])
+                            $this->updateonuopticalindb(
+                    $this->updateonuopticalindb(
+                $this->updateonuopticalindb($dbonu[id], $rxpower, $txpower, $distance)
+        $this->updateonuopticalindb($onuid, $optical[optical][rx_power], $optical[optical][tx_power], $distance)
+                $this->updateonustatus($dbonu[id], $status)
+            $this->updateonustatus($onuid, $status)
+        $this->updatependingdays($data[employee_id], $data[leave_type_id], $totaldays)
+                $this->updatependingdays($request[employee_id], $request[leave_type_id], -$request[total_days])
+            $this->updatependingdays($request[employee_id], $request[leave_type_id], -$request[total_days])
+            $this->updatepersistentroutes($activesubnets, $containername, $wginterface)
+                $this->updatestate($onuid, $nextstate, [
+            $this->updatestate($onuid, $result[next_state], $extradata ?: null)
+        $this->updatestate($onuid, null, [
+            $this->updatestate($onuid, self::state_complete, [
+                $this->updatestate($onuid, self::state_create_wan_conn_device, [
+            $this->updatestate($onuid, self::state_create_wan_conn_device, [
+            $this->updatestate($onuid, self::state_create_wan_device)
+                $this->updatestate($onuid, self::state_create_wan_ppp_conn, [
+            $this->updatestate($onuid, self::state_create_wan_ppp_conn, [
+            $this->updatestate($onuid, self::state_discover, [
+            $this->updatestate($onuid, self::state_failed, [
+        $this->updatestate($onuid, self::state_failed, [
+            $this->updatestate($onuid, self::state_set_l3_hw, [
+            $this->updatestate($onuid, self::state_set_policy_routes, [
+            $this->updatestate($onuid, self::state_set_ppp_params, [
+        $this->updatestate($onuid, self::state_verify)
+        $this->updatestate($onuid, self::state_verify, [
+            $this->updatestate($onuid, self::state_waiting_for_inform, [
+        $this->updatestate($state[onu_id], null, [
+            $this->updatesyncstatus($id, failed, $result[message])
+            $this->updatesyncstatus($id, success, $result[message])
+            $this->updatetotals($salesperson[id])
+            $this->updatetotals($salespersonid)
+        $this->updatetotals($salespersonid)
+                $this->updateuseddays($request[employee_id], $request[leave_type_id], -$request[total_days])
+            $this->updateuseddays($request[employee_id], $request[leave_type_id], $request[total_days])
+                $this->updateuserrole($userid, (int)$data[new_user_role_id])
+            $this->updateuserrole((int)$data[user_id], (int)$data[new_user_role_id])
+                $this->updatevehiclelocation($track)
+                                $this->whatsapp->logmessage($id, null, null, $customer[phone], customer, $wamessage, sent, status_update)
+        $tokenhash = password_hash($plaintoken, password_default)
+        $tokenlookup = substr(hash(sha256, $plaintoken), 0, 32)
+                    $topology[edges][] = [from => $oltnodeid, to => $slotnodeid]
+                    $topology[edges][] = [from => $rootid, to => $onunodeid]
+                    $topology[edges][] = [from => slot_ . $olt[id] . _ . $slotfilter, to => $portnodeid]
+        $update = $result[update_available] ?? null
+                        $updated++
+                    $updated++
+                $updated++
+            $updated = $stmt->execute([
+        $updated = 0
+            $updatedata = [
+        $updatedata = [
+                $updatedata[attached_vlans] = json_encode([$vlanid])
+            $updatedata[onu_id] = $assignedonuid
+            $updatedata[pppoe_password] = $pppoepassword
+            $updatedata[pppoe_username] = $pppoeusername
+                $updatedata[vlan_id] = $vlanid
+            $updatedonu = $this->getonu($onuid)
+            $updatefields = [
+                $updatefields[installed_at] = $extra[installed_at] ?? date(y-m-d h:i:s)
+                $updatefields[installed_by] = $extra[installed_by] ?? $changedby
+                $updatefields[installed_customer_id] = $extra[customer_id] ?? null
+                                $updategenieid->execute([$deviceid, $onu[id]])
+                            $updategenieid->execute([$deviceid, $onu[id]])
+                        $updategenieid->execute([$deviceid, $onu[id]])
+                $updategenieid->execute([$deviceid, $onu[id]])
+            $updatepayroll = $this->db->prepare(
+            $updatepayroll->execute([$totalamount, $totalamount, $payrollid])
+            $updates = [
+            $updates = []
+        $updates = []
+                    $updates[] = $field = ?
+                $updates[] = {$field} = ?
+                    $updates[] = $field = ?::boolean
+                $updates[] = api_password_encrypted = ?
+            $updates = array_merge($updates, $extradata)
+                $updates[assigned_to] = $data[escalated_to]
+                $updates[] = consumer_key = ?
+                $updates[] = consumer_secret = ?
+                $updates[] = is_active = ?::boolean
+                $updates[] = passkey = ?
+            $updates[] = password_encrypted = ?
+                $updates[priority] = $data[new_priority]
+        $updates = [provision_state => $state]
+            $updates[resolved_at] = date(y-m-d h:i:s)
+        $updates = [status => $newstatus, updated_at => date(y-m-d h:i:s)]
+                    $updatestmt = $this->db->prepare(
+            $updatestmt = $this->db->prepare(
+        $updatestmt = $this->db->prepare(
+                    $updatestmt->execute([
+            $updatestmt->execute($commissionids)
+        $updatestmt->execute([$deviceid])
+                    $updatestmt->execute([$deviceid, $serial, $ipaddress, $lastinform, $onu[id]])
+                $updatestmt->execute([$nasrecord[id], $sub[id]])
+                $updatestmt->execute([$newbalance, $sub[id]])
+                    $updatestmt->execute([$normalizedmac, $sub[id]])
+            $updatestmt->execute([$status, $status, $onuid])
+            $updatestmt->execute(array_merge([$payrollid], $earningids))
+            $updatestmt->execute([max(0, $newbalance), $newstatus, $advance[id]])
+            $updates[] = updated_at = current_timestamp
+        $updates[] = updated_at = current_timestamp
+                $updates[] = wireguard_peer_id = ?
+            $wacustomermessage = $this->buildsmsfromtemplate(wa_template_team_assigned, $customerplaceholders)
+                $wacustomermessage = $this->buildsmsfromtemplate(wa_template_ticket_assigned, $customerplaceholders)
+        $waitingminutes = round((time() - strtotime($state[updated_at] ?? now)) / 60)
+                        $wamessage = $this->buildsmsfromtemplate($watemplatekey, $placeholders)
+            $wamessage = $this->buildsmsfromtemplate(wa_template_technician_assigned, $placeholders)
+            $wamessage = $this->buildsmsfromtemplate(wa_template_ticket_created, $placeholders)
+                        $watemplatekey = $data[status] === resolved ? wa_template_resolved : wa_template_status_update
+            $where[] = (m.from_warehouse_id = :warehouse_id or m.to_warehouse_id = :warehouse_id2)
+            $where[] = sr.created_at >= :date_from
+            $where[] = u.usage_date >= :date_from
+0
+0.01
+2
+5
+a
+absent_deduction_rules
+                    access_type = static, updated_at = current_timestamp
+account
+accounting_settings
+            action => update_description,
+            action => update_vlan_desc,
+            action => update_vlan_features,
+activity_logs
+            address = ?, city = ?, country = ?, tax_pin = ?, payment_terms = ?, notes = ?, updated_at = current_timestamp
+agent
+all
+an
+                  and date(t.updated_at) = ?
+                and updated_at < now() - interval 1 hour * ?
+announcement_recipients
+announcements
+api
+                areas_for_improvement = ?, goals_next_period = ?, comments = ?, status = ?, updated_at = current_timestamp
+attached_vlans
+attendance
+attendance_notification_logs
+authorization
+available
+                avg(extract(epoch from (coalesce(t.resolved_at, now()) - t.created_at))/3600) as avg_resolution_hours
+                avg(extract(epoch from (resolved_at - created_at))/3600) 
+                badge_text = ?, badge_color = ?, icon = ?, updated_at = current_timestamp
+                balance_due = ? - amount_paid, updated_at = current_timestamp
+                balance_due = ?, updated_at = current_timestamp
+based
+bill
+bill_reminders
+biometric_attendance_logs
+biometric_devices
+            boards => $this->syncboardsfromolt($oltid),
+branches
+bridge
+call_center_agent_status
+call_center_calls
+call_center_extensions
+call_center_queue_members
+call_center_queues
+call_center_settings
+call_center_trunks
+                    caller_id = ?, device_type = ?, is_active = ?, updated_at = now()
+chart_of_accounts
+                // check if we actually updated (idempotency protection)
+cli
+clock_in
+                clock_in = ?, clock_out = ?, status = ?, hours_worked = ?, overtime_hours = ?, notes = ?, updated_at = current_timestamp
+company_settings
+complaints
+config
+container
+            context => from-internal,
+conversation
+                count(distinct case when a.return_date between ? and ? and a.status = returned then a.id end) as returned_from_assignment,
+                count(distinct case when l.actual_return_date between ? and ? and l.status = returned then l.id end) as returned_from_loan
+                count(*) filter (where status = work_from_home) as wfh,
+     * creates or updates the provision with the given script content
+crm
+current
+current_date
+customer
+customer_payments
+customers
+customer_ticket_tokens
+database
+                    data_used_mb = 0, updated_at = current_timestamp
+date
+                decoded_from => alt_format
+                decoded_from => huawei_port_index
+            decoded_from => raw_decode,
+            default => your ticket status has been updated.
+            // delete unauthorized onus that havent been seen/updated in a while
+departments
+desc
+_descr_
+description
+device
+device.
+deviceinfo.x_hw_systime
+device_user_mapping
+dhcp
+discovered_onus
+discovery
+display
+                    duration_seconds = extract(epoch from (now() - started_at))::integer
+each
+email_logs
+employee
+employee_branches
+                employee_id = ?, user_id = ?, is_active = ?::boolean, notes = ?, updated_at = current_timestamp
+employee_kyc_documents
+employees
+            && !empty($this->config[from_email])
+eqid
+equipment
+equipment_assignments
+equipment_categories
+equipment_faults
+                (equipment_id, movement_type, from_warehouse_id, to_warehouse_id, from_location_id, to_location_id, performed_by, notes)
+equipment_lifecycle_logs
+equipment_loans
+                            error_log(whatsapp notification failed for ticket $id status update:  . $e->getmessage())
+            error_log(wireguard updatepeer error:  . $e->getmessage())
+            error_log(wireguard updateserver error:  . $e->getmessage())
+            error_log(wireguard updatesetting error:  . $e->getmessage())
+existing
+expense_categories
+expenses
+expiry
+                   extract(day from (current_timestamp - e.created_at)) as days_in_stock,
+                    extract(epoch from (resolved_at - created_at))/3600 
+failed
+firmware
+fleet_alarms
+fleet_command_log
+fleet_geofences
+fleet_mileage_reports
+fleet_vehicle_assignments
+fleet_vehicles
+                fl.name as from_location_name, tl.name as to_location_name,
+            foreach ($updatefields as $field => $value) {
+            foreach ($updates as $field => $value) {
+        foreach ($updates as $field => $value) {
+        foreach ($updates as $key => $value) {
+            from: {$companyname}
+                    from => $this->fromnumber,
+            from_email => $settings->get(smtp_from_email, ),
+                from_location => $current[location_id],
+            from_name => $settings->get(smtp_from_name, ),
+                from_version => $fromversion,
+                from_warehouse => $current[warehouse_id],
+                fw.name as from_warehouse_name, tw.name as to_warehouse_name,
+genieacs
+genieacs.
+genieacs_config
+                // get the previous state to resume from
+                <h3>received from</h3>
+                handover_signature = :signature, updated_at = current_timestamp
+home
+host
+hr
+hr_notification_templates
+huawei
+huawei_alerts
+huawei_apartments
+huawei_logs
+huawei_odb_units
+huawei_olt_boards
+huawei_olt_pon_ports
+huawei_olts
+huawei_olt_uplinks
+huawei_onus
+huawei_onu_service_vlans
+huawei_onu_tr069_config
+huawei_onu_tr069_logs
+huawei_onu_types
+huawei_port_vlans
+huawei_provisioning_logs
+huawei_service_profiles
+huawei_service_templates
+huawei_subzones
+huawei_vlans
+huawei_zones
+            if ($datefrom) {
+        if ($datefrom) {
+        if (!$force && !empty($onu[optical_updated_at])) {
+            if ($lastinformts > $stateupdatedts) {
+            if ($lastupdate && (time() - $lastupdate) < 60) {
+        if ($sid && $token && $this->fromnumber) {
+            if ($this->updateattendancefromlogs($group[employee_id], $group[date], $group[logs])) {
+            if (!$this->updatesetting($key, $value)) {
+        if ($update) {
+            if ($updated && $resultcode === 0 && $amount > 0) {
+            if ($updatedonu && $olt) {
+            if (!empty($filters[date_from])) {
+        if (!empty($filters[date_from])) {
+        if (!empty($filters[from_date])) {
+        if (empty($plaintoken) || strlen($plaintoken) !== 64) {
+            if (!empty($result[update_available]) && !empty($result[update])) {
+            if (empty($updates)) {
+        if (empty($updates)) {
+            if (password_verify($plaintoken, $tokenrecord[token_hash])) {
+                            imported from  . $nas[name]
+info
+information_schema.columns
+information_schema.tables
+interface
+internet
+inventory_locations
+inventory_loss_reports
+inventory_notification_logs
+inventory_return_items
+inventory_returns
+inventory_rma
+inventory_stock_movements
+inventory_stock_request_items
+inventory_stock_requests
+inventory_thresholds
+inventory_usage
+inventory_warehouses
+invoice
+invoice_items
+invoice_payments
+invoices
+                    is_active = ?::boolean, updated_at = current_timestamp
+                    is_active = ?, updated_at = now()
+isp_core_equipment
+isp_cpe_devices
+isp_distribution_boxes
+isp_drop_cables
+isp_fiber_cores
+isp_field_assets
+isp_ip_addresses
+isp_maintenance_logs
+isp_network_sites
+isp_racks
+isp_settings
+isp_splice_closures
+isp_splitters
+isp_stock_movements
+isp_vlans
+isp_warehouse_serials
+isp_warehouse_stock
+                kit_name = ?, technician_id = ?, status = ?, notes = ?, updated_at = current_timestamp
+last_provision_at
+last_seen
+            last_update = to_timestamp(?) 
+late_rules
+leave_balances
+leave_calendar
+leave_requests
+leave_types
+license
+local
+m
+mac
+            message => $result[success] ? vlan {$vlanid} description updated : ($result[message] ?? failed),
+            message => cli sync: {$added} added, {$updated} updated,  . count($parsed) .  total parsed,
+            message => empty($errors) ? tr-069 profile updated successfully : implode(, , $errors),
+            message => moved onu {$sn} from {$frame}/{$oldslot}/{$oldport}:{$oldonuid} to {$frame}/{$newslot}/{$newport} . ($assignedonuid ? :{$assignedonuid} : ),
+            message => synced {$synced} onus ({$added} new, {$updated} updated),
+            message => updated {$updated} onus, added {$added} new, {$notfound} not found on olt,
+            message => vlan {$vlanid} features updated,
+                    message => wifi {$wifiindex} bridge updated to vlan {$vlanid} (reused existing wan {$wandeviceindex}),
+mikrotik
+mikrotik_provisioned_ips
+mikrotik_vlans
+mobile_notifications
+mobile_tokens
+mpesa_accounts
+mpesa_b2b_transactions
+mpesa_b2c_transactions
+mpesa_c2b_transactions
+mpesa_config
+mpesa_transactions
+                name = ?, category = ?, subject = ?, content = ?, is_active = ?::boolean, updated_at = current_timestamp
+                            name = coalesce(?, name), is_authorized = true, updated_at = current_timestamp
+nas
+nested
+next
+                next_step_at => null // will be updated on next inform
+                              notes = excluded.notes, updated_at = current_timestamp
+                notes = ?, terms = ?, updated_at = current_timestamp
+oid
+old
+olt
+olt_port_zones
+oms
+                        on conflict (onu_id, vlan_id, interface_type) do update 
+                    on conflict (onu_id, vlan_id, interface_type) do update 
+ont
+onu
+onu_discovery_log
+            (onu_id, device_id, serial_number, state, config_data, created_at, updated_at)
+onu_signal_history
+onu_type_id
+onu_uptime_log
+optical
+            order by o.updated_at desc
+            order by t.priority desc, t.updated_at desc
+                order by t.updated_at desc
+            order by t.updated_at desc
+orders
+                   o.rx_power, o.tx_power, o.distance, o.updated_at, o.olt_id,
+output
+package
+paid
+password
+payroll
+payroll_commissions
+payroll_deductions
+peer
+peers
+performance_reviews
+permissions
+persistent
+            ports => $this->syncponportsfromolt($oltid),
+position
+primary
+    private function applypaymenttoinvoicefromcallback(string $checkoutrequestid, float $amount, ?string $receiptnumber): void {
+    private function buildsmsfromtemplate(string $templatekey, array $placeholders): string {
+    private function createinvoicefromrecurring(array $template): int {
+    private function extractserialfromdeviceid(string $deviceid): ?string {
+    private function getemployeeidfromdeviceuser(int $deviceid, string $deviceuserid): ?int {
+    private function getfromcache(string $key): ?array {
+    private function getonustatusfromgenieacs(string $serial): array {
+    private function loadsessionsecretfromfile(): ?string {
+    private function parsecustomersfromhtml(string $html): array {
+    private function parseontipfromclioutput(string $output): ?string {
+    private function sendspeedupdatecoadirect(array $sub, array $nas, string $ratelimit): array {
+    private function updateattendancefromlogs(int $employeeid, string $date, array $logs): bool {
+    private function updateauthprogress(int $onuid, int $pct, string $step, string $detail = ): void {
+    private function updateonuopticalindb(int $onuid, ?float $rxpower, ?float $txpower, ?int $distance = null): void {
+    private function updateonustatus(int $onuid, string $status): void {
+    private function updatependingdays(int $employeeid, int $leavetypeid, float $days): void {
+    private function updatepersistentroutes(array $subnets, string $containername, string $interface): void {
+    private function updatestate(int $onuid, ?string $newstate, array $data = []): void {
+    private function updatesyncstatus(int $deviceid, string $status, string $message): void {
+    private function updateuseddays(int $employeeid, int $leavetypeid, float $days): void {
+    private function updatevehiclelocation(array $track): void {
+    private ?string $fromnumber = null
+products_services
+protrack
+    public function calculatenextrecurringdate(string $interval, ?string $fromdate = null): string {
+    public function checkandupdateslabreaches(): array {
+    public function checkforupdates(): ?array {
+    public function deleteonufromolt(int $onuid, bool $async = true): array {
+    public function detachfrombranch(int $employeeid, int $branchid): bool {
+    public function detachvlanfromonu(int $onudbid, int $vlanid): array {
+    public function generatestatusupdateurl($ticketid, $employeeid = null) {
+    public function getfastmovingitems(int $limit = 20, ?string $datefrom = null): array {
+    public function getnotificationlogs(?int $employeeid = null, ?string $datefrom = null, ?string $dateto = null, int $limit = 100): array {
+    public function getprofitlossreport(string $fromdate, string $todate): array {
+    public function gettechnicianconsumption(?int $technicianid = null, ?string $datefrom = null, ?string $dateto = null): array {
+    public function getupdatefromcache(): ?array {
+    public function getuseractivitystats(?int $userid = null, ?string $datefrom = null, ?string $dateto = null): array {
+    public function getwanconfigfromgenieacs(string $deviceid): array {
+    public function importfromexcel(string $filepath): array {
+    public function importfromsmartolt(int $oltid): array {
+    public function importserialsfromfile(string $filepath, int $stockid, array $columnmap = []): array {
+    public function importvlansfrommikrotik(?int $nasid = null): array {
+    public function parseonuconfigfromcli(string $clioutput): array {
+    public function removefromblockedlist(string $address, string $listname = disabled_users): bool {
+    public function removefrommikrotik(int $nasid, string $username): array {
+    public function reportupdateresult(int $updateid, string $fromversion, string $toversion, string $status, ?string $error = null): bool {
+    public function returnfromcustomer(int $loanid, ?string $returndate = null): bool {
+    public function returnfromemployee(int $assignmentid, ?string $returndate = null): bool {
+    public function sendspeedupdatecoa(int $subscriptionid, ?string $customratelimit = null): array {
+    public function syncallfromolt(int $oltid): array {
+    public function syncboardsfromolt(int $oltid): array {
+    public function syncdevicesfromprotrack(): array {
+    public function synconulocationsfromsnmp(int $oltid): array {
+    public function synconusfromcli(int $oltid): array {
+    public function synconusfromsnmp(int $oltid): array {
+    public function syncopticalpowerfromcli(int $oltid): array {
+    public function syncponportsfromolt(int $oltid): array {
+    public function syncsysteminfofromolt(int $oltid): array {
+    public function syncuplinksfromolt(int $oltid): array {
+    public function syncusersfromdatabase(\pdo $db): array {
+    public function syncvlansfromolt(int $oltid): array {
+    public function transfercall($channel, $destination, $context = from-internal) {
+    public function updateapartment(int $id, array $data): array {
+    public function updateattendance(int $id, array $data): bool {
+    public function updatebill(int $id, array $data): void {
+    public function updatebranches(int $employeeid, array $branchids, ?int $primarybranchid = null, ?int $assignedby = null): bool {
+    public function updatebusinesshours(array $hours): bool {
+    public function updatecategory(int $id, array $data): bool {
+    public function updatedepartment(int $id, array $data): bool {
+    public function updatedevice(int $id, array $data): bool {
+    public function updatedhcplease(string $id, array $updates): array {
+    public function updateemployee(int $id, array $data): bool {
+    public function updateequipment(int $id, array $data): bool {
+    public function updateequipmentstatus(int $id, string $status): bool {
+    public function updatefault(int $id, array $data): bool {
+    public function updatefeetype(int $id, array $data): bool {
+    public function updatehrtemplate(int $id, array $data): bool {
+    public function update(int $id, array $data): bool {
+    public function updateinvoice(int $id, array $data): void {
+    public function updateleavetype(int $id, array $data): bool {
+    public function updatelifecyclestatus(int $equipmentid, string $newstatus, int $changedby, ?array $extra = null): bool {
+    public function updatelocation(int $id, array $data): array {
+    public function updatelocation(int $id, array $data): bool {
+    public function updatemikrotikblockedstatus(int $subscriptionid, bool $block, string $reason = ): array {
+    public function updatempesaaccount(int $id, array $data): array {
+    public function updatenas(int $id, array $data): array {
+    public function updateodb(int $id, array $data): array {
+    public function updateodbusage(int $odbid): void {
+    public function updateolt(int $id, array $data): bool {
+    public function updateonudescription(int $onuid, string $description): array {
+    public function updateonu(int $id, array $data): bool {
+    public function updatepackage(int $id, array $data): array {
+    public function updatepackage(int $id, array $data): bool {
+    public function updatepackageschedule(int $id, array $data): bool {
+    public function updatepaymentstatus(int $id, string $status, ?int $transactionid = null): bool {
+    public function updatepayroll(int $id, array $data): bool {
+    public function updatepeer(int $id, array $data): bool {
+    public function updateperformancereview(int $id, array $data): bool {
+    public function updatepolicy(int $id, array $data): bool {
+    public function updatepppoesecret(string $name, array $updates): array {
+    public function updatepriority(int $id, string $priority): bool {
+    public function updateproduct(int $id, array $data): void {
+    public function updatequote(int $id, array $data): void {
+    public function updatequotestatus(int $id, string $status): void {
+    public function updaterate(int $id, array $data): bool {
+    public function updaterma(int $id, array $data): bool {
+    public function updaterole(int $id, array $data): bool {
+    public function updaterule(int $id, array $data): bool {
+    public function updatescheduler(string $name, array $updates): array {
+    public function updatescript(string $name, string $source): array {
+    public function updateserialstatus(int $serialid, string $status, ?string $assignedto = null): void {
+    public function updateserver(int $id, array $data): bool {
+    public function updateserviceprofile(int $id, array $data): bool {
+    public function updateservicetemplate(int $id, array $data): array {
+    public function updatesettings(array $settings): bool {
+    public function updatesetting(string $key, string $value): bool {
+    public function updatesimplequeue(string $target, array $updates): array {
+    public function updatestate(int $onuid, string $state, ?array $extradata = null): bool
+    public function updatestatus(int $id, string $status): bool {
+    public function updatesublocation(int $id, array $data): array {
+    public function updatesubzone(int $id, int $zoneid, string $name, ?string $description = null, bool $isactive = true): array {
+    public function updateteam(int $id, array $data): bool {
+    public function updatetechniciankit(int $id, array $data): bool {
+    public function updatetemplate(int $id, array $data): bool {
+    public function updateticketfee(int $feeid, array $data): bool {
+    public function updateticketstatusany(int $ticketid, int $userid, string $userrole, string $status, ?string $comment = null): array {
+    public function updateticketstatus(int $ticketid, int $userid, string $status, ?string $comment = null): array {
+    public function updatetotals(int $salespersonid): void {
+    public function updatetr069profile(int $oltid, int $profileid, array $settings): array {
+    public function updateuser(int $id, array $data): bool {
+    public function updateuserrole(int $userid, int $roleid): bool {
+    public function updateuser(string $employeeno, string $name, ?string $cardno = null): array {
+    public function updatevehiclefuelrate(int $vehicleid, float $fuelrate): bool {
+    public function updatevehicle(int $id, array $data): bool {
+    public function updatevendor(int $id, array $data): void {
+    public function updatevlandescription(int $oltid, int $vlanid, string $description): array {
+    public function updatevlanfeatures(int $oltid, int $vlanid, string $description, array $options): array {
+    public function updatevlan(int $id, array $data): array {
+    public function updatewarehouse(int $id, array $data): bool {
+    public function updatezone(int $id, string $name, ?string $description = null, bool $isactive = true): array {
+    public function validatetoken($plaintoken) {
+public_holidays
+    public static function checkforupdates(): ?array {
+    public static function getupdatefromcache(): ?array {
+quote_items
+quotes
+radius_addon_services
+radius_auth_logs
+radius_billing
+radius_billing_history
+radius_invoices
+radius_ip_pools
+radius_nas
+radius_nas_packages
+radius_packages
+radius_package_schedules
+radius_promotions
+radius_referrals
+radius_sessions
+radius_subscription_addons
+radius_subscription_devices
+radius_subscription_macs
+radius_subscriptions
+radius_usage_logs
+radius_vouchers
+raw
+                reference = ?, notes = ?, updated_at = current_timestamp
+            // regular status update
+rejected
+                    repair_cost = ?, repair_notes = ?, updated_at = current_timestamp
+response
+        return $cached[update_available] ?? null
+        return $from->format(y-m-d)
+        return $plaintoken
+                return $result[update]
+                return $this->parsecustomersfromhtml($htmlresult[data])
+            return $updated
+        return $updatestmt->execute([$deductions[total_deduction], $deductions[total_deduction], $payrollid])
+            return // onu not found, nothing to update
+        return self::getclient()->checkforupdates()
+        return self::getclient()->getupdatefromcache()
+            return [success => false, error => no settings to update]
+            return [success => true, coa_updated => $coacount]
+            return [success => true, message => user updated successfully]
+        return [success => true, message => vlan {$vlanid} features updated successfully]
+        return [success => true, updated => $updated]
+            return [success => true, updated => 0, message => no onus to update]
+        return [updated => $updated]
+role_permissions
+roles
+                round(avg(extract(epoch from (coalesce(t.resolved_at, now()) - t.created_at))/3600)::numeric, 1) as avg_resolution_hours
+salary_advance_payments
+salary_advance_repayments
+salary_advances
+sales_commissions
+salespersons
+     * save device parameters (batch update)
+            select count(*) from (
+            select e.id, e.name, e.phone, e.email, u.id as user_id, tm.joined_at
+            select e.*, tm.joined_at, u.name as user_name
+            select status, sum(coalesce(duration_seconds, extract(epoch from (now() - started_at))::integer)) as total_seconds
+server.
+service_fee_types
+service_packages
+                                          service_port_count, vlan_connect_count, updated_at)
+session
+session_duration_hours
+set
+                        set accrued_days = accrued_days + ?, last_accrual_date = current_date, updated_at = current_timestamp
+            set adjusted_days = adjusted_days + ?, updated_at = current_timestamp
+            set clock_out = ?, hours_worked = ?, source = ?, updated_at = current_timestamp
+                set conversation_id = ?, originator_conversation_id = ?, status = queued, updated_at = current_timestamp
+                set customer_id = ?, package_id = ?, status = pending_payment, updated_at = current_timestamp 
+                set ended_at = now(), duration = extract(epoch from (now() - started_at))::integer
+                    set expiry_date = ?, status = active, updated_at = current_timestamp 
+                        set frame = ?, slot = ?, port = ?, onu_id = ?, status = ?, is_authorized = true, updated_at = current_timestamp
+                        set frame = ?, slot = ?, port = ?, onu_id = ?, updated_at = current_timestamp
+            set is_authorized = true, updated_at = current_timestamp
+            set is_recurring = false, recurring_interval = null, next_recurring_date = null, updated_at = current_timestamp
+            set is_recurring = true, recurring_interval = ?, next_recurring_date = ?, updated_at = current_timestamp
+            set last_message_at = ?, last_message_preview = ?, updated_at = now(),
+            set last_sync_at = current_timestamp, last_sync_status = ?, last_sync_message = ?, updated_at = current_timestamp
+                set name = ?, description = ?, is_active = ?, updated_at = current_timestamp
+                set outstanding_balance = ?, status = ?, updated_at = current_timestamp
+            set pending_days = pending_days + ?, updated_at = current_timestamp
+            set priority = ?, updated_at = current_timestamp
+                set rx_power = ?, tx_power = ?, distance = ?, optical_updated_at = current_timestamp, updated_at = current_timestamp
+                set rx_power = ?, tx_power = ?, optical_updated_at = current_timestamp, updated_at = current_timestamp
+            set sms_template = ?, is_active = ?::boolean, send_sms = ?::boolean, updated_at = current_timestamp
+            set speed_override = null, override_expires_at = null, updated_at = current_timestamp 
+            set speed_override = ?, override_expires_at = ?, updated_at = current_timestamp 
+                            set status = active, expiry_date = ?, updated_at = current_timestamp 
+            set status = active, expiry_date = ?, updated_at = current_timestamp 
+                set status = approved, approved_by = ?, approved_at = current_timestamp, updated_at = current_timestamp
+            set status = approved, approved_by = ?, approved_at = current_timestamp, updated_at = current_timestamp
+                set status = approved, approved_by = :approved_by, approved_at = current_timestamp, updated_at = current_timestamp
+                set status = cancelled, cancelled_at = now(), updated_at = now() 
+            set status = cancelled, updated_at = current_timestamp
+            set status = completed, updated_at = current_timestamp
+            set status = disbursed, disbursed_at = current_timestamp, updated_at = current_timestamp
+                set status = picked, picked_by = :picked_by, picked_at = current_timestamp, updated_at = current_timestamp
+            set status = rejected, approved_by = ?, approved_at = current_timestamp, notes = ?, updated_at = current_timestamp
+                set status = rejected, approved_by = ?, approved_at = current_timestamp, rejection_reason = ?, updated_at = current_timestamp
+settings
+            set used_days = used_days + ?, updated_at = current_timestamp
+                set zone_id = ?, name = ?, description = ?, is_active = ?, updated_at = current_timestamp
+single
+sla_business_hours
+sla_holidays
+sla_policies
+                       slot, port, onu_id, updated_at
+smartolt
+sms_logs
+            sms_template_ticket_updated => isp support - ticket #{ticket_number} status: {status}. {message},
+sn
+snmp
+socket
+speed
+start_date
+started_at
+                    static_ip = null, updated_at = current_timestamp
+status
+                status = ?, payment_date = ?, payment_method = ?, notes = ?, updated_at = current_timestamp
+            status_update => status update,
+subscription
+                success => true, // will be updated if batch fails
+summary
+            system => $this->syncsysteminfofromolt($oltid),
+task
+                    // task completed synchronously - tree should be updated
+tax_rates
+                   t.description, t.category, t.created_at as ticket_created, t.updated_at as ticket_updated,
+team_members
+teams
+technician_kit_items
+technician_kits
+template
+the
+                    then extract(epoch from (f.repair_date::timestamp - f.reported_date::timestamp)) / 86400 
+        // throttle: skip if optical data was updated within 60 seconds (unless forced)
+ticket_categories
+ticket_comments
+ticket_commission_rates
+ticket_earnings
+ticket_escalations
+tickets
+ticket_satisfaction_ratings
+ticket_service_fees
+ticket_sla_logs
+ticket_status_tokens
+ticket_templates
+to
+today
+tr
+tr069_devices
+tr069_ip
+tr069_provision_logs
+tr069_provision_state
+                   t.updated_at, t.created_at, c.name as customer_name,
+ui
+            updated => $updated
+            updated => $updated,
+                updated_at => $onu[updated_at] ?? null,
+            updated_at => $state[updated_at],
+                        updated_at = current_timestamp
+                    updated_at = current_timestamp
+                    updated_at = current_timestamp 
+                    updated_at = current_timestamp,
+                updated_at = current_timestamp
+                updated_at = current_timestamp 
+                    updated_at = current_timestamp, completed_at = current_timestamp
+                updated_at => date(y-m-d h:i:s)
+                updated_at = now()
+                updated_at = now(),
+                updated_at timestamp,
+                    updated_at timestamp default current_timestamp
+                updated_at timestamp default current_timestamp
+            updated_at timestamp default current_timestamp,
+                update_id => $updateid,
+            uplinks => $this->syncuplinksfromolt($oltid)
+                // use addonu which has on conflict (olt_id, sn) do update
+user
+user_notifications
+users
+                values (:equipment_id, transfer, :from_warehouse, :to_warehouse, :from_location, :to_location, :performed_by, :notes)
+vb.due_date
+vendor_bill_items
+vendor_bills
+vendor_payments
+vendors
+            vlans => $this->syncvlansfromolt($oltid),
+            // wait for device to respond with updated wan tree
+            waiting_since => $state[updated_at]
+wallet
+wallet.
+wan
+            wa_template_status_update => sms_template_ticket_updated,
+website.
+whatsapp
+whatsapp_conversations
+whatsapp_logs
+whatsapp_messages
+            where t.branch_id = ? and (date(t.created_at) = ? or date(t.updated_at) = ?)
+wireguard_peers
+wireguard_servers
+wireguard_settings
+wireguard_subnets
+wireguard_sync_logs
+working
+                    wrapup_time = ?, max_wait_time = ?, is_active = ?, updated_at = now()
+                your ticket #{ticket_number} status has been updated to: {status}. thank you for your patience.)
+                       z.name as zone_name, o.created_at, o.updated_at

@@ -81,7 +81,8 @@ apt-get install -y \
     postgresql postgresql-contrib \
     curl wget git unzip software-properties-common \
     cron \
-    snmp snmp-mibs-downloader
+    snmp snmp-mibs-downloader \
+    fping
 
 print_step "Installing PHP 8.2..."
 if ! dpkg -l | grep -q php8.2-fpm; then
@@ -138,6 +139,8 @@ else
     exit 1
 fi
 
+CRON_SECRET=$(openssl rand -hex 16)
+
 print_step "Creating environment file..."
 cat > "${APP_DIR}/.env" << ENVEOF
 PGHOST=localhost
@@ -152,11 +155,14 @@ APP_URL=https://${DOMAIN}
 APP_TIMEZONE=${TIMEZONE}
 SESSION_SECRET=${SESSION_SECRET}
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
+CRON_SECRET=${CRON_SECRET}
 
 OLT_SERVICE_URL=http://127.0.0.1:3002
 OLT_SERVICE_PORT=3002
 OLT_ENCRYPTION_KEY=${ENCRYPTION_KEY}
-PHP_API_URL=http://127.0.0.1:9000
+
+SNMP_SERVICE_URL=http://127.0.0.1:3003
+SNMP_SERVICE_PORT=3003
 
 WHATSAPP_SESSION_URL=http://127.0.0.1:3001
 WA_PORT=3001
@@ -227,12 +233,29 @@ if [ -d "${APP_DIR}/whatsapp-service" ]; then
     print_ok "WhatsApp service dependencies installed"
 fi
 
+print_step "Installing Node.js dependencies (SNMP Service)..."
+if [ -d "${APP_DIR}/snmp-service" ]; then
+    cd "${APP_DIR}/snmp-service"
+    npm install --omit=dev 2>&1 | tail -3
+    print_ok "SNMP service dependencies installed"
+fi
+
 print_step "Setting file permissions..."
 chown -R www-data:www-data "${APP_DIR}"
 chmod -R 755 "${APP_DIR}"
 chmod -R 775 "${APP_DIR}/public"
-mkdir -p "${APP_DIR}/data" "${APP_DIR}/whatsapp-service/auth_info" "${APP_DIR}/backups" /tmp/auth_progress
-chown -R www-data:www-data "${APP_DIR}/data" "${APP_DIR}/whatsapp-service/auth_info" "${APP_DIR}/backups"
+mkdir -p "${APP_DIR}/data" \
+    "${APP_DIR}/whatsapp-service/auth_info" \
+    "${APP_DIR}/backups" \
+    "${APP_DIR}/storage/wireguard" \
+    "${APP_DIR}/public/uploads/contracts" \
+    "${APP_DIR}/public/uploads/employees" \
+    "${APP_DIR}/public/uploads/kyc" \
+    "${APP_DIR}/public/uploads/ticket_resolutions" \
+    "${APP_DIR}/logs" \
+    /tmp/auth_progress
+chown -R www-data:www-data "${APP_DIR}/data" "${APP_DIR}/whatsapp-service/auth_info" \
+    "${APP_DIR}/backups" "${APP_DIR}/storage" "${APP_DIR}/public/uploads" "${APP_DIR}/logs"
 chmod 600 "${APP_DIR}/.env"
 
 print_step "Configuring Nginx..."
@@ -365,6 +388,32 @@ SyslogIdentifier=isp-whatsapp
 WantedBy=multi-user.target
 WAEOF
 
+if [ -d "${APP_DIR}/snmp-service" ]; then
+    print_step "Creating systemd service for SNMP Polling Service..."
+    cat > /etc/systemd/system/isp-snmp.service << SNMPEOF
+[Unit]
+Description=ISP CRM SNMP Polling Service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=${APP_DIR}/snmp-service
+EnvironmentFile=${APP_DIR}/.env
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=isp-snmp
+
+[Install]
+WantedBy=multi-user.target
+SNMPEOF
+fi
+
 print_step "Initializing database schema..."
 cd "${APP_DIR}"
 export PGHOST=localhost PGPORT=5432 PGDATABASE="${DB_NAME}" PGUSER="${DB_USER}" PGPASSWORD="${DB_PASS}"
@@ -420,10 +469,34 @@ PGUSER=${DB_USER}
 PGPASSWORD=${DB_PASS}
 APP_URL=https://${DOMAIN}
 APP_TIMEZONE=${TIMEZONE}
+CRON_SECRET=${CRON_SECRET}
 
-*/5 * * * * www-data cd ${APP_DIR}/public && php cron.php >> /var/log/isp-crm-cron.log 2>&1
+# Schedule checker (every 5 min) - handles subscription expiry, grace periods, auto-suspend
+*/5 * * * * www-data cd ${APP_DIR}/public && php cron.php check_schedule >> /var/log/isp-crm-cron.log 2>&1
+
+# Daily summary report (6 AM)
+0 6 * * * www-data cd ${APP_DIR}/public && php cron.php daily_summary >> /var/log/isp-crm-cron.log 2>&1
+
+# SLA notifications (every 15 min)
+*/15 * * * * www-data cd ${APP_DIR}/public && php cron.php sla_notifications >> /var/log/isp-crm-cron.log 2>&1
+
+# Recurring billing processor (every hour)
+0 * * * * www-data cd ${APP_DIR}/public && php api/process-recurring.php >> /var/log/isp-crm-cron.log 2>&1
+
+# Attendance sync (every 30 min during work hours)
+*/30 6-20 * * 1-6 www-data cd ${APP_DIR}/public && php cron.php sync_attendance >> /var/log/isp-crm-cron.log 2>&1
+
+# Leave accrual (monthly on 1st)
+0 1 1 * * www-data cd ${APP_DIR}/public && php cron.php leave_accrual >> /var/log/isp-crm-cron.log 2>&1
+
+# Database backup (2 AM daily)
 0 2 * * * www-data pg_dump -h localhost -U ${DB_USER} ${DB_NAME} | gzip > ${APP_DIR}/backups/daily_\$(date +\%Y\%m\%d).sql.gz 2>/dev/null
+
+# Cleanup old backups (Sunday 3 AM, keep 30 days)
 0 3 * * 0 www-data find ${APP_DIR}/backups/ -name "daily_*.sql.gz" -mtime +30 -delete 2>/dev/null
+
+# Cleanup old cron logs (weekly)
+0 4 * * 0 www-data truncate -s 0 /var/log/isp-crm-cron.log 2>/dev/null
 CRONEOF
 
 chmod 644 "${CRON_FILE}"
@@ -434,6 +507,9 @@ systemctl daemon-reload
 systemctl restart "${PHP_FPM_SERVICE}"
 systemctl enable --now isp-olt
 systemctl enable --now isp-whatsapp
+if [ -f /etc/systemd/system/isp-snmp.service ]; then
+    systemctl enable --now isp-snmp
+fi
 systemctl enable nginx
 systemctl enable "${PHP_FPM_SERVICE}"
 print_ok "All services started"
@@ -488,19 +564,21 @@ echo -e "  ${YELLOW}Services:${NC}"
 echo "    PHP-FPM:     systemctl status ${PHP_FPM_SERVICE}"
 echo "    OLT Service: systemctl status isp-olt"
 echo "    WhatsApp:    systemctl status isp-whatsapp"
+echo "    SNMP:        systemctl status isp-snmp"
 echo "    Nginx:       systemctl status nginx"
 echo ""
 echo -e "  ${YELLOW}Logs:${NC}"
 echo "    OLT:       journalctl -u isp-olt -f"
 echo "    WhatsApp:  journalctl -u isp-whatsapp -f"
+echo "    SNMP:      journalctl -u isp-snmp -f"
 echo "    Nginx:     tail -f /var/log/nginx/${DOMAIN}_error.log"
 echo "    PHP-FPM:   journalctl -u ${PHP_FPM_SERVICE} -f"
 echo "    Cron:      tail -f /var/log/isp-crm-cron.log"
 echo ""
 echo -e "  ${YELLOW}Management:${NC}"
-echo "    Restart all:  systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp nginx"
+echo "    Restart all:  systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp isp-snmp nginx"
 echo "    Backup DB:    pg_dump -h localhost -U ${DB_USER} ${DB_NAME} > backup.sql"
-echo "    Update code:  cd ${APP_DIR} && git pull && composer install --no-dev && systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp"
+echo "    Update code:  cd ${APP_DIR} && git pull && composer install --no-dev && systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp isp-snmp"
 echo ""
 echo -e "${YELLOW}Credentials saved to: ${APP_DIR}/deploy/credentials.txt${NC}"
 echo -e "${RED}IMPORTANT: Change the default admin password after first login!${NC}"

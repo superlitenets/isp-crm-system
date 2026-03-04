@@ -380,6 +380,25 @@ CREATE TABLE IF NOT EXISTS radius_package_schedules (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ==================== TR069 Tables ====================
+CREATE TABLE IF NOT EXISTS tr069_provision_state (
+    id SERIAL PRIMARY KEY, onu_id INTEGER,
+    device_id VARCHAR(255), serial_number VARCHAR(255),
+    state VARCHAR(50) DEFAULT 'pending',
+    current_step INTEGER DEFAULT 0, total_steps INTEGER DEFAULT 0,
+    step_name VARCHAR(255), error_message TEXT,
+    config_profile TEXT, applied_config JSONB,
+    last_inform_at TIMESTAMP, next_step_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tr069_provision_logs (
+    id SERIAL PRIMARY KEY, onu_id INTEGER,
+    log_type VARCHAR(50), message TEXT, details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ==================== Employees ====================
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
 DO $$
