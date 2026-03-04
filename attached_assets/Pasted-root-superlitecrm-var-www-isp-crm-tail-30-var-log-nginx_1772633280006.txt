@@ -1,0 +1,32 @@
+root@superlitecrm:/var/www/isp-crm# tail -30 /var/log/nginx/demo.superlite.co.ke_error.loglog
+#2 /var/www/isp-crm/public/index.php(2572): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/HuaweiOLT.php on line 4761" while reading response header from upstream, client: 172.68.47.134, server: demo.superlite.co.ke, request: "GET /?page=huawei-olt HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke"
+2026/03/04 14:05:26 [error] 41102#41102: *357 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "status" does not exist
+LINE 1: SELECT COUNT(*) FROM radius_sessions WHERE status = 'active'
+                                                   ^ in /var/www/isp-crm/src/RadiusBilling.php:1647
+Stack trace:
+#0 /var/www/isp-crm/src/RadiusBilling.php(1647): PDO->query()
+#1 /var/www/isp-crm/templates/isp.php(2076): App\RadiusBilling->getDashboardStats()
+#2 /var/www/isp-crm/public/index.php(3490): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/RadiusBilling.php on line 1647" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=isp HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=dashboard"
+2026/03/04 14:06:54 [error] 41102#41102: *357 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "status" does not exist
+LINE 1: SELECT COUNT(*) FROM radius_sessions WHERE status = 'active'
+                                                   ^ in /var/www/isp-crm/src/RadiusBilling.php:1647
+Stack trace:
+#0 /var/www/isp-crm/src/RadiusBilling.php(1647): PDO->query()
+#1 /var/www/isp-crm/templates/isp.php(2076): App\RadiusBilling->getDashboardStats()
+#2 /var/www/isp-crm/public/index.php(3490): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/RadiusBilling.php on line 1647" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=isp HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=dashboard"
+2026/03/04 14:06:57 [error] 41102#41102: *357 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "isp_network_sites" does not exist
+LINE 1: SELECT * FROM isp_network_sites WHERE 1=1 ORDER BY name
+                      ^ in /var/www/isp-crm/src/ISPInventory.php:32
+Stack trace:
+#0 /var/www/isp-crm/src/ISPInventory.php(32): PDOStatement->execute()
+#1 /var/www/isp-crm/templates/isp_inventory.php(12): App\ISPInventory->getSites()
+#2 /var/www/isp-crm/public/index.php(2560): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/ISPInventory.php on line 32" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=isp_inventory HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=dashboard"
+root@superlitecrm:/var/www/isp-crm#

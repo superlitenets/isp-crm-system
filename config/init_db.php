@@ -2027,7 +2027,8 @@ function runMigrations(PDO $db): void {
         ['huawei_olts', 'uptime', 'ALTER TABLE huawei_olts ADD COLUMN uptime VARCHAR(100)'],
         ['tickets', 'sla_started_at', 'ALTER TABLE tickets ADD COLUMN sla_started_at TIMESTAMP'],
         ['tickets', 'sla_breach_notified_at', 'ALTER TABLE tickets ADD COLUMN sla_breach_notified_at TIMESTAMP'],
-        ['tickets', 'sla_warning_notified_at', 'ALTER TABLE tickets ADD COLUMN sla_warning_notified_at TIMESTAMP']
+        ['tickets', 'sla_warning_notified_at', 'ALTER TABLE tickets ADD COLUMN sla_warning_notified_at TIMESTAMP'],
+        ['radius_sessions', 'status', "ALTER TABLE radius_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'active'"]
     ];
     
     foreach ($columnMigrations as $migration) {
@@ -2150,6 +2151,303 @@ function runMigrations(PDO $db): void {
     } catch (PDOException $e) {
         error_log("ISP settings table error: " . $e->getMessage());
     }
+
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_network_sites (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            site_type VARCHAR(50) DEFAULT 'tower',
+            address TEXT,
+            gps_lat DECIMAL(10,7),
+            gps_lng DECIMAL(10,7),
+            contact_person VARCHAR(100),
+            contact_phone VARCHAR(20),
+            power_source VARCHAR(50),
+            ups_capacity VARCHAR(50),
+            ups_battery_health VARCHAR(50),
+            notes TEXT,
+            status VARCHAR(20) DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_racks (
+            id SERIAL PRIMARY KEY,
+            site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            name VARCHAR(100) NOT NULL,
+            rack_units INTEGER DEFAULT 42,
+            used_units INTEGER DEFAULT 0,
+            location_detail VARCHAR(255),
+            status VARCHAR(20) DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_core_equipment (
+            id SERIAL PRIMARY KEY,
+            site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            rack_id INTEGER REFERENCES isp_racks(id) ON DELETE SET NULL,
+            name VARCHAR(100) NOT NULL,
+            equipment_type VARCHAR(50) NOT NULL,
+            brand VARCHAR(50),
+            model VARCHAR(100),
+            serial_number VARCHAR(100),
+            ip_address VARCHAR(45),
+            mac_address VARCHAR(17),
+            firmware_version VARCHAR(50),
+            rack_position VARCHAR(20),
+            power_consumption INTEGER,
+            notes TEXT,
+            status VARCHAR(20) DEFAULT 'active',
+            monitor_enabled BOOLEAN DEFAULT TRUE,
+            ping_status VARCHAR(20) DEFAULT 'unknown',
+            last_ping_at TIMESTAMP,
+            last_seen_online TIMESTAMP,
+            downtime_started TIMESTAMP,
+            downtime_notified BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_fiber_cores (
+            id SERIAL PRIMARY KEY,
+            site_from INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            site_to INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            cable_name VARCHAR(100),
+            core_number INTEGER,
+            core_color VARCHAR(50),
+            purpose VARCHAR(100),
+            status VARCHAR(20) DEFAULT 'available',
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_splice_closures (
+            id SERIAL PRIMARY KEY,
+            site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            name VARCHAR(100) NOT NULL,
+            closure_type VARCHAR(50),
+            location_detail VARCHAR(255),
+            gps_lat DECIMAL(10,7),
+            gps_lng DECIMAL(10,7),
+            capacity INTEGER,
+            used_ports INTEGER DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'active',
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_splitters (
+            id SERIAL PRIMARY KEY,
+            splice_closure_id INTEGER REFERENCES isp_splice_closures(id) ON DELETE SET NULL,
+            name VARCHAR(100) NOT NULL,
+            ratio VARCHAR(20) DEFAULT '1:8',
+            input_core_id INTEGER REFERENCES isp_fiber_cores(id) ON DELETE SET NULL,
+            status VARCHAR(20) DEFAULT 'active',
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_distribution_boxes (
+            id SERIAL PRIMARY KEY,
+            site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            name VARCHAR(100) NOT NULL,
+            box_type VARCHAR(50),
+            location_detail VARCHAR(255),
+            gps_lat DECIMAL(10,7),
+            gps_lng DECIMAL(10,7),
+            total_ports INTEGER DEFAULT 8,
+            used_ports INTEGER DEFAULT 0,
+            splitter_id INTEGER REFERENCES isp_splitters(id) ON DELETE SET NULL,
+            status VARCHAR(20) DEFAULT 'active',
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_drop_cables (
+            id SERIAL PRIMARY KEY,
+            distribution_box_id INTEGER REFERENCES isp_distribution_boxes(id) ON DELETE SET NULL,
+            customer_id INTEGER,
+            port_number INTEGER,
+            cable_length DECIMAL(6,2),
+            cable_type VARCHAR(50) DEFAULT 'single-mode',
+            status VARCHAR(20) DEFAULT 'active',
+            installed_at TIMESTAMP,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_cpe_devices (
+            id SERIAL PRIMARY KEY,
+            customer_id INTEGER,
+            device_type VARCHAR(50) DEFAULT 'ONU',
+            brand VARCHAR(50),
+            model VARCHAR(100),
+            serial_number VARCHAR(100),
+            mac_address VARCHAR(17),
+            ip_address VARCHAR(45),
+            firmware_version VARCHAR(50),
+            status VARCHAR(20) DEFAULT 'active',
+            installed_at TIMESTAMP,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_ip_addresses (
+            id SERIAL PRIMARY KEY,
+            subnet VARCHAR(50) NOT NULL,
+            ip_address VARCHAR(45) NOT NULL,
+            assignment_type VARCHAR(20) DEFAULT 'dynamic',
+            assigned_to VARCHAR(100),
+            customer_id INTEGER,
+            device_id INTEGER,
+            description TEXT,
+            status VARCHAR(20) DEFAULT 'available',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_vlans (
+            id SERIAL PRIMARY KEY,
+            vlan_id INTEGER NOT NULL,
+            name VARCHAR(100),
+            description TEXT,
+            subnet VARCHAR(50),
+            gateway VARCHAR(45),
+            purpose VARCHAR(50),
+            site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            status VARCHAR(20) DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_warehouse_stock (
+            id SERIAL PRIMARY KEY,
+            item_name VARCHAR(100) NOT NULL,
+            category VARCHAR(50),
+            brand VARCHAR(50),
+            model VARCHAR(100),
+            quantity INTEGER DEFAULT 0,
+            min_quantity INTEGER DEFAULT 5,
+            unit_cost DECIMAL(10,2),
+            location VARCHAR(100),
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_warehouse_serials (
+            id SERIAL PRIMARY KEY,
+            stock_id INTEGER REFERENCES isp_warehouse_stock(id) ON DELETE CASCADE,
+            serial_number VARCHAR(100) NOT NULL,
+            mac_address VARCHAR(17),
+            status VARCHAR(20) DEFAULT 'in_stock',
+            assigned_to INTEGER,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_stock_movements (
+            id SERIAL PRIMARY KEY,
+            stock_id INTEGER REFERENCES isp_warehouse_stock(id) ON DELETE CASCADE,
+            movement_type VARCHAR(20) NOT NULL,
+            quantity INTEGER NOT NULL,
+            reference VARCHAR(100),
+            performed_by INTEGER,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_field_assets (
+            id SERIAL PRIMARY KEY,
+            asset_type VARCHAR(50) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            serial_number VARCHAR(100),
+            site_id INTEGER REFERENCES isp_network_sites(id) ON DELETE SET NULL,
+            assigned_to INTEGER,
+            condition VARCHAR(20) DEFAULT 'good',
+            purchase_date DATE,
+            warranty_expiry DATE,
+            notes TEXT,
+            status VARCHAR(20) DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_maintenance_logs (
+            id SERIAL PRIMARY KEY,
+            equipment_type VARCHAR(50),
+            equipment_id INTEGER,
+            maintenance_type VARCHAR(50),
+            description TEXT,
+            performed_by INTEGER,
+            performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            next_maintenance DATE,
+            cost DECIMAL(10,2),
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS isp_equipment_uptime_log (
+            id SERIAL PRIMARY KEY,
+            equipment_id INTEGER NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            duration_seconds INTEGER,
+            notes TEXT
+        )");
+    } catch (PDOException $e) {
+        error_log("ISP inventory tables error: " . $e->getMessage());
+    }
+
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS huawei_olts (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            ip_address VARCHAR(45) NOT NULL,
+            port INTEGER DEFAULT 23,
+            connection_type VARCHAR(20) DEFAULT 'telnet',
+            username VARCHAR(100),
+            password_encrypted TEXT,
+            snmp_community VARCHAR(100) DEFAULT 'public',
+            snmp_version VARCHAR(10) DEFAULT 'v2c',
+            snmp_port INTEGER DEFAULT 161,
+            vendor VARCHAR(50) DEFAULT 'Huawei',
+            model VARCHAR(100),
+            location VARCHAR(255),
+            is_active BOOLEAN DEFAULT TRUE,
+            last_sync_at TIMESTAMP,
+            last_status VARCHAR(20) DEFAULT 'unknown',
+            uptime VARCHAR(100),
+            temperature VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            boards_synced_at TIMESTAMP,
+            vlans_synced_at TIMESTAMP,
+            ports_synced_at TIMESTAMP,
+            uplinks_synced_at TIMESTAMP,
+            firmware_version VARCHAR(100),
+            hardware_model VARCHAR(100),
+            software_version VARCHAR(100),
+            cpu_usage INTEGER,
+            memory_usage INTEGER,
+            system_synced_at TIMESTAMP,
+            snmp_last_poll TIMESTAMP,
+            snmp_sys_name VARCHAR(255),
+            snmp_sys_descr TEXT,
+            snmp_sys_uptime VARCHAR(100),
+            snmp_sys_location VARCHAR(255),
+            snmp_status VARCHAR(20) DEFAULT 'unknown',
+            snmp_read_community VARCHAR(100),
+            snmp_write_community VARCHAR(100),
+            branch_id INTEGER,
+            smartolt_id INTEGER,
+            default_line_profile INTEGER,
+            cli_protocol VARCHAR(20) DEFAULT 'telnet',
+            ssh_port INTEGER DEFAULT 22
+        )");
+    } catch (PDOException $e) {
+        error_log("Huawei OLTs table error: " . $e->getMessage());
+    }
     
     // RADIUS NAS Devices
     try {
@@ -2257,11 +2555,13 @@ function runMigrations(PDO $db): void {
             input_octets BIGINT DEFAULT 0,
             output_octets BIGINT DEFAULT 0,
             terminate_cause VARCHAR(100),
+            status VARCHAR(20) DEFAULT 'active',
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_radius_sessions_username ON radius_sessions(username)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_radius_sessions_active ON radius_sessions(is_active)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_radius_sessions_status ON radius_sessions(status)");
     } catch (PDOException $e) {
         error_log("RADIUS sessions table error: " . $e->getMessage());
     }
