@@ -10,17 +10,16 @@ $dbServerUrl = '';
 $dbLicenseKey = '';
 
 try {
-    if (class_exists('Database', false)) {
-        $db = \Database::getConnection();
-        $stmt = $db->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('license_server_url', 'license_key')");
-        $stmt->execute();
-        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            if ($row['setting_key'] === 'license_server_url' && !empty($row['setting_value'])) {
-                $dbServerUrl = $row['setting_value'];
-            }
-            if ($row['setting_key'] === 'license_key' && !empty($row['setting_value'])) {
-                $dbLicenseKey = $row['setting_value'];
-            }
+    require_once __DIR__ . '/database.php';
+    $db = \Database::getConnection();
+    $stmt = $db->prepare("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('license_server_url', 'license_key')");
+    $stmt->execute();
+    while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+        if ($row['setting_key'] === 'license_server_url' && !empty($row['setting_value'])) {
+            $dbServerUrl = $row['setting_value'];
+        }
+        if ($row['setting_key'] === 'license_key' && !empty($row['setting_value'])) {
+            $dbLicenseKey = $row['setting_value'];
         }
     }
 } catch (\Throwable $e) {
