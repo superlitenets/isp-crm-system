@@ -942,7 +942,7 @@ $alarms = $fleet->getAlarms($alarmFilters);
 <div class="card mb-3">
     <div class="card-body">
         <form method="GET" class="row g-2 align-items-end">
-            <input type="hidden" name="page" value="inventory">
+            <input type="hidden" name="page" value="<?= $fleetPage ?>">
             <input type="hidden" name="tab" value="fleet">
             <input type="hidden" name="fleet_tab" value="alarms">
             <div class="col-md-3">
@@ -1056,7 +1056,7 @@ if ($cmdVehicleId > 0) {
 <div class="card mb-3">
     <div class="card-body">
         <form method="GET" class="row g-2 align-items-end">
-            <input type="hidden" name="page" value="inventory">
+            <input type="hidden" name="page" value="<?= $fleetPage ?>">
             <input type="hidden" name="tab" value="fleet">
             <input type="hidden" name="fleet_tab" value="commands">
             <div class="col-md-4">
