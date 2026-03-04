@@ -156,17 +156,25 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
         fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_track')
             .then(r => r.json())
             .then(data => {
-                if (data.code === 0 && data.record) {
+                const trackingData = data.tracking || data.record || [];
+                if (data.success || (data.code === 0 && data.record)) {
                     markers.clearLayers();
                     const vehicleMap = {};
+                    if (data.vehicles) {
+                        data.vehicles.forEach(function(v) {
+                            if (v.imei) vehicleMap[v.imei] = { name: v.name || '', plate: v.plate_number || '' };
+                        });
+                    }
                     <?php foreach ($vehicles as $v): ?>
-                    vehicleMap['<?= htmlspecialchars($v['imei'] ?? '') ?>'] = {
-                        name: '<?= htmlspecialchars(addslashes($v['name'] ?? '')) ?>',
-                        plate: '<?= htmlspecialchars(addslashes($v['plate_number'] ?? '')) ?>'
-                    };
+                    if (!vehicleMap['<?= htmlspecialchars($v['imei'] ?? '') ?>']) {
+                        vehicleMap['<?= htmlspecialchars($v['imei'] ?? '') ?>'] = {
+                            name: '<?= htmlspecialchars(addslashes($v['name'] ?? '')) ?>',
+                            plate: '<?= htmlspecialchars(addslashes($v['plate_number'] ?? '')) ?>'
+                        };
+                    }
                     <?php endforeach; ?>
 
-                    data.record.forEach(function(t) {
+                    trackingData.forEach(function(t) {
                         if (t.latitude && t.longitude && t.latitude !== 0 && t.longitude !== 0) {
                             const vInfo = vehicleMap[t.imei] || { name: t.imei, plate: '' };
                             const marker = L.marker([t.latitude, t.longitude]);
@@ -550,11 +558,11 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
     function updateTracking() {
         const vehicleId = select.value;
         if (!vehicleId) return;
-        fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_track&vehicle_id=' + vehicleId)
+        fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_track_vehicle&vehicle_id=' + vehicleId)
             .then(r => r.json())
             .then(data => {
-                if (data.code === 0 && data.record && data.record.length > 0) {
-                    const t = data.record[0];
+                if (data.success && data.track) {
+                    const t = data.track;
                     if (t.latitude && t.longitude && t.latitude !== 0) {
                         const pos = [t.latitude, t.longitude];
                         if (marker) {
@@ -563,18 +571,38 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
                             marker = L.marker(pos).addTo(map);
                         }
                         map.setView(pos, 15);
-                        marker.bindPopup('<strong>Speed:</strong> ' + (t.speed || 0) + ' km/h').openPopup();
+                        const v = data.vehicle;
+                        const label = v ? (v.name || v.plate_number || 'Vehicle') : 'Vehicle';
+                        marker.bindPopup('<strong>' + label + '</strong><br>Speed: ' + (t.speed || 0) + ' km/h').openPopup();
                     }
+                    const accOn = t.accstatus === 1;
+                    const mileage = t.mileage > 0 ? (t.mileage / 1000).toFixed(1) + ' km' : 'N/A';
+                    const battery = t.battery >= 0 ? t.battery + '%' : 'N/A';
+                    const datastatus = t.datastatus;
+                    let statusText = 'Unknown';
+                    let statusClass = 'text-muted';
+                    if (datastatus === 1) { statusText = 'Online (Moving)'; statusClass = 'text-success'; }
+                    else if (datastatus === 2) { statusText = 'Online (Idle)'; statusClass = 'text-primary'; }
+                    else if (datastatus === 3) { statusText = 'Offline (Recently)'; statusClass = 'text-warning'; }
+                    else if (datastatus === 4) { statusText = 'Offline'; statusClass = 'text-danger'; }
                     infoPanel.innerHTML =
+                        '<div class="mb-2"><strong>Status</strong><br><span class="' + statusClass + '">' + statusText + '</span></div>' +
                         '<div class="mb-2"><strong>Speed</strong><br><span class="fs-4">' + (t.speed || 0) + ' km/h</span></div>' +
-                        '<div class="mb-2"><strong>ACC</strong><br>' + (t.accstatus === 1 ? '<span class="acc-on">ON</span>' : '<span class="acc-off">OFF</span>') + '</div>' +
-                        '<div class="mb-2"><strong>Battery</strong><br>' + (t.battery >= 0 ? t.battery + '%' : 'N/A') + '</div>' +
-                        '<div class="mb-2"><strong>Mileage</strong><br>' + (t.mileage ? (t.mileage / 1000).toFixed(1) + ' km' : 'N/A') + '</div>' +
+                        '<div class="mb-2"><strong>ACC</strong><br>' + (accOn ? '<span class="acc-on">ON</span>' : '<span class="acc-off">OFF</span>') + '</div>' +
+                        '<div class="mb-2"><strong>Battery</strong><br>' + battery + '</div>' +
+                        '<div class="mb-2"><strong>Mileage</strong><br>' + mileage + '</div>' +
                         '<div class="mb-2"><strong>Coordinates</strong><br><small>' + (t.latitude || 0).toFixed(6) + ', ' + (t.longitude || 0).toFixed(6) + '</small></div>' +
                         '<div class="mb-2"><strong>Last Update</strong><br><small>' + formatTime(t.hearttime) + '</small></div>';
+                } else if (data.success && !data.track) {
+                    infoPanel.innerHTML = '<p class="text-warning text-center">No tracking data available for this vehicle</p>';
+                } else {
+                    infoPanel.innerHTML = '<p class="text-danger text-center">' + (data.error || 'Tracking failed') + '</p>';
                 }
             })
-            .catch(() => {});
+            .catch(err => {
+                console.error('Tracking error:', err);
+                infoPanel.innerHTML = '<p class="text-danger text-center">Failed to fetch tracking data</p>';
+            });
     }
 
     function sendCommand(command) {
