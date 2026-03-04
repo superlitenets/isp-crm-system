@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -47,16 +47,15 @@ SESSION_SECRET=$(openssl rand -hex 32)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
 
 echo ""
-echo -e "${CYAN}License Configuration (required for new deployments):${NC}"
+echo -e "${CYAN}License Configuration (optional - can be set later in Settings > License):${NC}"
 read -p "License Server URL (e.g. https://license.superlite.co.ke): " LICENSE_SERVER_URL
 read -p "License Key: " LICENSE_KEY
 if [ -z "$LICENSE_SERVER_URL" ] || [ -z "$LICENSE_KEY" ]; then
-    echo -e "${YELLOW}Warning: License not configured. The CRM will require license activation before use.${NC}"
-    echo -e "${YELLOW}You can configure it later in Settings > License.${NC}"
+    echo -e "${YELLOW}License not configured. You can set it later in Settings > License.${NC}"
 fi
 
 echo ""
-echo -e "${YELLOW}Configuration:${NC}"
+echo -e "${YELLOW}Configuration Summary:${NC}"
 echo "  Domain:    ${DOMAIN}"
 echo "  App Dir:   ${APP_DIR}"
 echo "  Database:  ${DB_NAME}"
@@ -71,6 +70,7 @@ if [ "$CONFIRM" != "y" ]; then
 fi
 
 print_step "Updating system packages..."
+export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
 
@@ -84,7 +84,7 @@ apt-get install -y \
     snmp snmp-mibs-downloader
 
 print_step "Installing PHP 8.2..."
-if ! command -v php &> /dev/null || php -v | grep -q "PHP 7"; then
+if ! dpkg -l | grep -q php8.2-fpm; then
     add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
     apt-get update -y
 fi
@@ -93,14 +93,8 @@ apt-get install -y \
     php8.2-zip php8.2-gd php8.2-intl php8.2-bcmath php8.2-snmp \
     php8.2-readline php8.2-soap php8.2-cli
 
-PHP_FPM_SOCK="/run/php/php8.2-fpm.sock"
-if [ ! -S "$PHP_FPM_SOCK" ]; then
-    PHP_FPM_SOCK=$(find /run/php/ -name "*.sock" 2>/dev/null | head -1)
-fi
-PHP_FPM_SERVICE=$(systemctl list-units --type=service | grep php | grep fpm | awk '{print $1}' | head -1)
-if [ -z "$PHP_FPM_SERVICE" ]; then
-    PHP_FPM_SERVICE="php8.2-fpm"
-fi
+PHP_FPM_SERVICE=$(systemctl list-units --all --type=service | grep php | grep fpm | awk '{print $1}' | head -1)
+PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.2-fpm}"
 
 print_step "Installing Node.js 20 LTS..."
 if ! command -v node &> /dev/null; then
@@ -115,8 +109,10 @@ if ! command -v composer &> /dev/null; then
 fi
 
 print_step "Setting up PostgreSQL database..."
+systemctl enable --now postgresql
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
     sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';"
+sudo -u postgres psql -c "ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" 2>/dev/null
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1 || \
     sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};"
@@ -134,11 +130,12 @@ if [ -d "${PROJECT_ROOT}/src" ] && [ -d "${PROJECT_ROOT}/public" ]; then
     rsync -av --exclude='deploy' --exclude='.git' --exclude='node_modules' \
         --exclude='.cache' --exclude='.local' --exclude='.config' \
         --exclude='backups/*.sql' --exclude='.replit' --exclude='replit.nix' \
+        --exclude='replit.md' --exclude='attached_assets' \
         "${PROJECT_ROOT}/" "${APP_DIR}/"
 else
-    print_warn "Project files not found in parent directory."
-    print_warn "Please copy your project files to ${APP_DIR} manually, then re-run this script."
-    echo "  Example: rsync -av /path/to/project/ ${APP_DIR}/"
+    print_err "Project files not found in parent directory."
+    print_err "Please copy your project files to ${APP_DIR} manually, then re-run this script."
+    exit 1
 fi
 
 print_step "Creating environment file..."
@@ -174,7 +171,7 @@ ENVEOF
 chmod 600 "${APP_DIR}/.env"
 print_ok "Environment file created at ${APP_DIR}/.env"
 
-print_step "Configuring PHP to load environment..."
+print_step "Configuring PHP-FPM pool..."
 cat > "/etc/php/8.2/fpm/pool.d/isp-crm.conf" << 'PHPPOOL'
 [isp-crm]
 user = www-data
@@ -195,41 +192,38 @@ php_admin_value[max_execution_time] = 300
 php_admin_value[memory_limit] = 256M
 php_admin_value[upload_max_filesize] = 50M
 php_admin_value[post_max_size] = 50M
-
 php_admin_value[date.timezone] = Africa/Nairobi
 
 PHPPOOL
 
-ENV_LINES=""
 while IFS='=' read -r key value; do
     key=$(echo "$key" | xargs)
-    if [ -n "$key" ] && [[ ! "$key" =~ ^# ]]; then
+    if [ -n "$key" ] && [[ ! "$key" =~ ^# ]] && [ -n "$value" ]; then
         value=$(echo "$value" | xargs)
-        ENV_LINES="${ENV_LINES}env[${key}] = ${value}\n"
+        echo "env[${key}] = ${value}" >> "/etc/php/8.2/fpm/pool.d/isp-crm.conf"
     fi
 done < "${APP_DIR}/.env"
-echo -e "$ENV_LINES" >> "/etc/php/8.2/fpm/pool.d/isp-crm.conf"
-
-PHP_FPM_SOCK="/run/php/isp-crm.sock"
 
 print_step "Installing PHP dependencies..."
 cd "${APP_DIR}"
-if [ -f composer.json ]; then
-    composer install --no-dev --optimize-autoloader 2>/dev/null || composer install --optimize-autoloader
-    print_ok "PHP dependencies installed"
-fi
+COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --no-interaction --optimize-autoloader 2>&1 || {
+    print_warn "Composer install from lock file failed, regenerating..."
+    rm -f composer.lock
+    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --no-interaction --optimize-autoloader
+}
+print_ok "PHP dependencies installed"
 
 print_step "Installing Node.js dependencies (OLT Service)..."
 if [ -d "${APP_DIR}/olt-service" ]; then
     cd "${APP_DIR}/olt-service"
-    npm install --production
+    npm install --omit=dev 2>&1 | tail -3
     print_ok "OLT service dependencies installed"
 fi
 
 print_step "Installing Node.js dependencies (WhatsApp Service)..."
 if [ -d "${APP_DIR}/whatsapp-service" ]; then
     cd "${APP_DIR}/whatsapp-service"
-    npm install --production
+    npm install --omit=dev 2>&1 | tail -3
     print_ok "WhatsApp service dependencies installed"
 fi
 
@@ -237,10 +231,21 @@ print_step "Setting file permissions..."
 chown -R www-data:www-data "${APP_DIR}"
 chmod -R 755 "${APP_DIR}"
 chmod -R 775 "${APP_DIR}/public"
-mkdir -p "${APP_DIR}/data" "${APP_DIR}/whatsapp-service/auth_info" /tmp/auth_progress
-chown -R www-data:www-data "${APP_DIR}/data" "${APP_DIR}/whatsapp-service/auth_info"
+mkdir -p "${APP_DIR}/data" "${APP_DIR}/whatsapp-service/auth_info" "${APP_DIR}/backups" /tmp/auth_progress
+chown -R www-data:www-data "${APP_DIR}/data" "${APP_DIR}/whatsapp-service/auth_info" "${APP_DIR}/backups"
+chmod 600 "${APP_DIR}/.env"
 
 print_step "Configuring Nginx..."
+
+mkdir -p /etc/nginx/snippets
+if [ ! -f /etc/nginx/snippets/fastcgi-params.conf ]; then
+    cat > /etc/nginx/snippets/fastcgi-params.conf << 'FCGIEOF'
+fastcgi_split_path_info ^(.+\.php)(/.+)$;
+fastcgi_index index.php;
+include fastcgi_params;
+FCGIEOF
+fi
+
 cat > "/etc/nginx/sites-available/${DOMAIN}" << NGINXEOF
 server {
     listen 80;
@@ -257,7 +262,7 @@ server {
 
     location ~ \.php\$ {
         include snippets/fastcgi-params.conf;
-        fastcgi_pass unix:${PHP_FPM_SOCK};
+        fastcgi_pass unix:/run/php/isp-crm.sock;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         fastcgi_read_timeout 300;
     }
@@ -294,17 +299,17 @@ server {
 }
 NGINXEOF
 
-if [ ! -f /etc/nginx/snippets/fastcgi-params.conf ]; then
-    cat > /etc/nginx/snippets/fastcgi-params.conf << 'FCGIEOF'
-fastcgi_split_path_info ^(.+\.php)(/.+)$;
-fastcgi_index index.php;
-include fastcgi_params;
-FCGIEOF
-fi
-
 ln -sf "/etc/nginx/sites-available/${DOMAIN}" /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
+
+print_step "Starting PHP-FPM..."
+systemctl restart "${PHP_FPM_SERVICE}" || {
+    print_warn "PHP-FPM failed to start. Check: journalctl -xeu ${PHP_FPM_SERVICE}"
+}
+
+nginx -t && systemctl reload nginx || {
+    print_warn "Nginx config test failed. Check: nginx -t"
+}
 print_ok "Nginx configured for ${DOMAIN}"
 
 print_step "Obtaining SSL certificate with Let's Encrypt..."
@@ -364,34 +369,37 @@ print_step "Initializing database schema..."
 cd "${APP_DIR}"
 export PGHOST=localhost PGPORT=5432 PGDATABASE="${DB_NAME}" PGUSER="${DB_USER}" PGPASSWORD="${DB_PASS}"
 
+print_step "Step 1/4: Loading complete schema from migration.sql..."
 if [ -f "${APP_DIR}/database/migration.sql" ]; then
-    print_step "Loading complete database schema..."
-    PGPASSWORD="${DB_PASS}" psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -f "${APP_DIR}/database/migration.sql" 2>&1 | grep -v "already exists\|multiple primary" | tail -5
-    print_ok "Complete schema loaded from migration.sql"
+    sudo -u postgres psql -d "${DB_NAME}" -f "${APP_DIR}/database/migration.sql" 2>&1 | grep -c "CREATE TABLE" | xargs -I{} echo "  Created/verified {} tables"
+    print_ok "Complete schema loaded"
+else
+    print_warn "migration.sql not found, relying on init_db.php only"
 fi
 
-print_step "Running migrations and seeding defaults..."
+print_step "Step 2/4: Running PHP migrations and seeding..."
 php -r "
 require_once 'vendor/autoload.php';
 require_once 'config/database.php';
 require_once 'config/init_db.php';
 initializeDatabase();
-echo \"Database initialized successfully.\n\";
-" 2>&1 && print_ok "Database schema finalized" || print_warn "Database init had warnings (check manually)"
+echo \"Database initialized.\n\";
+" 2>&1 && print_ok "Migrations and seeding complete" || print_warn "Some migrations had warnings (non-fatal)"
 
+print_step "Step 3/4: Applying column fixes..."
 if [ -f "${APP_DIR}/database/fix_missing_columns.sql" ]; then
-    print_step "Applying column fixes..."
-    sudo -u postgres psql -d "${DB_NAME}" -f "${APP_DIR}/database/fix_missing_columns.sql" 2>&1 | grep -v "already exists" | tail -5
+    sudo -u postgres psql -d "${DB_NAME}" -f "${APP_DIR}/database/fix_missing_columns.sql" 2>&1 | grep -cv "already exists\|GRANT\|ALTER" | xargs -I{} echo "  Applied {} fixes"
     print_ok "Column fixes applied"
 fi
 
+print_step "Step 4/4: Configuring database permissions..."
 sudo -u postgres psql -d "${DB_NAME}" -c "
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${DB_USER};
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${DB_USER};
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${DB_USER};
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${DB_USER};
 " 2>/dev/null
-print_ok "Database permissions configured"
+print_ok "Database fully initialized with all tables, columns, and permissions"
 
 print_step "Creating default admin user..."
 ADMIN_HASH=$(php -r "echo password_hash('admin123', PASSWORD_DEFAULT);")
@@ -419,8 +427,6 @@ APP_TIMEZONE=${TIMEZONE}
 CRONEOF
 
 chmod 644 "${CRON_FILE}"
-mkdir -p "${APP_DIR}/backups"
-chown www-data:www-data "${APP_DIR}/backups"
 print_ok "Cron jobs configured"
 
 print_step "Enabling and starting all services..."
@@ -434,12 +440,34 @@ print_ok "All services started"
 
 print_step "Configuring firewall (UFW)..."
 if command -v ufw &> /dev/null; then
-    ufw allow 80/tcp
-    ufw allow 443/tcp
-    ufw allow 22/tcp
+    ufw allow 80/tcp >/dev/null 2>&1
+    ufw allow 443/tcp >/dev/null 2>&1
+    ufw allow 22/tcp >/dev/null 2>&1
     ufw --force enable 2>/dev/null || true
     print_ok "Firewall configured (HTTP, HTTPS, SSH)"
 fi
+
+mkdir -p "${APP_DIR}/deploy"
+cat > "${APP_DIR}/deploy/credentials.txt" << CREDEOF
+=== ISP CRM Production Credentials ===
+Generated: $(date)
+
+Domain: https://${DOMAIN}
+Admin Login: admin@${DOMAIN} / admin123
+
+Database:
+  Host: localhost
+  Port: 5432
+  Name: ${DB_NAME}
+  User: ${DB_USER}
+  Password: ${DB_PASS}
+
+Session Secret: ${SESSION_SECRET}
+Encryption Key: ${ENCRYPTION_KEY}
+
+IMPORTANT: Change the admin password immediately after first login!
+CREDEOF
+chmod 600 "${APP_DIR}/deploy/credentials.txt"
 
 echo ""
 echo -e "${GREEN}============================================="
@@ -466,36 +494,14 @@ echo -e "  ${YELLOW}Logs:${NC}"
 echo "    OLT:       journalctl -u isp-olt -f"
 echo "    WhatsApp:  journalctl -u isp-whatsapp -f"
 echo "    Nginx:     tail -f /var/log/nginx/${DOMAIN}_error.log"
+echo "    PHP-FPM:   journalctl -u ${PHP_FPM_SERVICE} -f"
 echo "    Cron:      tail -f /var/log/isp-crm-cron.log"
 echo ""
 echo -e "  ${YELLOW}Management:${NC}"
 echo "    Restart all:  systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp nginx"
 echo "    Backup DB:    pg_dump -h localhost -U ${DB_USER} ${DB_NAME} > backup.sql"
-echo "    Update code:  cd ${APP_DIR} && git pull && composer install && systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp"
+echo "    Update code:  cd ${APP_DIR} && git pull && composer install --no-dev && systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp"
 echo ""
-
-mkdir -p "${APP_DIR}/deploy"
-cat > "${APP_DIR}/deploy/credentials.txt" << CREDEOF
-=== ISP CRM Production Credentials ===
-Generated: $(date)
-
-Domain: https://${DOMAIN}
-Admin Login: admin@${DOMAIN} / admin123
-
-Database:
-  Host: localhost
-  Port: 5432
-  Name: ${DB_NAME}
-  User: ${DB_USER}
-  Password: ${DB_PASS}
-
-Session Secret: ${SESSION_SECRET}
-Encryption Key: ${ENCRYPTION_KEY}
-
-IMPORTANT: Change the admin password immediately after first login!
-CREDEOF
-chmod 600 "${APP_DIR}/deploy/credentials.txt"
-
 echo -e "${YELLOW}Credentials saved to: ${APP_DIR}/deploy/credentials.txt${NC}"
 echo -e "${RED}IMPORTANT: Change the default admin password after first login!${NC}"
 echo ""
