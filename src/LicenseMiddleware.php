@@ -18,14 +18,7 @@ class LicenseMiddleware {
             return self::$validated;
         }
         
-        $client = self::getClient();
-        
-        if (!$client->isEnabled()) {
-            self::$validated = ['valid' => true, 'mode' => 'unlicensed'];
-            return self::$validated;
-        }
-        
-        self::$validated = $client->validate();
+        self::$validated = self::getClient()->validate();
         return self::$validated;
     }
     
@@ -73,14 +66,23 @@ class LicenseMiddleware {
         if ($max === 0) return true;
         return $currentCount < $max;
     }
+
+    public static function enforce(): void {
+        $result = self::check();
+        if ($result['valid'] ?? false) {
+            return;
+        }
+
+        $mode = $result['mode'] ?? '';
+        $error = $result['error'] ?? '';
+        $message = $result['message'] ?? 'License validation failed';
+
+        echo self::renderLicenseActivationPage($mode, $error, $message);
+        exit;
+    }
     
     public static function renderLicenseStatus(): string {
         $result = self::check();
-        $client = self::getClient();
-        
-        if (!$client->isEnabled()) {
-            return '';
-        }
         
         $html = '';
         
@@ -111,6 +113,103 @@ class LicenseMiddleware {
         }
         
         return $html;
+    }
+
+    private static function renderLicenseActivationPage(string $mode, string $error, string $message): string {
+        $version = LicenseClient::APP_VERSION;
+        $isUnconfigured = ($mode === 'unconfigured');
+        $isExpired = ($error === 'expired');
+        $isSuspended = ($error === 'suspended');
+
+        if ($isUnconfigured) {
+            $icon = 'bi-shield-lock';
+            $iconColor = 'text-primary';
+            $title = 'License Required';
+            $subtitle = 'This installation requires a valid license to operate.';
+        } elseif ($isExpired) {
+            $icon = 'bi-clock-history';
+            $iconColor = 'text-warning';
+            $title = 'License Expired';
+            $subtitle = 'Your license has expired. Please renew to continue.';
+        } elseif ($isSuspended) {
+            $icon = 'bi-shield-x';
+            $iconColor = 'text-danger';
+            $title = 'License Suspended';
+            $subtitle = htmlspecialchars($message);
+        } else {
+            $icon = 'bi-exclamation-triangle';
+            $iconColor = 'text-danger';
+            $title = 'License Error';
+            $subtitle = htmlspecialchars($message);
+        }
+
+        return '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>' . $title . ' - ISP CRM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 50%, #415a77 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .license-card { max-width: 520px; width: 100%; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .license-header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 3rem 2rem 2rem; text-align: center; }
+        .license-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .version-badge { position: absolute; top: 1rem; right: 1rem; font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+    <div class="license-card card border-0 position-relative">
+        <span class="version-badge badge bg-secondary">v' . htmlspecialchars($version) . '</span>
+        <div class="license-header text-white">
+            <i class="bi ' . $icon . ' license-icon ' . $iconColor . '"></i>
+            <h2 class="fw-bold mb-2">' . $title . '</h2>
+            <p class="text-white-50 mb-0">' . $subtitle . '</p>
+        </div>
+        <div class="card-body p-4">
+            ' . ($isUnconfigured ? '
+            <div class="mb-4">
+                <div class="d-flex align-items-start mb-3">
+                    <span class="badge bg-primary rounded-circle me-3 p-2"><i class="bi bi-1-circle-fill"></i></span>
+                    <div>
+                        <strong>Get a License Key</strong>
+                        <p class="text-muted small mb-0">Contact your administrator or purchase a license from the license portal.</p>
+                    </div>
+                </div>
+                <div class="d-flex align-items-start mb-3">
+                    <span class="badge bg-primary rounded-circle me-3 p-2"><i class="bi bi-2-circle-fill"></i></span>
+                    <div>
+                        <strong>Configure License</strong>
+                        <p class="text-muted small mb-0">Go to Settings and enter the License Server URL and your License Key.</p>
+                    </div>
+                </div>
+                <div class="d-flex align-items-start">
+                    <span class="badge bg-primary rounded-circle me-3 p-2"><i class="bi bi-3-circle-fill"></i></span>
+                    <div>
+                        <strong>Activate</strong>
+                        <p class="text-muted small mb-0">Click Save & Activate to register this installation.</p>
+                    </div>
+                </div>
+            </div>
+            ' : '
+            <div class="alert alert-' . ($isExpired ? 'warning' : 'danger') . ' mb-4">
+                <i class="bi bi-info-circle me-2"></i>' . htmlspecialchars($message) . '
+            </div>
+            ') . '
+            <a href="?page=settings&section=license" class="btn btn-primary btn-lg w-100 mb-3">
+                <i class="bi bi-gear me-2"></i>Go to License Settings
+            </a>
+            <div class="text-center">
+                <a href="?page=logout" class="text-muted small"><i class="bi bi-box-arrow-right me-1"></i>Sign Out</a>
+            </div>
+        </div>
+        <div class="card-footer bg-light text-center py-3">
+            <small class="text-muted">ISP CRM v' . htmlspecialchars($version) . ' &mdash; A valid license is required to use this application.</small>
+        </div>
+    </div>
+</body>
+</html>';
     }
     
     private static function renderUpgradeMessage(string $feature): string {

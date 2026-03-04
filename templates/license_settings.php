@@ -64,13 +64,9 @@ $isEnabled = $client->isEnabled();
             <div class="card-body">
                 <?php if (!$isEnabled): ?>
                 <div class="text-center py-4">
-                    <i class="bi bi-unlock text-success" style="font-size: 3rem;"></i>
-                    <h5 class="mt-3">Unlicensed Mode</h5>
-                    <p class="text-muted">All features are enabled. No license server configured.</p>
-                    <hr>
-                    <p class="small text-muted mb-0">
-                        To enable licensing, set the <code>LICENSE_SERVER_URL</code> and <code>LICENSE_KEY</code> environment variables.
-                    </p>
+                    <i class="bi bi-shield-lock text-danger" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3">License Not Configured</h5>
+                    <p class="text-muted">A valid license is required. Enter your License Server URL and License Key below, or set them as environment variables.</p>
                 </div>
                 
                 <?php elseif ($licenseStatus['valid']): ?>
@@ -174,8 +170,16 @@ $isEnabled = $client->isEnabled();
                         <td class="text-end fw-bold"><?= $limits['max_customers'] ?: '<span class="badge bg-success">Unlimited</span>' ?></td>
                     </tr>
                     <tr>
+                        <td><i class="bi bi-wifi me-2"></i>Max Subscribers</td>
+                        <td class="text-end fw-bold"><?= $limits['max_subscribers'] ?: '<span class="badge bg-success">Unlimited</span>' ?></td>
+                    </tr>
+                    <tr>
                         <td><i class="bi bi-router me-2"></i>Max ONUs</td>
                         <td class="text-end fw-bold"><?= $limits['max_onus'] ?: '<span class="badge bg-success">Unlimited</span>' ?></td>
+                    </tr>
+                    <tr>
+                        <td><i class="bi bi-hdd-rack me-2"></i>Max OLTs</td>
+                        <td class="text-end fw-bold"><?= $limits['max_olts'] ?: '<span class="badge bg-success">Unlimited</span>' ?></td>
                     </tr>
                 </table>
             </div>

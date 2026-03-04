@@ -2213,6 +2213,7 @@ if ($page === 'login') {
 // ISP Inventory Module - standalone page with its own layout
 if ($page === 'isp_inventory') {
     \App\Auth::requireLogin();
+    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
     if (!\App\Auth::canAny(['inventory.view', 'inventory.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2563,6 +2564,7 @@ if ($page === 'isp_inventory') {
 // OMS (ONU Management System) - standalone page with its own layout
 if ($page === 'huawei-olt') {
     \App\Auth::requireLogin();
+    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
     if (!\App\Auth::canAny(['oms.view', 'oms.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2574,6 +2576,7 @@ if ($page === 'huawei-olt') {
 // Finance Module - standalone page with its own layout
 if ($page === 'finance') {
     \App\Auth::requireLogin();
+    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
     if (!\App\Auth::canAny(['accounting.view', 'accounting.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2585,6 +2588,7 @@ if ($page === 'finance') {
 // Call Center Module - standalone page with its own layout
 if ($page === 'call_center') {
     \App\Auth::requireLogin();
+    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
     if (!\App\Auth::canAny(['callcenter.view', 'callcenter.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2963,6 +2967,7 @@ if ($page === 'call_center') {
 // ISP RADIUS Billing - standalone page with its own layout
 if ($page === 'isp') {
     \App\Auth::requireLogin();
+    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
     if (!\App\Auth::canAny(['isp.view', 'isp.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -3487,6 +3492,14 @@ if ($page === 'isp') {
 }
 
 \App\Auth::requireLogin();
+
+require_once __DIR__ . '/../src/LicenseMiddleware.php';
+if (!getenv('REPLIT_DEV_DOMAIN')) {
+    $licenseAllowedPages = ($page === 'settings' && (($_GET['section'] ?? '') === 'license' || ($_GET['subpage'] ?? '') === 'license'));
+    if (!$licenseAllowedPages && $page !== 'logout') {
+        LicenseMiddleware::enforce();
+    }
+}
 
 $customer = new \App\Customer();
 $ticket = new \App\Ticket();

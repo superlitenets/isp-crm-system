@@ -47,12 +47,22 @@ SESSION_SECRET=$(openssl rand -hex 32)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
 
 echo ""
+echo -e "${CYAN}License Configuration (required for new deployments):${NC}"
+read -p "License Server URL (e.g. https://license.superlite.co.ke): " LICENSE_SERVER_URL
+read -p "License Key: " LICENSE_KEY
+if [ -z "$LICENSE_SERVER_URL" ] || [ -z "$LICENSE_KEY" ]; then
+    echo -e "${YELLOW}Warning: License not configured. The CRM will require license activation before use.${NC}"
+    echo -e "${YELLOW}You can configure it later in Settings > License.${NC}"
+fi
+
+echo ""
 echo -e "${YELLOW}Configuration:${NC}"
 echo "  Domain:    ${DOMAIN}"
 echo "  App Dir:   ${APP_DIR}"
 echo "  Database:  ${DB_NAME}"
 echo "  DB User:   ${DB_USER}"
 echo "  Timezone:  ${TIMEZONE}"
+echo "  License:   ${LICENSE_SERVER_URL:-Not configured}"
 echo ""
 read -p "Continue? (y/n): " CONFIRM
 if [ "$CONFIRM" != "y" ]; then
@@ -154,6 +164,9 @@ PHP_API_URL=http://127.0.0.1:9000
 WHATSAPP_SESSION_URL=http://127.0.0.1:3001
 WA_PORT=3001
 WA_HOST=0.0.0.0
+
+LICENSE_SERVER_URL=${LICENSE_SERVER_URL}
+LICENSE_KEY=${LICENSE_KEY}
 
 TZ=${TIMEZONE}
 ENVEOF

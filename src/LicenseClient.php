@@ -22,7 +22,7 @@ class LicenseClient {
     
     public function validate(): array {
         if (!$this->isEnabled()) {
-            return ['valid' => true, 'mode' => 'unlicensed', 'features' => $this->config['features']];
+            return ['valid' => false, 'mode' => 'unconfigured', 'error' => 'license_required', 'message' => 'License not configured. Please enter your license server URL and key in Settings.'];
         }
         
         $cached = $this->getCachedLicense();
