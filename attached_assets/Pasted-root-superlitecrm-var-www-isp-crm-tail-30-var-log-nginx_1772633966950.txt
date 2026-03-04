@@ -1,0 +1,32 @@
+root@superlitecrm:/var/www/isp-crm# tail -30 /var/log/nginx/demo.superlite.co.ke_error.log
+#2 {main}
+  thrown in /var/www/isp-crm/templates/huawei_olt.php on line 18284" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=huawei-olt HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=isp_inventory"
+2026/03/04 14:15:58 [error] 41102#41102: *387 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "session_end" does not exist
+LINE 1: ...TINCT subscription_id) FROM radius_sessions WHERE session_en...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "radius_sessions.session_id". in /var/www/isp-crm/src/RadiusBilling.php:1689
+Stack trace:
+#0 /var/www/isp-crm/src/RadiusBilling.php(1689): PDO->query()
+#1 /var/www/isp-crm/templates/isp.php(2076): App\RadiusBilling->getDashboardStats()
+#2 /var/www/isp-crm/public/index.php(3490): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/RadiusBilling.php on line 1689" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=isp HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=huawei-olt"
+2026/03/04 14:18:36 [error] 41102#41102: *394 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "download_mb" does not exist
+LINE 1: SELECT COALESCE(SUM(download_mb + upload_mb), 0) / 1024 FROM...
+                            ^ in /var/www/isp-crm/src/RadiusBilling.php:1693
+Stack trace:
+#0 /var/www/isp-crm/src/RadiusBilling.php(1693): PDO->query()
+#1 /var/www/isp-crm/templates/isp.php(2076): App\RadiusBilling->getDashboardStats()
+#2 /var/www/isp-crm/public/index.php(3490): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/RadiusBilling.php on line 1693" while reading response header from upstream, client: 172.68.47.134, server: demo.superlite.co.ke, request: "GET /?page=isp HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=huawei-olt"
+2026/03/04 14:18:40 [error] 41102#41102: *394 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "download_mb" does not exist
+LINE 1: SELECT COALESCE(SUM(download_mb + upload_mb), 0) / 1024 FROM...
+                            ^ in /var/www/isp-crm/src/RadiusBilling.php:1693
+Stack trace:
+#0 /var/www/isp-crm/src/RadiusBilling.php(1693): PDO->query()
+#1 /var/www/isp-crm/templates/isp.php(2076): App\RadiusBilling->getDashboardStats()
+#2 /var/www/isp-crm/public/index.php(3490): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/RadiusBilling.php on line 1693" while reading response header from upstream, client: 172.68.47.134, server: demo.superlite.co.ke, request: "GET /?page=isp HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=huawei-olt"
+root@superlitecrm:/var/www/isp-crm#

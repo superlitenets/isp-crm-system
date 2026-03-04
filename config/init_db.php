@@ -2042,6 +2042,16 @@ function runMigrations(PDO $db): void {
         ['radius_sessions', 'started_at', 'ALTER TABLE radius_sessions ADD COLUMN started_at TIMESTAMP'],
         ['radius_sessions', 'stopped_at', 'ALTER TABLE radius_sessions ADD COLUMN stopped_at TIMESTAMP'],
         ['radius_billing', 'status', "ALTER TABLE radius_billing ADD COLUMN status VARCHAR(20) DEFAULT 'paid'"],
+        ['radius_billing', 'package_id', 'ALTER TABLE radius_billing ADD COLUMN package_id INTEGER'],
+        ['radius_billing', 'billing_type', 'ALTER TABLE radius_billing ADD COLUMN billing_type VARCHAR(20)'],
+        ['radius_billing', 'period_start', 'ALTER TABLE radius_billing ADD COLUMN period_start DATE'],
+        ['radius_billing', 'period_end', 'ALTER TABLE radius_billing ADD COLUMN period_end DATE'],
+        ['radius_billing', 'invoice_number', 'ALTER TABLE radius_billing ADD COLUMN invoice_number VARCHAR(50)'],
+        ['radius_billing', 'description', 'ALTER TABLE radius_billing ADD COLUMN description TEXT'],
+        ['radius_billing', 'paid_at', 'ALTER TABLE radius_billing ADD COLUMN paid_at TIMESTAMP'],
+        ['radius_usage_logs', 'log_date', 'ALTER TABLE radius_usage_logs ADD COLUMN log_date DATE'],
+        ['radius_usage_logs', 'upload_mb', 'ALTER TABLE radius_usage_logs ADD COLUMN upload_mb DECIMAL(12,2) DEFAULT 0'],
+        ['radius_usage_logs', 'download_mb', 'ALTER TABLE radius_usage_logs ADD COLUMN download_mb DECIMAL(12,2) DEFAULT 0'],
         ['huawei_onu_types', 'name', 'ALTER TABLE huawei_onu_types ADD COLUMN name VARCHAR(100)'],
         ['huawei_onu_types', 'equipment_id', 'ALTER TABLE huawei_onu_types ADD COLUMN equipment_id VARCHAR(100)'],
         ['huawei_onu_types', 'is_active', 'ALTER TABLE huawei_onu_types ADD COLUMN is_active BOOLEAN DEFAULT TRUE']
@@ -2642,12 +2652,19 @@ function runMigrations(PDO $db): void {
         $db->exec("CREATE TABLE IF NOT EXISTS radius_billing (
             id SERIAL PRIMARY KEY,
             subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+            package_id INTEGER,
             amount DECIMAL(10,2) NOT NULL,
-            transaction_type VARCHAR(20) NOT NULL,
+            billing_type VARCHAR(20),
+            transaction_type VARCHAR(20),
+            period_start DATE,
+            period_end DATE,
+            invoice_number VARCHAR(50),
             payment_method VARCHAR(50),
             reference VARCHAR(100),
             status VARCHAR(20) DEFAULT 'paid',
+            description TEXT,
             notes TEXT,
+            paid_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )");
     } catch (PDOException $e) {
@@ -2659,12 +2676,14 @@ function runMigrations(PDO $db): void {
         $db->exec("CREATE TABLE IF NOT EXISTS radius_usage_logs (
             id SERIAL PRIMARY KEY,
             subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
-            date DATE NOT NULL,
+            log_date DATE NOT NULL,
             upload_bytes BIGINT DEFAULT 0,
             download_bytes BIGINT DEFAULT 0,
+            upload_mb DECIMAL(12,2) DEFAULT 0,
+            download_mb DECIMAL(12,2) DEFAULT 0,
             session_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(subscription_id, date)
+            UNIQUE(subscription_id, log_date)
         )");
     } catch (PDOException $e) {
         error_log("RADIUS usage logs table error: " . $e->getMessage());
