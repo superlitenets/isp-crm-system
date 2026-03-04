@@ -1,0 +1,32 @@
+
+psql:database/migration.sql:17866: ERROR:  relation "tickets" does not exist
+LINE 1: UPDATE tickets SET status = 'resolved' WHERE status = 'close...
+               ^
+psql:database/migration.sql:17869: ERROR:  relation "ticket_status_tokens" does not exist
+psql:database/migration.sql:17870: ERROR:  relation "ticket_status_tokens" does not exist
+LINE 1: UPDATE ticket_status_tokens SET allowed_statuses = REPLACE(a...
+               ^
+psql:database/migration.sql:17878: ERROR:  relation "isp_core_equipment" does not exist
+CONTEXT:  SQL statement "ALTER TABLE isp_core_equipment ADD COLUMN monitor_enabled BOOLEAN DEFAULT TRUE"
+PL/pgSQL function inline_code_block line 2 at SQL statement
+psql:database/migration.sql:17883: ERROR:  relation "isp_core_equipment" does not exist
+CONTEXT:  SQL statement "ALTER TABLE isp_core_equipment ADD COLUMN ping_status VARCHAR(20) DEFAULT 'unknown'"
+PL/pgSQL function inline_code_block line 2 at SQL statement
+psql:database/migration.sql:17888: ERROR:  relation "isp_core_equipment" does not exist
+CONTEXT:  SQL statement "ALTER TABLE isp_core_equipment ADD COLUMN last_ping_at TIMESTAMP"
+PL/pgSQL function inline_code_block line 2 at SQL statement
+psql:database/migration.sql:17893: ERROR:  relation "isp_core_equipment" does not exist
+CONTEXT:  SQL statement "ALTER TABLE isp_core_equipment ADD COLUMN last_seen_online TIMESTAMP"
+PL/pgSQL function inline_code_block line 2 at SQL statement
+psql:database/migration.sql:17898: ERROR:  relation "isp_core_equipment" does not exist
+CONTEXT:  SQL statement "ALTER TABLE isp_core_equipment ADD COLUMN downtime_started TIMESTAMP"
+PL/pgSQL function inline_code_block line 2 at SQL statement
+psql:database/migration.sql:17903: ERROR:  relation "isp_core_equipment" does not exist
+CONTEXT:  SQL statement "ALTER TABLE isp_core_equipment ADD COLUMN downtime_notified BOOLEAN DEFAULT FALSE"
+PL/pgSQL function inline_code_block line 2 at SQL statement
+psql:database/migration.sql:17911: ERROR:  no schema has been selected to create in
+LINE 1: CREATE TABLE IF NOT EXISTS isp_equipment_uptime_log (
+                                   ^
+psql:database/migration.sql:17913: ERROR:  relation "isp_equipment_uptime_log" does not exist
+psql:database/migration.sql:17914: ERROR:  relation "isp_equipment_uptime_log" does not exist
+root@superlitecrm:/var/www/isp-crm#
