@@ -127,7 +127,7 @@ PHPPOOL
 
 while IFS='=' read -r key value; do
     key=$(echo "$key" | xargs)
-    if [ -n "$key" ] && [[ ! "$key" =~ ^# ]]; then
+    if [ -n "$key" ] && [[ ! "$key" =~ ^# ]] && [ -n "$value" ]; then
         value=$(echo "$value" | xargs)
         echo "env[${key}] = ${value}" >> "/etc/php/8.2/fpm/pool.d/license-server.conf"
     fi
@@ -156,7 +156,7 @@ server {
     }
 
     location ~ \.php\$ {
-        include snippets/fastcgi-params.conf;
+        include fastcgi_params;
         fastcgi_pass unix:/run/php/license-server.sock;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         fastcgi_read_timeout 60;
@@ -172,15 +172,22 @@ server {
 NGINXEOF
 
 ln -sf "/etc/nginx/sites-available/${DOMAIN}" /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
+
+print_step "Starting PHP-FPM..."
+PHP_FPM_SERVICE=$(systemctl list-units --all --type=service | grep php | grep fpm | awk '{print $1}' | head -1)
+PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.2-fpm}"
+systemctl restart "${PHP_FPM_SERVICE}" || {
+    echo -e "${YELLOW}PHP-FPM failed to start. Check: journalctl -xeu ${PHP_FPM_SERVICE}${NC}"
+}
+
+nginx -t && systemctl reload nginx || {
+    echo -e "${YELLOW}Nginx config test failed. Check: nginx -t${NC}"
+}
 
 print_step "Obtaining SSL certificate..."
 certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos -m "${ADMIN_EMAIL}" --redirect || {
     echo -e "${YELLOW}SSL setup failed. Retry later: certbot --nginx -d ${DOMAIN}${NC}"
 }
-
-PHP_FPM_SERVICE=$(systemctl list-units --type=service | grep php | grep fpm | awk '{print $1}' | head -1)
-systemctl restart "${PHP_FPM_SERVICE:-php8.2-fpm}"
 
 echo ""
 echo -e "${GREEN}============================================="
