@@ -130,24 +130,54 @@ class ProtrackService {
         return json_decode($result, true);
     }
     
-    private function apiGet(string $endpoint, array $params = []): ?array {
-        $token = $this->getAccessToken();
-        if (!$token) return null;
-        
-        $params['access_token'] = $token;
-        $url = $this->apiBase . $endpoint . '?' . http_build_query($params);
-        
-        return $this->httpGet($url);
+    private function invalidateToken(): void {
+        $this->accessToken = null;
+        $this->tokenExpiry = null;
+        $this->saveSetting('protrack_access_token', '');
+        $this->saveSetting('protrack_token_expiry', '');
     }
     
-    private function apiPost(string $endpoint, array $params = []): ?array {
+    private function isTokenError(?array $response): bool {
+        $code = $response['code'] ?? -1;
+        return in_array($code, [10012, 10013, 10014]);
+    }
+    
+    private function apiGet(string $endpoint, array $params = [], bool $isRetry = false): ?array {
         $token = $this->getAccessToken();
         if (!$token) return null;
         
         $params['access_token'] = $token;
         $url = $this->apiBase . $endpoint . '?' . http_build_query($params);
         
-        return $this->httpPost($url);
+        $result = $this->httpGet($url);
+        
+        if (!$isRetry && $this->isTokenError($result)) {
+            error_log("[ProtrackService] Token invalid/expired, refreshing and retrying...");
+            $this->invalidateToken();
+            unset($params['access_token']);
+            return $this->apiGet($endpoint, $params, true);
+        }
+        
+        return $result;
+    }
+    
+    private function apiPost(string $endpoint, array $params = [], bool $isRetry = false): ?array {
+        $token = $this->getAccessToken();
+        if (!$token) return null;
+        
+        $params['access_token'] = $token;
+        $url = $this->apiBase . $endpoint . '?' . http_build_query($params);
+        
+        $result = $this->httpPost($url);
+        
+        if (!$isRetry && $this->isTokenError($result)) {
+            error_log("[ProtrackService] Token invalid/expired, refreshing and retrying...");
+            $this->invalidateToken();
+            unset($params['access_token']);
+            return $this->apiPost($endpoint, $params, true);
+        }
+        
+        return $result;
     }
     
     public function getTrack(array $imeis): ?array {
