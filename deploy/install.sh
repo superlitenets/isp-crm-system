@@ -452,6 +452,7 @@ echo "    Backup DB:    pg_dump -h localhost -U ${DB_USER} ${DB_NAME} > backup.s
 echo "    Update code:  cd ${APP_DIR} && git pull && composer install && systemctl restart ${PHP_FPM_SERVICE} isp-olt isp-whatsapp"
 echo ""
 
+mkdir -p "${APP_DIR}/deploy"
 cat > "${APP_DIR}/deploy/credentials.txt" << CREDEOF
 === ISP CRM Production Credentials ===
 Generated: $(date)
