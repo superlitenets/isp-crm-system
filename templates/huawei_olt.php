@@ -252,10 +252,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
     exit;
 }
 // AJAX endpoint for staged authorization (with progress)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'auth_progress') {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    $onuId = (int)($_GET['onu_id'] ?? 0);
+    if ($onuId > 0) {
+        $progress = $huaweiOLT->getAuthProgress($onuId);
+        echo json_encode($progress ?: ['percent' => 0, 'step' => 'Waiting...', 'detail' => '']);
+    } else {
+        echo json_encode(['percent' => 0, 'step' => 'Waiting...', 'detail' => '']);
+    }
+    exit;
+}
+
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
     header('Content-Type: application/json');
     
-    // Debug logging function
     $debugLog = function($stage, $message, $data = []) {
         $logFile = '/tmp/auth_debug.log';
         $entry = date('Y-m-d H:i:s') . " [Stage $stage] $message";
@@ -7710,16 +7722,7 @@ try {
             <div class="loading-text mt-3" id="loadingText">Connecting to OLT...</div>
             <div class="text-muted small mt-1" id="loadingSubtext">This may take a few seconds</div>
             <div id="authProgressStage" class="auth-stage-label mt-2"></div>
-            <div id="loadingStages" class="mt-3 text-start" style="display:none; max-width: 350px;">
-                <div class="stage-item" id="stage1" data-stage="1">
-                    <i class="bi bi-circle stage-icon me-2"></i>
-                    <span>Saving ONU details...</span>
-                </div>
-                <div class="stage-item" id="stage2" data-stage="2">
-                    <i class="bi bi-circle stage-icon me-2"></i>
-                    <span>Authorizing + Service Port + TR-069...</span>
-                </div>
-            </div>
+            <div id="loadingStages" class="mt-3 text-start" style="display:none; max-width: 350px;"></div>
             <div id="loadingError" class="alert alert-danger mt-3" style="display:none; max-width: 350px;"></div>
             <div id="authProgressBar" style="display:none;"></div>
         </div>
@@ -7812,6 +7815,16 @@ try {
         .circular-progress-svg.indeterminate .circular-fill {
             stroke-dashoffset: 245;
             transition: none;
+        }
+        .circular-fill.indeterminate {
+            stroke-dashoffset: 245 !important;
+            transition: none !important;
+            animation: indeterminateSpin 1.4s linear infinite;
+        }
+        @keyframes indeterminateSpin {
+            0% { stroke-dashoffset: 245; }
+            50% { stroke-dashoffset: 80; }
+            100% { stroke-dashoffset: 245; }
         }
         .auth-stage-label {
             font-size: 0.85rem;
@@ -18504,16 +18517,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const loadingSubtext = document.getElementById('loadingSubtext');
         const loadingStages = document.getElementById('loadingStages');
         const loadingProgress = document.getElementById('loadingProgress');
-        const progressBar = document.getElementById('authProgressBar');
         const progressPct = document.getElementById('authProgressPct');
         const progressStage = document.getElementById('authProgressStage');
         const loadingError = document.getElementById('loadingError');
-
-        const stageLabels = {
-            1: 'Saving ONU details...',
-            2: 'Authorizing + configuring OLT...'
-        };
-        const stageWeights = { 1: 15, 2: 90 };
 
         loadingText.textContent = 'Authorizing ONU...';
         loadingSubtext.textContent = 'Please wait while we configure the device';
@@ -18522,114 +18528,127 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         loadingError.style.display = 'none';
         progressPct.textContent = '0%';
         progressPct.classList.remove('error', 'complete');
-        progressStage.textContent = '';
-        document.getElementById('circularFill').classList.remove('error', 'complete');
-        document.getElementById('circularFill').style.strokeDashoffset = 326.73;
-        document.getElementById('circularGlow').classList.remove('error', 'complete');
+        progressStage.textContent = 'Initializing...';
+        const circularFill = document.getElementById('circularFill');
+        const circularGlow = document.getElementById('circularGlow');
+        circularFill.classList.remove('error', 'complete', 'indeterminate');
+        circularFill.style.strokeDashoffset = 326.73;
+        const svgEl = circularFill.closest('svg');
+        if (svgEl) svgEl.classList.remove('indeterminate');
+        circularGlow.classList.remove('error', 'complete');
 
         overlay.classList.add('active');
-
         const authModal = bootstrap.Modal.getInstance(document.getElementById('authModal'));
         if (authModal) authModal.hide();
 
         let currentOnuId = formData.get('onu_id');
         let currentVlanId = formData.get('vlan_id');
         let currentOnuMode = formData.get('onu_mode') || 'router';
-        let warnings = [];
-
-        const circularFill = document.getElementById('circularFill');
-        const circularGlow = document.getElementById('circularGlow');
         const circumference = 2 * Math.PI * 52;
 
-        function setProgress(pct, label) {
+        function setProgress(pct, label, detail) {
             const offset = circumference - (pct / 100) * circumference;
             circularFill.style.strokeDashoffset = offset;
             progressPct.textContent = Math.round(pct) + '%';
             if (label) progressStage.textContent = label;
+            if (detail) loadingSubtext.textContent = detail;
         }
 
-        for (let stage = 1; stage <= 2; stage++) {
-            setProgress(stageWeights[stage] - 5, stageLabels[stage]);
+        function showError(msg, stageLabel) {
+            circularFill.classList.add('error');
+            circularGlow.classList.add('error');
+            progressPct.classList.add('error');
+            loadingText.textContent = 'Authorization Failed';
+            loadingSubtext.innerHTML = '';
+            loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>' + msg;
+            loadingError.style.display = 'block';
+            if (stageLabel) progressStage.textContent = 'Failed at: ' + stageLabel;
+            setTimeout(() => { hideLoading(); }, 5000);
+        }
 
-            try {
-                const stageData = new FormData();
-                stageData.append('stage', stage);
-
-                if (stage === 1) {
-                    for (let [key, value] of formData.entries()) {
-                        stageData.append(key, value);
+        let pollTimer = null;
+        function startPolling(onuId) {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(async () => {
+                try {
+                    const r = await fetch('?page=huawei-olt&ajax=auth_progress&onu_id=' + onuId);
+                    const p = await r.json();
+                    if (p && p.percent > 0) {
+                        setProgress(p.percent, p.step, p.detail);
                     }
-                } else {
-                    stageData.append('onu_id', currentOnuId);
-                    stageData.append('vlan_id', currentVlanId);
-                    stageData.append('name', formData.get('name'));
-                    stageData.append('sn', formData.get('sn'));
-                    stageData.append('onu_mode', currentOnuMode);
-                }
+                } catch(e) {}
+            }, 800);
+        }
+        function stopPolling() {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
 
-                const response = await fetch('?page=huawei-olt&ajax=authorize_staged', {
-                    method: 'POST',
-                    body: stageData
-                });
+        try {
+            setProgress(2, 'Saving ONU details...', 'Preparing database record...');
+            const stage1Data = new FormData();
+            stage1Data.append('stage', 1);
+            for (let [key, value] of formData.entries()) {
+                stage1Data.append(key, value);
+            }
+            const resp1 = await fetch('?page=huawei-olt&ajax=authorize_staged', { method: 'POST', body: stage1Data });
+            const result1 = await resp1.json();
 
-                const result = await response.json();
-
-                if (!result.success) {
-                    circularFill.classList.add('error');
-                    circularGlow.classList.add('error');
-                    progressPct.classList.add('error');
-                    setProgress(stageWeights[stage], stageLabels[stage]);
-                    loadingText.textContent = 'Authorization Failed';
-                    loadingSubtext.innerHTML = '';
-                    loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>' + (result.error || 'Unknown error');
-                    loadingError.style.display = 'block';
-                    progressStage.textContent = 'Failed at: ' + stageLabels[stage];
-
-                    setTimeout(() => { hideLoading(); }, 5000);
-                    return;
-                }
-
-                setProgress(stageWeights[stage], stageLabels[stage]);
-
-                if (result.onu_id) currentOnuId = result.onu_id;
-                if (result.vlan_id) currentVlanId = result.vlan_id;
-                if (result.onu_mode) currentOnuMode = result.onu_mode;
-                if (result.warning) warnings.push(result.warning);
-
-                if (result.next_stage === null) {
-                    circularFill.classList.add('complete');
-                    circularGlow.classList.add('complete');
-                    progressPct.classList.add('complete');
-                    setProgress(100, 'Complete!');
-                    loadingText.textContent = 'Authorization Complete!';
-                    loadingSubtext.textContent = warnings.length > 0
-                        ? 'Warnings: ' + warnings.join('; ')
-                        : 'Redirecting...';
-
-                    setTimeout(() => {
-                        if (result.redirect) {
-                            window.location.href = result.redirect;
-                        } else {
-                            hideLoading();
-                            location.reload();
-                        }
-                    }, 1200);
-                    return;
-                }
-
-            } catch (err) {
-                circularFill.classList.add('error');
-                circularGlow.classList.add('error');
-                progressPct.classList.add('error');
-                loadingText.textContent = 'Authorization Failed';
-                loadingSubtext.innerHTML = '';
-                loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Network Error: ' + err.message;
-                loadingError.style.display = 'block';
-                progressStage.textContent = 'Failed at: ' + stageLabels[stage];
-
-                setTimeout(() => { hideLoading(); }, 5000);
+            if (!result1.success) {
+                showError(result1.error || 'Failed to save ONU details', 'Saving ONU details');
                 return;
             }
+
+            if (result1.onu_id) currentOnuId = result1.onu_id;
+            if (result1.vlan_id) currentVlanId = result1.vlan_id;
+            if (result1.onu_mode) currentOnuMode = result1.onu_mode;
+
+            if (result1.next_stage === null) {
+                circularFill.classList.add('complete');
+                circularGlow.classList.add('complete');
+                progressPct.classList.add('complete');
+                setProgress(100, 'Complete!', 'Redirecting...');
+                loadingText.textContent = 'Authorization Complete!';
+                setTimeout(() => {
+                    if (result1.redirect) window.location.href = result1.redirect;
+                    else { hideLoading(); location.reload(); }
+                }, 1200);
+                return;
+            }
+
+            setProgress(5, 'Starting authorization...', 'Connecting to OLT...');
+            startPolling(currentOnuId);
+
+            const stage2Data = new FormData();
+            stage2Data.append('stage', 2);
+            stage2Data.append('onu_id', currentOnuId);
+            stage2Data.append('vlan_id', currentVlanId);
+            stage2Data.append('name', formData.get('name'));
+            stage2Data.append('sn', formData.get('sn'));
+            stage2Data.append('onu_mode', currentOnuMode);
+
+            const resp2 = await fetch('?page=huawei-olt&ajax=authorize_staged', { method: 'POST', body: stage2Data });
+            const result2 = await resp2.json();
+            stopPolling();
+
+            if (!result2.success) {
+                showError(result2.error || 'Authorization failed', progressStage.textContent);
+                return;
+            }
+
+            circularFill.classList.add('complete');
+            circularGlow.classList.add('complete');
+            progressPct.classList.add('complete');
+            setProgress(100, 'Complete!', result2.warning ? 'Warning: ' + result2.warning : 'Redirecting...');
+            loadingText.textContent = 'Authorization Complete!';
+
+            setTimeout(() => {
+                if (result2.redirect) window.location.href = result2.redirect;
+                else { hideLoading(); location.reload(); }
+            }, 1200);
+
+        } catch (err) {
+            stopPolling();
+            showError('Network Error: ' + err.message, progressStage.textContent);
         }
     }
     </script>
@@ -21729,15 +21748,29 @@ function saveDeviceStatus() {
     
     function showLoading(message) {
         document.getElementById('loadingText').textContent = message || 'Processing...';
+        document.getElementById('loadingSubtext').textContent = 'This may take a moment...';
+        const prog = document.getElementById('loadingProgress');
+        const fill = document.getElementById('circularFill');
+        const svg = fill ? fill.closest('svg') : null;
+        const pct = document.getElementById('authProgressPct');
+        const stage = document.getElementById('authProgressStage');
+        if (prog) prog.style.display = 'block';
+        if (fill) { fill.classList.remove('error', 'complete'); fill.classList.add('indeterminate'); }
+        if (svg) svg.classList.add('indeterminate');
+        if (pct) { pct.textContent = ''; pct.classList.remove('error', 'complete'); }
+        if (stage) stage.textContent = '';
+        document.getElementById('loadingError').style.display = 'none';
         document.getElementById('loadingOverlay').classList.add('active');
     }
     
     function hideLoading() {
         document.getElementById('loadingOverlay').classList.remove('active');
         const fill = document.getElementById('circularFill');
+        const svg = fill ? fill.closest('svg') : null;
         const glow = document.getElementById('circularGlow');
         const pct = document.getElementById('authProgressPct');
-        if (fill) fill.classList.remove('error', 'complete');
+        if (fill) fill.classList.remove('error', 'complete', 'indeterminate');
+        if (svg) svg.classList.remove('indeterminate');
         if (glow) glow.classList.remove('error', 'complete');
         if (pct) { pct.classList.remove('error', 'complete'); pct.textContent = '0%'; }
         if (fill) fill.style.strokeDashoffset = 326.73;

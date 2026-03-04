@@ -6629,6 +6629,28 @@ class HuaweiOLT {
      * STAGE 1: Authorization + Service Ports ONLY
      * SmartOLT-style provisioning: Authorize ONU first, verify it's online, then proceed
      */
+    private function updateAuthProgress(int $onuId, int $pct, string $step, string $detail = ''): void {
+        $data = [
+            'onu_id' => $onuId,
+            'percent' => $pct,
+            'step' => $step,
+            'detail' => $detail,
+            'timestamp' => microtime(true)
+        ];
+        @file_put_contents("/tmp/auth_progress_{$onuId}.json", json_encode($data));
+    }
+    
+    private function clearAuthProgress(int $onuId): void {
+        @unlink("/tmp/auth_progress_{$onuId}.json");
+    }
+    
+    public function getAuthProgress(int $onuId): ?array {
+        $file = "/tmp/auth_progress_{$onuId}.json";
+        if (!file_exists($file)) return null;
+        $data = @json_decode(@file_get_contents($file), true);
+        return $data ?: null;
+    }
+    
     public function authorizeONUStage1(int $onuId, int $profileId, array $options = []): array {
         $onu = $this->getONU($onuId);
         
@@ -6638,6 +6660,7 @@ class HuaweiOLT {
         
         $oltId = $onu['olt_id'];
         
+        $this->updateAuthProgress($onuId, 5, 'Preparing', 'Pausing discovery, looking up profiles...');
         $this->pauseDiscovery($oltId, 45000);
         
         $equipmentId = $this->getOnuEquipmentId($onuId);
@@ -6703,12 +6726,12 @@ class HuaweiOLT {
             $description = $this->generateNextSNSCode($oltId);
         }
         
-        // ==== CHECK IF ONU IS ALREADY AUTHORIZED ON OLT ====
+        $this->updateAuthProgress($onuId, 10, 'Checking OLT', "Querying OLT for SN {$onu['sn']}...");
+        
         $existingOnuId = null;
         $alreadyAuthorized = false;
         $output = '';
         
-        // Query OLT to check if this SN is already authorized
         $checkCmd = "display ont info by-sn {$onu['sn']}";
         $checkResult = $this->executeCommand($oltId, $checkCmd);
         $checkOutput = $checkResult['output'] ?? '';
@@ -6731,10 +6754,9 @@ class HuaweiOLT {
         }
         
         if (!$alreadyAuthorized) {
-            // Query OLT for the next available ONU ID to avoid conflicts
             $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
             
-            // ==== STAGE 1A: AUTHORIZE ONU ====
+            $this->updateAuthProgress($onuId, 20, 'Authorizing ONU', "Sending ont add command to OLT (ID: {$assignedOnuId})...");
             error_log("[AuthStage1] FINAL: lineProfile={$lineProfileId}, srvProfile={$srvProfileId}, source={$profileSource}");
             $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$assignedOnuId} {$authPart} omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"\r\nquit";
             error_log("[AuthStage1] CLI Script: " . str_replace("\r\n", " | ", $cliScript));
@@ -6760,8 +6782,8 @@ class HuaweiOLT {
                 }
             }
             
-            // Verify authorization actually worked by querying the OLT
             if (!$alreadyAuthorized) {
+                $this->updateAuthProgress($onuId, 30, 'Verifying', 'Confirming ONU is registered on OLT...');
                 usleep(500000);
                 $verifyResult = $this->executeCommand($oltId, "display ont info by-sn {$onu['sn']}");
                 $verifyOutput = $verifyResult['output'] ?? '';
@@ -6794,12 +6816,12 @@ class HuaweiOLT {
             'provisioning_stage' => 1
         ]);
         
-        // ==== STAGE 1B: CREATE SERVICE-PORT (Internet VLAN) ====
         $vlanId = $options['vlan_id'] ?? null;
         $servicePortOutput = '';
         $servicePortSuccess = false;
         
         if ($vlanId && $assignedOnuId !== null) {
+            $this->updateAuthProgress($onuId, 40, 'Service Port', "Creating service-port for VLAN {$vlanId}...");
             $gemPort = $options['gem_port'] ?? 1;
             $inboundIndex = $options['inbound_traffic_index'] ?? 9;
             $outboundIndex = $options['outbound_traffic_index'] ?? 8;
@@ -6839,16 +6861,14 @@ class HuaweiOLT {
             }
         }
         
-        // ==== STAGE 1C: BIND NATIVE VLAN TO ETH PORT(s) (only for line profile 1) ====
-        // SmartOLT profile (line profile 2) handles port VLAN config in the profile itself
         $needsPortVlanConfig = ((int)$lineProfileId !== 2);
         $onuMode = $options['onu_mode'] ?? 'router';
         $isBridgeMode = (strtolower($onuMode) === 'bridge');
         $ethPortCount = (int)($onu['type_eth_ports'] ?? 4);
         if ($ethPortCount < 1) $ethPortCount = 1;
         
-        // Bridge mode needs native VLAN on all ETH ports (from ONU type config)
         if ($vlanId && $assignedOnuId !== null && $isBridgeMode) {
+            $this->updateAuthProgress($onuId, 55, 'Native VLAN', "Binding VLAN {$vlanId} to {$ethPortCount} ETH ports (Bridge)...");
             $scriptLines = [];
             $scriptLines[] = "interface gpon {$frame}/{$slot}";
             for ($ethPort = 1; $ethPort <= $ethPortCount; $ethPort++) {
@@ -6877,6 +6897,7 @@ class HuaweiOLT {
                 } catch (\Exception $e) {}
             }
         } elseif ($vlanId && $assignedOnuId !== null && $needsPortVlanConfig) {
+            $this->updateAuthProgress($onuId, 55, 'Native VLAN', "Binding VLAN {$vlanId} to ETH 1 (Router)...");
             $scriptLines = [];
             $scriptLines[] = "interface gpon {$frame}/{$slot}";
             $scriptLines[] = "ont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0";
@@ -6897,11 +6918,11 @@ class HuaweiOLT {
             $output .= "\n[Native VLAN] Skipped - SmartOLT profile handles port VLAN config";
         }
         
-        // ==== STAGE 1D: TR-069 CONFIGURATION (Auto) ====
         $tr069Status = ['attempted' => false, 'success' => false];
         $tr069Vlan = $options['tr069_vlan'] ?? $this->getTR069VlanForOlt($oltId);
         
         if ($tr069Vlan && $assignedOnuId !== null) {
+            $this->updateAuthProgress($onuId, 65, 'TR-069 OMCI', "Configuring ipconfig + server profile on VLAN {$tr069Vlan}...");
             $tr069ProfileId = $options['tr069_profile_id'] ?? $this->getTR069ProfileId();
             $tr069Priority = $options['tr069_priority'] ?? 2;
             $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
@@ -6934,6 +6955,7 @@ class HuaweiOLT {
             
             usleep(1000000);
             
+            $this->updateAuthProgress($onuId, 80, 'TR-069 Service Port', "Creating service-port for TR-069 VLAN {$tr069Vlan}...");
             $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
             $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
             $spOutput = $tr069SpResult['output'] ?? '';
@@ -6976,6 +6998,8 @@ class HuaweiOLT {
             $this->updateONU($onuId, ['onu_mode' => 'bridge']);
         }
         
+        $this->updateAuthProgress($onuId, 95, 'Finalizing', 'Saving configuration and resuming discovery...');
+        
         $this->addLog([
             'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
             'status' => 'success',
@@ -6984,8 +7008,9 @@ class HuaweiOLT {
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        // Resume discovery after Stage 1 completes
         $this->resumeDiscovery($oltId);
+        $this->updateAuthProgress($onuId, 100, 'Complete', 'Authorization finished successfully');
+        $this->clearAuthProgress($onuId);
         
         return [
             'success' => true,
