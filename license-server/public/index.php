@@ -34,7 +34,6 @@ try {
 }
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = str_replace('/api', '', $uri);
 $method = $_SERVER['REQUEST_METHOD'];
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
