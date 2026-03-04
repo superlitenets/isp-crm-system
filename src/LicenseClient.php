@@ -224,16 +224,32 @@ class LicenseClient {
         return self::APP_VERSION;
     }
     
+    private function getRealServerIp(): string {
+        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            return $_SERVER['HTTP_CF_CONNECTING_IP'];
+        }
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            return trim($ips[0]);
+        }
+        if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+            return $_SERVER['HTTP_X_REAL_IP'];
+        }
+        return $_SERVER['SERVER_ADDR'] ?? gethostbyname(gethostname());
+    }
+
     private function collectServerStats(): array {
         $stats = [
             'app_version' => self::APP_VERSION,
             'php_version' => PHP_VERSION,
             'os_info' => php_uname(),
-            'server_ip' => $_SERVER['SERVER_ADDR'] ?? gethostbyname(gethostname())
+            'server_ip' => $this->getRealServerIp(),
+            'hostname' => gethostname()
         ];
 
         try {
-            if (class_exists('Database', false)) {
+            require_once __DIR__ . '/../config/database.php';
+            if (class_exists('Database')) {
                 $db = \Database::getConnection();
                 
                 $stmt = $db->query("SELECT COUNT(*) FROM users");
@@ -315,7 +331,7 @@ class LicenseClient {
     private function getClientInfo(): array {
         return [
             'domain' => $_SERVER['HTTP_HOST'] ?? gethostname(),
-            'server_ip' => $_SERVER['SERVER_ADDR'] ?? gethostbyname(gethostname()),
+            'server_ip' => $this->getRealServerIp(),
             'hostname' => gethostname(),
             'hardware_id' => $this->generateHardwareId(),
             'php_version' => PHP_VERSION,
