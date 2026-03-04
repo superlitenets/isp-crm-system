@@ -2467,6 +2467,95 @@ if ($page === 'isp_inventory') {
             exit;
         }
     }
+    
+    $ispTab = $_GET['tab'] ?? 'overview';
+    $ispAction = $_GET['action'] ?? '';
+    if ($ispTab === 'fleet' && !empty($ispAction) && strpos($ispAction, 'ajax_') === 0) {
+        require_once __DIR__ . '/../src/FleetManagement.php';
+        $fleet = new \App\FleetManagement($db);
+        header('Content-Type: application/json');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        try {
+            switch ($ispAction) {
+                case 'ajax_track':
+                    $vehicleIds = !empty($_GET['vehicle_ids']) ? explode(',', $_GET['vehicle_ids']) : null;
+                    $result = $fleet->trackVehicles($vehicleIds);
+                    $vehicles = $fleet->getVehicles(['status' => 'active']);
+                    echo json_encode(['success' => true, 'tracking' => $result['record'] ?? [], 'vehicles' => $vehicles]);
+                    break;
+                case 'ajax_track_vehicle':
+                    $vehicleId = (int)($_GET['vehicle_id'] ?? 0);
+                    if (!$vehicleId) { echo json_encode(['success' => false, 'error' => 'Vehicle ID required']); break; }
+                    $vehicle = $fleet->getVehicle($vehicleId);
+                    if (!$vehicle || empty($vehicle['imei'])) { echo json_encode(['success' => false, 'error' => 'Vehicle not found or no IMEI']); break; }
+                    $result = $fleet->trackVehicles([$vehicleId]);
+                    $track = null;
+                    if (!empty($result['record'])) {
+                        foreach ($result['record'] as $t) {
+                            if ($t['imei'] === $vehicle['imei']) { $track = $t; break; }
+                        }
+                    }
+                    $vehicle = $fleet->getVehicle($vehicleId);
+                    echo json_encode(['success' => true, 'track' => $track, 'vehicle' => $vehicle]);
+                    break;
+                case 'ajax_playback':
+                    $vehicleId = (int)($_GET['vehicle_id'] ?? 0);
+                    $beginTime = (int)($_GET['begintime'] ?? 0);
+                    $endTime = (int)($_GET['endtime'] ?? 0);
+                    if (!$vehicleId || !$beginTime || !$endTime) { echo json_encode(['success' => false, 'error' => 'Vehicle ID, begin time and end time required']); break; }
+                    $result = $fleet->getPlayback($vehicleId, $beginTime, $endTime);
+                    if ($result && ($result['code'] ?? -1) === 0) {
+                        $points = [];
+                        $record = $result['record'] ?? '';
+                        if ($record) {
+                            $entries = explode(';', $record);
+                            foreach ($entries as $entry) {
+                                $parts = explode(',', $entry);
+                                if (count($parts) >= 5) {
+                                    $points[] = ['lng' => (float)$parts[0], 'lat' => (float)$parts[1], 'time' => (int)$parts[2], 'speed' => (int)$parts[3], 'course' => (int)$parts[4]];
+                                }
+                            }
+                        }
+                        echo json_encode(['success' => true, 'points' => $points]);
+                    } else {
+                        echo json_encode(['success' => false, 'error' => 'Failed to get playback data']);
+                    }
+                    break;
+                case 'ajax_send_command':
+                    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['success' => false, 'error' => 'POST required']); break; }
+                    if (!\App\Auth::can('inventory.manage')) { echo json_encode(['success' => false, 'error' => 'Insufficient permissions to send commands']); break; }
+                    $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+                    $csrfToken = $input['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+                    if (!$csrfToken || !\App\Auth::validateToken($csrfToken)) { echo json_encode(['success' => false, 'error' => 'Invalid security token']); break; }
+                    $vehicleId = (int)($input['vehicle_id'] ?? 0);
+                    $command = $input['command'] ?? '';
+                    if (!$vehicleId || !$command) { echo json_encode(['success' => false, 'error' => 'Vehicle ID and command required']); break; }
+                    $result = $fleet->sendCommand($vehicleId, $command, (int)($_SESSION['employee_id'] ?? 0));
+                    echo json_encode(['success' => $result && ($result['code'] ?? -1) === 0, 'result' => $result]);
+                    break;
+                case 'ajax_sync_devices':
+                    if (!\App\Auth::can('inventory.manage')) { echo json_encode(['success' => false, 'error' => 'Insufficient permissions']); break; }
+                    $result = $fleet->syncDevicesFromProtrack();
+                    echo json_encode($result);
+                    break;
+                case 'ajax_fetch_alarms':
+                    $vehicleId = (int)($_GET['vehicle_id'] ?? 0);
+                    if ($vehicleId) { $fleet->fetchAndStoreAlarms($vehicleId); }
+                    $filters = [];
+                    if ($vehicleId) $filters['vehicle_id'] = $vehicleId;
+                    if (isset($_GET['acknowledged'])) $filters['acknowledged'] = $_GET['acknowledged'] === '1';
+                    $alarms = $fleet->getAlarms($filters);
+                    echo json_encode(['success' => true, 'alarms' => $alarms]);
+                    break;
+                default:
+                    echo json_encode(['success' => false, 'error' => 'Unknown action']);
+            }
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
     include __DIR__ . '/../templates/isp_inventory.php';
     exit;
 }
