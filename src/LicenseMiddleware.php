@@ -46,6 +46,18 @@ class LicenseMiddleware {
     public static function getLicenseInfo(): ?array {
         return self::getClient()->getLicenseInfo();
     }
+
+    public static function getAppVersion(): string {
+        return self::getClient()->getAppVersion();
+    }
+
+    public static function checkForUpdates(): ?array {
+        return self::getClient()->checkForUpdates();
+    }
+
+    public static function getUpdateFromCache(): ?array {
+        return self::getClient()->getUpdateFromCache();
+    }
     
     public static function requireFeature(string $feature): void {
         if (!self::hasFeature($feature)) {
@@ -70,25 +82,35 @@ class LicenseMiddleware {
             return '';
         }
         
+        $html = '';
+        
         if (!$result['valid']) {
-            $error = $result['error'] ?? 'unknown';
             $message = $result['message'] ?? 'License validation failed';
-            
-            return '<div class="alert alert-danger m-3">
+            $html .= '<div class="alert alert-danger m-3">
                 <i class="bi bi-shield-exclamation me-2"></i>
                 <strong>License Error:</strong> ' . htmlspecialchars($message) . '
                 <a href="?page=settings&section=license" class="alert-link ms-2">Configure License</a>
             </div>';
-        }
-        
-        if (!empty($result['grace_mode'])) {
-            return '<div class="alert alert-warning m-3">
+        } elseif (!empty($result['grace_mode'])) {
+            $html .= '<div class="alert alert-warning m-3">
                 <i class="bi bi-clock me-2"></i>
                 <strong>Offline Mode:</strong> Cannot connect to license server. Running in grace period.
             </div>';
         }
+
+        $update = $result['update_available'] ?? null;
+        if ($update) {
+            $critical = !empty($update['is_critical']) ? ' <span class="badge bg-danger">Critical</span>' : '';
+            $html .= '<div class="alert alert-info m-3 d-flex align-items-center justify-content-between">
+                <div>
+                    <i class="bi bi-cloud-arrow-down me-2"></i>
+                    <strong>Update Available:</strong> v' . htmlspecialchars($update['version']) . ' — ' . htmlspecialchars($update['title']) . $critical . '
+                </div>
+                <a href="?page=settings&section=license" class="btn btn-sm btn-info">View Details</a>
+            </div>';
+        }
         
-        return '';
+        return $html;
     }
     
     private static function renderUpgradeMessage(string $feature): string {

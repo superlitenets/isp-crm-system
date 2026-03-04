@@ -55,7 +55,11 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Static IP Provisioning**: Provision static IPs and manage DHCP leases on MikroTik.
   - **MikroTik API Integration**: Full RouterOS API support for network configuration.
   - **Live Traffic Monitoring**: Real-time traffic graph for PPPoE, DHCP, and Static IP subscribers with on-demand Chart.js visualization polling MikroTik every 2 seconds.
-- **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers). License settings configurable via Settings > License page (server URL, key, activation, renewal) with database persistence. Config priority: DB settings > environment variables > defaults.
+- **Licensing System**: Standalone license server and client for feature gating (Starter/Professional/Enterprise tiers). License settings configurable via Settings > License page (server URL, key, activation, renewal, software updates) with database persistence. Config priority: DB settings > environment variables > defaults.
+  - **License Server Admin** (`license-server/public/admin.php`): Dashboard with server monitoring (online/stale/offline), update management (create/publish/install logs), license/customer/tier CRUD.
+  - **Server Monitoring**: Heartbeat with full stats (user_count, customer_count, onu_count, ticket_count, disk_usage, db_size, app_version). Stats history recorded hourly.
+  - **Software Updates**: `/api/check-update` and `/api/report-update` endpoints; CRM settings page shows update availability with changelog, download link, critical badges.
+  - **License Server Installer** (`license-server/install.sh`): Standalone VPS installer for the license server with PostgreSQL, PHP-FPM, Nginx, SSL.
 - **Hotspot Captive Portal**: URL-based NAS routing (`/hotspot/{nas_ip}`) for per-NAS package selection, MAC-based auto-login, M-Pesa STK Push, voucher redemption, and MikroTik CHAP integration. PHP built-in server uses `public/router.php` for URL path routing; Apache uses `.htaccess` rewrite rules.
 - **Core Network Monitoring**: Ping-based uptime monitoring for core equipment (routers, switches, OLTs, UPS, etc.) with WhatsApp notifications.
   - **Ping Status**: Real-time ICMP ping checks with online/offline/unknown status badges.

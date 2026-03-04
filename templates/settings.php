@@ -7577,6 +7577,7 @@ $licenseEnabled = $licenseClient->isEnabled();
 $licenseInfo = null;
 $licenseStatus = null;
 $licenseError = null;
+$appVersion = \LicenseClient::APP_VERSION;
 
 $licenseServerUrl = $settings->get('license_server_url', getenv('LICENSE_SERVER_URL') ?: '');
 $licenseKey = $settings->get('license_key', getenv('LICENSE_KEY') ?: '');
@@ -7614,6 +7615,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csrf_token'])) {
         $licenseClient->deactivate();
         $licenseStatus = 'deactivated';
     }
+    
+    if ($licenseAction === 'check_license_updates') {
+        try {
+            $updateResult = $licenseClient->checkForUpdates();
+            if (!empty($updateResult['update_available'])) {
+                $licenseStatus = 'update_available';
+            } else {
+                $licenseStatus = 'up_to_date';
+            }
+        } catch (Exception $e) {
+            $licenseError = 'Update check failed: ' . $e->getMessage();
+        }
+    }
 }
 
 $licenseValidation = $licenseClient->validate();
@@ -7636,6 +7650,16 @@ $mode = $licenseValidation['mode'] ?? '';
 <?php elseif ($licenseStatus === 'deactivated'): ?>
 <div class="alert alert-warning alert-dismissible fade show">
     <i class="bi bi-exclamation-triangle me-1"></i> License deactivated from this installation.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php elseif ($licenseStatus === 'update_available'): ?>
+<div class="alert alert-info alert-dismissible fade show">
+    <i class="bi bi-cloud-arrow-down me-1"></i> A new update is available! See the Software Updates section below.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php elseif ($licenseStatus === 'up_to_date'): ?>
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle me-1"></i> You are running the latest version.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 <?php endif; ?>
@@ -7822,6 +7846,72 @@ $mode = $licenseValidation['mode'] ?? '';
             </div>
             <?php endif; ?>
         </div>
+
+        <?php
+        $updateAvailable = $licenseValidation['update_available'] ?? null;
+        if (!$updateAvailable && $licenseEnabled) {
+            $updateAvailable = $licenseClient->getUpdateFromCache();
+        }
+        ?>
+        <div class="card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down me-2"></i>Software Updates</h5>
+                <span class="badge bg-secondary">v<?= htmlspecialchars($appVersion) ?></span>
+            </div>
+            <div class="card-body">
+                <?php if ($updateAvailable): ?>
+                <div class="alert alert-<?= !empty($updateAvailable['is_critical']) ? 'danger' : 'info' ?> mb-3">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-<?= !empty($updateAvailable['is_critical']) ? 'exclamation-triangle' : 'cloud-arrow-down' ?> me-2 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <strong>v<?= htmlspecialchars($updateAvailable['version']) ?> Available</strong>
+                            <?php if (!empty($updateAvailable['is_critical'])): ?>
+                                <span class="badge bg-danger ms-1">Critical</span>
+                            <?php endif; ?>
+                            <p class="mb-1 small"><?= htmlspecialchars($updateAvailable['title'] ?? '') ?></p>
+                            <?php if (!empty($updateAvailable['changelog'])): ?>
+                            <details class="mt-1">
+                                <summary class="small">View Changelog</summary>
+                                <pre class="mt-1 p-2 bg-light rounded small" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;"><?= htmlspecialchars($updateAvailable['changelog']) ?></pre>
+                            </details>
+                            <?php endif; ?>
+                            <div class="small text-muted mt-1">
+                                <?php if (!empty($updateAvailable['release_type'])): ?>
+                                    <span class="badge bg-secondary"><?= htmlspecialchars($updateAvailable['release_type']) ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($updateAvailable['min_php_version'])): ?>
+                                    Requires PHP >= <?= htmlspecialchars($updateAvailable['min_php_version']) ?>
+                                <?php endif; ?>
+                                <?php if (!empty($updateAvailable['published_at'])): ?>
+                                    | Released <?= date('M d, Y', strtotime($updateAvailable['published_at'])) ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php if (!empty($updateAvailable['download_url'])): ?>
+                <a href="<?= htmlspecialchars($updateAvailable['download_url']) ?>" class="btn btn-primary btn-sm mb-2" target="_blank">
+                    <i class="bi bi-download me-1"></i> Download v<?= htmlspecialchars($updateAvailable['version']) ?>
+                </a>
+                <?php endif; ?>
+                <?php else: ?>
+                <div class="text-center py-3">
+                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                    <p class="mb-0 mt-2">You are running the latest version <strong>(v<?= htmlspecialchars($appVersion) ?>)</strong></p>
+                </div>
+                <?php endif; ?>
+            </div>
+            <div class="card-footer bg-white">
+                <form method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="license_action" value="check_license_updates">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Check for Updates
+                    </button>
+                </form>
+                <span class="text-muted small ms-2">Current: v<?= htmlspecialchars($appVersion) ?></span>
+            </div>
+        </div>
     </div>
 
     <div class="col-lg-4">
@@ -7884,6 +7974,8 @@ $mode = $licenseValidation['mode'] ?? '';
                     <li>7-day grace period if the server is unreachable</li>
                     <li>Features are enabled/disabled based on your plan tier</li>
                     <li>Leave both fields empty to run without license restrictions</li>
+                    <li>Server stats (users, customers, ONUs) are reported during heartbeat</li>
+                    <li>Software updates are checked automatically during validation</li>
                 </ul>
             </div>
         </div>

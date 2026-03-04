@@ -7879,6 +7879,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'check_license_updates':
+                try {
+                    $licenseClient = new \LicenseClient();
+                    $update = $licenseClient->checkForUpdates();
+                    if ($update) {
+                        $message = 'Update available: v' . ($update['version'] ?? '') . ' — ' . ($update['title'] ?? '');
+                        $messageType = 'info';
+                    } else {
+                        $message = 'You are running the latest version (v' . \LicenseClient::APP_VERSION . ').';
+                        $messageType = 'success';
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error checking for updates: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'deactivate_license':
+                try {
+                    $licenseClient = new \LicenseClient();
+                    $licenseClient->deactivate();
+                    $message = 'License deactivated successfully.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deactivating license: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_protrack_settings':
                 try {
                     $settings->set('protrack_account', trim($_POST['protrack_account'] ?? ''));

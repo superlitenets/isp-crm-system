@@ -5,6 +5,8 @@ class LicenseClient {
     private $cacheFile;
     private $activationToken = null;
     
+    const APP_VERSION = '1.0.0';
+    
     public function __construct() {
         $this->config = require __DIR__ . '/../config/license.php';
         $this->cacheFile = $this->config['cache_file'];
@@ -32,9 +34,11 @@ class LicenseClient {
             $token = $this->getActivationToken();
             
             if ($token) {
-                $result = $this->callServer('heartbeat', [
-                    'activation_token' => $token
-                ]);
+                $stats = $this->collectServerStats();
+                $result = $this->callServer('heartbeat', array_merge(
+                    ['activation_token' => $token],
+                    $stats
+                ));
                 
                 if ($result['valid']) {
                     $this->cacheLicense($result);
@@ -74,7 +78,8 @@ class LicenseClient {
             'hostname' => $clientInfo['hostname'],
             'hardware_id' => $clientInfo['hardware_id'],
             'php_version' => $clientInfo['php_version'],
-            'os_info' => $clientInfo['os_info']
+            'os_info' => $clientInfo['os_info'],
+            'app_version' => self::APP_VERSION
         ]);
         
         if ($result['valid'] && !empty($result['activation_token'])) {
@@ -127,6 +132,106 @@ class LicenseClient {
     public function getLicenseInfo(): ?array {
         $license = $this->validate();
         return $license['valid'] ? $license['license'] ?? null : null;
+    }
+
+    public function checkForUpdates(): ?array {
+        if (!$this->isEnabled()) return null;
+
+        $token = $this->getActivationToken();
+        if (!$token) return null;
+
+        try {
+            $result = $this->callServer('check-update', [
+                'activation_token' => $token,
+                'app_version' => self::APP_VERSION
+            ]);
+            
+            if (!empty($result['update_available']) && !empty($result['update'])) {
+                return $result['update'];
+            }
+            return null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    public function reportUpdateResult(int $updateId, string $fromVersion, string $toVersion, string $status, ?string $error = null): bool {
+        $token = $this->getActivationToken();
+        if (!$token) return false;
+
+        try {
+            $this->callServer('report-update', [
+                'activation_token' => $token,
+                'update_id' => $updateId,
+                'from_version' => $fromVersion,
+                'to_version' => $toVersion,
+                'status' => $status,
+                'error' => $error
+            ]);
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    public function getUpdateFromCache(): ?array {
+        $cached = $this->getCachedLicense();
+        return $cached['update_available'] ?? null;
+    }
+
+    public function getAppVersion(): string {
+        return self::APP_VERSION;
+    }
+    
+    private function collectServerStats(): array {
+        $stats = [
+            'app_version' => self::APP_VERSION,
+            'php_version' => PHP_VERSION,
+            'os_info' => php_uname(),
+            'server_ip' => $_SERVER['SERVER_ADDR'] ?? gethostbyname(gethostname())
+        ];
+
+        try {
+            if (class_exists('Database', false)) {
+                $db = \Database::getConnection();
+                
+                $stmt = $db->query("SELECT COUNT(*) FROM users");
+                $stats['user_count'] = (int)$stmt->fetchColumn();
+                
+                $stmt = $db->query("SELECT COUNT(*) FROM customers");
+                $stats['customer_count'] = (int)$stmt->fetchColumn();
+
+                try {
+                    $stmt = $db->query("SELECT COUNT(*) FROM discovered_onus");
+                    $stats['onu_count'] = (int)$stmt->fetchColumn();
+                } catch (\Throwable $e) {
+                    $stats['onu_count'] = 0;
+                }
+
+                try {
+                    $stmt = $db->query("SELECT COUNT(*) FROM tickets");
+                    $stats['ticket_count'] = (int)$stmt->fetchColumn();
+                } catch (\Throwable $e) {
+                    $stats['ticket_count'] = 0;
+                }
+
+                try {
+                    $stmt = $db->query("SELECT pg_size_pretty(pg_database_size(current_database()))");
+                    $stats['db_size'] = $stmt->fetchColumn();
+                } catch (\Throwable $e) {
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $diskTotal = @disk_total_space('/');
+        $diskFree = @disk_free_space('/');
+        if ($diskTotal && $diskFree) {
+            $used = $diskTotal - $diskFree;
+            $stats['disk_usage'] = round($used / 1073741824, 1) . 'GB / ' . round($diskTotal / 1073741824, 1) . 'GB';
+        }
+
+        return $stats;
     }
     
     private function callServer(string $endpoint, array $data): array {

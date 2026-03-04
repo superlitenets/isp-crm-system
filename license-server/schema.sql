@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS license_products (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     features JSONB DEFAULT '{}',
+    current_version VARCHAR(20) DEFAULT '1.0.0',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -72,6 +73,14 @@ CREATE TABLE IF NOT EXISTS license_activations (
     
     php_version VARCHAR(20),
     os_info VARCHAR(255),
+    app_version VARCHAR(20),
+    
+    user_count INTEGER DEFAULT 0,
+    customer_count INTEGER DEFAULT 0,
+    onu_count INTEGER DEFAULT 0,
+    ticket_count INTEGER DEFAULT 0,
+    disk_usage VARCHAR(50),
+    db_size VARCHAR(50),
     
     first_activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -129,22 +138,73 @@ CREATE TABLE IF NOT EXISTS license_payments (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_licenses_key ON licenses(license_key);
-CREATE INDEX idx_licenses_customer ON licenses(customer_id);
-CREATE INDEX idx_licenses_active ON licenses(is_active, is_suspended);
-CREATE INDEX idx_activations_license ON license_activations(license_id);
-CREATE INDEX idx_activations_token ON license_activations(activation_token);
-CREATE INDEX idx_activations_domain ON license_activations(domain);
-CREATE INDEX idx_validation_logs_license ON license_validation_logs(license_id);
-CREATE INDEX idx_validation_logs_created ON license_validation_logs(created_at);
-CREATE INDEX idx_subscriptions_license ON license_subscriptions(license_id);
-CREATE INDEX idx_payments_license ON license_payments(license_id);
-CREATE INDEX idx_payments_mpesa ON license_payments(mpesa_receipt);
+CREATE TABLE IF NOT EXISTS license_updates (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER REFERENCES license_products(id),
+    version VARCHAR(20) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    changelog TEXT,
+    release_type VARCHAR(20) DEFAULT 'patch',
+    min_php_version VARCHAR(10),
+    min_node_version VARCHAR(10),
+    download_url TEXT,
+    download_hash VARCHAR(64),
+    file_size BIGINT,
+    is_critical BOOLEAN DEFAULT FALSE,
+    is_published BOOLEAN DEFAULT FALSE,
+    published_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(product_id, version)
+);
+
+CREATE TABLE IF NOT EXISTS license_update_logs (
+    id SERIAL PRIMARY KEY,
+    activation_id INTEGER REFERENCES license_activations(id),
+    update_id INTEGER REFERENCES license_updates(id),
+    from_version VARCHAR(20),
+    to_version VARCHAR(20),
+    status VARCHAR(20) DEFAULT 'pending',
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS license_server_stats_history (
+    id SERIAL PRIMARY KEY,
+    activation_id INTEGER REFERENCES license_activations(id),
+    user_count INTEGER DEFAULT 0,
+    customer_count INTEGER DEFAULT 0,
+    onu_count INTEGER DEFAULT 0,
+    ticket_count INTEGER DEFAULT 0,
+    disk_usage VARCHAR(50),
+    db_size VARCHAR(50),
+    app_version VARCHAR(20),
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key);
+CREATE INDEX IF NOT EXISTS idx_licenses_customer ON licenses(customer_id);
+CREATE INDEX IF NOT EXISTS idx_licenses_active ON licenses(is_active, is_suspended);
+CREATE INDEX IF NOT EXISTS idx_activations_license ON license_activations(license_id);
+CREATE INDEX IF NOT EXISTS idx_activations_token ON license_activations(activation_token);
+CREATE INDEX IF NOT EXISTS idx_activations_domain ON license_activations(domain);
+CREATE INDEX IF NOT EXISTS idx_activations_active ON license_activations(is_active, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_validation_logs_license ON license_validation_logs(license_id);
+CREATE INDEX IF NOT EXISTS idx_validation_logs_created ON license_validation_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_license ON license_subscriptions(license_id);
+CREATE INDEX IF NOT EXISTS idx_payments_license ON license_payments(license_id);
+CREATE INDEX IF NOT EXISTS idx_payments_mpesa ON license_payments(mpesa_receipt);
+CREATE INDEX IF NOT EXISTS idx_updates_product ON license_updates(product_id, version);
+CREATE INDEX IF NOT EXISTS idx_updates_published ON license_updates(is_published, published_at);
+CREATE INDEX IF NOT EXISTS idx_update_logs_activation ON license_update_logs(activation_id);
+CREATE INDEX IF NOT EXISTS idx_stats_history_activation ON license_server_stats_history(activation_id, recorded_at);
 
 -- Insert default product
-INSERT INTO license_products (code, name, description, features) VALUES 
+INSERT INTO license_products (code, name, description, features, current_version) VALUES 
 ('isp-crm', 'ISP CRM & OMS System', 'Complete ISP management with CRM, Ticketing, OMS, and more', 
- '{"crm": true, "tickets": true, "oms": true, "hr": true, "inventory": true, "accounting": true}')
+ '{"crm": true, "tickets": true, "oms": true, "hr": true, "inventory": true, "accounting": true}', '1.0.0')
 ON CONFLICT (code) DO NOTHING;
 
 -- Insert default tiers
