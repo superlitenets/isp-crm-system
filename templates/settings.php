@@ -7929,6 +7929,227 @@ $mode = $licenseValidation['mode'] ?? '';
     </div>
 
     <div class="col-lg-4">
+        <?php if ($licenseEnabled): ?>
+        <div class="card mb-4 border-success">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-phone me-2"></i>Pay with M-Pesa</h5>
+                <button class="btn btn-sm btn-outline-light" onclick="loadSubscriptionInfo()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="subscriptionLoading" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+                    <small class="text-muted ms-2">Loading...</small>
+                </div>
+
+                <div id="subscriptionContent" style="display:none;">
+                    <div class="bg-light rounded p-2 mb-3 small">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Plan</span>
+                            <strong id="subTierName">-</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Expires</span>
+                            <span id="subExpires">-</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Monthly</span>
+                            <span id="subPriceMonthly">-</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Yearly</span>
+                            <span id="subPriceYearly">-</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="billingCycle" id="cycleMonthly" value="monthly" checked onchange="updatePayAmount()">
+                            <label class="btn btn-outline-success btn-sm" for="cycleMonthly">Monthly</label>
+                            <input type="radio" class="btn-check" name="billingCycle" id="cycleYearly" value="yearly" onchange="updatePayAmount()">
+                            <label class="btn btn-outline-success btn-sm" for="cycleYearly">Yearly</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                            <input type="tel" class="form-control" id="mpesaPhone" placeholder="0712345678" maxlength="13">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success w-100" id="payBtn" onclick="initiateMpesaPayment()">
+                        <i class="bi bi-phone me-1"></i>Pay <span id="payAmountLabel">KES 0</span>
+                    </button>
+
+                    <div id="paymentProgress" style="display:none;" class="mt-2">
+                        <div class="alert alert-info py-2 mb-0 small">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                <div>
+                                    <strong>Waiting for M-Pesa...</strong>
+                                    <div id="paymentStatusText">Check your phone</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="paymentSuccess" style="display:none;" class="mt-2">
+                        <div class="alert alert-success py-2 mb-0 small">
+                            <i class="bi bi-check-circle-fill me-1"></i>
+                            <strong>Payment Successful!</strong>
+                            <div>Receipt: <span id="paymentReceipt"></span></div>
+                        </div>
+                    </div>
+
+                    <div id="paymentFailed" style="display:none;" class="mt-2">
+                        <div class="alert alert-danger py-2 mb-0 small">
+                            <i class="bi bi-x-circle-fill me-1"></i>
+                            <strong>Failed</strong>
+                            <div id="paymentErrorText"></div>
+                        </div>
+                    </div>
+
+                    <hr class="my-2">
+                    <h6 class="small text-muted mb-2"><i class="bi bi-clock-history me-1"></i>Recent Payments</h6>
+                    <div class="small" style="max-height:200px; overflow-y:auto;">
+                        <table class="table table-sm table-borderless mb-0">
+                            <tbody id="paymentHistoryBody">
+                                <tr><td class="text-center text-muted" colspan="3">No payments</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="subscriptionError" style="display:none;">
+                    <div class="text-center py-2 small text-muted">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <span id="subscriptionErrorText">Could not load info</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+        let subData = null;
+        function loadSubscriptionInfo() {
+            document.getElementById('subscriptionLoading').style.display = '';
+            document.getElementById('subscriptionContent').style.display = 'none';
+            document.getElementById('subscriptionError').style.display = 'none';
+            fetch('?page=license_subscription_info').then(r => r.json()).then(data => {
+                document.getElementById('subscriptionLoading').style.display = 'none';
+                if (data.success && data.license) {
+                    subData = data;
+                    renderSubscription(data);
+                    document.getElementById('subscriptionContent').style.display = '';
+                } else {
+                    document.getElementById('subscriptionErrorText').textContent = data.error || 'Could not load info';
+                    document.getElementById('subscriptionError').style.display = '';
+                }
+            }).catch(err => {
+                document.getElementById('subscriptionLoading').style.display = 'none';
+                document.getElementById('subscriptionErrorText').textContent = err.message;
+                document.getElementById('subscriptionError').style.display = '';
+            });
+        }
+        function renderSubscription(data) {
+            const lic = data.license;
+            document.getElementById('subTierName').textContent = lic.tier_name || 'N/A';
+            if (lic.expires_at) {
+                const exp = new Date(lic.expires_at);
+                const days = Math.max(0, Math.ceil((exp - new Date()) / 86400000));
+                let badge = days <= 7 ? ' <span class="badge bg-danger">' + days + 'd</span>'
+                    : days <= 30 ? ' <span class="badge bg-warning">' + days + 'd</span>' : '';
+                document.getElementById('subExpires').innerHTML = exp.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + badge;
+            } else {
+                document.getElementById('subExpires').innerHTML = '<span class="badge bg-success">Lifetime</span>';
+            }
+            document.getElementById('subPriceMonthly').textContent = 'KES ' + Number(lic.price_monthly).toLocaleString();
+            document.getElementById('subPriceYearly').textContent = 'KES ' + Number(lic.price_yearly).toLocaleString();
+            if (lic.customer_phone) document.getElementById('mpesaPhone').value = lic.customer_phone;
+            updatePayAmount();
+            const tbody = document.getElementById('paymentHistoryBody');
+            if (data.payments && data.payments.length > 0) {
+                tbody.innerHTML = data.payments.slice(0, 5).map(p => {
+                    const d = p.paid_at ? new Date(p.paid_at).toLocaleDateString() : new Date(p.created_at).toLocaleDateString();
+                    const s = p.status === 'completed' ? '<span class="text-success">Paid</span>'
+                        : p.status === 'failed' ? '<span class="text-danger">Failed</span>'
+                        : '<span class="text-warning">Pending</span>';
+                    return '<tr><td>' + d + '</td><td>KES ' + Number(p.amount).toLocaleString() + '</td><td>' + s + '</td></tr>';
+                }).join('');
+            }
+        }
+        function updatePayAmount() {
+            if (!subData) return;
+            const cycle = document.querySelector('input[name="billingCycle"]:checked').value;
+            const amt = cycle === 'yearly' ? subData.license.price_yearly : subData.license.price_monthly;
+            document.getElementById('payAmountLabel').textContent = 'KES ' + Number(amt).toLocaleString();
+        }
+        function initiateMpesaPayment() {
+            const phone = document.getElementById('mpesaPhone').value.trim();
+            if (!phone || phone.length < 10) { alert('Enter a valid phone number'); return; }
+            const cycle = document.querySelector('input[name="billingCycle"]:checked').value;
+            const btn = document.getElementById('payBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+            ['paymentProgress','paymentSuccess','paymentFailed'].forEach(id => document.getElementById(id).style.display = 'none');
+            fetch('?page=license_pay_initiate', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({phone, billing_cycle: cycle})
+            }).then(r => r.json()).then(data => {
+                if (data.success && data.checkout_request_id) {
+                    document.getElementById('paymentProgress').style.display = '';
+                    document.getElementById('paymentStatusText').textContent = data.message || 'Check your phone';
+                    pollPaymentStatus(data.checkout_request_id, 0);
+                } else {
+                    resetPayButton();
+                    document.getElementById('paymentFailed').style.display = '';
+                    document.getElementById('paymentErrorText').textContent = data.error || 'Failed';
+                }
+            }).catch(err => {
+                resetPayButton();
+                document.getElementById('paymentFailed').style.display = '';
+                document.getElementById('paymentErrorText').textContent = err.message;
+            });
+        }
+        function pollPaymentStatus(cid, attempt) {
+            if (attempt > 40) {
+                document.getElementById('paymentProgress').style.display = 'none';
+                document.getElementById('paymentFailed').style.display = '';
+                document.getElementById('paymentErrorText').textContent = 'Timed out. Payment may still process.';
+                resetPayButton(); return;
+            }
+            setTimeout(() => {
+                fetch('?page=license_pay_status', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({checkout_request_id: cid})
+                }).then(r => r.json()).then(data => {
+                    if (data.status === 'completed') {
+                        document.getElementById('paymentProgress').style.display = 'none';
+                        document.getElementById('paymentSuccess').style.display = '';
+                        document.getElementById('paymentReceipt').textContent = data.mpesa_receipt || 'N/A';
+                        resetPayButton();
+                        setTimeout(() => location.reload(), 3000);
+                    } else if (data.status === 'failed') {
+                        document.getElementById('paymentProgress').style.display = 'none';
+                        document.getElementById('paymentFailed').style.display = '';
+                        document.getElementById('paymentErrorText').textContent = 'Cancelled or failed';
+                        resetPayButton();
+                    } else { pollPaymentStatus(cid, attempt + 1); }
+                }).catch(() => pollPaymentStatus(cid, attempt + 1));
+            }, 3000);
+        }
+        function resetPayButton() {
+            const btn = document.getElementById('payBtn');
+            btn.disabled = false;
+            const cycle = document.querySelector('input[name="billingCycle"]:checked')?.value || 'monthly';
+            const amt = subData ? (cycle === 'yearly' ? subData.license.price_yearly : subData.license.price_monthly) : 0;
+            btn.innerHTML = '<i class="bi bi-phone me-1"></i>Pay KES ' + Number(amt).toLocaleString();
+        }
+        document.addEventListener('DOMContentLoaded', loadSubscriptionInfo);
+        </script>
+        <?php endif; ?>
+
         <div class="card mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0"><i class="bi bi-gear me-2"></i>License Configuration</h5>

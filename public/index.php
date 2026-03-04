@@ -3501,6 +3501,46 @@ if (!getenv('REPLIT_DEV_DOMAIN')) {
     }
 }
 
+if ($page === 'license_pay_initiate' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    require_once __DIR__ . '/../src/LicenseClient.php';
+    $client = new LicenseClient();
+    $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $phone = $input['phone'] ?? '';
+    $billingCycle = $input['billing_cycle'] ?? 'monthly';
+    if (empty($phone)) {
+        echo json_encode(['success' => false, 'error' => 'Phone number is required']);
+        exit;
+    }
+    $result = $client->initiatePayment($phone, $billingCycle);
+    echo json_encode($result);
+    exit;
+}
+
+if ($page === 'license_pay_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    require_once __DIR__ . '/../src/LicenseClient.php';
+    $client = new LicenseClient();
+    $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $checkoutId = $input['checkout_request_id'] ?? '';
+    if (empty($checkoutId)) {
+        echo json_encode(['status' => 'error', 'error' => 'Missing checkout_request_id']);
+        exit;
+    }
+    $result = $client->checkPaymentStatus($checkoutId);
+    echo json_encode($result);
+    exit;
+}
+
+if ($page === 'license_subscription_info') {
+    header('Content-Type: application/json');
+    require_once __DIR__ . '/../src/LicenseClient.php';
+    $client = new LicenseClient();
+    $result = $client->getSubscriptionInfo();
+    echo json_encode($result ?: ['success' => false, 'error' => 'Could not retrieve subscription info']);
+    exit;
+}
+
 $customer = new \App\Customer();
 $ticket = new \App\Ticket();
 $sms = new \App\SMS();

@@ -42,10 +42,22 @@ DB_PASS=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
 JWT_SECRET=$(openssl rand -hex 32)
 
 echo ""
+echo -e "${CYAN}M-Pesa Configuration (for license payments):${NC}"
+read -p "M-Pesa Consumer Key (leave blank to skip): " MPESA_KEY
+read -p "M-Pesa Consumer Secret: " MPESA_SECRET
+read -p "M-Pesa Shortcode: " MPESA_SHORTCODE
+read -p "M-Pesa Passkey: " MPESA_PASSKEY
+read -p "M-Pesa Account Type (paybill/till) [paybill]: " MPESA_ACCT_TYPE
+MPESA_ACCT_TYPE="${MPESA_ACCT_TYPE:-paybill}"
+read -p "M-Pesa Environment (sandbox/production) [production]: " MPESA_ENV_VAL
+MPESA_ENV_VAL="${MPESA_ENV_VAL:-production}"
+
+echo ""
 echo -e "${YELLOW}Configuration:${NC}"
 echo "  Domain:    ${DOMAIN}"
 echo "  App Dir:   ${APP_DIR}"
 echo "  Database:  ${DB_NAME}"
+echo "  M-Pesa:    ${MPESA_KEY:+Configured}${MPESA_KEY:-Not configured}"
 echo ""
 read -p "Continue? (y/n): " CONFIRM
 if [ "$CONFIRM" != "y" ]; then echo "Aborted."; exit 0; fi
@@ -87,6 +99,13 @@ LICENSE_DB_PASSWORD=${DB_PASS}
 LICENSE_JWT_SECRET=${JWT_SECRET}
 LICENSE_ADMIN_PASSWORD=${ADMIN_PASS}
 LICENSE_SERVER_URL=https://${DOMAIN}
+LICENSE_SERVER_PUBLIC_URL=https://${DOMAIN}
+MPESA_CONSUMER_KEY=${MPESA_KEY}
+MPESA_CONSUMER_SECRET=${MPESA_SECRET}
+MPESA_SHORTCODE=${MPESA_SHORTCODE}
+MPESA_PASSKEY=${MPESA_PASSKEY}
+MPESA_ACCOUNT_TYPE=${MPESA_ACCT_TYPE}
+MPESA_ENV=${MPESA_ENV_VAL}
 ENVEOF
 chmod 600 "${APP_DIR}/.env"
 

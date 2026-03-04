@@ -176,6 +176,45 @@ class LicenseClient {
         }
     }
 
+    public function getSubscriptionInfo(): ?array {
+        if (!$this->isEnabled()) return null;
+        try {
+            return $this->callServer('subscription-info', [
+                'license_key' => $this->config['license_key']
+            ]);
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    public function initiatePayment(string $phone, string $billingCycle = 'monthly'): array {
+        if (!$this->isEnabled()) {
+            return ['success' => false, 'error' => 'License not configured'];
+        }
+        try {
+            return $this->callServer('pay/initiate', [
+                'license_key' => $this->config['license_key'],
+                'phone' => $phone,
+                'billing_cycle' => $billingCycle
+            ]);
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function checkPaymentStatus(string $checkoutRequestId): array {
+        if (!$this->isEnabled()) {
+            return ['status' => 'error', 'error' => 'License not configured'];
+        }
+        try {
+            return $this->callServer('pay/status', [
+                'checkout_request_id' => $checkoutRequestId
+            ]);
+        } catch (Exception $e) {
+            return ['status' => 'error', 'error' => $e->getMessage()];
+        }
+    }
+
     public function getUpdateFromCache(): ?array {
         $cached = $this->getCachedLicense();
         return $cached['update_available'] ?? null;
