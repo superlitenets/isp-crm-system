@@ -449,7 +449,18 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Syncing...';
     fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_sync_devices')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('Server returned ' + r.status);
+            return r.text();
+        })
+        .then(text => {
+            try {
+                return JSON.parse(text);
+            } catch(e) {
+                console.error('Non-JSON response:', text.substring(0, 500));
+                throw new Error('Invalid response from server');
+            }
+        })
         .then(data => {
             if (data.success) {
                 alert('Sync complete! ' + data.added + ' new device(s) added, ' + data.synced + ' total synced.');
@@ -458,7 +469,7 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
                 alert('Sync failed: ' + (data.error || 'Unknown error'));
             }
         })
-        .catch(() => alert('Sync request failed.'))
+        .catch(err => alert('Sync request failed: ' + err.message))
         .finally(() => {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync from Protrack';
