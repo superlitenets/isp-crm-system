@@ -7825,7 +7825,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $protrack = new \App\ProtrackService($db);
                     $accountInfo = $protrack->getAccountInfo();
                     if ($accountInfo && ($accountInfo['code'] ?? -1) === 0) {
-                        $message = 'Protrack connection successful! Account verified.';
+                        $deviceCount = $accountInfo['record']['device_count'] ?? 0;
+                        $message = "Protrack connection successful! Account verified. {$deviceCount} device(s) found.";
                         $messageType = 'success';
                     } else {
                         $errorMsg = $accountInfo['message'] ?? 'Unknown error (code: ' . ($accountInfo['code'] ?? 'null') . ')';

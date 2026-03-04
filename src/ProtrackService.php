@@ -220,7 +220,19 @@ class ProtrackService {
     }
     
     public function getAccountInfo(): ?array {
-        return $this->apiGet('/api/account/info');
+        $result = $this->apiGet('/api/device/list');
+        if ($result && ($result['code'] ?? -1) === 0) {
+            $deviceCount = is_array($result['record'] ?? null) ? count($result['record']) : 0;
+            return [
+                'code' => 0,
+                'message' => 'OK',
+                'record' => [
+                    'account' => $this->account,
+                    'device_count' => $deviceCount
+                ]
+            ];
+        }
+        return $result;
     }
     
     public function getIMEIsInfo(array $imeis): ?array {
