@@ -113,98 +113,223 @@ CREATE TABLE IF NOT EXISTS isp_racks (
 );
 
 CREATE TABLE IF NOT EXISTS isp_core_equipment (
-    id SERIAL PRIMARY KEY, site_id INTEGER, rack_id INTEGER,
+    id SERIAL PRIMARY KEY, site_id INTEGER, rack_id INTEGER, olt_id INTEGER,
     name VARCHAR(100) NOT NULL, equipment_type VARCHAR(50) NOT NULL,
-    brand VARCHAR(50), model VARCHAR(100), serial_number VARCHAR(100),
-    ip_address VARCHAR(45), mac_address VARCHAR(17), firmware_version VARCHAR(50),
-    rack_position VARCHAR(20), power_consumption INTEGER, notes TEXT,
+    manufacturer VARCHAR(100), model VARCHAR(100), serial_number VARCHAR(100),
+    mac_address VARCHAR(17), management_ip VARCHAR(45), os_version VARCHAR(50),
+    firmware_version VARCHAR(50), rack_position VARCHAR(20), capacity VARCHAR(50),
+    purchase_date DATE, warranty_expiry DATE, supplier VARCHAR(100),
+    purchase_price DECIMAL(10,2), notes TEXT,
     status VARCHAR(20) DEFAULT 'active', monitor_enabled BOOLEAN DEFAULT TRUE,
     ping_status VARCHAR(20) DEFAULT 'unknown', last_ping_at TIMESTAMP,
     last_seen_online TIMESTAMP, downtime_started TIMESTAMP,
     downtime_notified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS olt_id INTEGER;
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS manufacturer VARCHAR(100);
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS management_ip VARCHAR(45);
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS os_version VARCHAR(50);
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS capacity VARCHAR(50);
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS purchase_date DATE;
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS warranty_expiry DATE;
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS supplier VARCHAR(100);
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS purchase_price DECIMAL(10,2);
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS ping_status VARCHAR(20) DEFAULT 'unknown';
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS last_ping_at TIMESTAMP;
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS last_seen_online TIMESTAMP;
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS downtime_started TIMESTAMP;
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS downtime_notified BOOLEAN DEFAULT FALSE;
+ALTER TABLE isp_core_equipment ADD COLUMN IF NOT EXISTS monitor_enabled BOOLEAN DEFAULT TRUE;
 
 CREATE TABLE IF NOT EXISTS isp_fiber_cores (
-    id SERIAL PRIMARY KEY, site_from INTEGER, site_to INTEGER, cable_name VARCHAR(100),
-    core_number INTEGER, core_color VARCHAR(50), purpose VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'available', notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id SERIAL PRIMARY KEY, cable_name VARCHAR(100), core_number INTEGER,
+    core_color VARCHAR(50), tube_color VARCHAR(50),
+    route_path TEXT, start_point VARCHAR(255), end_point VARCHAR(255),
+    splice_points TEXT, distance_meters DECIMAL(10,2), attenuation_db DECIMAL(6,2),
+    assigned_to VARCHAR(255), assignment_type VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'available', notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS tube_color VARCHAR(50);
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS route_path TEXT;
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS start_point VARCHAR(255);
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS end_point VARCHAR(255);
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS splice_points TEXT;
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS distance_meters DECIMAL(10,2);
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS attenuation_db DECIMAL(6,2);
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(255);
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS assignment_type VARCHAR(50);
+ALTER TABLE isp_fiber_cores ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS isp_splice_closures (
-    id SERIAL PRIMARY KEY, site_id INTEGER, name VARCHAR(100) NOT NULL, closure_type VARCHAR(50),
-    location_detail VARCHAR(255), gps_lat DECIMAL(10,7), gps_lng DECIMAL(10,7),
-    capacity INTEGER, used_ports INTEGER DEFAULT 0, status VARCHAR(20) DEFAULT 'active',
-    notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL, closure_type VARCHAR(50),
+    location_description TEXT, pole_number VARCHAR(50),
+    gps_lat DECIMAL(10,7), gps_lng DECIMAL(10,7),
+    splice_diagram TEXT, core_mapping TEXT, fiber_core_id INTEGER,
+    status VARCHAR(20) DEFAULT 'active', notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_splice_closures ADD COLUMN IF NOT EXISTS location_description TEXT;
+ALTER TABLE isp_splice_closures ADD COLUMN IF NOT EXISTS pole_number VARCHAR(50);
+ALTER TABLE isp_splice_closures ADD COLUMN IF NOT EXISTS splice_diagram TEXT;
+ALTER TABLE isp_splice_closures ADD COLUMN IF NOT EXISTS core_mapping TEXT;
+ALTER TABLE isp_splice_closures ADD COLUMN IF NOT EXISTS fiber_core_id INTEGER;
+ALTER TABLE isp_splice_closures ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS isp_splitters (
-    id SERIAL PRIMARY KEY, splice_closure_id INTEGER, name VARCHAR(100) NOT NULL,
-    ratio VARCHAR(20) DEFAULT '1:8', input_core_id INTEGER, status VARCHAR(20) DEFAULT 'active',
-    notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id SERIAL PRIMARY KEY, site_id INTEGER, name VARCHAR(100) NOT NULL,
+    splitter_type VARCHAR(50), ratio VARCHAR(20) DEFAULT '1:8',
+    total_ports INTEGER DEFAULT 8, used_ports INTEGER DEFAULT 0,
+    location_description TEXT, pole_number VARCHAR(50),
+    gps_lat DECIMAL(10,7), gps_lng DECIMAL(10,7),
+    upstream_equipment_id INTEGER, upstream_port VARCHAR(50),
+    upstream_fiber_core_id INTEGER,
+    status VARCHAR(20) DEFAULT 'active', notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS site_id INTEGER;
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS splitter_type VARCHAR(50);
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS total_ports INTEGER DEFAULT 8;
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS used_ports INTEGER DEFAULT 0;
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS location_description TEXT;
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS pole_number VARCHAR(50);
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS gps_lat DECIMAL(10,7);
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS gps_lng DECIMAL(10,7);
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS upstream_equipment_id INTEGER;
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS upstream_port VARCHAR(50);
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS upstream_fiber_core_id INTEGER;
+ALTER TABLE isp_splitters ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS isp_distribution_boxes (
     id SERIAL PRIMARY KEY, site_id INTEGER, name VARCHAR(100) NOT NULL, box_type VARCHAR(50),
-    location_detail VARCHAR(255), gps_lat DECIMAL(10,7), gps_lng DECIMAL(10,7),
-    total_ports INTEGER DEFAULT 8, used_ports INTEGER DEFAULT 0, splitter_id INTEGER,
-    status VARCHAR(20) DEFAULT 'active', notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    capacity INTEGER DEFAULT 8, used_ports INTEGER DEFAULT 0,
+    pole_number VARCHAR(50), gps_lat DECIMAL(10,7), gps_lng DECIMAL(10,7),
+    location_description TEXT, splitter_id INTEGER,
+    status VARCHAR(20) DEFAULT 'active', notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_distribution_boxes ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 8;
+ALTER TABLE isp_distribution_boxes ADD COLUMN IF NOT EXISTS pole_number VARCHAR(50);
+ALTER TABLE isp_distribution_boxes ADD COLUMN IF NOT EXISTS location_description TEXT;
+ALTER TABLE isp_distribution_boxes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS isp_drop_cables (
-    id SERIAL PRIMARY KEY, distribution_box_id INTEGER, customer_id INTEGER, port_number INTEGER,
-    cable_length DECIMAL(6,2), cable_type VARCHAR(50) DEFAULT 'single-mode',
-    status VARCHAR(20) DEFAULT 'active', installed_at TIMESTAMP, notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id SERIAL PRIMARY KEY, distribution_box_id INTEGER, box_port INTEGER,
+    customer_id INTEGER, cable_type VARCHAR(50) DEFAULT 'single-mode',
+    length_meters DECIMAL(6,2), installation_date DATE,
+    status VARCHAR(20) DEFAULT 'active', notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_drop_cables ADD COLUMN IF NOT EXISTS box_port INTEGER;
+ALTER TABLE isp_drop_cables ADD COLUMN IF NOT EXISTS length_meters DECIMAL(6,2);
+ALTER TABLE isp_drop_cables ADD COLUMN IF NOT EXISTS installation_date DATE;
+ALTER TABLE isp_drop_cables ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS isp_cpe_devices (
-    id SERIAL PRIMARY KEY, customer_id INTEGER, device_type VARCHAR(50) DEFAULT 'ONU',
-    brand VARCHAR(50), model VARCHAR(100), serial_number VARCHAR(100), mac_address VARCHAR(17),
-    ip_address VARCHAR(45), firmware_version VARCHAR(50), status VARCHAR(20) DEFAULT 'active',
-    installed_at TIMESTAMP, notes TEXT,
+    id SERIAL PRIMARY KEY, serial_number VARCHAR(100), mac_address VARCHAR(17),
+    model VARCHAR(100), manufacturer VARCHAR(100), firmware_version VARCHAR(50),
+    olt_id INTEGER, olt_port VARCHAR(50), splitter_id INTEGER, splitter_port VARCHAR(50),
+    customer_id INTEGER, pppoe_account VARCHAR(100),
+    installation_date DATE, warranty_expiry DATE,
+    purchase_price DECIMAL(10,2), supplier VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'active', notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS manufacturer VARCHAR(100);
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS olt_id INTEGER;
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS olt_port VARCHAR(50);
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS splitter_id INTEGER;
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS splitter_port VARCHAR(50);
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS pppoe_account VARCHAR(100);
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS installation_date DATE;
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS warranty_expiry DATE;
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS purchase_price DECIMAL(10,2);
+ALTER TABLE isp_cpe_devices ADD COLUMN IF NOT EXISTS supplier VARCHAR(100);
 
 CREATE TABLE IF NOT EXISTS isp_ip_addresses (
-    id SERIAL PRIMARY KEY, subnet VARCHAR(50) NOT NULL, ip_address VARCHAR(45) NOT NULL,
-    assignment_type VARCHAR(20) DEFAULT 'dynamic', assigned_to VARCHAR(100), customer_id INTEGER,
-    device_id INTEGER, description TEXT, status VARCHAR(20) DEFAULT 'available',
+    id SERIAL PRIMARY KEY, ip_type VARCHAR(20) DEFAULT 'ipv4',
+    ip_address VARCHAR(45) NOT NULL, subnet_mask VARCHAR(45),
+    cidr INTEGER, gateway VARCHAR(45), block_name VARCHAR(100),
+    vlan_id INTEGER, assigned_to VARCHAR(255), assignment_type VARCHAR(50) DEFAULT 'dynamic',
+    customer_id INTEGER, device_id INTEGER, reverse_dns VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'available', notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_ip_addresses ADD COLUMN IF NOT EXISTS ip_type VARCHAR(20) DEFAULT 'ipv4';
+ALTER TABLE isp_ip_addresses ADD COLUMN IF NOT EXISTS subnet_mask VARCHAR(45);
+ALTER TABLE isp_ip_addresses ADD COLUMN IF NOT EXISTS cidr INTEGER;
+ALTER TABLE isp_ip_addresses ADD COLUMN IF NOT EXISTS gateway VARCHAR(45);
+ALTER TABLE isp_ip_addresses ADD COLUMN IF NOT EXISTS block_name VARCHAR(100);
+ALTER TABLE isp_ip_addresses ADD COLUMN IF NOT EXISTS vlan_id INTEGER;
+ALTER TABLE isp_ip_addresses ADD COLUMN IF NOT EXISTS reverse_dns VARCHAR(255);
 
 CREATE TABLE IF NOT EXISTS isp_vlans (
-    id SERIAL PRIMARY KEY, vlan_id INTEGER NOT NULL, name VARCHAR(100), description TEXT,
-    subnet VARCHAR(50), gateway VARCHAR(45), purpose VARCHAR(50),
-    site_id INTEGER, status VARCHAR(20) DEFAULT 'active', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS isp_warehouse_stock (
-    id SERIAL PRIMARY KEY, item_name VARCHAR(100) NOT NULL, category VARCHAR(50), brand VARCHAR(50),
-    model VARCHAR(100), quantity INTEGER DEFAULT 0, min_quantity INTEGER DEFAULT 5,
-    unit_cost DECIMAL(10,2), location VARCHAR(100), notes TEXT,
+    id SERIAL PRIMARY KEY, vlan_id INTEGER NOT NULL, name VARCHAR(100),
+    purpose VARCHAR(50), subnet VARCHAR(50), gateway VARCHAR(45),
+    site_id INTEGER, equipment_id INTEGER, description TEXT,
+    status VARCHAR(20) DEFAULT 'active', notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_vlans ADD COLUMN IF NOT EXISTS equipment_id INTEGER;
+ALTER TABLE isp_vlans ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE isp_vlans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+CREATE TABLE IF NOT EXISTS isp_warehouse_stock (
+    id SERIAL PRIMARY KEY, site_id INTEGER, item_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50), unit VARCHAR(20) DEFAULT 'piece',
+    quantity INTEGER DEFAULT 0, min_threshold INTEGER DEFAULT 5,
+    unit_cost DECIMAL(10,2), supplier VARCHAR(100), supplier_contact VARCHAR(100),
+    storage_location VARCHAR(255), last_restocked TIMESTAMP, notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE isp_warehouse_stock ADD COLUMN IF NOT EXISTS site_id INTEGER;
+ALTER TABLE isp_warehouse_stock ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'piece';
+ALTER TABLE isp_warehouse_stock ADD COLUMN IF NOT EXISTS min_threshold INTEGER DEFAULT 5;
+ALTER TABLE isp_warehouse_stock ADD COLUMN IF NOT EXISTS supplier VARCHAR(100);
+ALTER TABLE isp_warehouse_stock ADD COLUMN IF NOT EXISTS supplier_contact VARCHAR(100);
+ALTER TABLE isp_warehouse_stock ADD COLUMN IF NOT EXISTS storage_location VARCHAR(255);
+ALTER TABLE isp_warehouse_stock ADD COLUMN IF NOT EXISTS last_restocked TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS isp_warehouse_serials (
     id SERIAL PRIMARY KEY, stock_id INTEGER, serial_number VARCHAR(100) NOT NULL,
     mac_address VARCHAR(17), status VARCHAR(20) DEFAULT 'in_stock', assigned_to INTEGER,
-    notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    site_id INTEGER, received_date DATE, notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_warehouse_serials ADD COLUMN IF NOT EXISTS site_id INTEGER;
+ALTER TABLE isp_warehouse_serials ADD COLUMN IF NOT EXISTS received_date DATE;
+ALTER TABLE isp_warehouse_serials ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS isp_stock_movements (
     id SERIAL PRIMARY KEY, stock_id INTEGER, movement_type VARCHAR(20) NOT NULL,
-    quantity INTEGER NOT NULL, reference VARCHAR(100), performed_by INTEGER,
-    notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    quantity INTEGER NOT NULL, reference_number VARCHAR(100),
+    from_location VARCHAR(255), to_location VARCHAR(255),
+    performed_by INTEGER, reason TEXT, notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_stock_movements ADD COLUMN IF NOT EXISTS reference_number VARCHAR(100);
+ALTER TABLE isp_stock_movements ADD COLUMN IF NOT EXISTS from_location VARCHAR(255);
+ALTER TABLE isp_stock_movements ADD COLUMN IF NOT EXISTS to_location VARCHAR(255);
+ALTER TABLE isp_stock_movements ADD COLUMN IF NOT EXISTS reason TEXT;
 
 CREATE TABLE IF NOT EXISTS isp_field_assets (
     id SERIAL PRIMARY KEY, asset_type VARCHAR(50) NOT NULL, name VARCHAR(100) NOT NULL,
-    serial_number VARCHAR(100), site_id INTEGER, assigned_to INTEGER,
-    condition VARCHAR(20) DEFAULT 'good', purchase_date DATE, warranty_expiry DATE,
+    serial_number VARCHAR(100), model VARCHAR(100), manufacturer VARCHAR(100),
+    site_id INTEGER, assigned_to INTEGER, assigned_to_name VARCHAR(100),
+    assignment_date DATE, purchase_date DATE, purchase_price DECIMAL(10,2),
+    warranty_expiry DATE, condition VARCHAR(20) DEFAULT 'good',
+    next_maintenance DATE, last_maintenance DATE,
     notes TEXT, status VARCHAR(20) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS model VARCHAR(100);
+ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS manufacturer VARCHAR(100);
+ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS assigned_to_name VARCHAR(100);
+ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS assignment_date DATE;
+ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS purchase_price DECIMAL(10,2);
+ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS next_maintenance DATE;
+ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS last_maintenance DATE;
 
 CREATE TABLE IF NOT EXISTS isp_maintenance_logs (
     id SERIAL PRIMARY KEY, equipment_type VARCHAR(50), equipment_id INTEGER,
