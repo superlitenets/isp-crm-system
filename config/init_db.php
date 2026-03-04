@@ -2054,7 +2054,16 @@ function runMigrations(PDO $db): void {
         ['radius_usage_logs', 'download_mb', 'ALTER TABLE radius_usage_logs ADD COLUMN download_mb DECIMAL(12,2) DEFAULT 0'],
         ['huawei_onu_types', 'name', 'ALTER TABLE huawei_onu_types ADD COLUMN name VARCHAR(100)'],
         ['huawei_onu_types', 'equipment_id', 'ALTER TABLE huawei_onu_types ADD COLUMN equipment_id VARCHAR(100)'],
-        ['huawei_onu_types', 'is_active', 'ALTER TABLE huawei_onu_types ADD COLUMN is_active BOOLEAN DEFAULT TRUE']
+        ['huawei_onu_types', 'is_active', 'ALTER TABLE huawei_onu_types ADD COLUMN is_active BOOLEAN DEFAULT TRUE'],
+        ['radius_packages', 'package_type', "ALTER TABLE radius_packages ADD COLUMN package_type VARCHAR(20) DEFAULT 'pppoe'"],
+        ['radius_nas', 'wireguard_peer_id', 'ALTER TABLE radius_nas ADD COLUMN wireguard_peer_id INTEGER'],
+        ['radius_nas', 'mpesa_account_id', 'ALTER TABLE radius_nas ADD COLUMN mpesa_account_id INTEGER'],
+        ['radius_nas', 'local_ip', 'ALTER TABLE radius_nas ADD COLUMN local_ip VARCHAR(255)'],
+        ['radius_nas', 'location_id', 'ALTER TABLE radius_nas ADD COLUMN location_id INTEGER'],
+        ['radius_nas', 'sub_location_id', 'ALTER TABLE radius_nas ADD COLUMN sub_location_id INTEGER'],
+        ['radius_vouchers', 'created_by', 'ALTER TABLE radius_vouchers ADD COLUMN created_by INTEGER'],
+        ['radius_subscriptions', 'location_id', 'ALTER TABLE radius_subscriptions ADD COLUMN location_id INTEGER'],
+        ['radius_subscriptions', 'sub_location_id', 'ALTER TABLE radius_subscriptions ADD COLUMN sub_location_id INTEGER']
     ];
     
     foreach ($columnMigrations as $migration) {
@@ -2490,6 +2499,9 @@ function runMigrations(PDO $db): void {
             api_password_encrypted TEXT,
             description TEXT,
             is_active BOOLEAN DEFAULT TRUE,
+            wireguard_peer_id INTEGER,
+            mpesa_account_id INTEGER,
+            local_ip VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )");
@@ -2509,6 +2521,7 @@ function runMigrations(PDO $db): void {
             id SERIAL PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
             description TEXT,
+            package_type VARCHAR(20) DEFAULT 'pppoe',
             download_speed INTEGER,
             upload_speed INTEGER,
             data_quota BIGINT,
