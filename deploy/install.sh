@@ -366,7 +366,7 @@ export PGHOST=localhost PGPORT=5432 PGDATABASE="${DB_NAME}" PGUSER="${DB_USER}" 
 
 if [ -f "${APP_DIR}/database/migration.sql" ]; then
     print_step "Loading complete database schema..."
-    PGPASSWORD="${DB_PASS}" psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -f "${APP_DIR}/database/migration.sql" 2>&1 | tail -5
+    PGPASSWORD="${DB_PASS}" psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -f "${APP_DIR}/database/migration.sql" 2>&1 | grep -v "already exists\|multiple primary" | tail -5
     print_ok "Complete schema loaded from migration.sql"
 fi
 
@@ -378,6 +378,12 @@ require_once 'config/init_db.php';
 initializeDatabase();
 echo \"Database initialized successfully.\n\";
 " 2>&1 && print_ok "Database schema finalized" || print_warn "Database init had warnings (check manually)"
+
+if [ -f "${APP_DIR}/database/fix_missing_columns.sql" ]; then
+    print_step "Applying column fixes..."
+    sudo -u postgres psql -d "${DB_NAME}" -f "${APP_DIR}/database/fix_missing_columns.sql" 2>&1 | grep -v "already exists" | tail -5
+    print_ok "Column fixes applied"
+fi
 
 sudo -u postgres psql -d "${DB_NAME}" -c "
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${DB_USER};
