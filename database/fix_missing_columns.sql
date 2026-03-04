@@ -380,6 +380,16 @@ CREATE TABLE IF NOT EXISTS radius_package_schedules (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ==================== Employees ====================
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'employment_status')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'status') THEN
+        UPDATE employees SET status = employment_status WHERE status IS NULL OR status = 'active';
+    END IF;
+END $$;
+
 -- ==================== Fleet Management ====================
 CREATE TABLE IF NOT EXISTS fleet_vehicles (
     id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL,

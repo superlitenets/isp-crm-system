@@ -1,0 +1,31 @@
+root@superlitecrm:/home/superlite/isp-crm-system# tail -30 /var/log/nginx/demo.superlite.co.ke_error.log
+2026/03/04 14:43:02 [error] 41099#41099: *553 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "fleet_vehicles" does not exist
+LINE 2:                 FROM fleet_vehicles v
+                             ^ in /var/www/isp-crm/src/FleetManagement.php:58
+Stack trace:
+#0 /var/www/isp-crm/src/FleetManagement.php(58): PDOStatement->execute()
+#1 /var/www/isp-crm/templates/fleet_management.php(4): App\FleetManagement->getVehicles()
+#2 /var/www/isp-crm/templates/isp_inventory.php(2022): include('...')
+#3 /var/www/isp-crm/public/index.php(2560): include('...')
+#4 {main}
+  thrown in /var/www/isp-crm/src/FleetManagement.php on line 58" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=isp_inventory&tab=fleet HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=isp_inventory"
+2026/03/04 14:46:40 [error] 41099#41099: *566 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "status" does not exist
+LINE 1: SELECT id, name FROM employees WHERE status = 'active' ORDER...
+                                             ^ in /var/www/isp-crm/src/FleetManagement.php:375
+Stack trace:
+#0 /var/www/isp-crm/src/FleetManagement.php(375): PDO->query()
+#1 /var/www/isp-crm/templates/fleet_management.php(5): App\FleetManagement->getEmployees()
+#2 /var/www/isp-crm/templates/isp_inventory.php(2022): include('...')
+#3 /var/www/isp-crm/public/index.php(2560): include('...')
+#4 {main}
+  thrown in /var/www/isp-crm/src/FleetManagement.php on line 375" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=isp_inventory&tab=fleet HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=isp_inventory&tab=overview"
+2026/03/04 14:47:03 [error] 41099#41099: *566 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "status" does not exist
+LINE 1: SELECT id, name FROM employees WHERE status = 'active' ORDER...
+                                             ^ in /var/www/isp-crm/src/FleetManagement.php:375
+Stack trace:
+#0 /var/www/isp-crm/src/FleetManagement.php(375): PDO->query()
+#1 /var/www/isp-crm/templates/fleet_management.php(5): App\FleetManagement->getEmployees()
+#2 /var/www/isp-crm/templates/isp_inventory.php(2022): include('...')
+#3 /var/www/isp-crm/public/index.php(2560): include('...')
+#4 {main}
+  thrown in /var/www/isp-crm/src/FleetManagement.php on line 375" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=isp_inventory&tab=fleet HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=isp_inventory&tab=overview"
