@@ -141,6 +141,19 @@ if ($page === 'logout') {
     exit;
 }
 
+// Global License Enforcement - blocks ALL authenticated pages when license is invalid
+// Only pages that work without a valid license: login, logout, order, reset-password,
+// ticket-wallboard, download, and the license settings page (so admin can fix it)
+if (!getenv('REPLIT_DEV_DOMAIN') && \App\Auth::isLoggedIn()) {
+    $licenseExemptPages = ['login', 'logout', 'order', 'reset-password', 'ticket-wallboard', 'download'];
+    $isLicenseSettingsPage = ($page === 'settings' && (($_GET['section'] ?? '') === 'license' || ($_GET['subpage'] ?? '') === 'license'));
+    $isLicensePayment = in_array($page, ['license_pay_initiate', 'license_pay_status', 'license_subscription_info']);
+    if (!in_array($page, $licenseExemptPages) && !$isLicenseSettingsPage && !$isLicensePayment) {
+        require_once __DIR__ . '/../src/LicenseMiddleware.php';
+        LicenseMiddleware::enforce();
+    }
+}
+
 if ($page === 'download' && $action === 'zip') {
     $file = __DIR__ . '/isp-crm-complete.zip';
     if (file_exists($file)) {
@@ -2213,7 +2226,7 @@ if ($page === 'login') {
 // ISP Inventory Module - standalone page with its own layout
 if ($page === 'isp_inventory') {
     \App\Auth::requireLogin();
-    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
+    // License already enforced globally above
     if (!\App\Auth::canAny(['inventory.view', 'inventory.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2564,7 +2577,7 @@ if ($page === 'isp_inventory') {
 // OMS (ONU Management System) - standalone page with its own layout
 if ($page === 'huawei-olt') {
     \App\Auth::requireLogin();
-    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
+
     if (!\App\Auth::canAny(['oms.view', 'oms.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2576,7 +2589,7 @@ if ($page === 'huawei-olt') {
 // Finance Module - standalone page with its own layout
 if ($page === 'finance') {
     \App\Auth::requireLogin();
-    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
+
     if (!\App\Auth::canAny(['accounting.view', 'accounting.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2588,7 +2601,7 @@ if ($page === 'finance') {
 // Call Center Module - standalone page with its own layout
 if ($page === 'call_center') {
     \App\Auth::requireLogin();
-    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
+
     if (!\App\Auth::canAny(['callcenter.view', 'callcenter.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -2967,7 +2980,7 @@ if ($page === 'call_center') {
 // ISP RADIUS Billing - standalone page with its own layout
 if ($page === 'isp') {
     \App\Auth::requireLogin();
-    if (!getenv('REPLIT_DEV_DOMAIN')) { require_once __DIR__ . '/../src/LicenseMiddleware.php'; LicenseMiddleware::enforce(); }
+
     if (!\App\Auth::canAny(['isp.view', 'isp.*'])) {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
@@ -3493,13 +3506,8 @@ if ($page === 'isp') {
 
 \App\Auth::requireLogin();
 
+// License already enforced globally after login page (line ~2216)
 require_once __DIR__ . '/../src/LicenseMiddleware.php';
-if (!getenv('REPLIT_DEV_DOMAIN')) {
-    $licenseAllowedPages = ($page === 'settings' && (($_GET['section'] ?? '') === 'license' || ($_GET['subpage'] ?? '') === 'license'));
-    if (!$licenseAllowedPages && $page !== 'logout') {
-        LicenseMiddleware::enforce();
-    }
-}
 
 if ($page === 'license_pay_initiate' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
