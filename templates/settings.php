@@ -7748,21 +7748,35 @@ $mode = $licenseValidation['mode'] ?? '';
                             <div class="border rounded p-3 text-center">
                                 <i class="bi bi-people fs-4 text-primary d-block mb-1"></i>
                                 <small class="text-muted d-block">Max Users</small>
-                                <strong class="fs-5"><?= $licenseData['max_users'] > 0 ? $licenseData['max_users'] : 'Unlimited' ?></strong>
+                                <strong class="fs-5"><?= ($licenseData['max_users'] ?? 0) > 0 ? $licenseData['max_users'] : 'Unlimited' ?></strong>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-3 text-center">
                                 <i class="bi bi-person-lines-fill fs-4 text-info d-block mb-1"></i>
                                 <small class="text-muted d-block">Max Customers</small>
-                                <strong class="fs-5"><?= $licenseData['max_customers'] > 0 ? $licenseData['max_customers'] : 'Unlimited' ?></strong>
+                                <strong class="fs-5"><?= ($licenseData['max_customers'] ?? 0) > 0 ? $licenseData['max_customers'] : 'Unlimited' ?></strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 text-center">
+                                <i class="bi bi-wifi fs-4 text-warning d-block mb-1"></i>
+                                <small class="text-muted d-block">Max Subscribers</small>
+                                <strong class="fs-5"><?= ($licenseData['max_subscribers'] ?? 0) > 0 ? $licenseData['max_subscribers'] : 'Unlimited' ?></strong>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-3 text-center">
                                 <i class="bi bi-router fs-4 text-success d-block mb-1"></i>
                                 <small class="text-muted d-block">Max ONUs</small>
-                                <strong class="fs-5"><?= $licenseData['max_onus'] > 0 ? $licenseData['max_onus'] : 'Unlimited' ?></strong>
+                                <strong class="fs-5"><?= ($licenseData['max_onus'] ?? 0) > 0 ? $licenseData['max_onus'] : 'Unlimited' ?></strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 text-center">
+                                <i class="bi bi-hdd-rack fs-4 text-danger d-block mb-1"></i>
+                                <small class="text-muted d-block">Max OLTs</small>
+                                <strong class="fs-5"><?= ($licenseData['max_olts'] ?? 0) > 0 ? $licenseData['max_olts'] : 'Unlimited' ?></strong>
                             </div>
                         </div>
                     </div>

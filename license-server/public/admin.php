@@ -164,8 +164,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             $stmt = $db->prepare("
-                INSERT INTO license_tiers (product_id, code, name, max_users, max_customers, max_onus, features, price_monthly, price_yearly)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO license_tiers (product_id, code, name, max_users, max_customers, max_onus, max_olts, max_subscribers, features, price_monthly, price_yearly)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $_POST['product_id'],
@@ -174,6 +174,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (int)$_POST['max_users'] ?: 0,
                 (int)$_POST['max_customers'] ?: 0,
                 (int)$_POST['max_onus'] ?: 0,
+                (int)$_POST['max_olts'] ?: 0,
+                (int)$_POST['max_subscribers'] ?: 0,
                 json_encode($features),
                 (float)$_POST['price_monthly'],
                 (float)$_POST['price_yearly']
@@ -192,6 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare("
                 UPDATE license_tiers SET 
                     name = ?, max_users = ?, max_customers = ?, max_onus = ?,
+                    max_olts = ?, max_subscribers = ?,
                     features = ?, price_monthly = ?, price_yearly = ?, is_active = ?
                 WHERE id = ?
             ");
@@ -200,6 +203,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (int)$_POST['max_users'] ?: 0,
                 (int)$_POST['max_customers'] ?: 0,
                 (int)$_POST['max_onus'] ?: 0,
+                (int)$_POST['max_olts'] ?: 0,
+                (int)$_POST['max_subscribers'] ?: 0,
                 json_encode($features),
                 (float)$_POST['price_monthly'],
                 (float)$_POST['price_yearly'],
@@ -699,7 +704,9 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
                         <ul class="list-unstyled mb-3">
                             <li><i class="bi bi-people me-2"></i><?= $tier['max_users'] ?: 'Unlimited' ?> Users</li>
                             <li><i class="bi bi-person-badge me-2"></i><?= $tier['max_customers'] ?: 'Unlimited' ?> Customers</li>
+                            <li><i class="bi bi-wifi me-2"></i><?= $tier['max_subscribers'] ?: 'Unlimited' ?> Subscribers</li>
                             <li><i class="bi bi-router me-2"></i><?= $tier['max_onus'] ?: 'Unlimited' ?> ONUs</li>
+                            <li><i class="bi bi-hdd-rack me-2"></i><?= $tier['max_olts'] ?: 'Unlimited' ?> OLTs</li>
                         </ul>
                         <div class="mb-2">
                             <?php 
@@ -1068,7 +1075,11 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
                         <div class="row">
                             <div class="col-4 mb-3"><label class="form-label">Max Users (0=unlimited)</label><input type="number" name="max_users" class="form-control" value="0"></div>
                             <div class="col-4 mb-3"><label class="form-label">Max Customers</label><input type="number" name="max_customers" class="form-control" value="0"></div>
-                            <div class="col-4 mb-3"><label class="form-label">Max ONUs</label><input type="number" name="max_onus" class="form-control" value="0"></div>
+                            <div class="col-4 mb-3"><label class="form-label">Max Subscribers</label><input type="number" name="max_subscribers" class="form-control" value="0"></div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3"><label class="form-label">Max ONUs</label><input type="number" name="max_onus" class="form-control" value="0"></div>
+                            <div class="col-6 mb-3"><label class="form-label">Max OLTs</label><input type="number" name="max_olts" class="form-control" value="0"></div>
                         </div>
                         <div class="row">
                             <div class="col-6 mb-3"><label class="form-label">Price Monthly (KES)</label><input type="number" name="price_monthly" class="form-control" step="0.01" value="0"></div>
@@ -1098,7 +1109,11 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
                         <div class="row">
                             <div class="col-4 mb-3"><label class="form-label">Max Users</label><input type="number" name="max_users" id="editTierMaxUsers" class="form-control"></div>
                             <div class="col-4 mb-3"><label class="form-label">Max Customers</label><input type="number" name="max_customers" id="editTierMaxCust" class="form-control"></div>
-                            <div class="col-4 mb-3"><label class="form-label">Max ONUs</label><input type="number" name="max_onus" id="editTierMaxOnus" class="form-control"></div>
+                            <div class="col-4 mb-3"><label class="form-label">Max Subscribers</label><input type="number" name="max_subscribers" id="editTierMaxSubs" class="form-control"></div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3"><label class="form-label">Max ONUs</label><input type="number" name="max_onus" id="editTierMaxOnus" class="form-control"></div>
+                            <div class="col-6 mb-3"><label class="form-label">Max OLTs</label><input type="number" name="max_olts" id="editTierMaxOlts" class="form-control"></div>
                         </div>
                         <div class="row">
                             <div class="col-6 mb-3"><label class="form-label">Price Monthly</label><input type="number" name="price_monthly" id="editTierPriceM" class="form-control" step="0.01"></div>
@@ -1228,7 +1243,9 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
         document.getElementById('editTierName').value = tier.name;
         document.getElementById('editTierMaxUsers').value = tier.max_users;
         document.getElementById('editTierMaxCust').value = tier.max_customers;
+        document.getElementById('editTierMaxSubs').value = tier.max_subscribers || 0;
         document.getElementById('editTierMaxOnus').value = tier.max_onus;
+        document.getElementById('editTierMaxOlts').value = tier.max_olts || 0;
         document.getElementById('editTierPriceM').value = tier.price_monthly;
         document.getElementById('editTierPriceY').value = tier.price_yearly;
         const features = JSON.parse(tier.features || '{}');

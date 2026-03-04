@@ -120,12 +120,14 @@ class LicenseClient {
     public function getLimits(): array {
         $license = $this->validate();
         if (!$license['valid']) {
-            return ['max_users' => 0, 'max_customers' => 0, 'max_onus' => 0];
+            return ['max_users' => 0, 'max_customers' => 0, 'max_onus' => 0, 'max_olts' => 0, 'max_subscribers' => 0];
         }
         return [
             'max_users' => $license['license']['max_users'] ?? 0,
             'max_customers' => $license['license']['max_customers'] ?? 0,
-            'max_onus' => $license['license']['max_onus'] ?? 0
+            'max_onus' => $license['license']['max_onus'] ?? 0,
+            'max_olts' => $license['license']['max_olts'] ?? 0,
+            'max_subscribers' => $license['license']['max_subscribers'] ?? 0
         ];
     }
     

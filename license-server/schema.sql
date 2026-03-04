@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS license_tiers (
     max_users INTEGER DEFAULT 0,
     max_customers INTEGER DEFAULT 0,
     max_onus INTEGER DEFAULT 0,
+    max_olts INTEGER DEFAULT 0,
+    max_subscribers INTEGER DEFAULT 0,
     features JSONB DEFAULT '{}',
     price_monthly DECIMAL(10,2) DEFAULT 0,
     price_yearly DECIMAL(10,2) DEFAULT 0,
@@ -208,11 +210,11 @@ INSERT INTO license_products (code, name, description, features, current_version
 ON CONFLICT (code) DO NOTHING;
 
 -- Insert default tiers
-INSERT INTO license_tiers (product_id, code, name, max_users, max_customers, max_onus, features, price_monthly, price_yearly) VALUES
-((SELECT id FROM license_products WHERE code = 'isp-crm'), 'starter', 'Starter', 3, 100, 50, 
+INSERT INTO license_tiers (product_id, code, name, max_users, max_customers, max_onus, max_olts, max_subscribers, features, price_monthly, price_yearly) VALUES
+((SELECT id FROM license_products WHERE code = 'isp-crm'), 'starter', 'Starter', 3, 100, 50, 1, 100, 
  '{"crm": true, "tickets": true, "oms": false}', 29.99, 299.99),
-((SELECT id FROM license_products WHERE code = 'isp-crm'), 'professional', 'Professional', 10, 500, 200, 
+((SELECT id FROM license_products WHERE code = 'isp-crm'), 'professional', 'Professional', 10, 500, 200, 3, 500, 
  '{"crm": true, "tickets": true, "oms": true, "hr": true}', 79.99, 799.99),
-((SELECT id FROM license_products WHERE code = 'isp-crm'), 'enterprise', 'Enterprise', 0, 0, 0, 
+((SELECT id FROM license_products WHERE code = 'isp-crm'), 'enterprise', 'Enterprise', 0, 0, 0, 0, 0, 
  '{"crm": true, "tickets": true, "oms": true, "hr": true, "inventory": true, "accounting": true, "whitelabel": true}', 199.99, 1999.99)
 ON CONFLICT (product_id, code) DO NOTHING;

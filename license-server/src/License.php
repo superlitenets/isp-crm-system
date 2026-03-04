@@ -57,7 +57,7 @@ class License {
             SELECT l.*, 
                    c.name as customer_name, c.email as customer_email, c.company,
                    p.code as product_code, p.name as product_name, p.features as product_features, p.current_version,
-                   t.code as tier_code, t.name as tier_name, t.max_users, t.max_customers, t.max_onus, t.features as tier_features
+                   t.code as tier_code, t.name as tier_name, t.max_users, t.max_customers, t.max_onus, t.max_olts, t.max_subscribers, t.features as tier_features
             FROM licenses l
             LEFT JOIN license_customers c ON l.customer_id = c.id
             LEFT JOIN license_products p ON l.product_id = p.id
@@ -119,6 +119,8 @@ class License {
                 'max_users' => (int)$license['max_users'],
                 'max_customers' => (int)$license['max_customers'],
                 'max_onus' => (int)$license['max_onus'],
+                'max_olts' => (int)$license['max_olts'],
+                'max_subscribers' => (int)$license['max_subscribers'],
                 'features' => json_decode($license['tier_features'] ?: '{}', true),
                 'current_version' => $license['current_version']
             ]
@@ -196,7 +198,7 @@ class License {
     public function heartbeat(string $activationToken, array $clientStats = []): array {
         $stmt = $this->db->prepare("
             SELECT a.*, l.license_key, l.is_active, l.is_suspended, l.expires_at, l.product_id,
-                   t.code as tier_code, t.name as tier_name, t.max_users, t.max_customers, t.max_onus, t.features
+                   t.code as tier_code, t.name as tier_name, t.max_users, t.max_customers, t.max_onus, t.max_olts, t.max_subscribers, t.features
             FROM license_activations a
             JOIN licenses l ON a.license_id = l.id
             LEFT JOIN license_tiers t ON l.tier_id = t.id
@@ -267,6 +269,8 @@ class License {
                 'max_users' => (int)$activation['max_users'],
                 'max_customers' => (int)$activation['max_customers'],
                 'max_onus' => (int)$activation['max_onus'],
+                'max_olts' => (int)$activation['max_olts'],
+                'max_subscribers' => (int)$activation['max_subscribers'],
                 'features' => json_decode($activation['features'] ?: '{}', true)
             ]
         ];
@@ -410,7 +414,7 @@ class License {
         $stmt = $this->db->query("
             SELECT a.*, l.license_key, l.is_active as license_active, l.is_suspended, l.expires_at,
                    c.name as customer_name, c.company, c.email as customer_email, c.phone as customer_phone,
-                   t.name as tier_name, t.code as tier_code, t.max_users, t.max_customers, t.max_onus
+                   t.name as tier_name, t.code as tier_code, t.max_users, t.max_customers, t.max_onus, t.max_olts, t.max_subscribers
             FROM license_activations a
             JOIN licenses l ON a.license_id = l.id
             LEFT JOIN license_customers c ON l.customer_id = c.id
@@ -425,7 +429,7 @@ class License {
         $stmt = $this->db->prepare("
             SELECT a.*, l.license_key, l.is_active as license_active, l.is_suspended, l.expires_at, l.notes as license_notes,
                    c.name as customer_name, c.company, c.email as customer_email, c.phone as customer_phone,
-                   t.name as tier_name, t.code as tier_code, t.max_users, t.max_customers, t.max_onus, t.features as tier_features,
+                   t.name as tier_name, t.code as tier_code, t.max_users, t.max_customers, t.max_onus, t.max_olts, t.max_subscribers, t.features as tier_features,
                    p.name as product_name, p.current_version as latest_version
             FROM license_activations a
             JOIN licenses l ON a.license_id = l.id
@@ -692,6 +696,8 @@ class License {
 
     public function ensureSchema(): void {
         $migrations = [
+            "ALTER TABLE license_tiers ADD COLUMN IF NOT EXISTS max_olts INTEGER DEFAULT 0",
+            "ALTER TABLE license_tiers ADD COLUMN IF NOT EXISTS max_subscribers INTEGER DEFAULT 0",
             "ALTER TABLE license_activations ADD COLUMN IF NOT EXISTS app_version VARCHAR(20)",
             "ALTER TABLE license_activations ADD COLUMN IF NOT EXISTS user_count INTEGER DEFAULT 0",
             "ALTER TABLE license_activations ADD COLUMN IF NOT EXISTS customer_count INTEGER DEFAULT 0",
