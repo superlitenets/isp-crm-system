@@ -1,0 +1,22 @@
+root@superlitecrm:/var/www/isp-crm# tail -20 /var/log/nginx/demo.superlite.co.ke_error.log
+2026/03/04 13:47:20 [error] 41102#41102: *312 open() "/var/www/isp-crm/public/favicon.ico" failed (2: No such file or directory), client: 172.71.120.77, server: demo.superlite.co.ke, request: "GET /favicon.ico HTTP/1.1", host: "demo.superlite.co.ke", referrer: "http://demo.superlite.co.ke/favicon.ico"
+2026/03/04 13:47:20 [error] 41101#41101: *299 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "call_center_calls" does not exist
+LINE 10:                 FROM call_center_calls
+                              ^ in /var/www/isp-crm/src/CallCenter.php:473
+Stack trace:
+#0 /var/www/isp-crm/src/CallCenter.php(473): PDO->query()
+#1 /var/www/isp-crm/src/CallCenter.php(601): CallCenter->getCallStats()
+#2 /var/www/isp-crm/templates/call_center.php(9): CallCenter->getDashboardStats()
+#3 /var/www/isp-crm/public/index.php(2963): include('...')
+#4 {main}
+  thrown in /var/www/isp-crm/src/CallCenter.php on line 473" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=call_center HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=settings&subpage=license"
+2026/03/04 13:50:32 [error] 41102#41102: *328 FastCGI sent in stderr: "PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "huawei_olts" does not exist
+LINE 1: ...*) FILTER (WHERE is_active = TRUE) as active FROM huawei_olt...
+                                                             ^ in /var/www/isp-crm/src/HuaweiOLT.php:4761
+Stack trace:
+#0 /var/www/isp-crm/src/HuaweiOLT.php(4761): PDO->query()
+#1 /var/www/isp-crm/templates/huawei_olt.php(6204): App\HuaweiOLT->getDashboardStats()
+#2 /var/www/isp-crm/public/index.php(2572): include('...')
+#3 {main}
+  thrown in /var/www/isp-crm/src/HuaweiOLT.php on line 4761" while reading response header from upstream, client: 172.68.47.135, server: demo.superlite.co.ke, request: "GET /?page=huawei-olt HTTP/1.1", upstream: "fastcgi://unix:/run/php/isp-crm.sock:", host: "demo.superlite.co.ke", referrer: "https://demo.superlite.co.ke/?page=settings"
+root@superlitecrm:/var/www/isp-crm#
