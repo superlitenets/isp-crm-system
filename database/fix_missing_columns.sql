@@ -332,11 +332,19 @@ ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS next_maintenance DATE;
 ALTER TABLE isp_field_assets ADD COLUMN IF NOT EXISTS last_maintenance DATE;
 
 CREATE TABLE IF NOT EXISTS isp_maintenance_logs (
-    id SERIAL PRIMARY KEY, equipment_type VARCHAR(50), equipment_id INTEGER,
-    maintenance_type VARCHAR(50), description TEXT, performed_by INTEGER,
-    performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, next_maintenance DATE,
-    cost DECIMAL(10,2), notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id SERIAL PRIMARY KEY, asset_type VARCHAR(50), asset_id INTEGER,
+    asset_name VARCHAR(255), maintenance_type VARCHAR(50), description TEXT,
+    performed_by INTEGER, performed_by_name VARCHAR(255),
+    cost DECIMAL(10,2), next_due DATE, notes TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE isp_maintenance_logs ADD COLUMN IF NOT EXISTS asset_type VARCHAR(50);
+ALTER TABLE isp_maintenance_logs ADD COLUMN IF NOT EXISTS asset_id INTEGER;
+ALTER TABLE isp_maintenance_logs ADD COLUMN IF NOT EXISTS asset_name VARCHAR(255);
+ALTER TABLE isp_maintenance_logs ADD COLUMN IF NOT EXISTS performed_by_name VARCHAR(255);
+ALTER TABLE isp_maintenance_logs ADD COLUMN IF NOT EXISTS next_due DATE;
+ALTER TABLE isp_maintenance_logs ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending';
 
 CREATE TABLE IF NOT EXISTS isp_equipment_uptime_log (
     id SERIAL PRIMARY KEY, equipment_id INTEGER NOT NULL, status VARCHAR(20) NOT NULL,
