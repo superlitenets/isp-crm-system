@@ -380,6 +380,64 @@ CREATE TABLE IF NOT EXISTS radius_package_schedules (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ==================== Fleet Management ====================
+CREATE TABLE IF NOT EXISTS fleet_vehicles (
+    id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL,
+    plate_number VARCHAR(50), imei VARCHAR(50),
+    vehicle_type VARCHAR(50) DEFAULT 'car',
+    make VARCHAR(100), model VARCHAR(100), year INTEGER,
+    color VARCHAR(50), fuel_rate DECIMAL(6,2) DEFAULT 0,
+    assigned_employee_id INTEGER,
+    last_latitude DECIMAL(10,7), last_longitude DECIMAL(10,7),
+    last_speed DECIMAL(6,2) DEFAULT 0, last_acc_status INTEGER DEFAULT -1,
+    last_battery INTEGER DEFAULT -1, last_mileage DECIMAL(12,2) DEFAULT 0,
+    last_update TIMESTAMP,
+    status VARCHAR(20) DEFAULT 'active', notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_vehicle_assignments (
+    id SERIAL PRIMARY KEY, vehicle_id INTEGER NOT NULL,
+    employee_id INTEGER NOT NULL, notes TEXT,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    returned_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_geofences (
+    id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL,
+    geofence_type VARCHAR(20) DEFAULT 'circle',
+    latitude DECIMAL(10,7), longitude DECIMAL(10,7),
+    radius INTEGER DEFAULT 500, alarm_type INTEGER DEFAULT 2,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_alarms (
+    id SERIAL PRIMARY KEY, vehicle_id INTEGER,
+    imei VARCHAR(50), alarm_type INTEGER DEFAULT 0,
+    alarm_name VARCHAR(100), latitude DECIMAL(10,7),
+    longitude DECIMAL(10,7), speed DECIMAL(6,2) DEFAULT 0,
+    alarm_time TIMESTAMP, acknowledged BOOLEAN DEFAULT FALSE,
+    acknowledged_by INTEGER, acknowledged_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_command_log (
+    id SERIAL PRIMARY KEY, vehicle_id INTEGER,
+    imei VARCHAR(50), command VARCHAR(255),
+    command_id VARCHAR(100), status VARCHAR(20) DEFAULT 'sent',
+    response TEXT, sent_by INTEGER,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fleet_mileage_reports (
+    id SERIAL PRIMARY KEY, vehicle_id INTEGER,
+    imei VARCHAR(50), report_date DATE,
+    mileage_km DECIMAL(12,2) DEFAULT 0,
+    fuel_consumed DECIMAL(8,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ==================== Grant all permissions ====================
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO isp_crm;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO isp_crm;
