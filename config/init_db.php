@@ -2028,7 +2028,23 @@ function runMigrations(PDO $db): void {
         ['tickets', 'sla_started_at', 'ALTER TABLE tickets ADD COLUMN sla_started_at TIMESTAMP'],
         ['tickets', 'sla_breach_notified_at', 'ALTER TABLE tickets ADD COLUMN sla_breach_notified_at TIMESTAMP'],
         ['tickets', 'sla_warning_notified_at', 'ALTER TABLE tickets ADD COLUMN sla_warning_notified_at TIMESTAMP'],
-        ['radius_sessions', 'status', "ALTER TABLE radius_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'active'"]
+        ['radius_sessions', 'status', "ALTER TABLE radius_sessions ADD COLUMN status VARCHAR(20) DEFAULT 'active'"],
+        ['radius_sessions', 'session_end', 'ALTER TABLE radius_sessions ADD COLUMN session_end TIMESTAMP'],
+        ['radius_sessions', 'acct_session_id', 'ALTER TABLE radius_sessions ADD COLUMN acct_session_id VARCHAR(64)'],
+        ['radius_sessions', 'nas_ip_address', 'ALTER TABLE radius_sessions ADD COLUMN nas_ip_address VARCHAR(45)'],
+        ['radius_sessions', 'nas_port_id', 'ALTER TABLE radius_sessions ADD COLUMN nas_port_id VARCHAR(50)'],
+        ['radius_sessions', 'framed_ip_address', 'ALTER TABLE radius_sessions ADD COLUMN framed_ip_address VARCHAR(45)'],
+        ['radius_sessions', 'mac_address', 'ALTER TABLE radius_sessions ADD COLUMN mac_address VARCHAR(17)'],
+        ['radius_sessions', 'session_start', 'ALTER TABLE radius_sessions ADD COLUMN session_start TIMESTAMP'],
+        ['radius_sessions', 'session_duration', 'ALTER TABLE radius_sessions ADD COLUMN session_duration INTEGER DEFAULT 0'],
+        ['radius_sessions', 'input_packets', 'ALTER TABLE radius_sessions ADD COLUMN input_packets BIGINT DEFAULT 0'],
+        ['radius_sessions', 'output_packets', 'ALTER TABLE radius_sessions ADD COLUMN output_packets BIGINT DEFAULT 0'],
+        ['radius_sessions', 'started_at', 'ALTER TABLE radius_sessions ADD COLUMN started_at TIMESTAMP'],
+        ['radius_sessions', 'stopped_at', 'ALTER TABLE radius_sessions ADD COLUMN stopped_at TIMESTAMP'],
+        ['radius_billing', 'status', "ALTER TABLE radius_billing ADD COLUMN status VARCHAR(20) DEFAULT 'paid'"],
+        ['huawei_onu_types', 'name', 'ALTER TABLE huawei_onu_types ADD COLUMN name VARCHAR(100)'],
+        ['huawei_onu_types', 'equipment_id', 'ALTER TABLE huawei_onu_types ADD COLUMN equipment_id VARCHAR(100)'],
+        ['huawei_onu_types', 'is_active', 'ALTER TABLE huawei_onu_types ADD COLUMN is_active BOOLEAN DEFAULT TRUE']
     ];
     
     foreach ($columnMigrations as $migration) {
@@ -2630,6 +2646,7 @@ function runMigrations(PDO $db): void {
             transaction_type VARCHAR(20) NOT NULL,
             payment_method VARCHAR(50),
             reference VARCHAR(100),
+            status VARCHAR(20) DEFAULT 'paid',
             notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )");
