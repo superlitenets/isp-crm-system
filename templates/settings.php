@@ -7720,6 +7720,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csrf_token'])) {
         $licenseStatus = 'deactivated';
     }
     
+    if ($licenseAction === 'save_remote_update_setting') {
+        try {
+            $val = $_POST['allow_remote_updates'] ?? '1';
+            $settings->set('allow_remote_updates', $val);
+            $licenseStatus = 'remote_update_' . ($val === '0' ? 'disabled' : 'enabled');
+        } catch (Exception $e) {
+            $licenseError = 'Error: ' . $e->getMessage();
+        }
+    }
+    
     if ($licenseAction === 'check_license_updates') {
         try {
             $updateResult = $licenseClient->checkForUpdates();
@@ -8019,17 +8029,67 @@ $mode = $licenseValidation['mode'] ?? '';
                 </div>
                 <?php endif; ?>
             </div>
-            <div class="card-footer bg-white">
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <form method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                        <input type="hidden" name="license_action" value="check_license_updates">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Check for Updates
+                        </button>
+                    </form>
+                    <span class="text-muted small ms-2">Current: v<?= htmlspecialchars($appVersion) ?></span>
+                </div>
                 <form method="POST" class="d-inline">
                     <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                    <input type="hidden" name="license_action" value="check_license_updates">
-                    <button type="submit" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Check for Updates
+                    <input type="hidden" name="license_action" value="save_remote_update_setting">
+                    <?php $remoteUpdatesAllowed = $settings->get('allow_remote_updates', '1') !== '0'; ?>
+                    <input type="hidden" name="allow_remote_updates" value="<?= $remoteUpdatesAllowed ? '0' : '1' ?>">
+                    <button type="submit" class="btn btn-sm <?= $remoteUpdatesAllowed ? 'btn-outline-success' : 'btn-outline-secondary' ?>" title="<?= $remoteUpdatesAllowed ? 'Remote updates are enabled — the license server can push updates to this installation' : 'Remote updates are disabled' ?>">
+                        <i class="bi bi-<?= $remoteUpdatesAllowed ? 'cloud-check' : 'cloud-slash' ?> me-1"></i>
+                        Remote Updates <?= $remoteUpdatesAllowed ? 'ON' : 'OFF' ?>
                     </button>
                 </form>
-                <span class="text-muted small ms-2">Current: v<?= htmlspecialchars($appVersion) ?></span>
             </div>
         </div>
+
+        <?php
+        require_once __DIR__ . '/../src/UpdateManager.php';
+        $updateMgr = new UpdateManager();
+        $updateHistory = $updateMgr->getHistory();
+        ?>
+        <?php if (!empty($updateHistory)): ?>
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Update History</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>Version</th><th>Status</th><th>Message</th><th>Date</th></tr></thead>
+                    <tbody>
+                        <?php foreach (array_slice($updateHistory, 0, 10) as $hist): ?>
+                        <tr>
+                            <td><code>v<?= htmlspecialchars($hist['version'] ?? '') ?></code></td>
+                            <td>
+                                <?php
+                                $statusClass = match($hist['status'] ?? '') {
+                                    'completed' => 'success',
+                                    'failed' => 'danger',
+                                    'started' => 'warning',
+                                    default => 'secondary'
+                                };
+                                ?>
+                                <span class="badge bg-<?= $statusClass ?>"><?= htmlspecialchars($hist['status'] ?? '') ?></span>
+                            </td>
+                            <td class="small"><?= htmlspecialchars($hist['message'] ?? '') ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars($hist['timestamp'] ?? '') ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <div class="col-lg-4">

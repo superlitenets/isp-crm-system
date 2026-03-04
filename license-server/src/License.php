@@ -279,6 +279,14 @@ class License {
             $result['update_available'] = $updateInfo;
         }
         
+        $autoApply = $this->getAutoApplyUpdate(
+            $clientStats['app_version'] ?? $activation['app_version'] ?? '0.0.0',
+            $activation['license_id']
+        );
+        if ($autoApply) {
+            $result['auto_update'] = $autoApply;
+        }
+        
         return $result;
     }
     
@@ -624,6 +632,196 @@ class License {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
+    public function pushUpdateToServer(int $activationId, int $updateId): array {
+        $stmt = $this->db->prepare("
+            SELECT a.*, a.domain, a.server_ip, a.activation_token, a.app_version
+            FROM license_activations a
+            WHERE a.id = ? AND a.is_active = TRUE
+        ");
+        $stmt->execute([$activationId]);
+        $server = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$server) {
+            return ['success' => false, 'error' => 'Server not found or inactive'];
+        }
+        
+        $stmt = $this->db->prepare("SELECT * FROM license_updates WHERE id = ? AND is_published = TRUE");
+        $stmt->execute([$updateId]);
+        $update = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$update) {
+            return ['success' => false, 'error' => 'Update not found or not published'];
+        }
+        
+        if (!empty($server['app_version']) && version_compare($server['app_version'], $update['version'], '>=')) {
+            return ['success' => false, 'error' => 'Server already on v' . $server['app_version']];
+        }
+        
+        $webhookUrl = $this->getServerWebhookUrl($server);
+        
+        $payload = [
+            'action' => 'push_update',
+            'activation_token' => $server['activation_token'],
+            'update' => [
+                'id' => (int)$update['id'],
+                'version' => $update['version'],
+                'title' => $update['title'],
+                'download_url' => $update['download_url'],
+                'download_hash' => $update['download_hash'],
+                'release_type' => $update['release_type'],
+                'is_critical' => (bool)$update['is_critical']
+            ]
+        ];
+        
+        $ch = curl_init($webhookUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => false
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        $result = json_decode($response, true) ?? [];
+        $success = ($httpCode === 200 && !empty($result['success']));
+        
+        $this->logPushResult($activationId, $updateId, $success ? 'sent' : 'failed', $response ?: $curlError);
+        
+        if (!$success) {
+            $error = $result['error'] ?? $curlError ?: "HTTP {$httpCode}";
+            return ['success' => false, 'error' => $error, 'server' => $server['domain'] ?? $server['server_ip']];
+        }
+        
+        return ['success' => true, 'message' => 'Update pushed successfully', 'server' => $server['domain'] ?? $server['server_ip']];
+    }
+    
+    public function pushUpdateToAll(int $updateId): array {
+        $stmt = $this->db->prepare("SELECT * FROM license_updates WHERE id = ? AND is_published = TRUE");
+        $stmt->execute([$updateId]);
+        $update = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$update) {
+            return ['success' => false, 'error' => 'Update not found or not published', 'results' => []];
+        }
+        
+        $stmt = $this->db->query("
+            SELECT a.id, a.domain, a.server_ip, a.app_version, a.last_seen_at
+            FROM license_activations a
+            WHERE a.is_active = TRUE
+            ORDER BY a.domain
+        ");
+        $servers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $results = [];
+        $successCount = 0;
+        $failCount = 0;
+        
+        foreach ($servers as $server) {
+            if (!empty($server['app_version']) && version_compare($server['app_version'], $update['version'], '>=')) {
+                $results[] = ['server' => $server['domain'] ?? $server['server_ip'], 'status' => 'skipped', 'message' => 'Already on v' . $server['app_version']];
+                continue;
+            }
+            
+            $pushResult = $this->pushUpdateToServer($server['id'], $updateId);
+            $results[] = [
+                'server' => $server['domain'] ?? $server['server_ip'],
+                'status' => $pushResult['success'] ? 'sent' : 'failed',
+                'message' => $pushResult['success'] ? 'Update pushed' : ($pushResult['error'] ?? 'Unknown error')
+            ];
+            
+            if ($pushResult['success']) $successCount++;
+            else $failCount++;
+        }
+        
+        return [
+            'success' => true,
+            'message' => "{$successCount} sent, {$failCount} failed, " . (count($servers) - $successCount - $failCount) . " skipped",
+            'results' => $results
+        ];
+    }
+    
+    private function getServerWebhookUrl(array $server): string {
+        $domain = $server['domain'] ?? $server['server_ip'];
+        $scheme = 'https';
+        if (filter_var($domain, FILTER_VALIDATE_IP)) {
+            $scheme = 'http';
+        }
+        return "{$scheme}://{$domain}/api/update-webhook.php";
+    }
+    
+    private function logPushResult(int $activationId, int $updateId, string $status, ?string $response = null): void {
+        try {
+            $this->db->exec("CREATE TABLE IF NOT EXISTS license_update_push_log (
+                id SERIAL PRIMARY KEY,
+                activation_id INTEGER REFERENCES license_activations(id),
+                update_id INTEGER REFERENCES license_updates(id),
+                status VARCHAR(20) DEFAULT 'pending',
+                response TEXT,
+                pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO license_update_push_log (activation_id, update_id, status, response)
+                VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([$activationId, $updateId, $status, $response]);
+        } catch (\Throwable $e) {
+        }
+    }
+    
+    public function getPushLogs(int $updateId): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT pl.*, a.domain, a.server_ip
+                FROM license_update_push_log pl
+                JOIN license_activations a ON pl.activation_id = a.id
+                WHERE pl.update_id = ?
+                ORDER BY pl.pushed_at DESC
+            ");
+            $stmt->execute([$updateId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function markUpdateAutoApply(int $updateId, bool $enabled = true): bool {
+        try {
+            $this->db->exec("ALTER TABLE license_updates ADD COLUMN IF NOT EXISTS auto_apply BOOLEAN DEFAULT FALSE");
+            $stmt = $this->db->prepare("UPDATE license_updates SET auto_apply = ? WHERE id = ?");
+            return $stmt->execute([$enabled ? 1 : 0, $updateId]);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+    
+    public function getAutoApplyUpdate(string $currentVersion, int $licenseId): ?array {
+        try {
+            $this->db->exec("ALTER TABLE license_updates ADD COLUMN IF NOT EXISTS auto_apply BOOLEAN DEFAULT FALSE");
+        } catch (\Throwable $e) {}
+        
+        $update = $this->getAvailableUpdate($currentVersion, $licenseId);
+        if (!$update) return null;
+        
+        $stmt = $this->db->prepare("SELECT auto_apply FROM license_updates WHERE id = ?");
+        $stmt->execute([$update['id'] ?? 0]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!empty($row['auto_apply'])) {
+            $update['auto_apply'] = true;
+            return $update;
+        }
+        
+        return null;
+    }
+
     public function editLicense(int $id, array $data): bool {
         $fields = [];
         $params = [];
@@ -748,6 +946,14 @@ class License {
                 db_size VARCHAR(50),
                 app_version VARCHAR(20),
                 recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+            "CREATE TABLE IF NOT EXISTS license_update_push_log (
+                id SERIAL PRIMARY KEY,
+                activation_id INTEGER REFERENCES license_activations(id),
+                update_id INTEGER REFERENCES license_updates(id),
+                status VARCHAR(20) DEFAULT 'pending',
+                response TEXT,
+                pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
         ];
 
@@ -756,6 +962,11 @@ class License {
                 $this->db->exec($sql);
             } catch (\PDOException $e) {
             }
+        }
+
+        try {
+            $this->db->exec("ALTER TABLE license_updates ADD COLUMN IF NOT EXISTS auto_apply BOOLEAN DEFAULT FALSE");
+        } catch (\PDOException $e) {
         }
     }
 }

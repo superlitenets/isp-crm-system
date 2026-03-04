@@ -42,6 +42,11 @@ class LicenseClient {
                 
                 if ($result['valid']) {
                     $this->cacheLicense($result);
+                    
+                    if (!empty($result['auto_update']) && is_array($result['auto_update'])) {
+                        $this->handleAutoUpdate($result['auto_update']);
+                    }
+                    
                     return $result;
                 }
             }
@@ -154,6 +159,29 @@ class LicenseClient {
             return null;
         } catch (Exception $e) {
             return null;
+        }
+    }
+
+    private function handleAutoUpdate(array $update): void {
+        try {
+            require_once __DIR__ . '/UpdateManager.php';
+            $manager = new \UpdateManager();
+            
+            if (!$manager->isRemoteUpdateAllowed()) return;
+            if ($manager->isLocked()) return;
+            
+            $currentVersion = self::APP_VERSION;
+            $newVersion = $update['version'] ?? '';
+            if (empty($newVersion) || version_compare($currentVersion, $newVersion, '>=')) return;
+            
+            $history = $manager->getHistory();
+            foreach ($history as $h) {
+                if (($h['version'] ?? '') === $newVersion && ($h['status'] ?? '') === 'completed') return;
+            }
+            
+            $manager->applyUpdate($update);
+        } catch (\Throwable $e) {
+            error_log("Auto-update failed: " . $e->getMessage());
         }
     }
 

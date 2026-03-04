@@ -136,10 +136,15 @@ switch ($uri) {
         }
         
         $update = $license->getAvailableUpdate($currentVersion, $licenseId);
-        echo json_encode([
+        $autoUpdate = $license->getAutoApplyUpdate($currentVersion, $licenseId);
+        $response = [
             'update_available' => $update !== null,
             'update' => $update
-        ]);
+        ];
+        if ($autoUpdate) {
+            $response['auto_update'] = $autoUpdate;
+        }
+        echo json_encode($response);
         break;
 
     case '/api/report-update':

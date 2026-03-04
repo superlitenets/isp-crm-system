@@ -273,6 +273,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $message = 'M-Pesa settings saved successfully';
             break;
+
+        case 'push_update_server':
+            $result = $license->pushUpdateToServer((int)$_POST['activation_id'], (int)$_POST['update_id']);
+            $message = $result['success'] ? 'Update pushed to ' . ($result['server'] ?? 'server') : 'Push failed: ' . ($result['error'] ?? 'Unknown error');
+            $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+
+        case 'push_update_all':
+            $result = $license->pushUpdateToAll((int)$_POST['update_id']);
+            $message = 'Push complete: ' . ($result['message'] ?? '');
+            $messageType = 'info';
+            break;
+
+        case 'toggle_auto_apply':
+            $enabled = !empty($_POST['auto_apply']);
+            $license->markUpdateAutoApply((int)$_POST['update_id'], $enabled);
+            $message = 'Auto-apply ' . ($enabled ? 'enabled' : 'disabled');
+            break;
     }
 }
 
@@ -584,6 +602,9 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
                                 <button class="btn btn-sm btn-outline-primary" onclick="showServerDetail(<?= $srv['id'] ?>)" title="View Details">
                                     <i class="bi bi-eye"></i>
                                 </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="pushUpdateToServer(<?= $srv['id'] ?>, '<?= htmlspecialchars($srv['domain'] ?? $srv['server_ip'] ?? '') ?>')" title="Push Update">
+                                    <i class="bi bi-cloud-upload"></i>
+                                </button>
                                 <button class="btn btn-sm btn-outline-danger" onclick="deactivateServer(<?= $srv['id'] ?>, '<?= htmlspecialchars($srv['domain'] ?? $srv['server_ip'] ?? '') ?>')" title="Deactivate">
                                     <i class="bi bi-x-circle"></i>
                                 </button>
@@ -803,26 +824,44 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
                             <?php if ($upd['file_size']): ?> | <?= formatFileSize($upd['file_size']) ?><?php endif; ?>
                         </small>
                     </div>
-                    <div class="btn-group btn-group-sm">
-                        <?php if (!$upd['is_published']): ?>
+                    <div class="d-flex flex-column gap-1 align-items-end">
+                        <div class="btn-group btn-group-sm">
+                            <?php if (!$upd['is_published']): ?>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="publish_update">
+                                <input type="hidden" name="update_id" value="<?= $upd['id'] ?>">
+                                <button type="submit" class="btn btn-outline-success" title="Publish"><i class="bi bi-cloud-upload"></i></button>
+                            </form>
+                            <?php else: ?>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="unpublish_update">
+                                <input type="hidden" name="update_id" value="<?= $upd['id'] ?>">
+                                <button type="submit" class="btn btn-outline-warning" title="Unpublish"><i class="bi bi-cloud-slash"></i></button>
+                            </form>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Push this update to ALL active servers?')">
+                                <input type="hidden" name="action" value="push_update_all">
+                                <input type="hidden" name="update_id" value="<?= $upd['id'] ?>">
+                                <button type="submit" class="btn btn-outline-primary" title="Push to All Servers"><i class="bi bi-broadcast"></i></button>
+                            </form>
+                            <?php endif; ?>
+                            <button class="btn btn-outline-info" onclick="showUpdateLogs(<?= $upd['id'] ?>, '<?= htmlspecialchars($upd['version']) ?>')" title="Install Logs"><i class="bi bi-list-check"></i></button>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Delete this release?')">
+                                <input type="hidden" name="action" value="delete_update">
+                                <input type="hidden" name="update_id" value="<?= $upd['id'] ?>">
+                                <button type="submit" class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </div>
+                        <?php if ($upd['is_published']): ?>
                         <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="publish_update">
+                            <input type="hidden" name="action" value="toggle_auto_apply">
                             <input type="hidden" name="update_id" value="<?= $upd['id'] ?>">
-                            <button type="submit" class="btn btn-outline-success" title="Publish"><i class="bi bi-cloud-upload"></i></button>
-                        </form>
-                        <?php else: ?>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="unpublish_update">
-                            <input type="hidden" name="update_id" value="<?= $upd['id'] ?>">
-                            <button type="submit" class="btn btn-outline-warning" title="Unpublish"><i class="bi bi-cloud-slash"></i></button>
+                            <input type="hidden" name="auto_apply" value="<?= empty($upd['auto_apply']) ? '1' : '0' ?>">
+                            <button type="submit" class="btn btn-sm <?= !empty($upd['auto_apply']) ? 'btn-success' : 'btn-outline-secondary' ?>" title="<?= !empty($upd['auto_apply']) ? 'Auto-apply enabled' : 'Enable auto-apply via heartbeat' ?>">
+                                <i class="bi bi-<?= !empty($upd['auto_apply']) ? 'check-circle-fill' : 'arrow-repeat' ?> me-1"></i>
+                                Auto-Apply <?= !empty($upd['auto_apply']) ? 'ON' : 'OFF' ?>
+                            </button>
                         </form>
                         <?php endif; ?>
-                        <button class="btn btn-outline-info" onclick="showUpdateLogs(<?= $upd['id'] ?>, '<?= htmlspecialchars($upd['version']) ?>')" title="Install Logs"><i class="bi bi-list-check"></i></button>
-                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this release?')">
-                            <input type="hidden" name="action" value="delete_update">
-                            <input type="hidden" name="update_id" value="<?= $upd['id'] ?>">
-                            <button type="submit" class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
-                        </form>
                     </div>
                 </div>
             </div>
@@ -1377,6 +1416,38 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
         </div>
     </div>
 
+    <div class="modal fade" id="pushUpdateModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" value="push_update_server">
+                    <input type="hidden" name="activation_id" id="pushActivationId">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-cloud-upload me-2"></i>Push Update</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted mb-3">Push update to <strong id="pushServerName"></strong></p>
+                        <div class="mb-3">
+                            <label class="form-label">Select Update</label>
+                            <select name="update_id" id="pushUpdateSelect" class="form-select" required>
+                                <?php foreach ($updates as $upd): ?>
+                                <?php if ($upd['is_published']): ?>
+                                <option value="<?= $upd['id'] ?>">v<?= htmlspecialchars($upd['version']) ?> — <?= htmlspecialchars($upd['title']) ?></option>
+                                <?php endif; ?>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-upload me-1"></i>Push Now</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     document.getElementById('suspendModal')?.addEventListener('show.bs.modal', function(e) {
@@ -1553,6 +1624,17 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
         } catch (e) {
             document.getElementById('updateLogsContent').innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
         }
+    }
+
+    function pushUpdateToServer(activationId, serverName) {
+        const updateSelect = document.getElementById('pushUpdateSelect');
+        if (!updateSelect) {
+            alert('No published updates available');
+            return;
+        }
+        document.getElementById('pushActivationId').value = activationId;
+        document.getElementById('pushServerName').textContent = serverName;
+        new bootstrap.Modal(document.getElementById('pushUpdateModal')).show();
     }
 
     async function testMpesaConnection() {
