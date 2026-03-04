@@ -61,13 +61,20 @@ switch ($action) {
             exit;
         }
         
+        $dbSettings = [];
+        try {
+            $sRows = $db->query("SELECT key, value FROM license_settings")->fetchAll();
+            foreach ($sRows as $sRow) { $dbSettings[$sRow['key']] = $sRow['value']; }
+        } catch (Exception $e) {}
+
         $mpesaConfig = [
-            'consumer_key' => getenv('MPESA_CONSUMER_KEY'),
-            'consumer_secret' => getenv('MPESA_CONSUMER_SECRET'),
-            'shortcode' => getenv('MPESA_SHORTCODE'),
-            'passkey' => getenv('MPESA_PASSKEY'),
-            'env' => getenv('MPESA_ENV') ?: 'sandbox',
-            'callback_url' => rtrim(getenv('LICENSE_SERVER_URL') ?: '', '/') . '/api/pay.php?action=callback'
+            'consumer_key' => $dbSettings['mpesa_consumer_key'] ?? getenv('MPESA_CONSUMER_KEY') ?: '',
+            'consumer_secret' => $dbSettings['mpesa_consumer_secret'] ?? getenv('MPESA_CONSUMER_SECRET') ?: '',
+            'shortcode' => $dbSettings['mpesa_shortcode'] ?? getenv('MPESA_SHORTCODE') ?: '',
+            'passkey' => $dbSettings['mpesa_passkey'] ?? getenv('MPESA_PASSKEY') ?: '',
+            'env' => $dbSettings['mpesa_env'] ?? getenv('MPESA_ENV') ?: 'sandbox',
+            'account_type' => $dbSettings['mpesa_account_type'] ?? 'paybill',
+            'callback_url' => rtrim($dbSettings['license_server_url'] ?? getenv('LICENSE_SERVER_URL') ?: '', '/') . '/api/pay.php?action=callback'
         ];
         
         if (empty($mpesaConfig['consumer_key'])) {
@@ -77,7 +84,7 @@ switch ($action) {
         }
         
         try {
-            $mpesa = new LicenseServer\Mpesa($mpesaConfig);
+            $mpesa = new LicenseServer\Mpesa($mpesaConfig, $db);
             $reference = 'LIC-' . substr($license['license_key'], 0, 8);
             $result = $mpesa->stkPush($input['phone'], $amount, $reference, 'License Payment - ' . $license['tier_name']);
             
@@ -116,8 +123,13 @@ switch ($action) {
             exit;
         }
         
-        $mpesaConfig = ['env' => getenv('MPESA_ENV') ?: 'sandbox'];
-        $mpesa = new LicenseServer\Mpesa($mpesaConfig);
+        $cbSettings = [];
+        try {
+            $cbRows = $db->query("SELECT key, value FROM license_settings")->fetchAll();
+            foreach ($cbRows as $cbRow) { $cbSettings[$cbRow['key']] = $cbRow['value']; }
+        } catch (Exception $e) {}
+        $mpesaConfig = ['env' => $cbSettings['mpesa_env'] ?? getenv('MPESA_ENV') ?: 'sandbox'];
+        $mpesa = new LicenseServer\Mpesa($mpesaConfig, $db);
         $result = $mpesa->processCallback($data);
         
         if (!$result['checkout_request_id']) {
@@ -207,6 +219,37 @@ switch ($action) {
         ]);
         break;
         
+    case 'test_connection':
+        $dbSettings = [];
+        try {
+            $sRows = $db->query("SELECT key, value FROM license_settings")->fetchAll();
+            foreach ($sRows as $sRow) { $dbSettings[$sRow['key']] = $sRow['value']; }
+        } catch (Exception $e) {}
+
+        $mpesaConfig = [
+            'consumer_key' => $dbSettings['mpesa_consumer_key'] ?? getenv('MPESA_CONSUMER_KEY') ?: '',
+            'consumer_secret' => $dbSettings['mpesa_consumer_secret'] ?? getenv('MPESA_CONSUMER_SECRET') ?: '',
+            'shortcode' => $dbSettings['mpesa_shortcode'] ?? getenv('MPESA_SHORTCODE') ?: '',
+            'passkey' => $dbSettings['mpesa_passkey'] ?? getenv('MPESA_PASSKEY') ?: '',
+            'env' => $dbSettings['mpesa_env'] ?? getenv('MPESA_ENV') ?: 'sandbox',
+            'account_type' => $dbSettings['mpesa_account_type'] ?? 'paybill',
+            'callback_url' => ''
+        ];
+
+        if (empty($mpesaConfig['consumer_key'])) {
+            echo json_encode(['success' => false, 'error' => 'M-Pesa not configured']);
+            exit;
+        }
+
+        try {
+            $mpesa = new LicenseServer\Mpesa($mpesaConfig, $db);
+            $token = $mpesa->getAccessToken();
+            echo json_encode(['success' => true, 'message' => 'M-Pesa connection successful']);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        break;
+
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Invalid action']);

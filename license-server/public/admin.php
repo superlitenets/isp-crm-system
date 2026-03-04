@@ -251,6 +251,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $license->deleteUpdate((int)$_POST['update_id']);
             $message = 'Update deleted';
             break;
+
+        case 'save_mpesa_settings':
+            $db->exec("CREATE TABLE IF NOT EXISTS license_settings (
+                key VARCHAR(100) PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )");
+            $settingsToSave = [
+                'mpesa_consumer_key' => $_POST['mpesa_consumer_key'] ?? '',
+                'mpesa_consumer_secret' => $_POST['mpesa_consumer_secret'] ?? '',
+                'mpesa_shortcode' => $_POST['mpesa_shortcode'] ?? '',
+                'mpesa_passkey' => $_POST['mpesa_passkey'] ?? '',
+                'mpesa_env' => $_POST['mpesa_env'] ?? 'sandbox',
+                'mpesa_account_type' => $_POST['mpesa_account_type'] ?? 'paybill',
+                'license_server_url' => $_POST['license_server_url'] ?? '',
+            ];
+            $stmt = $db->prepare("INSERT INTO license_settings (key, value, updated_at) VALUES (?, ?, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()");
+            foreach ($settingsToSave as $k => $v) {
+                $stmt->execute([$k, $v]);
+            }
+            $message = 'M-Pesa settings saved successfully';
+            break;
     }
 }
 
@@ -355,6 +377,9 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
             </a>
             <a class="nav-link <?= $activeTab === 'payments' ? 'active' : '' ?>" href="?tab=payments">
                 <i class="bi bi-credit-card me-2"></i>Payments
+            </a>
+            <a class="nav-link <?= $activeTab === 'settings' ? 'active' : '' ?>" href="?tab=settings">
+                <i class="bi bi-gear me-2"></i>Settings
             </a>
             <hr class="mx-3 border-secondary">
             <a class="nav-link" href="?logout=1">
@@ -837,6 +862,132 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($activeTab === 'settings'):
+            $db->exec("CREATE TABLE IF NOT EXISTS license_settings (
+                key VARCHAR(100) PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )");
+            $savedSettings = [];
+            try {
+                $rows = $db->query("SELECT key, value FROM license_settings")->fetchAll();
+                foreach ($rows as $row) { $savedSettings[$row['key']] = $row['value']; }
+            } catch (Exception $e) {}
+
+            $mpesaKey = $savedSettings['mpesa_consumer_key'] ?? getenv('MPESA_CONSUMER_KEY') ?: '';
+            $mpesaSecret = $savedSettings['mpesa_consumer_secret'] ?? getenv('MPESA_CONSUMER_SECRET') ?: '';
+            $mpesaShortcode = $savedSettings['mpesa_shortcode'] ?? getenv('MPESA_SHORTCODE') ?: '';
+            $mpesaPasskey = $savedSettings['mpesa_passkey'] ?? getenv('MPESA_PASSKEY') ?: '';
+            $mpesaEnv = $savedSettings['mpesa_env'] ?? getenv('MPESA_ENV') ?: 'sandbox';
+            $mpesaAccountType = $savedSettings['mpesa_account_type'] ?? 'paybill';
+            $serverUrl = $savedSettings['license_server_url'] ?? getenv('LICENSE_SERVER_URL') ?: '';
+            $mpesaConfigured = !empty($mpesaKey) && !empty($mpesaSecret) && !empty($mpesaShortcode) && !empty($mpesaPasskey);
+        ?>
+        <h4 class="mb-4">Settings</h4>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header bg-white d-flex align-items-center gap-2">
+                        <i class="bi bi-phone text-success"></i>
+                        <h6 class="mb-0">M-Pesa Configuration (Daraja API)</h6>
+                        <?php if ($mpesaConfigured): ?>
+                        <span class="badge bg-success ms-auto"><i class="bi bi-check-circle me-1"></i>Configured</span>
+                        <?php else: ?>
+                        <span class="badge bg-warning ms-auto"><i class="bi bi-exclamation-triangle me-1"></i>Not Configured</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            <input type="hidden" name="action" value="save_mpesa_settings">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Consumer Key</label>
+                                    <input type="text" name="mpesa_consumer_key" class="form-control" value="<?= htmlspecialchars($mpesaKey) ?>" placeholder="Get from Daraja portal">
+                                    <small class="text-muted">From developer.safaricom.co.ke</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Consumer Secret</label>
+                                    <input type="password" name="mpesa_consumer_secret" class="form-control" value="<?= htmlspecialchars($mpesaSecret) ?>" placeholder="Get from Daraja portal">
+                                    <small class="text-muted">From developer.safaricom.co.ke</small>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-medium">Business Shortcode</label>
+                                    <input type="text" name="mpesa_shortcode" class="form-control" value="<?= htmlspecialchars($mpesaShortcode) ?>" placeholder="e.g. 174379">
+                                    <small class="text-muted">Paybill or Till number</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-medium">Passkey</label>
+                                    <input type="password" name="mpesa_passkey" class="form-control" value="<?= htmlspecialchars($mpesaPasskey) ?>" placeholder="STK Push passkey">
+                                    <small class="text-muted">Lipa Na M-Pesa Online passkey</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-medium">Account Type</label>
+                                    <select name="mpesa_account_type" class="form-select">
+                                        <option value="paybill" <?= $mpesaAccountType === 'paybill' ? 'selected' : '' ?>>Paybill</option>
+                                        <option value="till" <?= $mpesaAccountType === 'till' ? 'selected' : '' ?>>Till (Buy Goods)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">Environment</label>
+                                    <select name="mpesa_env" class="form-select">
+                                        <option value="sandbox" <?= $mpesaEnv === 'sandbox' ? 'selected' : '' ?>>Sandbox (Testing)</option>
+                                        <option value="production" <?= $mpesaEnv === 'production' ? 'selected' : '' ?>>Production (Live)</option>
+                                    </select>
+                                    <small class="text-muted">Use sandbox for testing, production for live payments</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-medium">License Server URL</label>
+                                    <input type="url" name="license_server_url" class="form-control" value="<?= htmlspecialchars($serverUrl) ?>" placeholder="https://license.yourdomain.com">
+                                    <small class="text-muted">Public URL for M-Pesa callbacks</small>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i>Save M-Pesa Settings
+                                </button>
+                                <?php if ($mpesaConfigured): ?>
+                                <button type="button" class="btn btn-outline-success btn-sm" id="testMpesaBtn" onclick="testMpesaConnection()">
+                                    <i class="bi bi-plug me-1"></i>Test Connection
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card mb-3">
+                    <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-info-circle me-1"></i>Setup Guide</h6></div>
+                    <div class="card-body">
+                        <ol class="mb-0" style="padding-left: 1.2rem; font-size: 0.9rem;">
+                            <li class="mb-2">Go to <a href="https://developer.safaricom.co.ke" target="_blank">developer.safaricom.co.ke</a> and log in</li>
+                            <li class="mb-2">Create a new app and enable <strong>Lipa Na M-Pesa Online</strong></li>
+                            <li class="mb-2">Copy the <strong>Consumer Key</strong> and <strong>Consumer Secret</strong></li>
+                            <li class="mb-2">For the <strong>Passkey</strong>, request it via Daraja support or use the sandbox default</li>
+                            <li class="mb-2">Set your <strong>License Server URL</strong> (must be publicly accessible for callbacks)</li>
+                            <li class="mb-2">Test in <strong>Sandbox</strong> first, then switch to <strong>Production</strong></li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-link-45deg me-1"></i>Callback URL</h6></div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">M-Pesa will send payment notifications to:</p>
+                        <code class="d-block p-2 bg-light rounded small" style="word-break: break-all;">
+                            <?= htmlspecialchars(rtrim($serverUrl, '/') . '/api/pay.php?action=callback') ?>
+                        </code>
+                        <p class="text-muted small mt-2 mb-0">Ensure this URL is accessible from Safaricom's servers.</p>
+                    </div>
+                </div>
             </div>
         </div>
         <?php endif; ?>
@@ -1402,6 +1553,32 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
         } catch (e) {
             document.getElementById('updateLogsContent').innerHTML = '<div class="alert alert-danger">' + e.message + '</div>';
         }
+    }
+
+    async function testMpesaConnection() {
+        const btn = document.getElementById('testMpesaBtn');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing...';
+        try {
+            const resp = await fetch('api/pay.php?action=test_connection');
+            const data = await resp.json();
+            if (data.success) {
+                btn.className = 'btn btn-success btn-sm';
+                btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Connected!';
+            } else {
+                btn.className = 'btn btn-outline-danger btn-sm';
+                btn.innerHTML = '<i class="bi bi-x-circle me-1"></i>' + (data.error || 'Failed');
+            }
+        } catch (e) {
+            btn.className = 'btn btn-outline-danger btn-sm';
+            btn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Error';
+        }
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.className = 'btn btn-outline-success btn-sm';
+            btn.innerHTML = origHtml;
+        }, 5000);
     }
     </script>
 </body>
