@@ -325,10 +325,20 @@ class FleetManagement {
     }
     
     public function syncDevicesFromProtrack(): array {
+        if (!$this->protrack->isConfigured()) {
+            return ['success' => false, 'error' => 'Protrack not configured. Please set account and password in Settings.'];
+        }
+        
         $result = $this->protrack->getDeviceList();
         
-        if (!$result || ($result['code'] ?? -1) !== 0) {
-            return ['success' => false, 'error' => 'Failed to fetch device list from Protrack'];
+        if (!$result) {
+            $lastError = $this->protrack->getLastError();
+            return ['success' => false, 'error' => 'Failed to connect to Protrack: ' . ($lastError ?? 'No response from API')];
+        }
+        if (($result['code'] ?? -1) !== 0) {
+            $apiError = $result['message'] ?? 'Unknown API error';
+            $apiCode = $result['code'] ?? 'null';
+            return ['success' => false, 'error' => "Protrack API error (code $apiCode): $apiError"];
         }
         
         $devices = $result['record'] ?? [];

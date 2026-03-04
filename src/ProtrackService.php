@@ -9,6 +9,7 @@ class ProtrackService {
     private ?string $password = null;
     private ?string $accessToken = null;
     private ?int $tokenExpiry = null;
+    private ?string $lastError = null;
     
     public function __construct(?\PDO $db = null) {
         $this->db = $db ?? \Database::getConnection();
@@ -33,13 +34,18 @@ class ProtrackService {
         return !empty($this->account) && !empty($this->password);
     }
     
+    public function getLastError(): ?string {
+        return $this->lastError;
+    }
+    
     private function getAccessToken(): ?string {
         if ($this->accessToken && $this->tokenExpiry && time() < ($this->tokenExpiry - 300)) {
             return $this->accessToken;
         }
         
         if (!$this->isConfigured()) {
-            error_log("[ProtrackService] Not configured - missing account or password");
+            $this->lastError = 'Not configured - missing account or password';
+            error_log("[ProtrackService] " . $this->lastError);
             return null;
         }
         
@@ -53,8 +59,14 @@ class ProtrackService {
         ]);
         
         $response = $this->httpGet($url);
-        if (!$response || ($response['code'] ?? -1) !== 0) {
-            error_log("[ProtrackService] Auth failed: " . json_encode($response));
+        if (!$response) {
+            $this->lastError = 'No response from Protrack API during authentication (URL: ' . $this->apiBase . ')';
+            error_log("[ProtrackService] " . $this->lastError);
+            return null;
+        }
+        if (($response['code'] ?? -1) !== 0) {
+            $this->lastError = 'Auth failed: ' . ($response['message'] ?? 'Unknown') . ' (code: ' . ($response['code'] ?? 'null') . ')';
+            error_log("[ProtrackService] " . $this->lastError);
             return null;
         }
         
