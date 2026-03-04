@@ -236,7 +236,7 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
                         <td><?= htmlspecialchars($v['plate_number'] ?? '-') ?></td>
                         <td><code><?= htmlspecialchars($v['imei'] ?? '-') ?></code></td>
                         <td><span class="badge bg-secondary"><?= ucfirst(htmlspecialchars($v['vehicle_type'] ?? 'car')) ?></span></td>
-                        <td><?= htmlspecialchars($v['employee_name'] ?? '<span class="text-muted">Unassigned</span>') ?></td>
+                        <td><?= $v['employee_name'] ? htmlspecialchars($v['employee_name']) : '<span class="text-muted">Unassigned</span>' ?></td>
                         <td>
                             <?php
                             $statusClass = match($v['status']) {

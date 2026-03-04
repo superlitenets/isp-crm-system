@@ -353,10 +353,16 @@ class FleetManagement {
             $existing->execute([$imei]);
             
             if ($existing->fetch()) {
+                $this->db->prepare("UPDATE fleet_vehicles SET name = COALESCE(NULLIF(?, ''), name), plate_number = COALESCE(NULLIF(?, ''), plate_number) WHERE imei = ? AND (name = imei OR name IS NULL OR name = '')")->execute([
+                    $device['devicename'] ?? $device['name'] ?? '',
+                    $device['platenumber'] ?? '',
+                    $imei
+                ]);
                 $synced++;
             } else {
-                $name = $device['name'] ?? $device['imei'] ?? 'Vehicle';
-                $this->db->prepare("INSERT INTO fleet_vehicles (name, imei, vehicle_type, status) VALUES (?, ?, 'car', 'active')")->execute([$name, $imei]);
+                $name = $device['devicename'] ?? $device['name'] ?? $device['imei'] ?? 'Vehicle';
+                $plateNumber = $device['platenumber'] ?? null;
+                $this->db->prepare("INSERT INTO fleet_vehicles (name, plate_number, imei, vehicle_type, status) VALUES (?, ?, ?, 'car', 'active')")->execute([$name, $plateNumber, $imei]);
                 $added++;
                 $synced++;
             }
