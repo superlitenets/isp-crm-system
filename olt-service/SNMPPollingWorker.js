@@ -1131,7 +1131,7 @@ class SNMPPollingWorker {
             `, [oltId]);
             const oltInfo = oltResult.rows[0];
             
-            const losFaults = faults.filter(f => f.new_status !== 'dying-gasp');
+            const losFaults = faults.filter(f => f.new_status === 'los');
             const dyingGaspFaults = faults.filter(f => f.new_status === 'dying-gasp');
             
             const basePayload = {

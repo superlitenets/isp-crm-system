@@ -136,18 +136,13 @@ try {
             exit;
         }
         
-        // Create tickets for each fault with a linked customer
         $ticketsCreated = 0;
         require_once __DIR__ . '/../../src/Ticket.php';
         $ticketClass = new \App\Ticket();
         
         foreach ($faults as $f) {
-            // Only create ticket if customer is linked
-            if (!empty($f['customer_id'])) {
-                $statusLabel = $f['new_status'] === 'los' ? 'LOS (Loss of Signal)' : 
-                    ($f['new_status'] === 'dying-gasp' ? 'Dying Gasp (Power Failure)' : 'Offline');
-                
-                $ticketSubject = "ONU {$statusLabel}: " . ($f['name'] ?: $f['sn']);
+            if (!empty($f['customer_id']) && $f['new_status'] === 'los') {
+                $ticketSubject = "ONU LOS (Loss of Signal): " . ($f['name'] ?: $f['sn']);
                 $ticketDescription = "Automatic fault detection:\n\n" .
                     "ONU: " . ($f['name'] ?: $f['sn']) . "\n" .
                     "Serial: {$f['sn']}\n" .
@@ -163,7 +158,7 @@ try {
                         'customer_id' => $f['customer_id'],
                         'subject' => $ticketSubject,
                         'description' => $ticketDescription,
-                        'priority' => ($f['new_status'] === 'los' || $f['new_status'] === 'dying-gasp') ? 'high' : 'medium',
+                        'priority' => 'high',
                         'category' => 'Fiber/ONU',
                         'source' => 'system'
                     ]);
