@@ -6932,11 +6932,15 @@ class HuaweiOLT {
             $output .= "\n[TR-069 OMCI]\n" . $omciOutput;
             error_log("[AuthStage1] TR-069 OMCI response: " . substr(str_replace(["\r\n", "\n"], " | ", $omciOutput), 0, 300));
             
+            usleep(1000000);
+            
             $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
             $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
             $spOutput = $tr069SpResult['output'] ?? '';
             $output .= "\n[TR-069 Service-Port]\n" . $spOutput;
             error_log("[AuthStage1] TR-069 Service-Port response: " . substr(str_replace(["\r\n", "\n"], " | ", $spOutput), 0, 300));
+            
+            usleep(1000000);
             
             $omciOk = !preg_match('/does not exist|is not valid|Unrecognized command/i', $omciOutput);
             $spOk = empty($spOutput) || !preg_match('/does not exist|is not valid|Unrecognized command/i', $spOutput) || preg_match('/already exist|existed|service-port\s+\d+/i', $spOutput);
@@ -7110,7 +7114,7 @@ class HuaweiOLT {
             $errors[] = "TR-069 OMCI config had issues";
         }
         
-        usleep(500000);
+        usleep(1000000);
         
         // Step 3: Create service-port for TR-069 VLAN
         // Determine gemport based on line profile (profile 2 has gemport 2 for TR-069)
@@ -7132,7 +7136,7 @@ class HuaweiOLT {
         }
         // Note: "Failure: Service virtual port has existed already" is SUCCESS (already configured)
         
-        usleep(500000);
+        usleep(1000000);
         
         // Step 4: For BRIDGE mode, set native VLAN on ALL ETH ports (1-4)
         // Bridge mode passes traffic transparently through all ports

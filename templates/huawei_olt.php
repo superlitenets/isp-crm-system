@@ -1826,22 +1826,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $hasError = true;
                 }
                 
-                // Step 2: Auto-configure TR-069 WAN (IPHOST on VLAN 69 with DHCP)
-                if (!$hasError) {
-                    try {
-                        $tr069Result = $huaweiOLT->configureONUStage2TR069($onuId, [
-                            'tr069_vlan' => 69,
-                            'tr069_gem_port' => 2,
-                            'tr069_profile_id' => 3
-                        ]);
-                        
-                        if ($tr069Result['success']) {
-                            $authMessages[] = "TR-069 WAN configured on VLAN 69";
-                        } else {
-                            $authMessages[] = "TR-069 config info: " . ($tr069Result['message'] ?? 'Pending');
-                        }
-                    } catch (Exception $e) {
-                        $authMessages[] = "TR-069 setup: " . $e->getMessage();
+                if (!$hasError && isset($result['tr069_status'])) {
+                    if (!empty($result['tr069_status']['success'])) {
+                        $authMessages[] = "TR-069 configured (VLAN " . ($result['tr069_status']['vlan'] ?? '69') . ")";
+                    } elseif (!empty($result['tr069_status']['attempted'])) {
+                        $authMessages[] = "TR-069 partially configured — check ONU detail";
                     }
                 }
                 
