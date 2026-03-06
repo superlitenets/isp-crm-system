@@ -41,6 +41,9 @@ ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS override_expires_at TI
 ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP;
 ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS days_remaining_at_suspension INTEGER;
 ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS huawei_onu_id INTEGER;
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS last_queue_rx_bytes BIGINT DEFAULT 0;
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS last_queue_tx_bytes BIGINT DEFAULT 0;
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS last_queue_poll_at TIMESTAMP;
 
 -- ==================== radius_sessions ====================
 ALTER TABLE radius_sessions ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';

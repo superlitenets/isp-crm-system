@@ -489,6 +489,18 @@ CRON_SECRET=${CRON_SECRET}
 # Leave accrual (monthly on 1st)
 0 1 1 * * www-data cd ${APP_DIR}/public && php cron.php leave_accrual >> /var/log/isp-crm-cron.log 2>&1
 
+# ISP: Poll static subscriber bandwidth from MikroTik queues (every 5 min)
+*/5 * * * * www-data cd ${APP_DIR}/public && php isp-cron.php poll_static_bandwidth >> /var/log/isp-crm-cron.log 2>&1
+
+# ISP: Sync sessions and blocked list (every 5 min)
+*/5 * * * * www-data cd ${APP_DIR}/public && php isp-cron.php sync_sessions >> /var/log/isp-crm-cron.log 2>&1
+
+# ISP: Process expired subscriptions (every 5 min)
+*/5 * * * * www-data cd ${APP_DIR}/public && php isp-cron.php process_expired >> /var/log/isp-crm-cron.log 2>&1
+
+# ISP: Sync blocked list (every 10 min)
+*/10 * * * * www-data cd ${APP_DIR}/public && php isp-cron.php sync_blocked_list >> /var/log/isp-crm-cron.log 2>&1
+
 # Database backup (2 AM daily)
 0 2 * * * www-data pg_dump -h localhost -U ${DB_USER} ${DB_NAME} | gzip > ${APP_DIR}/backups/daily_\$(date +\%Y\%m\%d).sql.gz 2>/dev/null
 

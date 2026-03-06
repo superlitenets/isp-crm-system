@@ -51,6 +51,7 @@ The system features a responsive design, including a mobile PWA. Both the main C
   - **Customer Self-Service Portal**: For usage viewing, session history, and invoices.
   - **CoA Support**: Change of Authorization for immediate package changes.
   - **Static IP Online Detection**: Detects static IP customer online status via MikroTik ARP and Simple Queue checks.
+  - **Static IP Bandwidth Polling**: Polls MikroTik simple queue byte counters via API to log bandwidth usage for static/DHCP subscribers (who don't use RADIUS accounting). Runs via `poll_static_bandwidth` cron action every 5 minutes. Stores last polled bytes in `last_queue_rx_bytes`/`last_queue_tx_bytes` columns, calculates deltas, and logs to `radius_usage_logs`.
   - **MAC Binding, IP Pool Management, Bulk Import**: Advanced subscription management features.
   - **VLAN Management**: Define VLANs per NAS and sync to MikroTik.
   - **Static IP Provisioning**: Provisioning and management of static IPs and DHCP leases on MikroTik.

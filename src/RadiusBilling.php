@@ -3448,6 +3448,137 @@ class RadiusBilling {
         return $result;
     }
     
+    public function pollStaticBandwidth(): array {
+        $result = ['polled' => 0, 'logged' => 0, 'errors' => []];
+        
+        try {
+            $staticSubs = $this->db->query("
+                SELECT s.id, s.username, s.static_ip, s.nas_id, s.access_type,
+                       s.last_queue_rx_bytes, s.last_queue_tx_bytes,
+                       n.ip_address as nas_ip, n.api_port, n.api_username, n.api_password_encrypted, n.api_enabled
+                FROM radius_subscriptions s
+                LEFT JOIN radius_nas n ON s.nas_id = n.id
+                WHERE s.access_type IN ('static', 'dhcp')
+                AND s.static_ip IS NOT NULL AND s.static_ip != ''
+                AND s.status = 'active'
+            ")->fetchAll(\PDO::FETCH_ASSOC);
+            
+            if (empty($staticSubs)) {
+                return $result;
+            }
+            
+            $subsByNas = [];
+            foreach ($staticSubs as $sub) {
+                $nasIp = $sub['nas_ip'] ?? '';
+                if ($nasIp && $sub['api_enabled']) {
+                    $subsByNas[$nasIp][] = $sub;
+                }
+            }
+            
+            $encKey = getenv('ENCRYPTION_KEY');
+            if (empty($encKey)) {
+                $encKey = $_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me';
+            }
+            
+            foreach ($subsByNas as $nasIp => $subs) {
+                $nasInfo = $subs[0];
+                
+                try {
+                    $apiPassword = '';
+                    if (!empty($nasInfo['api_password_encrypted'])) {
+                        $decoded = base64_decode($nasInfo['api_password_encrypted']);
+                        if ($decoded !== false && strlen($decoded) > 16) {
+                            $iv = substr($decoded, 0, 16);
+                            $encrypted = substr($decoded, 16);
+                            $apiPassword = openssl_decrypt($encrypted, 'AES-256-CBC', $encKey, 0, $iv) ?: '';
+                        }
+                    }
+                    
+                    require_once __DIR__ . '/MikroTikAPI.php';
+                    $api = new \App\MikroTikAPI(
+                        $nasIp,
+                        (int)($nasInfo['api_port'] ?? 8728),
+                        $nasInfo['api_username'] ?? 'admin',
+                        $apiPassword
+                    );
+                    $api->connect();
+                    
+                    $queueData = [];
+                    try {
+                        $queues = $api->command('/queue/simple/print');
+                        foreach ($queues as $q) {
+                            $target = $q['target'] ?? '';
+                            $ip = str_replace('/32', '', $target);
+                            if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
+                                $bytesStr = $q['bytes'] ?? '0/0';
+                                $parts = explode('/', $bytesStr);
+                                $queueData[$ip] = [
+                                    'rx_bytes' => (int)($parts[0] ?? 0),
+                                    'tx_bytes' => (int)($parts[1] ?? 0),
+                                ];
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $result['errors'][] = "NAS $nasIp queues: " . $e->getMessage();
+                    }
+                    
+                    $api->disconnect();
+                    
+                    foreach ($subs as $sub) {
+                        $ip = $sub['static_ip'];
+                        if (!isset($queueData[$ip])) {
+                            continue;
+                        }
+                        
+                        $result['polled']++;
+                        $currentRx = $queueData[$ip]['rx_bytes'];
+                        $currentTx = $queueData[$ip]['tx_bytes'];
+                        $lastRx = (int)($sub['last_queue_rx_bytes'] ?? 0);
+                        $lastTx = (int)($sub['last_queue_tx_bytes'] ?? 0);
+                        
+                        $deltaRx = $currentRx - $lastRx;
+                        $deltaTx = $currentTx - $lastTx;
+                        
+                        if ($deltaRx < 0) $deltaRx = $currentRx;
+                        if ($deltaTx < 0) $deltaTx = $currentTx;
+                        
+                        $this->db->prepare("
+                            UPDATE radius_subscriptions 
+                            SET last_queue_rx_bytes = ?, last_queue_tx_bytes = ?, last_queue_poll_at = CURRENT_TIMESTAMP
+                            WHERE id = ?
+                        ")->execute([$currentRx, $currentTx, $sub['id']]);
+                        
+                        if ($deltaRx > 0 || $deltaTx > 0) {
+                            $dlMb = $deltaRx / 1048576;
+                            $ulMb = $deltaTx / 1048576;
+                            
+                            $this->db->prepare("
+                                INSERT INTO radius_usage_logs (subscription_id, log_date, download_mb, upload_mb, session_count, session_time_seconds)
+                                VALUES (?, CURRENT_DATE, ?, ?, 0, 0)
+                                ON CONFLICT (subscription_id, log_date) DO UPDATE SET
+                                    download_mb = radius_usage_logs.download_mb + EXCLUDED.download_mb,
+                                    upload_mb = radius_usage_logs.upload_mb + EXCLUDED.upload_mb
+                            ")->execute([$sub['id'], $dlMb, $ulMb]);
+                            
+                            $totalMb = $dlMb + $ulMb;
+                            $this->db->prepare("
+                                UPDATE radius_subscriptions SET data_used_mb = data_used_mb + ? WHERE id = ?
+                            ")->execute([$totalMb, $sub['id']]);
+                            
+                            $result['logged']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $result['errors'][] = "NAS $nasIp: " . $e->getMessage();
+                }
+            }
+        } catch (\Exception $e) {
+            $result['errors'][] = $e->getMessage();
+        }
+        
+        return $result;
+    }
+    
     public function processAutoRenewals(): array {
         $renewed = 0;
         $disconnected = 0;

@@ -66,6 +66,11 @@ switch ($action) {
         echo json_encode($result);
         break;
         
+    case 'poll_static_bandwidth':
+        $result = $radiusBilling->pollStaticBandwidth();
+        echo json_encode($result);
+        break;
+        
     case 'all':
         $results = [];
         $results['expired'] = processExpiredSubscriptions($radiusBilling, $db, $settings);
@@ -76,6 +81,7 @@ switch ($action) {
         $results['session_sync'] = syncRadiusSessions($radiusBilling, $db);
         $results['speed_overrides'] = applySpeedOverrides($radiusBilling, $db);
         $results['blocked_list_sync'] = $radiusBilling->syncMikroTikBlockedList();
+        $results['static_bandwidth'] = $radiusBilling->pollStaticBandwidth();
         echo json_encode(['success' => true, 'results' => $results]);
         break;
         
