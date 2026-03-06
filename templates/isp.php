@@ -538,15 +538,11 @@ if ($action === 'link_onu') {
     
     // Verify ONU exists if provided
     if ($onuId !== null && $onuId > 0) {
-        $stmt = $db->prepare("SELECT id, name, serial_number, genieacs_id FROM huawei_onus WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, name, sn, genieacs_id FROM huawei_onus WHERE id = ?");
         $stmt->execute([$onuId]);
         $onu = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$onu) {
             echo json_encode(['success' => false, 'error' => 'ONU not found']);
-            exit;
-        }
-        if (empty($onu['genieacs_id'])) {
-            echo json_encode(['success' => false, 'error' => 'This ONU does not have a GenieACS device ID. Please configure TR-069 for this ONU first.']);
             exit;
         }
     }
@@ -568,16 +564,22 @@ if ($action === 'search_onus') {
     
     $search = trim($_GET['q'] ?? '');
     
-    $query = "SELECT id, name, serial_number, genieacs_id, status FROM huawei_onus WHERE genieacs_id IS NOT NULL AND genieacs_id != ''";
+    $query = "SELECT o.id, o.name, o.sn, o.genieacs_id, o.status, o.rx_power, o.onu_type,
+                     o.frame, o.slot, o.port, o.onu_id,
+                     t.name as olt_name
+              FROM huawei_onus o
+              LEFT JOIN huawei_olts t ON o.olt_id = t.id
+              WHERE 1=1";
     $params = [];
     
     if ($search) {
-        $query .= " AND (name ILIKE ? OR serial_number ILIKE ?)";
+        $query .= " AND (o.name ILIKE ? OR o.sn ILIKE ? OR CAST(o.id AS TEXT) = ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
+        $params[] = $search;
     }
     
-    $query .= " ORDER BY name ASC LIMIT 50";
+    $query .= " ORDER BY o.name ASC LIMIT 50";
     
     $stmt = $db->prepare($query);
     $stmt->execute($params);
@@ -3766,7 +3768,14 @@ try {
                 // Get linked ONU information
                 $linkedOnu = null;
                 if (!empty($subscriber['huawei_onu_id'])) {
-                    $stmt = $db->prepare("SELECT id, name, serial_number, genieacs_id, status FROM huawei_onus WHERE id = ?");
+                    $stmt = $db->prepare("
+                        SELECT o.id, o.name, o.sn, o.genieacs_id, o.status, o.rx_power, o.tx_power,
+                               o.onu_type, o.distance, o.frame, o.slot, o.port, o.onu_id,
+                               t.name as olt_name, t.ip_address as olt_ip
+                        FROM huawei_onus o
+                        LEFT JOIN huawei_olts t ON o.olt_id = t.id
+                        WHERE o.id = ?
+                    ");
                     $stmt->execute([$subscriber['huawei_onu_id']]);
                     $linkedOnu = $stmt->fetch(PDO::FETCH_ASSOC);
                 }
@@ -4391,6 +4400,12 @@ try {
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="traffic-tab" data-bs-toggle="tab" data-bs-target="#liveTrafficTab" type="button">
                                 <i class="bi bi-graph-up me-1"></i>Live Traffic
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="onu-tab" data-bs-toggle="tab" data-bs-target="#onuTab" type="button">
+                                <i class="bi bi-diagram-3 me-1"></i>ONU
+                                <?php if ($linkedOnu): ?><span class="badge bg-success ms-1">1</span><?php endif; ?>
                             </button>
                         </li>
                         <?php if (strtolower($subscriber['access_type']) === 'hotspot'): ?>
@@ -5732,8 +5747,129 @@ try {
                             </div>
                         </div>
                         
+                        <!-- ONU Tab -->
+                        <div class="tab-pane fade" id="onuTab">
+                            <div id="onuLinkedSection">
+                                <?php if ($linkedOnu): ?>
+                                <div class="card border-0 shadow-sm mb-3">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <div>
+                                                <h6 class="mb-1"><i class="bi bi-diagram-3 me-2 text-primary"></i>Linked ONU</h6>
+                                                <small class="text-muted">This subscriber is connected via the ONU below</small>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $linkedOnu['id'] ?>" class="btn btn-outline-primary btn-sm">
+                                                    <i class="bi bi-box-arrow-up-right me-1"></i>View ONU
+                                                </a>
+                                                <button class="btn btn-outline-danger btn-sm" onclick="unlinkOnu()">
+                                                    <i class="bi bi-link-45deg me-1"></i>Unlink
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <table class="table table-sm table-borderless mb-0">
+                                                    <tbody>
+                                                        <tr>
+                                                            <td class="text-muted" style="width:120px;">Name</td>
+                                                            <td class="fw-medium"><?= htmlspecialchars($linkedOnu['name'] ?? '-') ?></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="text-muted">Serial Number</td>
+                                                            <td><code><?= htmlspecialchars($linkedOnu['sn'] ?? '-') ?></code></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="text-muted">Type</td>
+                                                            <td><?= htmlspecialchars($linkedOnu['onu_type'] ?? '-') ?></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="text-muted">Status</td>
+                                                            <td>
+                                                                <?php
+                                                                $onuStatus = strtolower($linkedOnu['status'] ?? 'unknown');
+                                                                $onuStatusClass = match($onuStatus) {
+                                                                    'online' => 'success',
+                                                                    'offline' => 'danger',
+                                                                    'los' => 'warning',
+                                                                    'dying-gasp' => 'warning',
+                                                                    default => 'secondary'
+                                                                };
+                                                                ?>
+                                                                <span class="badge bg-<?= $onuStatusClass ?>"><?= ucfirst($onuStatus) ?></span>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <table class="table table-sm table-borderless mb-0">
+                                                    <tbody>
+                                                        <tr>
+                                                            <td class="text-muted" style="width:120px;">OLT</td>
+                                                            <td><?= htmlspecialchars($linkedOnu['olt_name'] ?? '-') ?></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="text-muted">Location</td>
+                                                            <td><?= ($linkedOnu['frame'] ?? '-') ?>/<?= ($linkedOnu['slot'] ?? '-') ?>/<?= ($linkedOnu['port'] ?? '-') ?>/<?= ($linkedOnu['onu_id'] ?? '-') ?></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="text-muted">Rx Power</td>
+                                                            <td>
+                                                                <?php
+                                                                $rx = $linkedOnu['rx_power'] ?? null;
+                                                                if ($rx !== null) {
+                                                                    $rxVal = (float)$rx;
+                                                                    $rxClass = $rxVal > -25 ? 'success' : ($rxVal > -28 ? 'warning' : 'danger');
+                                                                    echo "<span class='text-$rxClass fw-bold'>{$rxVal} dBm</span>";
+                                                                } else {
+                                                                    echo '<span class="text-muted">-</span>';
+                                                                }
+                                                                ?>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="text-muted">Distance</td>
+                                                            <td><?= $linkedOnu['distance'] ? $linkedOnu['distance'] . ' m' : '-' ?></td>
+                                                        </tr>
+                                                        <?php if (!empty($linkedOnu['genieacs_id'])): ?>
+                                                        <tr>
+                                                            <td class="text-muted">TR-069</td>
+                                                            <td><span class="badge bg-info-subtle text-info">GenieACS Ready</span></td>
+                                                        </tr>
+                                                        <?php endif; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php else: ?>
+                                <div id="onuSearchSection">
+                                    <div class="text-center py-4 mb-3" id="onuEmptyState">
+                                        <i class="bi bi-diagram-3 text-muted" style="font-size:3rem;"></i>
+                                        <h6 class="mt-2 text-muted">No ONU Linked</h6>
+                                        <p class="text-muted small mb-3">Link an ONU to this subscriber to manage their fiber connection</p>
+                                        <button class="btn btn-primary btn-sm" onclick="document.getElementById('onuSearchBox').style.display='block'; document.getElementById('onuEmptyState').style.display='none'; document.getElementById('onuSearchInput').focus();">
+                                            <i class="bi bi-link-45deg me-1"></i>Link ONU
+                                        </button>
+                                    </div>
+                                    <div id="onuSearchBox" style="display:none;">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-medium"><i class="bi bi-search me-1"></i>Search ONU by Name or Serial Number</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="onuSearchInput" placeholder="Type ONU name or serial number..." autocomplete="off">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="searchOnus()"><i class="bi bi-search"></i></button>
+                                            </div>
+                                        </div>
+                                        <div id="onuSearchResults"></div>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
                         <?php if (strtolower($subscriber['access_type']) === 'hotspot'): ?>
-                        <!-- Devices Tab -->
                         <div class="tab-pane fade" id="devicesTab">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <div>
@@ -12633,6 +12769,111 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
                     <p class="mb-0">Failed to reset devices</p>
                 `;
             });
+    }
+    
+    let onuSearchTimeout = null;
+    const onuSearchInput = document.getElementById('onuSearchInput');
+    if (onuSearchInput) {
+        onuSearchInput.addEventListener('keyup', function(e) {
+            clearTimeout(onuSearchTimeout);
+            if (e.key === 'Enter') { searchOnus(); return; }
+            onuSearchTimeout = setTimeout(() => searchOnus(), 400);
+        });
+    }
+    
+    function searchOnus() {
+        const query = document.getElementById('onuSearchInput').value.trim();
+        const resultsDiv = document.getElementById('onuSearchResults');
+        
+        if (!query) {
+            resultsDiv.innerHTML = '<p class="text-muted small text-center">Type a name or serial number to search</p>';
+            return;
+        }
+        
+        resultsDiv.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Searching...</div>';
+        
+        fetch(`/index.php?page=isp&action=search_onus&q=${encodeURIComponent(query)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !data.onus || data.onus.length === 0) {
+                    resultsDiv.innerHTML = '<div class="alert alert-light text-center py-3"><i class="bi bi-search me-2"></i>No ONUs found matching "' + query + '"</div>';
+                    return;
+                }
+                
+                let html = '<div class="list-group">';
+                data.onus.forEach(onu => {
+                    const statusClass = onu.status === 'online' ? 'success' : (onu.status === 'los' || onu.status === 'dying-gasp' ? 'warning' : 'danger');
+                    const rxPower = onu.rx_power ? `${onu.rx_power} dBm` : '-';
+                    const location = [onu.frame, onu.slot, onu.port, onu.onu_id].filter(x => x !== null && x !== undefined).join('/');
+                    const tr069Badge = onu.genieacs_id ? '<span class="badge bg-info-subtle text-info ms-1">TR-069</span>' : '';
+                    
+                    html += `
+                        <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3" style="cursor:pointer;" onclick="linkOnu(${onu.id}, '${(onu.name || '').replace(/'/g, "\\'")}', '${(onu.sn || '').replace(/'/g, "\\'")}')">
+                            <div>
+                                <div class="fw-medium">${onu.name || 'Unnamed ONU'} ${tr069Badge}</div>
+                                <small class="text-muted">
+                                    SN: <code>${onu.sn || '-'}</code>
+                                    ${onu.olt_name ? ' | OLT: ' + onu.olt_name : ''}
+                                    ${location ? ' | F/S/P/O: ' + location : ''}
+                                    ${onu.onu_type ? ' | ' + onu.onu_type : ''}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-${statusClass} mb-1">${(onu.status || 'unknown').toUpperCase()}</span>
+                                <br><small class="text-muted">Rx: ${rxPower}</small>
+                            </div>
+                        </div>`;
+                });
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+            })
+            .catch(err => {
+                resultsDiv.innerHTML = '<div class="alert alert-danger">Search failed: ' + err.message + '</div>';
+            });
+    }
+    
+    function linkOnu(onuId, onuName, onuSn) {
+        if (!confirm(`Link ONU "${onuName}" (SN: ${onuSn}) to this subscriber?`)) return;
+        
+        fetch('/index.php?page=isp&action=link_huawei_onu', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                subscription_id: <?= $subId ?? 0 ?>,
+                onu_id: onuId
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to link ONU');
+            }
+        })
+        .catch(err => alert('Error: ' + err.message));
+    }
+    
+    function unlinkOnu() {
+        if (!confirm('Unlink this ONU from the subscriber? WiFi configuration via TR-069 will no longer be available.')) return;
+        
+        fetch('/index.php?page=isp&action=link_huawei_onu', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                subscription_id: <?= $subId ?? 0 ?>,
+                onu_id: null
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to unlink ONU');
+            }
+        })
+        .catch(err => alert('Error: ' + err.message));
     }
     
     function openRouterPage(ip) {
