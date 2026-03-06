@@ -3886,158 +3886,227 @@ try {
             
             <style>
                 .sub-hero {
-                    background: linear-gradient(135deg, <?= $isOnline ? '#0f766e' : '#374151' ?> 0%, <?= $isOnline ? '#1e40af' : '#1f2937' ?> 50%, <?= $isOnline ? '#6d28d9' : '#111827' ?> 100%);
+                    background: <?= $isOnline 
+                        ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 35%, #2563eb 70%, #0ea5e9 100%)' 
+                        : 'linear-gradient(135deg, #475569 0%, #334155 50%, #1e293b 100%)' ?>;
                     position: relative;
                     overflow: hidden;
+                    border-radius: var(--isp-radius-xl) !important;
+                    box-shadow: <?= $isOnline 
+                        ? '0 20px 60px -15px rgba(79,70,229,0.4), 0 8px 20px -8px rgba(37,99,235,0.3)' 
+                        : '0 15px 40px -10px rgba(30,41,59,0.5)' ?>;
                 }
                 .sub-hero::before {
                     content: '';
                     position: absolute;
-                    top: -50%;
-                    right: -20%;
-                    width: 400px;
-                    height: 400px;
-                    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+                    top: -80px;
+                    right: -60px;
+                    width: 350px;
+                    height: 350px;
+                    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
                     border-radius: 50%;
+                    animation: float-orb 8s ease-in-out infinite;
                 }
                 .sub-hero::after {
                     content: '';
                     position: absolute;
-                    bottom: -30%;
-                    left: -10%;
-                    width: 300px;
-                    height: 300px;
-                    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+                    bottom: -60px;
+                    left: -40px;
+                    width: 280px;
+                    height: 280px;
+                    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
                     border-radius: 50%;
+                    animation: float-orb 10s ease-in-out infinite reverse;
+                }
+                @keyframes float-orb {
+                    0%, 100% { transform: translate(0, 0); }
+                    50% { transform: translate(15px, -10px); }
                 }
                 .sub-avatar {
-                    width: 88px;
-                    height: 88px;
+                    width: 92px;
+                    height: 92px;
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    background: rgba(255,255,255,0.15);
-                    backdrop-filter: blur(10px);
-                    border: 3px solid rgba(255,255,255,0.25);
+                    background: rgba(255,255,255,0.2);
+                    backdrop-filter: blur(12px);
+                    border: 3px solid rgba(255,255,255,0.35);
                     position: relative;
-                    transition: transform 0.3s ease;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
                 }
-                .sub-avatar:hover { transform: scale(1.05); }
+                .sub-avatar:hover { transform: scale(1.08); box-shadow: 0 12px 40px rgba(0,0,0,0.2); }
                 .sub-avatar .pulse-dot {
                     position: absolute;
-                    bottom: 4px;
-                    right: 4px;
-                    width: 18px;
-                    height: 18px;
+                    bottom: 2px;
+                    right: 2px;
+                    width: 20px;
+                    height: 20px;
                     border-radius: 50%;
-                    border: 3px solid rgba(255,255,255,0.9);
+                    border: 3px solid rgba(255,255,255,0.95);
                 }
                 .sub-avatar .pulse-dot.online {
-                    background: #34d399;
+                    background: #22c55e;
                     animation: pulse-glow 2s ease-in-out infinite;
+                    box-shadow: 0 0 12px rgba(34,197,94,0.5);
                 }
-                .sub-avatar .pulse-dot.offline { background: #9ca3af; }
+                .sub-avatar .pulse-dot.offline { background: #94a3b8; }
                 @keyframes pulse-glow {
-                    0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
-                    50% { box-shadow: 0 0 0 6px rgba(52,211,153,0); }
+                    0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+                    50% { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
                 }
                 .sub-stat-card {
-                    background: rgba(255,255,255,0.08);
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.12);
-                    border-radius: 12px;
-                    padding: 16px;
+                    background: rgba(255,255,255,0.95);
+                    border: none;
+                    border-radius: 14px;
+                    padding: 18px 14px;
                     text-align: center;
                     transition: all 0.3s ease;
                     position: relative;
                     z-index: 1;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                    overflow: hidden;
                 }
+                .sub-stat-card::before {
+                    content: '';
+                    position: absolute;
+                    top: 0; left: 0; right: 0;
+                    height: 3px;
+                }
+                .sub-stat-card.sc-pkg::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+                .sub-stat-card.sc-dl::before { background: linear-gradient(90deg, #10b981, #34d399); }
+                .sub-stat-card.sc-sess::before { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
+                .sub-stat-card.sc-exp::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+                .sub-stat-card.sc-exp-danger::before { background: linear-gradient(90deg, #ef4444, #f87171); }
                 .sub-stat-card:hover {
-                    background: rgba(255,255,255,0.14);
-                    transform: translateY(-2px);
+                    transform: translateY(-3px);
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
                 }
                 .sub-stat-card .stat-val {
-                    font-size: 1.35rem;
-                    font-weight: 700;
-                    color: #fff;
+                    font-size: 1.4rem;
+                    font-weight: 800;
+                    color: var(--isp-primary);
                     line-height: 1.2;
                 }
+                .sub-stat-card.sc-dl .stat-val { color: #059669; }
+                .sub-stat-card.sc-sess .stat-val { color: #0284c7; }
+                .sub-stat-card.sc-exp .stat-val { color: #d97706; }
+                .sub-stat-card.sc-exp-danger .stat-val { color: #dc2626; }
                 .sub-stat-card .stat-lbl {
-                    font-size: 0.72rem;
-                    color: rgba(255,255,255,0.6);
+                    font-size: 0.7rem;
+                    color: #64748b;
                     text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    font-weight: 600;
-                    margin-top: 4px;
+                    letter-spacing: 0.8px;
+                    font-weight: 700;
+                    margin-top: 6px;
                 }
                 .sub-glass-badge {
                     display: inline-flex;
                     align-items: center;
-                    gap: 5px;
-                    padding: 4px 12px;
+                    gap: 6px;
+                    padding: 5px 14px;
                     border-radius: 20px;
-                    font-size: 0.78rem;
+                    font-size: 0.8rem;
                     font-weight: 600;
-                    backdrop-filter: blur(10px);
+                    backdrop-filter: blur(12px);
+                    transition: all 0.2s ease;
                 }
-                .sub-glass-badge.online { background: rgba(52,211,153,0.25); color: #a7f3d0; }
-                .sub-glass-badge.offline { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
-                .sub-glass-badge.status { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); }
-                .sub-glass-badge.access { background: rgba(99,102,241,0.3); color: #c7d2fe; }
-                .sub-glass-badge.mac { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.65); font-size: 0.72rem; }
+                .sub-glass-badge:hover { transform: translateY(-1px); }
+                .sub-glass-badge.online { background: rgba(34,197,94,0.3); color: #bbf7d0; border: 1px solid rgba(34,197,94,0.3); }
+                .sub-glass-badge.offline { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.15); }
+                .sub-glass-badge.status { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+                .sub-glass-badge.status-expired { background: rgba(239,68,68,0.3); color: #fecaca; border: 1px solid rgba(239,68,68,0.3); }
+                .sub-glass-badge.status-suspended { background: rgba(245,158,11,0.3); color: #fef3c7; border: 1px solid rgba(245,158,11,0.3); }
+                .sub-glass-badge.access { background: rgba(255,255,255,0.18); color: #e0e7ff; border: 1px solid rgba(255,255,255,0.2); font-weight: 700; letter-spacing: 0.5px; }
+                .sub-glass-badge.mac { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.12); font-size: 0.73rem; }
                 .sub-wallet-bar {
-                    background: rgba(255,255,255,0.07);
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.1);
-                    border-radius: 12px;
-                    padding: 12px 20px;
+                    background: rgba(255,255,255,0.12);
+                    backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255,255,255,0.18);
+                    border-radius: 14px;
+                    padding: 14px 22px;
                     position: relative;
                     z-index: 1;
                 }
                 .sub-wallet-bar .wallet-amt {
-                    font-size: 1.2rem;
+                    font-size: 1.3rem;
+                    font-weight: 800;
+                    color: #fff;
+                    text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                }
+                .sub-wallet-bar .wallet-lbl {
+                    font-size: 0.68rem;
+                    color: rgba(255,255,255,0.6);
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
                     font-weight: 700;
-                    color: #a7f3d0;
                 }
                 .sub-wallet-bar .btn {
-                    border-radius: 8px;
+                    border-radius: 10px;
                     font-size: 0.82rem;
-                    padding: 5px 14px;
+                    padding: 7px 18px;
+                    font-weight: 600;
+                }
+                .sub-wallet-bar .btn-topup {
+                    background: rgba(255,255,255,0.95);
+                    color: #059669;
+                    border: none;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                }
+                .sub-wallet-bar .btn-topup:hover {
+                    background: #fff;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    color: #059669;
+                }
+                .sub-wallet-bar .btn-mpesa {
+                    background: rgba(255,255,255,0.15);
+                    color: #fff;
+                    border: 1px solid rgba(255,255,255,0.25);
+                }
+                .sub-wallet-bar .btn-mpesa:hover {
+                    background: rgba(255,255,255,0.25);
+                    color: #fff;
+                    transform: translateY(-1px);
                 }
                 .sub-actions-bar {
                     position: relative;
                     z-index: 1;
                 }
                 .sub-actions-bar .btn {
-                    border-radius: 8px;
+                    border-radius: 10px;
                     font-size: 0.82rem;
-                    padding: 6px 14px;
-                    font-weight: 500;
-                    border: 1px solid rgba(255,255,255,0.15);
-                    color: rgba(255,255,255,0.9);
-                    background: rgba(255,255,255,0.08);
+                    padding: 8px 16px;
+                    font-weight: 600;
+                    border: none;
+                    color: #fff;
                     transition: all 0.2s ease;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                 }
                 .sub-actions-bar .btn:hover {
-                    background: rgba(255,255,255,0.18);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
                     color: #fff;
-                    transform: translateY(-1px);
                 }
-                .sub-actions-bar .btn-act-suspend { border-color: rgba(251,191,36,0.4); color: #fde68a; }
-                .sub-actions-bar .btn-act-suspend:hover { background: rgba(251,191,36,0.2); }
-                .sub-actions-bar .btn-act-activate { border-color: rgba(52,211,153,0.4); color: #a7f3d0; }
-                .sub-actions-bar .btn-act-activate:hover { background: rgba(52,211,153,0.2); }
-                .sub-actions-bar .btn-act-renew { border-color: rgba(129,140,248,0.4); color: #c7d2fe; }
-                .sub-actions-bar .btn-act-renew:hover { background: rgba(129,140,248,0.2); }
-                .sub-actions-bar .btn-act-ping { border-color: rgba(56,189,248,0.4); color: #bae6fd; }
-                .sub-actions-bar .btn-act-ping:hover { background: rgba(56,189,248,0.2); }
-                .sub-actions-bar .btn-act-danger { border-color: rgba(248,113,113,0.4); color: #fca5a5; }
-                .sub-actions-bar .btn-act-danger:hover { background: rgba(248,113,113,0.2); }
+                .sub-actions-bar .btn-act-suspend { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #fff; }
+                .sub-actions-bar .btn-act-suspend:hover { background: linear-gradient(135deg, #d97706, #f59e0b); color: #fff; }
+                .sub-actions-bar .btn-act-activate { background: linear-gradient(135deg, #10b981, #34d399); }
+                .sub-actions-bar .btn-act-activate:hover { background: linear-gradient(135deg, #059669, #10b981); }
+                .sub-actions-bar .btn-act-renew { background: linear-gradient(135deg, #6366f1, #818cf8); }
+                .sub-actions-bar .btn-act-renew:hover { background: linear-gradient(135deg, #4f46e5, #6366f1); }
+                .sub-actions-bar .btn-act-ping { background: linear-gradient(135deg, #0ea5e9, #38bdf8); }
+                .sub-actions-bar .btn-act-ping:hover { background: linear-gradient(135deg, #0284c7, #0ea5e9); }
+                .sub-actions-bar .btn-act-danger { background: linear-gradient(135deg, #ef4444, #f87171); }
+                .sub-actions-bar .btn-act-danger:hover { background: linear-gradient(135deg, #dc2626, #ef4444); }
+                .sub-actions-bar .btn-act-default { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); }
+                .sub-actions-bar .btn-act-default:hover { background: rgba(255,255,255,0.28); }
+                .sub-actions-bar .btn-act-more { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; }
+                .sub-actions-bar .btn-act-more:hover { background: rgba(255,255,255,0.22); }
                 .sub-tabs-nav {
                     background: #fff;
-                    border-bottom: 1px solid var(--isp-border);
-                    padding: 0 1rem;
+                    border-bottom: 2px solid var(--isp-border-light);
+                    padding: 0 1.25rem;
                     overflow-x: auto;
                     scrollbar-width: none;
                     -ms-overflow-style: none;
@@ -4046,12 +4115,13 @@ try {
                 .sub-tabs-nav .nav {
                     flex-wrap: nowrap;
                     min-width: max-content;
+                    gap: 2px;
                 }
                 .sub-tabs-nav .nav-link {
                     color: var(--isp-text-muted);
                     font-weight: 500;
-                    font-size: 0.85rem;
-                    padding: 14px 18px;
+                    font-size: 0.84rem;
+                    padding: 15px 16px;
                     border: none;
                     border-bottom: 3px solid transparent;
                     border-radius: 0;
@@ -4059,27 +4129,29 @@ try {
                     white-space: nowrap;
                     transition: all 0.2s ease;
                     position: relative;
+                    margin-bottom: -2px;
                 }
                 .sub-tabs-nav .nav-link:hover {
                     color: var(--isp-accent);
-                    background: rgba(99,102,241,0.04);
+                    background: linear-gradient(180deg, transparent, rgba(99,102,241,0.04));
                 }
                 .sub-tabs-nav .nav-link.active {
                     color: var(--isp-accent);
                     border-bottom-color: var(--isp-accent);
-                    background: rgba(99,102,241,0.06);
-                    font-weight: 600;
+                    background: linear-gradient(180deg, transparent, rgba(99,102,241,0.06));
+                    font-weight: 700;
                 }
                 .sub-tabs-nav .nav-link .badge {
-                    font-size: 0.65rem;
+                    font-size: 0.62rem;
                     padding: 2px 6px;
                     border-radius: 10px;
                     position: relative;
                     top: -1px;
                 }
                 .sub-tab-body {
-                    padding: 1.5rem;
+                    padding: 1.75rem;
                     min-height: 300px;
+                    background: #fff;
                 }
             </style>
 
@@ -4130,7 +4202,7 @@ try {
                                     <?php else: ?>
                                     <span class="sub-glass-badge online"><i class="bi bi-circle-fill" style="font-size: 7px;"></i>Online</span>
                                     <?php endif; ?>
-                                    <span class="sub-glass-badge status"><?= $statusLabel ?></span>
+                                    <span class="sub-glass-badge status<?= $displayStatus === 'expired' ? ' status-expired' : ($displayStatus === 'suspended' ? ' status-suspended' : '') ?>"><?= $statusLabel ?></span>
                                     <span class="sub-glass-badge access"><?= strtoupper($subscriber['access_type']) ?></span>
                                 </div>
                                 <?php if ($subscriber['mac_address']): 
@@ -4150,27 +4222,27 @@ try {
                         <div class="col-lg-8">
                             <div class="row g-2 mb-3">
                                 <div class="col-6 col-md-3">
-                                    <div class="sub-stat-card">
+                                    <div class="sub-stat-card sc-pkg">
                                         <div class="stat-val"><?= $package['name'] ?? 'N/A' ?></div>
                                         <div class="stat-lbl">Package</div>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <div class="sub-stat-card">
-                                        <div class="stat-val" style="color: #a7f3d0;"><?= number_format($totalDownload, 1) ?> <small style="font-size:0.7rem;">GB</small></div>
+                                    <div class="sub-stat-card sc-dl">
+                                        <div class="stat-val"><?= number_format($totalDownload, 1) ?> <small style="font-size:0.7rem;">GB</small></div>
                                         <div class="stat-lbl">Downloaded</div>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <div class="sub-stat-card">
-                                        <div class="stat-val" style="color: #93c5fd;"><?= $totalSessions ?></div>
+                                    <div class="sub-stat-card sc-sess">
+                                        <div class="stat-val"><?= $totalSessions ?></div>
                                         <div class="stat-lbl">Sessions</div>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <div class="sub-stat-card">
-                                        <?php $daysRemaining = $subscriber['expiry_date'] ? ceil((strtotime($subscriber['expiry_date']) - time()) / 86400) : null; ?>
-                                        <div class="stat-val" style="color: <?= $isSubExpired ? '#fca5a5' : '#fde68a' ?>;">
+                                    <?php $daysRemaining = $subscriber['expiry_date'] ? ceil((strtotime($subscriber['expiry_date']) - time()) / 86400) : null; ?>
+                                    <div class="sub-stat-card <?= $isSubExpired ? 'sc-exp-danger' : 'sc-exp' ?>">
+                                        <div class="stat-val">
                                             <?= $daysRemaining !== null ? ($daysRemaining < 0 ? 'Expired' : $daysRemaining . 'd') : '∞' ?>
                                         </div>
                                         <div class="stat-lbl"><?= $isSubExpired ? 'Days Ago' : 'Days Left' ?></div>
@@ -4180,20 +4252,20 @@ try {
 
                             <div class="sub-wallet-bar d-flex align-items-center gap-3 flex-wrap mb-3">
                                 <div class="d-flex align-items-center gap-2">
-                                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(52,211,153,0.2);display:flex;align-items:center;justify-content:center;">
-                                        <i class="bi bi-wallet2" style="color:#a7f3d0;font-size:1.1rem;"></i>
+                                    <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg, rgba(16,185,129,0.3), rgba(52,211,153,0.15));display:flex;align-items:center;justify-content:center;border:1px solid rgba(52,211,153,0.2);">
+                                        <i class="bi bi-wallet2" style="color:#6ee7b7;font-size:1.15rem;"></i>
                                     </div>
                                     <div>
-                                        <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;">Wallet</div>
+                                        <div class="wallet-lbl">Wallet Balance</div>
                                         <div class="wallet-amt">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></div>
                                     </div>
                                 </div>
-                                <div style="width:1px;height:30px;background:rgba(255,255,255,0.15);"></div>
-                                <button type="button" class="btn" style="background:rgba(52,211,153,0.2);color:#a7f3d0;border-color:rgba(52,211,153,0.3);" data-bs-toggle="modal" data-bs-target="#addCreditModal">
+                                <div style="width:1px;height:34px;background:rgba(255,255,255,0.18);margin:0 4px;"></div>
+                                <button type="button" class="btn btn-topup" data-bs-toggle="modal" data-bs-target="#addCreditModal">
                                     <i class="bi bi-plus-lg me-1"></i>Top Up
                                 </button>
                                 <?php if ($customer && !empty($customer['phone'])): ?>
-                                <button type="button" class="btn" style="background:rgba(52,211,153,0.1);color:#a7f3d0;border-color:rgba(52,211,153,0.2);" data-bs-toggle="modal" data-bs-target="#stkPushModal">
+                                <button type="button" class="btn btn-mpesa" data-bs-toggle="modal" data-bs-target="#stkPushModal">
                                     <i class="bi bi-phone me-1"></i>M-Pesa
                                 </button>
                                 <?php endif; ?>
@@ -4231,11 +4303,11 @@ try {
                                 <button type="button" class="btn btn-act-danger" onclick="resetSubscriberMAC(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
                                     <i class="bi bi-phone me-1"></i>Reset MAC
                                 </button>
-                                <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
+                                <button type="button" class="btn btn-act-default" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
                                     <i class="bi bi-wifi me-1"></i>WiFi
                                 </button>
                                 <div class="btn-group">
-                                    <button type="button" class="btn dropdown-toggle" data-bs-toggle="dropdown" style="padding:6px 10px;">
+                                    <button type="button" class="btn btn-act-more dropdown-toggle" data-bs-toggle="dropdown">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" style="border-radius:12px;">
