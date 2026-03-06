@@ -492,6 +492,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         }
         
         if ($unconfigured) {
+            $huaweiOLT->autoAuthorizeMislabeledONUs();
             $where[] = "o.is_authorized = FALSE";
             $where[] = "o.updated_at > NOW() - INTERVAL '24 hours'";
         } else {

@@ -3307,10 +3307,12 @@ class HuaweiOLT {
                 SET is_authorized = TRUE, authorized_at = COALESCE(authorized_at, NOW())
                 WHERE is_authorized = FALSE
                 AND (
-                    (name IS NOT NULL AND name != '' AND zone_id IS NOT NULL)
+                    (name IS NOT NULL AND name != '' AND (zone_id IS NOT NULL OR (zone IS NOT NULL AND zone != '')))
                     OR (onu_id IS NOT NULL AND onu_id > 0 AND slot IS NOT NULL AND port IS NOT NULL)
                     OR (vlan_id IS NOT NULL)
                     OR (customer_id IS NOT NULL)
+                    OR (name IS NOT NULL AND name != '' AND vlan_id IS NOT NULL)
+                    OR (name IS NOT NULL AND name != '' AND onu_id IS NOT NULL AND onu_id > 0)
                 )
             ");
         } catch (\Exception $e) {
