@@ -56,6 +56,7 @@ The system features a responsive design, including a mobile PWA. Both the main C
   - **Static IP Provisioning**: Provisioning and management of static IPs and DHCP leases on MikroTik.
   - **MikroTik API Integration**: Full RouterOS API support.
   - **Live Traffic Monitoring**: Real-time traffic graphs for subscribers.
+  - **Subscriber Growth Graphs**: Daily (30 days), weekly (12 weeks), and monthly (12 months) bar charts with new/expired subscriber counts, active total line overlay, status distribution doughnut, and top packages doughnut on the Subscribers page.
 - **Licensing System**: Standalone license server and client for feature gating across Starter/Professional/Enterprise tiers. A valid license is mandatory for new deployments.
   - **License Server Admin**: Dashboard for server monitoring, update management, license/customer/tier CRUD, and M-Pesa settings.
   - **Server Monitoring**: Heartbeat with full statistics and history.

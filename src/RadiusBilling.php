@@ -4353,7 +4353,111 @@ class RadiusBilling {
         ");
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
-    
+
+    public function getSubscriberGrowthDaily(int $days = 30): array {
+        $stmt = $this->db->prepare("
+            SELECT d.date, 
+                   COALESCE(new_subs.cnt, 0) as new_subscribers,
+                   COALESCE(expired.cnt, 0) as expired_subscribers,
+                   COALESCE(active.cnt, 0) as active_total
+            FROM (
+                SELECT generate_series(CURRENT_DATE - INTERVAL '1 day' * ?, CURRENT_DATE, '1 day')::date as date
+            ) d
+            LEFT JOIN (
+                SELECT created_at::date as dt, COUNT(*) as cnt FROM radius_subscriptions GROUP BY dt
+            ) new_subs ON new_subs.dt = d.date
+            LEFT JOIN (
+                SELECT expiry_date::date as dt, COUNT(*) as cnt FROM radius_subscriptions WHERE status = 'expired' GROUP BY dt
+            ) expired ON expired.dt = d.date
+            LEFT JOIN (
+                SELECT d2.date, COUNT(*) as cnt FROM radius_subscriptions s,
+                (SELECT generate_series(CURRENT_DATE - INTERVAL '1 day' * ?, CURRENT_DATE, '1 day')::date as date) d2
+                WHERE s.created_at::date <= d2.date AND (s.status != 'terminated' OR s.updated_at::date > d2.date)
+                GROUP BY d2.date
+            ) active ON active.date = d.date
+            ORDER BY d.date
+        ");
+        $stmt->execute([$days - 1, $days - 1]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getSubscriberGrowthWeekly(int $weeks = 12): array {
+        $stmt = $this->db->prepare("
+            SELECT w.week_start,
+                   TO_CHAR(w.week_start, 'DD Mon') as label,
+                   COALESCE(new_subs.cnt, 0) as new_subscribers,
+                   COALESCE(expired.cnt, 0) as expired_subscribers
+            FROM (
+                SELECT generate_series(
+                    date_trunc('week', CURRENT_DATE - INTERVAL '1 week' * ?),
+                    date_trunc('week', CURRENT_DATE),
+                    '1 week'
+                )::date as week_start
+            ) w
+            LEFT JOIN (
+                SELECT date_trunc('week', created_at)::date as wk, COUNT(*) as cnt 
+                FROM radius_subscriptions GROUP BY wk
+            ) new_subs ON new_subs.wk = w.week_start
+            LEFT JOIN (
+                SELECT date_trunc('week', expiry_date)::date as wk, COUNT(*) as cnt 
+                FROM radius_subscriptions WHERE status = 'expired' GROUP BY wk
+            ) expired ON expired.wk = w.week_start
+            ORDER BY w.week_start
+        ");
+        $stmt->execute([$weeks - 1]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getSubscriberGrowthMonthly(int $months = 12): array {
+        $stmt = $this->db->prepare("
+            SELECT m.month_start,
+                   TO_CHAR(m.month_start, 'Mon YYYY') as label,
+                   COALESCE(new_subs.cnt, 0) as new_subscribers,
+                   COALESCE(expired.cnt, 0) as expired_subscribers
+            FROM (
+                SELECT generate_series(
+                    date_trunc('month', CURRENT_DATE - INTERVAL '1 month' * ?),
+                    date_trunc('month', CURRENT_DATE),
+                    '1 month'
+                )::date as month_start
+            ) m
+            LEFT JOIN (
+                SELECT date_trunc('month', created_at)::date as mo, COUNT(*) as cnt 
+                FROM radius_subscriptions GROUP BY mo
+            ) new_subs ON new_subs.mo = m.month_start
+            LEFT JOIN (
+                SELECT date_trunc('month', expiry_date)::date as mo, COUNT(*) as cnt 
+                FROM radius_subscriptions WHERE status = 'expired' GROUP BY mo
+            ) expired ON expired.mo = m.month_start
+            ORDER BY m.month_start
+        ");
+        $stmt->execute([$months - 1]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getSubscriberStatusBreakdown(): array {
+        $stmt = $this->db->query("
+            SELECT status, COUNT(*) as cnt 
+            FROM radius_subscriptions 
+            GROUP BY status 
+            ORDER BY cnt DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getSubscribersByPackage(): array {
+        $stmt = $this->db->query("
+            SELECT p.name as package_name, COUNT(s.id) as cnt
+            FROM radius_subscriptions s
+            JOIN radius_packages p ON s.package_id = p.id
+            WHERE s.status NOT IN ('terminated')
+            GROUP BY p.name
+            ORDER BY cnt DESC
+            LIMIT 10
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
     public function getRevenuePerSite(?string $startDate = null, ?string $endDate = null): array {
         $dateFilter = '';
         $params = [];
