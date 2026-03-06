@@ -104,6 +104,8 @@ class HuaweiOLT {
     }
     
     public function getStats(): array {
+        $this->autoAuthorizeMislabeledONUs();
+        
         $losCond = self::losCondition();
         $stats = $this->db->query("
             SELECT 
@@ -4809,6 +4811,8 @@ class HuaweiOLT {
             'recent_alerts' => 0
         ];
         
+        $this->autoAuthorizeMislabeledONUs();
+        
         $stmt = $this->db->query("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_active = TRUE) as active FROM huawei_olts");
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         $stats['total_olts'] = (int)$row['total'];
@@ -4835,11 +4839,15 @@ class HuaweiOLT {
         $stats['unconfigured_onus'] = (int)$row['unconfigured'];
         
         try {
-            // Only count discovery entries from the last 2 hours as truly pending
             $stats['discovered_onus'] = (int)$this->db->query("
                 SELECT COUNT(*) FROM onu_discovery_log 
                 WHERE authorized = FALSE 
                 AND last_seen_at > NOW() - INTERVAL '2 hours'
+                AND NOT EXISTS (
+                    SELECT 1 FROM huawei_onus ho 
+                    WHERE ho.sn = onu_discovery_log.serial_number 
+                    AND ho.is_authorized = TRUE
+                )
             ")->fetchColumn();
         } catch (\Exception $e) {
             $stats['discovered_onus'] = 0;
