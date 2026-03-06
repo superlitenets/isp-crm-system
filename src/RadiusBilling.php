@@ -1696,8 +1696,17 @@ class RadiusBilling {
         $stmt = $this->db->query("SELECT COUNT(*) FROM radius_subscriptions WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)");
         $stats['new_this_month'] = $stmt->fetchColumn();
         
-        // Online subscribers (active sessions count)
-        $stmt = $this->db->query("SELECT COUNT(DISTINCT subscription_id) FROM radius_sessions WHERE session_end IS NULL");
+        // Online subscribers (active RADIUS sessions + static IP online)
+        $stmt = $this->db->query("
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT subscription_id FROM radius_sessions WHERE session_end IS NULL
+                UNION
+                SELECT id FROM radius_subscriptions 
+                WHERE access_type IN ('static', 'dhcp') 
+                AND online_status = 'online' 
+                AND status = 'active'
+            ) AS online_subs
+        ");
         $stats['online_now'] = $stmt->fetchColumn();
         
         // Today's data usage (GB)
