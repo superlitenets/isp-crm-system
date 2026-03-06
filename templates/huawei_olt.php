@@ -9586,6 +9586,7 @@ try {
                             <option value="<?= $olt['id'] ?>" <?= $oltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <?php if (!isset($_GET['unconfigured'])): ?>
                         <select name="status" class="form-select form-select-sm" style="width:auto;min-width:110px" onchange="this.form.submit()">
                             <option value="">All Status</option>
                             <option value="online" <?= ($_GET['status'] ?? '') === 'online' ? 'selected' : '' ?>>Online</option>
@@ -9619,6 +9620,7 @@ try {
                             <option value="signal_asc" <?= ($_GET['sort'] ?? '') === 'signal_asc' ? 'selected' : '' ?>>Signal (Weakest)</option>
                             <option value="signal_desc" <?= ($_GET['sort'] ?? '') === 'signal_desc' ? 'selected' : '' ?>>Signal (Strongest)</option>
                         </select>
+                        <?php endif; ?>
                         <input type="text" name="search" class="form-control form-control-sm" style="width:auto;min-width:180px" placeholder="Search SN/Name/Customer..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
                         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
                         <?php
