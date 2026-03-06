@@ -3083,23 +3083,34 @@ if ($page === 'isp') {
             exit;
         }
         
-        $result = ['success' => true, 'online' => false, 'ip_address' => $ipAddress, 'latency_ms' => null];
+        $result = ['success' => true, 'online' => false, 'ip_address' => $ipAddress, 'latency_ms' => null, 'ping_output' => ''];
         
-        $startTime = microtime(true);
-        $socket = @fsockopen($ipAddress, 80, $errno, $errstr, 2);
-        $endTime = microtime(true);
+        $safeIp = escapeshellarg($ipAddress);
+        $pingOutput = [];
+        $pingReturnCode = 1;
+        exec("ping -c 3 -W 2 $safeIp 2>&1", $pingOutput, $pingReturnCode);
+        $pingOutputStr = implode("\n", $pingOutput);
+        $result['ping_output'] = $pingOutputStr;
         
-        if ($socket) {
-            fclose($socket);
+        if ($pingReturnCode === 0) {
             $result['online'] = true;
-            $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+            if (preg_match('/rtt min\/avg\/max\/mdev = ([\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+)/', $pingOutputStr, $matches)) {
+                $result['latency_ms'] = round((float)$matches[2], 2);
+                $result['min_ms'] = round((float)$matches[1], 2);
+                $result['max_ms'] = round((float)$matches[3], 2);
+            } elseif (preg_match('/time[=<]([\d.]+)\s*ms/', $pingOutputStr, $matches)) {
+                $result['latency_ms'] = round((float)$matches[1], 2);
+            }
+            if (preg_match('/(\d+) packets transmitted, (\d+) received/', $pingOutputStr, $matches)) {
+                $result['packets_sent'] = (int)$matches[1];
+                $result['packets_received'] = (int)$matches[2];
+                $result['packet_loss'] = round((1 - $matches[2] / $matches[1]) * 100, 1);
+            }
         } else {
-            $socket = @fsockopen($ipAddress, 443, $errno, $errstr, 2);
-            $endTime = microtime(true);
-            if ($socket) {
-                fclose($socket);
-                $result['online'] = true;
-                $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+            if (preg_match('/(\d+) packets transmitted, (\d+) received/', $pingOutputStr, $matches)) {
+                $result['packets_sent'] = (int)$matches[1];
+                $result['packets_received'] = (int)$matches[2];
+                $result['packet_loss'] = 100;
             }
         }
         

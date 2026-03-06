@@ -6705,6 +6705,26 @@ try {
                 </div>
             </div>
             
+            <div class="modal fade" id="testNASModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-broadcast me-2"></i>Ping Subscriber</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center py-4">
+                            <div id="testNASResult">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Initializing...</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <script>
             // WiFi Config Modal initialization
             document.getElementById('wifiConfigModal').addEventListener('show.bs.modal', function() {
@@ -12481,11 +12501,26 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.online) {
+                    let statsHtml = '';
+                    if (data.min_ms !== undefined) {
+                        statsHtml = `
+                            <div class="d-flex justify-content-center gap-3 mt-2 mb-2">
+                                <div class="text-center"><small class="text-muted d-block">Min</small><strong class="text-success">${data.min_ms} ms</strong></div>
+                                <div class="text-center"><small class="text-muted d-block">Avg</small><strong class="text-primary">${data.latency_ms} ms</strong></div>
+                                <div class="text-center"><small class="text-muted d-block">Max</small><strong class="text-warning">${data.max_ms} ms</strong></div>
+                            </div>`;
+                    }
+                    let pktHtml = '';
+                    if (data.packets_sent !== undefined) {
+                        pktHtml = `<p class="mb-1 small text-muted">${data.packets_received}/${data.packets_sent} packets received (${data.packet_loss}% loss)</p>`;
+                    }
                     resultDiv.innerHTML = `
                         <i class="bi bi-check-circle-fill text-success fs-1"></i>
                         <h5 class="mt-3 text-success">Reachable</h5>
                         <p class="mb-1"><strong>IP:</strong> ${data.ip_address}</p>
-                        <p class="mb-0"><strong>Latency:</strong> ${data.latency_ms ? data.latency_ms + ' ms' : 'N/A'}</p>
+                        ${statsHtml}
+                        ${pktHtml}
+                        <details class="mt-2 text-start"><summary class="small text-muted" style="cursor:pointer;">Raw Output</summary><pre class="small bg-dark text-light p-2 rounded mt-1" style="max-height:150px;overflow:auto;font-size:11px;">${data.ping_output || 'N/A'}</pre></details>
                     `;
                 } else if (data.error) {
                     resultDiv.innerHTML = `
@@ -12499,6 +12534,7 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
                         <h5 class="mt-3 text-danger">Unreachable</h5>
                         <p class="mb-1"><strong>IP:</strong> ${data.ip_address || 'Unknown'}</p>
                         <p class="mb-0">Could not reach the subscriber</p>
+                        ${data.ping_output ? `<details class="mt-2 text-start"><summary class="small text-muted" style="cursor:pointer;">Raw Output</summary><pre class="small bg-dark text-light p-2 rounded mt-1" style="max-height:150px;overflow:auto;font-size:11px;">${data.ping_output}</pre></details>` : ''}
                     `;
                 }
             })

@@ -147,6 +147,15 @@ switch (strtolower($acctStatusType)) {
         
     case 'interim-update':
     case 'alive':
+        $prevStmt = $db->prepare("
+            SELECT input_octets, output_octets FROM radius_sessions
+            WHERE acct_session_id = ? AND subscription_id = ?
+        ");
+        $prevStmt->execute([$sessionId, $subscriptionId]);
+        $prevData = $prevStmt->fetch(\PDO::FETCH_ASSOC);
+        $prevInput = $prevData ? (int)$prevData['input_octets'] : 0;
+        $prevOutput = $prevData ? (int)$prevData['output_octets'] : 0;
+        
         $stmt = $db->prepare("
             UPDATE radius_sessions SET
                 session_duration = ?,
@@ -166,6 +175,20 @@ switch (strtolower($acctStatusType)) {
                 framed_ip_address = COALESCE(NULLIF(?, ''), framed_ip_address)
             WHERE id = ?
         ")->execute([$framedIP, $subscriptionId]);
+        
+        $deltaInput = max(0, $inputOctets - $prevInput);
+        $deltaOutput = max(0, $outputOctets - $prevOutput);
+        if ($deltaInput > 0 || $deltaOutput > 0) {
+            $dlMb = $deltaInput / 1048576;
+            $ulMb = $deltaOutput / 1048576;
+            $db->prepare("
+                INSERT INTO radius_usage_logs (subscription_id, log_date, download_mb, upload_mb, session_count, session_time_seconds)
+                VALUES (?, CURRENT_DATE, ?, ?, 0, 0)
+                ON CONFLICT (subscription_id, log_date) DO UPDATE SET
+                    download_mb = radius_usage_logs.download_mb + EXCLUDED.download_mb,
+                    upload_mb = radius_usage_logs.upload_mb + EXCLUDED.upload_mb
+            ")->execute([$subscriptionId, $dlMb, $ulMb]);
+        }
         
         echo json_encode(['success' => true, 'action' => 'session_updated']);
         break;
