@@ -3787,10 +3787,12 @@ try {
                     $isOnline = ($subscriber['online_status'] ?? '') === 'online';
                     if ($isOnline && !$activeSession) {
                         $activeSession = [
+                            'id' => 0,
                             'session_start' => $subscriber['last_session_start'] ?? $subscriber['last_seen'] ?? date('Y-m-d H:i:s'),
                             'framed_ip_address' => $subscriber['static_ip'] ?? $subscriber['framed_ip_address'] ?? '',
                             'mac_address' => $subscriber['mac_address'] ?? '',
                             'acct_session_id' => 'static-' . $subscriber['id'],
+                            'is_static' => true,
                         ];
                     }
                 }
@@ -12514,9 +12516,13 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
                     if (data.packets_sent !== undefined) {
                         pktHtml = `<p class="mb-1 small text-muted">${data.packets_received}/${data.packets_sent} packets received (${data.packet_loss}% loss)</p>`;
                     }
+                    let methodBadge = data.method === 'mikrotik' 
+                        ? `<span class="badge bg-info-subtle text-info mb-2">via ${data.nas_name || 'MikroTik'}</span>` 
+                        : `<span class="badge bg-secondary-subtle text-secondary mb-2">TCP probe</span>`;
                     resultDiv.innerHTML = `
                         <i class="bi bi-check-circle-fill text-success fs-1"></i>
                         <h5 class="mt-3 text-success">Reachable</h5>
+                        ${methodBadge}
                         <p class="mb-1"><strong>IP:</strong> ${data.ip_address}</p>
                         ${statsHtml}
                         ${pktHtml}

@@ -3083,33 +3083,109 @@ if ($page === 'isp') {
             exit;
         }
         
-        $result = ['success' => true, 'online' => false, 'ip_address' => $ipAddress, 'latency_ms' => null, 'ping_output' => ''];
+        $result = ['success' => true, 'online' => false, 'ip_address' => $ipAddress, 'latency_ms' => null, 'ping_output' => '', 'method' => 'mikrotik'];
         
-        $safeIp = escapeshellarg($ipAddress);
-        $pingOutput = [];
-        $pingReturnCode = 1;
-        exec("ping -c 3 -W 2 $safeIp 2>&1", $pingOutput, $pingReturnCode);
-        $pingOutputStr = implode("\n", $pingOutput);
-        $result['ping_output'] = $pingOutputStr;
+        $nasId = $sub['nas_id'] ?? null;
+        $pingDone = false;
         
-        if ($pingReturnCode === 0) {
-            $result['online'] = true;
-            if (preg_match('/rtt min\/avg\/max\/mdev = ([\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+)/', $pingOutputStr, $matches)) {
-                $result['latency_ms'] = round((float)$matches[2], 2);
-                $result['min_ms'] = round((float)$matches[1], 2);
-                $result['max_ms'] = round((float)$matches[3], 2);
-            } elseif (preg_match('/time[=<]([\d.]+)\s*ms/', $pingOutputStr, $matches)) {
-                $result['latency_ms'] = round((float)$matches[1], 2);
+        if ($nasId) {
+            $nasStmt = $db->prepare("SELECT * FROM radius_nas WHERE id = ?");
+            $nasStmt->execute([$nasId]);
+            $nas = $nasStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($nas && !empty($nas['api_enabled']) && !empty($nas['ip_address'])) {
+                try {
+                    $encKey = getenv('ENCRYPTION_KEY') ?: ($_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me');
+                    $apiPassword = '';
+                    if (!empty($nas['api_password_encrypted'])) {
+                        $decoded = base64_decode($nas['api_password_encrypted']);
+                        if ($decoded !== false && strlen($decoded) > 16) {
+                            $iv = substr($decoded, 0, 16);
+                            $encrypted = substr($decoded, 16);
+                            $apiPassword = openssl_decrypt($encrypted, 'AES-256-CBC', $encKey, 0, $iv) ?: '';
+                        }
+                    }
+                    
+                    require_once __DIR__ . '/../src/MikroTikAPI.php';
+                    $api = new \App\MikroTikAPI(
+                        $nas['ip_address'],
+                        (int)($nas['api_port'] ?? 8728),
+                        $nas['api_username'] ?? 'admin',
+                        $apiPassword
+                    );
+                    $api->connect();
+                    
+                    $pingResults = $api->command('/tool/ping', [
+                        'address' => $ipAddress,
+                        'count' => '3',
+                        'interval' => '1',
+                    ]);
+                    
+                    $api->disconnect();
+                    
+                    $received = 0;
+                    $sent = 0;
+                    $times = [];
+                    $outputLines = [];
+                    
+                    foreach ($pingResults as $pr) {
+                        if (isset($pr['seq'])) {
+                            $sent++;
+                            if (isset($pr['time']) && $pr['time'] !== '' && !isset($pr['timeout'])) {
+                                $received++;
+                                $timeMs = (float)str_replace('ms', '', $pr['time']);
+                                $times[] = $timeMs;
+                                $outputLines[] = "seq={$pr['seq']} host={$ipAddress} time={$pr['time']}";
+                            } else {
+                                $outputLines[] = "seq={$pr['seq']} host={$ipAddress} timeout";
+                            }
+                        }
+                    }
+                    
+                    if ($sent === 0) $sent = 3;
+                    
+                    $result['ping_output'] = implode("\n", $outputLines);
+                    $result['packets_sent'] = $sent;
+                    $result['packets_received'] = $received;
+                    $result['packet_loss'] = $sent > 0 ? round((1 - $received / $sent) * 100, 1) : 100;
+                    $result['nas_name'] = $nas['name'] ?? $nas['ip_address'];
+                    
+                    if ($received > 0) {
+                        $result['online'] = true;
+                        $result['latency_ms'] = round(array_sum($times) / count($times), 2);
+                        $result['min_ms'] = round(min($times), 2);
+                        $result['max_ms'] = round(max($times), 2);
+                    }
+                    
+                    $pingDone = true;
+                } catch (\Exception $e) {
+                    $result['ping_output'] = 'MikroTik API ping failed: ' . $e->getMessage();
+                }
             }
-            if (preg_match('/(\d+) packets transmitted, (\d+) received/', $pingOutputStr, $matches)) {
-                $result['packets_sent'] = (int)$matches[1];
-                $result['packets_received'] = (int)$matches[2];
-                $result['packet_loss'] = round((1 - $matches[2] / $matches[1]) * 100, 1);
+        }
+        
+        if (!$pingDone) {
+            $result['method'] = 'tcp';
+            $ports = [80, 443, 8291, 8728];
+            foreach ($ports as $port) {
+                $startTime = microtime(true);
+                $socket = @fsockopen($ipAddress, $port, $errno, $errstr, 2);
+                $endTime = microtime(true);
+                if ($socket) {
+                    fclose($socket);
+                    $result['online'] = true;
+                    $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+                    $result['ping_output'] = "TCP port $port reachable";
+                    $result['packets_sent'] = 1;
+                    $result['packets_received'] = 1;
+                    $result['packet_loss'] = 0;
+                    break;
+                }
             }
-        } else {
-            if (preg_match('/(\d+) packets transmitted, (\d+) received/', $pingOutputStr, $matches)) {
-                $result['packets_sent'] = (int)$matches[1];
-                $result['packets_received'] = (int)$matches[2];
+            if (!$result['online']) {
+                $result['ping_output'] = 'No TCP ports reachable (tried: ' . implode(', ', $ports) . ')';
+                $result['packets_sent'] = count($ports);
+                $result['packets_received'] = 0;
                 $result['packet_loss'] = 100;
             }
         }
