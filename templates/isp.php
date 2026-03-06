@@ -3884,38 +3884,238 @@ try {
                 $allSessions)) / $totalSessions / 3600 : 0;
             ?>
             
-            <!-- Premium Subscriber Header Card -->
-            <div class="card border-0 shadow-lg mb-4 overflow-hidden">
-                <div class="card-body p-0">
-                    <div class="row g-0">
-                        <!-- Left: Profile Section with Gradient -->
-                        <div class="col-lg-4" style="background: linear-gradient(135deg, <?= $isOnline ? '#198754' : '#6c757d' ?> 0%, <?= $isOnline ? '#0d6efd' : '#495057' ?> 100%);">
-                            <div class="p-4 text-white text-center">
-                                <a href="?page=isp&view=subscriptions" class="btn btn-sm btn-light btn-outline-light mb-3 opacity-75">
-                                    <i class="bi bi-arrow-left me-1"></i> Back
-                                </a>
-                                <div class="position-relative d-inline-block mb-3">
+            <style>
+                .sub-hero {
+                    background: linear-gradient(135deg, <?= $isOnline ? '#0f766e' : '#374151' ?> 0%, <?= $isOnline ? '#1e40af' : '#1f2937' ?> 50%, <?= $isOnline ? '#6d28d9' : '#111827' ?> 100%);
+                    position: relative;
+                    overflow: hidden;
+                }
+                .sub-hero::before {
+                    content: '';
+                    position: absolute;
+                    top: -50%;
+                    right: -20%;
+                    width: 400px;
+                    height: 400px;
+                    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+                    border-radius: 50%;
+                }
+                .sub-hero::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -30%;
+                    left: -10%;
+                    width: 300px;
+                    height: 300px;
+                    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+                    border-radius: 50%;
+                }
+                .sub-avatar {
+                    width: 88px;
+                    height: 88px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(255,255,255,0.15);
+                    backdrop-filter: blur(10px);
+                    border: 3px solid rgba(255,255,255,0.25);
+                    position: relative;
+                    transition: transform 0.3s ease;
+                }
+                .sub-avatar:hover { transform: scale(1.05); }
+                .sub-avatar .pulse-dot {
+                    position: absolute;
+                    bottom: 4px;
+                    right: 4px;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    border: 3px solid rgba(255,255,255,0.9);
+                }
+                .sub-avatar .pulse-dot.online {
+                    background: #34d399;
+                    animation: pulse-glow 2s ease-in-out infinite;
+                }
+                .sub-avatar .pulse-dot.offline { background: #9ca3af; }
+                @keyframes pulse-glow {
+                    0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
+                    50% { box-shadow: 0 0 0 6px rgba(52,211,153,0); }
+                }
+                .sub-stat-card {
+                    background: rgba(255,255,255,0.08);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255,255,255,0.12);
+                    border-radius: 12px;
+                    padding: 16px;
+                    text-align: center;
+                    transition: all 0.3s ease;
+                    position: relative;
+                    z-index: 1;
+                }
+                .sub-stat-card:hover {
+                    background: rgba(255,255,255,0.14);
+                    transform: translateY(-2px);
+                }
+                .sub-stat-card .stat-val {
+                    font-size: 1.35rem;
+                    font-weight: 700;
+                    color: #fff;
+                    line-height: 1.2;
+                }
+                .sub-stat-card .stat-lbl {
+                    font-size: 0.72rem;
+                    color: rgba(255,255,255,0.6);
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    font-weight: 600;
+                    margin-top: 4px;
+                }
+                .sub-glass-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                    font-size: 0.78rem;
+                    font-weight: 600;
+                    backdrop-filter: blur(10px);
+                }
+                .sub-glass-badge.online { background: rgba(52,211,153,0.25); color: #a7f3d0; }
+                .sub-glass-badge.offline { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
+                .sub-glass-badge.status { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); }
+                .sub-glass-badge.access { background: rgba(99,102,241,0.3); color: #c7d2fe; }
+                .sub-glass-badge.mac { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.65); font-size: 0.72rem; }
+                .sub-wallet-bar {
+                    background: rgba(255,255,255,0.07);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 12px;
+                    padding: 12px 20px;
+                    position: relative;
+                    z-index: 1;
+                }
+                .sub-wallet-bar .wallet-amt {
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                    color: #a7f3d0;
+                }
+                .sub-wallet-bar .btn {
+                    border-radius: 8px;
+                    font-size: 0.82rem;
+                    padding: 5px 14px;
+                }
+                .sub-actions-bar {
+                    position: relative;
+                    z-index: 1;
+                }
+                .sub-actions-bar .btn {
+                    border-radius: 8px;
+                    font-size: 0.82rem;
+                    padding: 6px 14px;
+                    font-weight: 500;
+                    border: 1px solid rgba(255,255,255,0.15);
+                    color: rgba(255,255,255,0.9);
+                    background: rgba(255,255,255,0.08);
+                    transition: all 0.2s ease;
+                }
+                .sub-actions-bar .btn:hover {
+                    background: rgba(255,255,255,0.18);
+                    color: #fff;
+                    transform: translateY(-1px);
+                }
+                .sub-actions-bar .btn-act-suspend { border-color: rgba(251,191,36,0.4); color: #fde68a; }
+                .sub-actions-bar .btn-act-suspend:hover { background: rgba(251,191,36,0.2); }
+                .sub-actions-bar .btn-act-activate { border-color: rgba(52,211,153,0.4); color: #a7f3d0; }
+                .sub-actions-bar .btn-act-activate:hover { background: rgba(52,211,153,0.2); }
+                .sub-actions-bar .btn-act-renew { border-color: rgba(129,140,248,0.4); color: #c7d2fe; }
+                .sub-actions-bar .btn-act-renew:hover { background: rgba(129,140,248,0.2); }
+                .sub-actions-bar .btn-act-ping { border-color: rgba(56,189,248,0.4); color: #bae6fd; }
+                .sub-actions-bar .btn-act-ping:hover { background: rgba(56,189,248,0.2); }
+                .sub-actions-bar .btn-act-danger { border-color: rgba(248,113,113,0.4); color: #fca5a5; }
+                .sub-actions-bar .btn-act-danger:hover { background: rgba(248,113,113,0.2); }
+                .sub-tabs-nav {
+                    background: #fff;
+                    border-bottom: 1px solid var(--isp-border);
+                    padding: 0 1rem;
+                    overflow-x: auto;
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                }
+                .sub-tabs-nav::-webkit-scrollbar { display: none; }
+                .sub-tabs-nav .nav {
+                    flex-wrap: nowrap;
+                    min-width: max-content;
+                }
+                .sub-tabs-nav .nav-link {
+                    color: var(--isp-text-muted);
+                    font-weight: 500;
+                    font-size: 0.85rem;
+                    padding: 14px 18px;
+                    border: none;
+                    border-bottom: 3px solid transparent;
+                    border-radius: 0;
+                    background: transparent;
+                    white-space: nowrap;
+                    transition: all 0.2s ease;
+                    position: relative;
+                }
+                .sub-tabs-nav .nav-link:hover {
+                    color: var(--isp-accent);
+                    background: rgba(99,102,241,0.04);
+                }
+                .sub-tabs-nav .nav-link.active {
+                    color: var(--isp-accent);
+                    border-bottom-color: var(--isp-accent);
+                    background: rgba(99,102,241,0.06);
+                    font-weight: 600;
+                }
+                .sub-tabs-nav .nav-link .badge {
+                    font-size: 0.65rem;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    position: relative;
+                    top: -1px;
+                }
+                .sub-tab-body {
+                    padding: 1.5rem;
+                    min-height: 300px;
+                }
+            </style>
+
+            <div class="sub-hero mb-4" style="border-radius: var(--isp-radius-xl);">
+                <div class="p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3 position-relative" style="z-index:1;">
+                        <a href="?page=isp&view=subscriptions" class="sub-glass-badge offline text-decoration-none">
+                            <i class="bi bi-arrow-left"></i> Back to Subscribers
+                        </a>
+                        <div class="sub-glass-badge access">
+                            <i class="bi bi-hash"></i> ID: <?= $subscriber['id'] ?>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 align-items-center position-relative" style="z-index:1;">
+                        <div class="col-lg-4 text-center text-lg-start">
+                            <div class="d-flex flex-column align-items-center">
+                                <div class="sub-avatar mx-auto mb-3">
                                     <?php if ($isOnline): ?>
-                                    <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px;">
-                                        <i class="bi bi-wifi text-white" style="font-size: 2.5rem;"></i>
-                                    </div>
-                                    <span class="position-absolute bottom-0 end-0 bg-success border border-3 border-white rounded-circle" style="width: 24px; height: 24px;"></span>
+                                    <i class="bi bi-wifi text-white" style="font-size: 2.2rem;"></i>
+                                    <span class="pulse-dot online"></span>
                                     <?php else: ?>
-                                    <div class="rounded-circle bg-white bg-opacity-10 d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px;">
-                                        <i class="bi bi-wifi-off text-white opacity-50" style="font-size: 2.5rem;"></i>
-                                    </div>
+                                    <i class="bi bi-wifi-off text-white opacity-50" style="font-size: 2.2rem;"></i>
+                                    <span class="pulse-dot offline"></span>
                                     <?php endif; ?>
                                 </div>
-                                <h4 class="fw-bold mb-1">
+                                <h4 class="fw-bold text-white mb-1" style="letter-spacing: -0.3px;">
                                     <?= htmlspecialchars($subscriber['username']) ?>
-                                    <button class="btn btn-link btn-sm p-0 text-white opacity-75" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                    <button class="btn btn-link btn-sm p-0 text-white opacity-50 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy"><i class="bi bi-clipboard" style="font-size: 0.85rem;"></i></button>
                                 </h4>
                                 <?php if ($customer): ?>
-                                <p class="mb-2 opacity-75"><?= htmlspecialchars($customer['name']) ?></p>
+                                <p class="mb-2 text-white" style="opacity:0.65; font-size: 0.95rem;"><?= htmlspecialchars($customer['name']) ?></p>
                                 <?php endif; ?>
-                                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                <div class="d-flex gap-2 flex-wrap justify-content-center">
                                     <?php if ($isOnline && $activeSession): ?>
-                                    <span class="badge bg-white text-success live-timer" data-start="<?= strtotime($activeSession['session_start']) ?>" data-type="uptime"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online (<span class="timer-value"><?= $uptimeStr ?></span>)</span>
+                                    <span class="sub-glass-badge online live-timer" data-start="<?= strtotime($activeSession['session_start']) ?>" data-type="uptime"><i class="bi bi-circle-fill" style="font-size: 7px;"></i>Online <span class="timer-value"><?= $uptimeStr ?></span></span>
                                     <?php elseif (!$isOnline): ?>
                                     <?php 
                                     $lastSessionForTimer = null;
@@ -3926,211 +4126,204 @@ try {
                                         }
                                     }
                                     ?>
-                                    <span class="badge bg-white bg-opacity-25 text-white live-timer" data-start="<?= $lastSessionForTimer ? strtotime($lastSessionForTimer['session_end']) : '' ?>" data-type="offline"><i class="bi bi-circle me-1" style="font-size: 8px;"></i>Offline (<span class="timer-value"><?= $offlineStr ?></span>)</span>
+                                    <span class="sub-glass-badge offline live-timer" data-start="<?= $lastSessionForTimer ? strtotime($lastSessionForTimer['session_end']) : '' ?>" data-type="offline"><i class="bi bi-circle" style="font-size: 7px;"></i>Offline <span class="timer-value"><?= $offlineStr ?></span></span>
                                     <?php else: ?>
-                                    <span class="badge bg-white text-success"><i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>Online</span>
+                                    <span class="sub-glass-badge online"><i class="bi bi-circle-fill" style="font-size: 7px;"></i>Online</span>
                                     <?php endif; ?>
-                                    <span class="badge bg-<?= $statusClass === 'success' ? 'white text-success' : ($statusClass === 'danger' ? 'danger' : 'warning text-dark') ?>"><?= $statusLabel ?></span>
-                                    <span class="badge bg-white bg-opacity-25"><?= strtoupper($subscriber['access_type']) ?></span>
+                                    <span class="sub-glass-badge status"><?= $statusLabel ?></span>
+                                    <span class="sub-glass-badge access"><?= strtoupper($subscriber['access_type']) ?></span>
                                 </div>
                                 <?php if ($subscriber['mac_address']): 
                                     $macVendor = \App\MacVendorLookup::getShortName($subscriber['mac_address']);
                                     $macIcon = $macVendor ? \App\MacVendorLookup::getDeviceIcon($macVendor) : 'bi-lock-fill';
                                 ?>
-                                <div class="mt-2">
-                                    <span class="badge bg-white bg-opacity-10"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span>
+                                <div class="mt-2 d-flex gap-1 flex-wrap justify-content-center">
+                                    <span class="sub-glass-badge mac"><i class="bi bi-lock-fill"></i>MAC Bound</span>
                                     <?php if ($macVendor): ?>
-                                    <span class="badge bg-white bg-opacity-10"><i class="bi <?= $macIcon ?> me-1"></i><?= htmlspecialchars($macVendor) ?></span>
+                                    <span class="sub-glass-badge mac"><i class="bi <?= $macIcon ?>"></i><?= htmlspecialchars($macVendor) ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <?php endif; ?>
                             </div>
                         </div>
-                        <!-- Right: Quick Stats -->
+
                         <div class="col-lg-8">
-                            <div class="p-4">
-                                <div class="row g-3 mb-3">
-                                    <div class="col-6 col-md-3">
-                                        <div class="text-center p-3 rounded-3 bg-primary bg-opacity-10">
-                                            <div class="fs-4 fw-bold text-primary"><?= $package['name'] ?? 'N/A' ?></div>
-                                            <small class="text-muted">Package</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="text-center p-3 rounded-3 bg-success bg-opacity-10">
-                                            <div class="fs-4 fw-bold text-success"><?= number_format($totalDownload, 1) ?> GB</div>
-                                            <small class="text-muted">Downloaded</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="text-center p-3 rounded-3 bg-info bg-opacity-10">
-                                            <div class="fs-4 fw-bold text-info"><?= $totalSessions ?></div>
-                                            <small class="text-muted">Sessions</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="text-center p-3 rounded-3 <?= $isSubExpired ? 'bg-danger bg-opacity-10' : 'bg-warning bg-opacity-10' ?>">
-                                            <?php 
-                                            $daysRemaining = $subscriber['expiry_date'] ? ceil((strtotime($subscriber['expiry_date']) - time()) / 86400) : null;
-                                            ?>
-                                            <div class="fs-4 fw-bold <?= $isSubExpired ? 'text-danger' : 'text-warning' ?>">
-                                                <?= $daysRemaining !== null ? ($daysRemaining < 0 ? 'Expired' : $daysRemaining . 'd') : '∞' ?>
-                                            </div>
-                                            <small class="text-muted"><?= $isSubExpired ? 'Days Ago' : 'Days Left' ?></small>
-                                        </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6 col-md-3">
+                                    <div class="sub-stat-card">
+                                        <div class="stat-val"><?= $package['name'] ?? 'N/A' ?></div>
+                                        <div class="stat-lbl">Package</div>
                                     </div>
                                 </div>
-                                <!-- Wallet Card at Top -->
-                                <div class="d-flex align-items-center gap-3 mb-3 p-3 rounded-3 bg-gradient" style="background: linear-gradient(90deg, rgba(25,135,84,0.15) 0%, rgba(13,110,253,0.15) 100%); border: 1px solid rgba(25,135,84,0.2);">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                            <i class="bi bi-wallet2 fs-5"></i>
-                                        </div>
-                                        <div>
-                                            <div class="text-muted small">Wallet Balance</div>
-                                            <div class="fw-bold fs-5 text-success">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></div>
-                                        </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="sub-stat-card">
+                                        <div class="stat-val" style="color: #a7f3d0;"><?= number_format($totalDownload, 1) ?> <small style="font-size:0.7rem;">GB</small></div>
+                                        <div class="stat-lbl">Downloaded</div>
                                     </div>
-                                    <div class="vr mx-2"></div>
-                                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addCreditModal">
-                                        <i class="bi bi-plus-lg me-1"></i> Top Up
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="sub-stat-card">
+                                        <div class="stat-val" style="color: #93c5fd;"><?= $totalSessions ?></div>
+                                        <div class="stat-lbl">Sessions</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="sub-stat-card">
+                                        <?php $daysRemaining = $subscriber['expiry_date'] ? ceil((strtotime($subscriber['expiry_date']) - time()) / 86400) : null; ?>
+                                        <div class="stat-val" style="color: <?= $isSubExpired ? '#fca5a5' : '#fde68a' ?>;">
+                                            <?= $daysRemaining !== null ? ($daysRemaining < 0 ? 'Expired' : $daysRemaining . 'd') : '∞' ?>
+                                        </div>
+                                        <div class="stat-lbl"><?= $isSubExpired ? 'Days Ago' : 'Days Left' ?></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sub-wallet-bar d-flex align-items-center gap-3 flex-wrap mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(52,211,153,0.2);display:flex;align-items:center;justify-content:center;">
+                                        <i class="bi bi-wallet2" style="color:#a7f3d0;font-size:1.1rem;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;">Wallet</div>
+                                        <div class="wallet-amt">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></div>
+                                    </div>
+                                </div>
+                                <div style="width:1px;height:30px;background:rgba(255,255,255,0.15);"></div>
+                                <button type="button" class="btn" style="background:rgba(52,211,153,0.2);color:#a7f3d0;border-color:rgba(52,211,153,0.3);" data-bs-toggle="modal" data-bs-target="#addCreditModal">
+                                    <i class="bi bi-plus-lg me-1"></i>Top Up
+                                </button>
+                                <?php if ($customer && !empty($customer['phone'])): ?>
+                                <button type="button" class="btn" style="background:rgba(52,211,153,0.1);color:#a7f3d0;border-color:rgba(52,211,153,0.2);" data-bs-toggle="modal" data-bs-target="#stkPushModal">
+                                    <i class="bi bi-phone me-1"></i>M-Pesa
+                                </button>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="sub-actions-bar d-flex flex-wrap gap-2">
+                                <?php if ($subscriber['status'] === 'active'): ?>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="suspend_subscription">
+                                    <input type="hidden" name="id" value="<?= $subId ?>">
+                                    <input type="hidden" name="return_to" value="subscriber">
+                                    <button type="submit" class="btn btn-act-suspend"><i class="bi bi-pause-fill me-1"></i>Suspend</button>
+                                </form>
+                                <?php elseif ($subscriber['status'] === 'suspended'): ?>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="unsuspend_subscription">
+                                    <input type="hidden" name="id" value="<?= $subId ?>">
+                                    <input type="hidden" name="return_to" value="subscriber">
+                                    <button type="submit" class="btn btn-act-activate"><i class="bi bi-play-fill me-1"></i>Unsuspend</button>
+                                </form>
+                                <?php else: ?>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="activate_subscription">
+                                    <input type="hidden" name="id" value="<?= $subId ?>">
+                                    <input type="hidden" name="return_to" value="subscriber">
+                                    <button type="submit" class="btn btn-act-activate"><i class="bi bi-play-fill me-1"></i>Activate</button>
+                                </form>
+                                <?php endif; ?>
+                                <button type="button" class="btn btn-act-renew" data-bs-toggle="modal" data-bs-target="#renewModal">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Renew
+                                </button>
+                                <button type="button" class="btn btn-act-ping" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
+                                    <i class="bi bi-lightning me-1"></i>Ping
+                                </button>
+                                <button type="button" class="btn btn-act-danger" onclick="resetSubscriberMAC(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
+                                    <i class="bi bi-phone me-1"></i>Reset MAC
+                                </button>
+                                <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
+                                    <i class="bi bi-wifi me-1"></i>WiFi
+                                </button>
+                                <div class="btn-group">
+                                    <button type="button" class="btn dropdown-toggle" data-bs-toggle="dropdown" style="padding:6px 10px;">
+                                        <i class="bi bi-three-dots-vertical"></i>
                                     </button>
-                                    <?php if ($customer && !empty($customer['phone'])): ?>
-                                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#stkPushModal">
-                                        <i class="bi bi-phone me-1"></i> M-Pesa STK
-                                    </button>
-                                    <?php endif; ?>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" style="border-radius:12px;">
+                                        <?php if ($customer): ?>
+                                        <li><a class="dropdown-item py-2" href="?page=tickets&action=create&customer_id=<?= $customer['id'] ?>"><i class="bi bi-ticket-perforated me-2 text-primary"></i>Create Ticket</a></li>
+                                        <li><a class="dropdown-item py-2" href="?page=customers&action=view&id=<?= $customer['id'] ?>"><i class="bi bi-person me-2 text-info"></i>View Customer</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <?php endif; ?>
+                                        <?php if (!empty($customer['phone'])): ?>
+                                        <li><a class="dropdown-item py-2" href="#" onclick="sendQuickSMS('<?= htmlspecialchars($customer['phone']) ?>', '<?= htmlspecialchars($customer['name']) ?>')"><i class="bi bi-chat-dots me-2 text-primary"></i>Send SMS</a></li>
+                                        <li><a class="dropdown-item py-2" href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank"><i class="bi bi-whatsapp me-2 text-success"></i>WhatsApp</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <?php endif; ?>
+                                        <li><a class="dropdown-item py-2 text-danger" href="#" onclick="if(confirm('Reset data usage to 0?')) document.getElementById('resetDataForm').submit()"><i class="bi bi-arrow-counterclockwise me-2"></i>Reset Data Usage</a></li>
+                                    </ul>
                                 </div>
-                                
-                                <!-- Action Buttons -->
-                                <div class="d-flex flex-wrap gap-2">
-                <div class="btn-group">
-                    <?php if ($subscriber['status'] === 'active'): ?>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="suspend_subscription">
-                        <input type="hidden" name="id" value="<?= $subId ?>">
-                        <input type="hidden" name="return_to" value="subscriber">
-                        <button type="submit" class="btn btn-warning"><i class="bi bi-pause-fill me-1"></i> Suspend</button>
-                    </form>
-                    <?php elseif ($subscriber['status'] === 'suspended'): ?>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="unsuspend_subscription">
-                        <input type="hidden" name="id" value="<?= $subId ?>">
-                        <input type="hidden" name="return_to" value="subscriber">
-                        <button type="submit" class="btn btn-success"><i class="bi bi-play-fill me-1"></i> Unsuspend</button>
-                    </form>
-                    <?php else: ?>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="activate_subscription">
-                        <input type="hidden" name="id" value="<?= $subId ?>">
-                        <input type="hidden" name="return_to" value="subscriber">
-                        <button type="submit" class="btn btn-success"><i class="bi bi-play-fill me-1"></i> Activate</button>
-                    </form>
-                    <?php endif; ?>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#renewModal">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Renew
-                    </button>
-                    <button type="button" class="btn btn-info" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
-                        <i class="bi bi-lightning me-1"></i> Ping
-                    </button>
-                    <button type="button" class="btn btn-danger" onclick="resetSubscriberMAC(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
-                        <i class="bi bi-phone me-1"></i> Reset MAC
-                    </button>
-                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#wifiConfigModal">
-                        <i class="bi bi-wifi me-1"></i> WiFi Config
-                    </button>
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                            <i class="bi bi-three-dots-vertical"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <?php if ($customer): ?>
-                            <li><a class="dropdown-item" href="?page=tickets&action=create&customer_id=<?= $customer['id'] ?>"><i class="bi bi-ticket-perforated me-2"></i>Create Ticket</a></li>
-                            <li><a class="dropdown-item" href="?page=customers&action=view&id=<?= $customer['id'] ?>"><i class="bi bi-person me-2"></i>View Customer</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <?php endif; ?>
-                            <?php if (!empty($customer['phone'])): ?>
-                            <li><a class="dropdown-item" href="#" onclick="sendQuickSMS('<?= htmlspecialchars($customer['phone']) ?>', '<?= htmlspecialchars($customer['name']) ?>')"><i class="bi bi-chat-dots me-2"></i>Send SMS</a></li>
-                            <li><a class="dropdown-item" href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank"><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <?php endif; ?>
-                            <li><a class="dropdown-item text-danger" href="#" onclick="if(confirm('Reset data usage to 0?')) document.getElementById('resetDataForm').submit()"><i class="bi bi-arrow-counterclockwise me-2"></i>Reset Data Usage</a></li>
-                        </ul>
-                    </div>
-                    <form id="resetDataForm" method="post" style="display:none;">
-                        <input type="hidden" name="action" value="reset_data_usage">
-                        <input type="hidden" name="id" value="<?= $subId ?>">
-                        <input type="hidden" name="return_to" value="subscriber">
-                    </form>
-                                </div>
+                                <form id="resetDataForm" method="post" style="display:none;">
+                                    <input type="hidden" name="action" value="reset_data_usage">
+                                    <input type="hidden" name="id" value="<?= $subId ?>">
+                                    <input type="hidden" name="return_to" value="subscriber">
+                                </form>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Full Width Tabs Layout -->
-            <div class="card border-0 shadow-lg">
-                <div class="card-header bg-white border-bottom p-0">
-                    <ul class="nav nav-pills nav-fill" id="subscriberTabs" role="tablist">
+            <div class="card border-0 shadow-lg" style="border-radius: var(--isp-radius-xl); overflow: hidden;">
+                <div class="sub-tabs-nav p-0">
+                    <ul class="nav" id="subscriberTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active rounded-0 py-3 border-end" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessionsTab" type="button">
-                                <i class="bi bi-broadcast me-2"></i>Sessions
+                            <button class="nav-link active" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessionsTab" type="button">
+                                <i class="bi bi-broadcast me-1"></i>Sessions
                                 <?php if ($isOnline): ?><span class="badge bg-success ms-1">1</span><?php endif; ?>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="customer-tab" data-bs-toggle="tab" data-bs-target="#customerTab" type="button">
-                                <i class="bi bi-person-circle me-2"></i>Customer
+                            <button class="nav-link" id="customer-tab" data-bs-toggle="tab" data-bs-target="#customerTab" type="button">
+                                <i class="bi bi-person-circle me-1"></i>Customer
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="subscription-tab" data-bs-toggle="tab" data-bs-target="#subscriptionTab" type="button">
-                                <i class="bi bi-router me-2"></i>Subscription
+                            <button class="nav-link" id="subscription-tab" data-bs-toggle="tab" data-bs-target="#subscriptionTab" type="button">
+                                <i class="bi bi-router me-1"></i>Subscription
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="billing-tab" data-bs-toggle="tab" data-bs-target="#billingTab" type="button">
-                                <i class="bi bi-receipt me-2"></i>Billing
+                            <button class="nav-link" id="billing-tab" data-bs-toggle="tab" data-bs-target="#billingTab" type="button">
+                                <i class="bi bi-receipt me-1"></i>Billing
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoicesTab" type="button">
-                                <i class="bi bi-file-text me-2"></i>Invoices
+                            <button class="nav-link" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoicesTab" type="button">
+                                <i class="bi bi-file-text me-1"></i>Invoices
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="tickets-tab" data-bs-toggle="tab" data-bs-target="#ticketsTab" type="button">
-                                <i class="bi bi-ticket me-2"></i>Tickets
+                            <button class="nav-link" id="tickets-tab" data-bs-toggle="tab" data-bs-target="#ticketsTab" type="button">
+                                <i class="bi bi-ticket me-1"></i>Tickets
                                 <?php $openTickets = count(array_filter($tickets, fn($t) => in_array($t['status'], ['open', 'in_progress']))); ?>
                                 <?php if ($openTickets): ?><span class="badge bg-danger ms-1"><?= $openTickets ?></span><?php endif; ?>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="notes-tab" data-bs-toggle="tab" data-bs-target="#notesTab" type="button">
-                                <i class="bi bi-sticky me-2"></i>Notes
+                            <button class="nav-link" id="notes-tab" data-bs-toggle="tab" data-bs-target="#notesTab" type="button">
+                                <i class="bi bi-sticky me-1"></i>Notes
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="speed-tab" data-bs-toggle="tab" data-bs-target="#speedOverridesTab" type="button">
-                                <i class="bi bi-speedometer2 me-2"></i>Speed
+                            <button class="nav-link" id="speed-tab" data-bs-toggle="tab" data-bs-target="#speedOverridesTab" type="button">
+                                <i class="bi bi-speedometer2 me-1"></i>Speed
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="bandwidth-tab" data-bs-toggle="tab" data-bs-target="#bandwidthTab" type="button">
-                                <i class="bi bi-bar-chart-line me-2"></i>Bandwidth
+                            <button class="nav-link" id="bandwidth-tab" data-bs-toggle="tab" data-bs-target="#bandwidthTab" type="button">
+                                <i class="bi bi-bar-chart-line me-1"></i>Bandwidth
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3 border-end" id="traffic-tab" data-bs-toggle="tab" data-bs-target="#liveTrafficTab" type="button">
-                                <i class="bi bi-graph-up me-2"></i>Live Traffic
+                            <button class="nav-link" id="traffic-tab" data-bs-toggle="tab" data-bs-target="#liveTrafficTab" type="button">
+                                <i class="bi bi-graph-up me-1"></i>Live Traffic
                             </button>
                         </li>
                         <?php if (strtolower($subscriber['access_type']) === 'hotspot'): ?>
                         <?php $devices = $radiusBilling->getSubscriptionDevices($subscriber['id']); ?>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link rounded-0 py-3" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devicesTab" type="button">
-                                <i class="bi bi-phone me-2"></i>Devices
+                            <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devicesTab" type="button">
+                                <i class="bi bi-phone me-1"></i>Devices
                                 <span class="badge bg-secondary ms-1"><?= count($devices) ?>/<?= $package['max_devices'] ?? 1 ?></span>
                             </button>
                         </li>
@@ -4138,7 +4331,7 @@ try {
                     </ul>
                 </div>
                 
-                <div class="card-body p-4">
+                <div class="sub-tab-body">
                     <div class="tab-content">
                         <!-- Customer Tab -->
                         <div class="tab-pane fade" id="customerTab" role="tabpanel">
