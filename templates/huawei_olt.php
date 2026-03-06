@@ -6217,6 +6217,7 @@ if ($view === 'onus' || $view === 'dashboard') {
     if (isset($_GET['unconfigured'])) {
         $onuFilters['is_authorized'] = false;
         $onuFilters['max_age_hours'] = 24;
+        $huaweiOLT->autoAuthorizeMislabeledONUs();
         $lastCleanup = $_SESSION['last_stale_cleanup'] ?? 0;
         if (time() - $lastCleanup > 300) {
             $huaweiOLT->cleanupStalePendingONUs(24);

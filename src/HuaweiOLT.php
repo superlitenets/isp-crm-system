@@ -3298,6 +3298,24 @@ class HuaweiOLT {
         }
     }
     
+    public function autoAuthorizeMislabeledONUs(): int {
+        try {
+            return (int)$this->db->exec("
+                UPDATE huawei_onus 
+                SET is_authorized = TRUE, authorized_at = COALESCE(authorized_at, NOW())
+                WHERE is_authorized = FALSE
+                AND (
+                    (name IS NOT NULL AND name != '' AND zone_id IS NOT NULL)
+                    OR (onu_id IS NOT NULL AND onu_id > 0 AND slot IS NOT NULL AND port IS NOT NULL)
+                    OR (vlan_id IS NOT NULL)
+                    OR (customer_id IS NOT NULL)
+                )
+            ");
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+    
     private function cleanupAuthorizedDiscoveryEntries(): void {
         try {
             $this->db->exec("
@@ -3332,10 +3350,22 @@ class HuaweiOLT {
      * Cleanup stale discovery entries and unauthorized ONUs
      */
     public function cleanupStalePendingONUs(int $hoursOld = 2): array {
-        $cleaned = ['discovery_log' => 0, 'unauthorized_onus' => 0, 'marked_authorized' => 0];
+        $cleaned = ['discovery_log' => 0, 'unauthorized_onus' => 0, 'auto_authorized' => 0];
         
         try {
             $this->cleanupAuthorizedDiscoveryEntries();
+            
+            $stmt = $this->db->exec("
+                UPDATE huawei_onus 
+                SET is_authorized = TRUE, authorized_at = NOW()
+                WHERE is_authorized = FALSE
+                AND (
+                    (name IS NOT NULL AND name != '' AND zone_id IS NOT NULL)
+                    OR (onu_id IS NOT NULL AND onu_id > 0 AND slot IS NOT NULL AND port IS NOT NULL)
+                    OR (vlan_id IS NOT NULL)
+                )
+            ");
+            $cleaned['auto_authorized'] = (int)$stmt;
             
             $stmt = $this->db->prepare("
                 DELETE FROM onu_discovery_log 
@@ -3349,6 +3379,7 @@ class HuaweiOLT {
                 DELETE FROM huawei_onus 
                 WHERE is_authorized = FALSE 
                 AND customer_id IS NULL
+                AND (name IS NULL OR name = '')
                 AND updated_at < NOW() - INTERVAL '1 hour' * ?
             ");
             $stmt->execute([$hoursOld]);
