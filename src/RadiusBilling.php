@@ -1627,6 +1627,8 @@ class RadiusBilling {
     public function getDashboardStats(): array {
         $stats = [];
         
+        $this->syncStaticIPOnlineStatus();
+        
         // Active subscriptions
         $stmt = $this->db->query("SELECT COUNT(*) FROM radius_subscriptions WHERE status = 'active'");
         $stats['active_subscriptions'] = $stmt->fetchColumn();
@@ -1643,9 +1645,18 @@ class RadiusBilling {
         $stmt = $this->db->query("SELECT COUNT(*) FROM radius_subscriptions WHERE status = 'active' AND expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'");
         $stats['expiring_soon'] = $stmt->fetchColumn();
         
-        // Active sessions
+        // Active sessions (RADIUS sessions + static IP online)
         $stmt = $this->db->query("SELECT COUNT(*) FROM radius_sessions WHERE status = 'active'");
-        $stats['active_sessions'] = $stmt->fetchColumn();
+        $radiusSessions = (int)$stmt->fetchColumn();
+        $stmt = $this->db->query("
+            SELECT COUNT(*) FROM radius_subscriptions 
+            WHERE access_type IN ('static', 'dhcp') 
+            AND online_status = 'online' 
+            AND status = 'active'
+        ");
+        $staticOnline = (int)$stmt->fetchColumn();
+        $stats['active_sessions'] = $radiusSessions + $staticOnline;
+        $stats['static_online'] = $staticOnline;
         
         // NAS devices
         $stmt = $this->db->query("SELECT COUNT(*) FROM radius_nas WHERE is_active = TRUE");

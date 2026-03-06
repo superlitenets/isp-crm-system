@@ -3779,6 +3779,17 @@ try {
                 }
                 
                 $isOnline = !empty($activeSession);
+                if (!$isOnline && in_array(strtolower($subscriber['access_type'] ?? ''), ['static', 'dhcp'])) {
+                    $isOnline = ($subscriber['online_status'] ?? '') === 'online';
+                    if ($isOnline && !$activeSession) {
+                        $activeSession = [
+                            'session_start' => $subscriber['last_session_start'] ?? $subscriber['last_seen'] ?? date('Y-m-d H:i:s'),
+                            'framed_ip_address' => $subscriber['static_ip'] ?? $subscriber['framed_ip_address'] ?? '',
+                            'mac_address' => $subscriber['mac_address'] ?? '',
+                            'acct_session_id' => 'static-' . $subscriber['id'],
+                        ];
+                    }
+                }
                 
                 // Calculate uptime or offline duration
                 // Database stores timestamps in UTC, convert to local timezone for comparison
@@ -3823,7 +3834,23 @@ try {
                             $offlineStr = sprintf('%02d:%02d:%02d', $hours, $mins, $secs) . ' ago';
                         }
                     } else {
-                        $offlineStr = 'Never connected';
+                        if (in_array(strtolower($subscriber['access_type'] ?? ''), ['static', 'dhcp']) && !empty($subscriber['last_seen'])) {
+                            $lastSeen = new DateTime($subscriber['last_seen'], new DateTimeZone('UTC'));
+                            $now = new DateTime('now', new DateTimeZone('UTC'));
+                            $offline = $now->getTimestamp() - $lastSeen->getTimestamp();
+                            if ($offline < 0) $offline = 0;
+                            $days = floor($offline / 86400);
+                            $hours = floor(($offline % 86400) / 3600);
+                            $mins = floor(($offline % 3600) / 60);
+                            $secs = $offline % 60;
+                            if ($days > 0) {
+                                $offlineStr = $days . 'd ' . sprintf('%02d:%02d:%02d', $hours, $mins, $secs) . ' ago';
+                            } else {
+                                $offlineStr = sprintf('%02d:%02d:%02d', $hours, $mins, $secs) . ' ago';
+                            }
+                        } else {
+                            $offlineStr = 'Never connected';
+                        }
                     }
                 }
                 
