@@ -420,7 +420,7 @@ CREATE TABLE IF NOT EXISTS fleet_vehicles (
     last_latitude DECIMAL(10,7), last_longitude DECIMAL(10,7),
     last_speed DECIMAL(6,2) DEFAULT 0, last_acc_status INTEGER DEFAULT -1,
     last_battery INTEGER DEFAULT -1, last_mileage DECIMAL(12,2) DEFAULT 0,
-    last_update TIMESTAMP,
+    last_data_status INTEGER DEFAULT 0, last_update TIMESTAMP,
     status VARCHAR(20) DEFAULT 'active', notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -466,6 +466,8 @@ CREATE TABLE IF NOT EXISTS fleet_mileage_reports (
     fuel_consumed DECIMAL(8,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS last_data_status INTEGER DEFAULT 0;
 
 -- ==================== Grant all permissions ====================
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO isp_crm;

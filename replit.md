@@ -65,11 +65,14 @@ The system features a responsive design, including a mobile PWA. Both the main C
 - **Core Network Monitoring**: Ping-based uptime monitoring for core equipment with WhatsApp notifications for status changes and uptime logging.
 - **Fleet Management (Protrack365 GPS)**: Integrated vehicle tracking within the Inventory module.
   - **Vehicle Management**: CRUD operations for vehicles, including assignment tracking.
-  - **Real-Time GPS Tracking**: Live map view with auto-refresh using Leaflet.js and OpenStreetMap via Protrack365 API.
-  - **Route Playback**: Historical route playback with animation.
+  - **Real-Time GPS Tracking**: Live map view with color-coded status markers (green=moving, blue=idle, red=offline), auto-refresh every 30s.
+  - **Live Vehicle Status Table**: Overview shows all vehicles with real-time status, speed, ACC state, and last update time.
+  - **Route Playback**: Historical route playback with animation, slider, and play/pause controls.
   - **Geofencing**: Creation and management of circular geofences with alarms.
   - **Remote Commands**: Engine stop/restore, door lock/unlock.
   - **Alarm Monitoring**: SOS, overspeed, geofence, vibration, and power disconnect alerts.
+  - **Reports**: Daily vehicle report, fuel consumption estimates, vehicle swap history, and mileage trend charts.
+  - **Mileage Conversion**: Protrack API returns meters; automatically converted to km for display and reports.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.

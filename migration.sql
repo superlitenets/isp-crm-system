@@ -400,6 +400,7 @@ CREATE TABLE IF NOT EXISTS fleet_vehicles (
     last_acc_status INTEGER DEFAULT -1,
     last_battery INTEGER DEFAULT -1,
     last_mileage DOUBLE PRECISION DEFAULT 0,
+    last_data_status INTEGER DEFAULT 0,
     fuel_rate DOUBLE PRECISION DEFAULT 0,
     last_update TIMESTAMP,
     notes TEXT,

@@ -166,21 +166,29 @@ class FleetManagement {
     }
     
     private function updateVehicleLocation(array $track): void {
-        $stmt = $this->db->prepare("UPDATE fleet_vehicles SET 
-            last_latitude = ?, last_longitude = ?, last_speed = ?, 
-            last_acc_status = ?, last_battery = ?, last_mileage = ?,
-            last_update = TO_TIMESTAMP(?) 
-            WHERE imei = ?");
-        $stmt->execute([
-            $track['latitude'] ?? null,
-            $track['longitude'] ?? null,
-            $track['speed'] ?? 0,
-            $track['accstatus'] ?? -1,
-            $track['battery'] ?? -1,
-            $track['mileage'] ?? 0,
-            $track['hearttime'] ?? time(),
-            $track['imei']
-        ]);
+        try {
+            $stmt = $this->db->prepare("UPDATE fleet_vehicles SET 
+                last_latitude = ?, last_longitude = ?, last_speed = ?, 
+                last_acc_status = ?, last_battery = ?, last_mileage = ?,
+                last_data_status = ?, last_update = TO_TIMESTAMP(?) 
+                WHERE imei = ?");
+            $stmt->execute([
+                $track['latitude'] ?? null,
+                $track['longitude'] ?? null,
+                $track['speed'] ?? 0,
+                $track['accstatus'] ?? -1,
+                $track['battery'] ?? -1,
+                $track['mileage'] ?? 0,
+                $track['datastatus'] ?? 0,
+                $track['hearttime'] ?? time(),
+                $track['imei']
+            ]);
+        } catch (\PDOException $e) {
+            if (str_contains($e->getMessage(), 'last_data_status')) {
+                $this->db->exec("ALTER TABLE fleet_vehicles ADD COLUMN IF NOT EXISTS last_data_status INTEGER DEFAULT 0");
+                $this->updateVehicleLocation($track);
+            }
+        }
     }
     
     public function getPlayback(int $vehicleId, int $beginTime, int $endTime): ?array {
@@ -414,7 +422,8 @@ class FleetManagement {
             if ($mileageResult && ($mileageResult['code'] ?? -1) === 0 && !empty($mileageResult['record'])) {
                 foreach ($mileageResult['record'] as $rec) {
                     if (isset($imeiToVehicle[$rec['imei']])) {
-                        $km = round((float)($rec['mileage'] ?? 0), 2);
+                        $rawMileage = (float)($rec['mileage'] ?? 0);
+                        $km = $rawMileage > 1000 ? round($rawMileage / 1000, 2) : round($rawMileage, 2);
                         $imeiToVehicle[$rec['imei']]['daily_mileage'] = $km;
                         $fuelRate = (float)($imeiToVehicle[$rec['imei']]['fuel_rate'] ?? 0);
                         if ($fuelRate > 0 && $km > 0) {

@@ -117,13 +117,41 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
     </div>
 </div>
 
-<div class="card">
+<div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-map"></i> Live Vehicle Map</h5>
-        <span class="badge bg-secondary" id="map-update-status">Updating...</span>
+        <div class="d-flex align-items-center gap-3">
+            <span id="fleet-live-summary"></span>
+            <span class="badge bg-secondary" id="map-update-status">Updating...</span>
+        </div>
     </div>
     <div class="card-body p-0">
         <div id="overview-map" class="fleet-map"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-list-ul"></i> Vehicle Status</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Vehicle</th>
+                        <th>Plate</th>
+                        <th>Status</th>
+                        <th>Speed</th>
+                        <th>ACC</th>
+                        <th>Last Update</th>
+                    </tr>
+                </thead>
+                <tbody id="fleet-live-table">
+                    <tr><td colspan="6" class="text-center text-muted py-3">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -137,7 +165,7 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
 
     const markers = L.markerClusterGroup();
     map.addLayer(markers);
-    let vehicleMarkers = {};
+    let firstLoad = true;
 
     function formatTime(ts) {
         if (!ts) return 'N/A';
@@ -151,6 +179,15 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
         return '<span class="text-muted">Unknown</span>';
     }
 
+    function statusInfo(t) {
+        const ds = t.datastatus;
+        if (ds === 1) return { text: 'Moving', cls: 'text-success', icon: '🟢' };
+        if (ds === 2) return { text: 'Idle', cls: 'text-primary', icon: '🔵' };
+        if (ds === 3) return { text: 'Recently Offline', cls: 'text-warning', icon: '🟡' };
+        if (ds === 4) return { text: 'Offline', cls: 'text-danger', icon: '🔴' };
+        return { text: 'Unknown', cls: 'text-muted', icon: '⚪' };
+    }
+
     function updatePositions() {
         document.getElementById('map-update-status').textContent = 'Updating...';
         fetch('?page=<?= $fleetPage ?>&tab=fleet&action=ajax_track')
@@ -162,39 +199,85 @@ $fleetPage = ($_GET['page'] ?? 'inventory') === 'isp_inventory' ? 'isp_inventory
                     const vehicleMap = {};
                     if (data.vehicles) {
                         data.vehicles.forEach(function(v) {
-                            if (v.imei) vehicleMap[v.imei] = { name: v.name || '', plate: v.plate_number || '' };
+                            if (v.imei) vehicleMap[v.imei] = { name: v.name || '', plate: v.plate_number || '', type: v.vehicle_type || 'car' };
                         });
                     }
                     <?php foreach ($vehicles as $v): ?>
                     if (!vehicleMap['<?= htmlspecialchars($v['imei'] ?? '') ?>']) {
                         vehicleMap['<?= htmlspecialchars($v['imei'] ?? '') ?>'] = {
                             name: '<?= htmlspecialchars(addslashes($v['name'] ?? '')) ?>',
-                            plate: '<?= htmlspecialchars(addslashes($v['plate_number'] ?? '')) ?>'
+                            plate: '<?= htmlspecialchars(addslashes($v['plate_number'] ?? '')) ?>',
+                            type: '<?= htmlspecialchars($v['vehicle_type'] ?? 'car') ?>'
                         };
                     }
                     <?php endforeach; ?>
 
+                    let moving = 0, idle = 0, offline = 0, total = 0;
+                    const listHtml = [];
+
                     trackingData.forEach(function(t) {
+                        total++;
+                        const st = statusInfo(t);
+                        if (t.datastatus === 1) moving++;
+                        else if (t.datastatus === 2) idle++;
+                        else offline++;
+
                         if (t.latitude && t.longitude && t.latitude !== 0 && t.longitude !== 0) {
                             const vInfo = vehicleMap[t.imei] || { name: t.imei, plate: '' };
-                            const marker = L.marker([t.latitude, t.longitude]);
-                            marker.bindPopup(
+                            const iconColor = t.datastatus === 1 ? '#198754' : (t.datastatus === 2 ? '#0d6efd' : '#dc3545');
+                            const markerIcon = L.divIcon({
+                                className: 'custom-marker',
+                                html: '<div style="background:' + iconColor + ';width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
+                                iconSize: [12, 12],
+                                iconAnchor: [6, 6]
+                            });
+                            const m = L.marker([t.latitude, t.longitude], { icon: markerIcon });
+                            const mileageKm = t.mileage > 0 ? (t.mileage / 1000).toFixed(1) : '0';
+                            m.bindPopup(
                                 '<strong>' + vInfo.name + '</strong><br>' +
                                 (vInfo.plate ? 'Plate: ' + vInfo.plate + '<br>' : '') +
+                                'Status: <span class="' + st.cls + '">' + st.text + '</span><br>' +
                                 'Speed: ' + (t.speed || 0) + ' km/h<br>' +
                                 'ACC: ' + accLabel(t.accstatus) + '<br>' +
-                                'Last Update: ' + formatTime(t.hearttime)
+                                'Mileage: ' + mileageKm + ' km<br>' +
+                                'Updated: ' + formatTime(t.hearttime)
                             );
-                            markers.addLayer(marker);
+                            markers.addLayer(m);
+                            listHtml.push(
+                                '<tr>' +
+                                '<td><strong>' + vInfo.name + '</strong></td>' +
+                                '<td>' + (vInfo.plate || '-') + '</td>' +
+                                '<td><span class="' + st.cls + '">' + st.icon + ' ' + st.text + '</span></td>' +
+                                '<td>' + (t.speed || 0) + ' km/h</td>' +
+                                '<td>' + accLabel(t.accstatus) + '</td>' +
+                                '<td><small>' + formatTime(t.hearttime) + '</small></td>' +
+                                '</tr>'
+                            );
                         }
                     });
-                    if (markers.getLayers().length > 0) {
+                    if (firstLoad && markers.getLayers().length > 0) {
                         map.fitBounds(markers.getBounds(), { padding: [30, 30] });
+                        firstLoad = false;
+                    }
+
+                    const summaryEl = document.getElementById('fleet-live-summary');
+                    if (summaryEl) {
+                        summaryEl.innerHTML =
+                            '<span class="badge bg-success me-2">' + moving + ' Moving</span>' +
+                            '<span class="badge bg-primary me-2">' + idle + ' Idle</span>' +
+                            '<span class="badge bg-danger me-2">' + offline + ' Offline</span>' +
+                            '<span class="badge bg-secondary">' + total + ' Total</span>';
+                    }
+
+                    const tableBody = document.getElementById('fleet-live-table');
+                    if (tableBody) {
+                        tableBody.innerHTML = listHtml.length > 0 ? listHtml.join('') : '<tr><td colspan="6" class="text-center text-muted">No tracking data available</td></tr>';
                     }
                 }
                 document.getElementById('map-update-status').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
             })
-            .catch(function() {
+            .catch(function(err) {
+                console.error('Tracking error:', err);
                 document.getElementById('map-update-status').textContent = 'Update failed';
             });
     }
@@ -737,10 +820,13 @@ document.getElementById('btn-sync-protrack').addEventListener('click', function(
                 if (marker) { map.removeLayer(marker); marker = null; }
                 points = [];
 
-                if (data.code === 0 && data.record && data.record.length > 0) {
-                    data.record.forEach(function(p) {
-                        if (p.latitude && p.longitude && p.latitude !== 0) {
-                            points.push([p.latitude, p.longitude]);
+                const rawPoints = data.points || data.record || [];
+                if ((data.success || data.code === 0) && rawPoints.length > 0) {
+                    rawPoints.forEach(function(p) {
+                        const lat = p.lat || p.latitude || 0;
+                        const lng = p.lng || p.longitude || 0;
+                        if (lat && lng && lat !== 0) {
+                            points.push([lat, lng]);
                         }
                     });
                 }
