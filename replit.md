@@ -71,7 +71,7 @@ The system features a responsive design, including a mobile PWA. Both the main C
   - **Geofencing**: Creation and management of circular geofences with alarms.
   - **Remote Commands**: Engine stop/restore, door lock/unlock.
   - **Alarm Monitoring**: SOS, overspeed, geofence, vibration, and power disconnect alerts.
-  - **Reports**: Daily vehicle report, fuel consumption estimates, vehicle swap history, and mileage trend charts.
+  - **Reports**: Daily vehicle report, fuel consumption estimates, vehicle swap history, mileage trend charts, and per-vehicle daily log with day-by-day breakdown.
   - **Mileage Conversion**: Protrack API returns meters; automatically converted to km for display and reports.
 
 ## External Dependencies

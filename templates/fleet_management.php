@@ -1236,6 +1236,9 @@ $reportVehicle = !empty($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : null;
             <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports&report=swaps" class="btn btn-<?= $reportType === 'swaps' ? 'primary' : 'outline-primary' ?>">
                 <i class="bi bi-arrow-left-right"></i> Vehicle Swaps
             </a>
+            <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports&report=vehicle_daily" class="btn btn-<?= $reportType === 'vehicle_daily' ? 'primary' : 'outline-primary' ?>">
+                <i class="bi bi-truck"></i> Vehicle Daily Log
+            </a>
             <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=reports&report=mileage" class="btn btn-<?= $reportType === 'mileage' ? 'primary' : 'outline-primary' ?>">
                 <i class="bi bi-speedometer"></i> Mileage Trend
             </a>
@@ -1482,6 +1485,207 @@ $reportVehicle = !empty($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : null;
                 </tbody>
             </table>
         </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php elseif ($reportType === 'vehicle_daily'): ?>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-truck"></i> Vehicle Daily Log</h5>
+        <form class="d-flex gap-2 align-items-center flex-wrap" method="GET">
+            <input type="hidden" name="page" value="<?= $fleetPage ?>">
+            <input type="hidden" name="tab" value="fleet">
+            <input type="hidden" name="fleet_tab" value="reports">
+            <input type="hidden" name="report" value="vehicle_daily">
+            <select name="vehicle_id" class="form-select form-select-sm" style="width:auto;" required>
+                <option value="">-- Select Vehicle --</option>
+                <?php foreach ($vehicles as $v): ?>
+                <option value="<?= $v['id'] ?>" <?= $reportVehicle == $v['id'] ? 'selected' : '' ?>><?= htmlspecialchars($v['name']) ?> (<?= htmlspecialchars($v['plate_number'] ?? 'No plate') ?>)</option>
+                <?php endforeach; ?>
+            </select>
+            <input type="date" name="start_date" class="form-control form-control-sm" style="width:auto;" value="<?= htmlspecialchars($reportStart) ?>">
+            <span class="text-muted">to</span>
+            <input type="date" name="end_date" class="form-control form-control-sm" style="width:auto;" value="<?= htmlspecialchars($reportEnd) ?>">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> View</button>
+        </form>
+    </div>
+    <div class="card-body">
+        <?php if (!$reportVehicle): ?>
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> Select a vehicle and date range to view its daily activity log.</div>
+        <?php else: ?>
+        <?php $dailyLog = $fleet->getVehicleDailyLog($reportVehicle, $reportStart, $reportEnd); ?>
+        <?php if (empty($dailyLog)): ?>
+        <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle"></i> No data found. Make sure the vehicle has an IMEI configured.</div>
+        <?php else: ?>
+        <?php $veh = $dailyLog['vehicle']; $logDays = $dailyLog['days']; ?>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="d-flex align-items-center gap-3">
+                    <div>
+                        <h6 class="mb-0"><?= htmlspecialchars($veh['name']) ?></h6>
+                        <small class="text-muted"><?= htmlspecialchars(($veh['make'] ?? '') . ' ' . ($veh['model'] ?? '')) ?> &bull; <?= htmlspecialchars($veh['plate_number'] ?? 'No plate') ?></small>
+                    </div>
+                    <span class="badge bg-<?= $veh['status'] === 'active' ? 'success' : ($veh['status'] === 'maintenance' ? 'warning' : 'secondary') ?>"><?= ucfirst($veh['status']) ?></span>
+                </div>
+                <small class="text-muted">Assigned to: <?= htmlspecialchars($veh['assigned_to'] ?? 'Unassigned') ?></small>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <?php
+                $totalKm = array_sum(array_column($logDays, 'mileage_km'));
+                $totalFuel = array_sum(array_column($logDays, 'fuel_consumed'));
+                $totalAlarms = array_sum(array_column($logDays, 'alarm_count'));
+                $activeDays = count(array_filter($logDays, fn($d) => $d['mileage_km'] > 0));
+                $maxSpeedAll = max(array_column($logDays, 'max_speed'));
+                ?>
+                <div class="d-flex gap-3 justify-content-md-end flex-wrap">
+                    <div class="text-center"><strong><?= number_format($totalKm, 1) ?></strong><br><small class="text-muted">Total km</small></div>
+                    <div class="text-center"><strong><?= number_format($totalFuel, 1) ?></strong><br><small class="text-muted">Fuel (L)</small></div>
+                    <div class="text-center"><strong><?= $activeDays ?>/<?= count($logDays) ?></strong><br><small class="text-muted">Active Days</small></div>
+                    <div class="text-center"><strong><?= number_format($maxSpeedAll, 0) ?></strong><br><small class="text-muted">Max km/h</small></div>
+                    <div class="text-center"><strong><?= $totalAlarms ?></strong><br><small class="text-muted">Alarms</small></div>
+                </div>
+            </div>
+        </div>
+
+        <?php if (count($logDays) > 1): ?>
+        <canvas id="vehicleDailyChart" height="80" class="mb-3"></canvas>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script>
+        (function() {
+            const days = <?= json_encode($logDays) ?>;
+            new Chart(document.getElementById('vehicleDailyChart'), {
+                type: 'bar',
+                data: {
+                    labels: days.map(d => d.date + ' (' + d.day_name + ')'),
+                    datasets: [{
+                        label: 'Distance (km)',
+                        data: days.map(d => d.mileage_km),
+                        backgroundColor: days.map(d => d.mileage_km > 0 ? 'rgba(54, 162, 235, 0.6)' : 'rgba(200, 200, 200, 0.3)'),
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Distance (km)' } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Daily Distance - <?= htmlspecialchars($veh['name']) ?>' }
+                    }
+                }
+            });
+        })();
+        </script>
+        <?php endif; ?>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Date</th>
+                        <th>Day</th>
+                        <th class="text-end">Distance (km)</th>
+                        <th class="text-end">Fuel Est. (L)</th>
+                        <th class="text-end">Max Speed</th>
+                        <th class="text-center">First Move</th>
+                        <th class="text-center">Last Move</th>
+                        <th class="text-center">Alarms</th>
+                        <th class="text-center">Playback</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($logDays as $day): ?>
+                    <tr class="<?= $day['mileage_km'] == 0 ? 'table-light text-muted' : '' ?>">
+                        <td><?= date('M j, Y', strtotime($day['date'])) ?></td>
+                        <td><?= $day['day_name'] ?></td>
+                        <td class="text-end"><strong><?= number_format($day['mileage_km'], 2) ?></strong></td>
+                        <td class="text-end">
+                            <?php if ($day['fuel_consumed'] > 0): ?>
+                            <?= number_format($day['fuel_consumed'], 2) ?>
+                            <?php elseif (($veh['fuel_rate'] ?? 0) == 0 && $day['mileage_km'] > 0): ?>
+                            <small class="text-muted">No rate</small>
+                            <?php else: ?>
+                            -
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-end">
+                            <?php if ($day['max_speed'] > 0): ?>
+                            <?= number_format($day['max_speed'], 0) ?> km/h
+                            <?php if ($day['max_speed'] > 100): ?>
+                            <i class="bi bi-exclamation-triangle-fill text-warning" title="High speed detected"></i>
+                            <?php endif; ?>
+                            <?php else: ?>
+                            -
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-center"><?= $day['first_move'] ?? '-' ?></td>
+                        <td class="text-center"><?= $day['last_move'] ?? '-' ?></td>
+                        <td class="text-center"><?= $day['alarm_count'] > 0 ? '<span class="badge bg-danger">'.$day['alarm_count'].'</span>' : '0' ?></td>
+                        <td class="text-center">
+                            <?php if ($day['mileage_km'] > 0): ?>
+                            <a href="?page=<?= $fleetPage ?>&tab=fleet&fleet_tab=playback&vehicle_id=<?= $reportVehicle ?>&playback_date=<?= $day['date'] ?>" class="btn btn-sm btn-outline-primary" title="View route playback">
+                                <i class="bi bi-play-circle"></i>
+                            </a>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot class="table-dark">
+                    <tr>
+                        <th colspan="2">Totals (<?= count($logDays) ?> days)</th>
+                        <th class="text-end"><?= number_format($totalKm, 2) ?> km</th>
+                        <th class="text-end"><?= $totalFuel > 0 ? number_format($totalFuel, 2) . ' L' : '-' ?></th>
+                        <th class="text-end"><?= number_format($maxSpeedAll, 0) ?> km/h</th>
+                        <th colspan="2"></th>
+                        <th class="text-center"><?= $totalAlarms ?></th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <?php if ($activeDays > 0 && $totalKm > 0): ?>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted">Avg Daily Distance</small>
+                        <h5 class="mb-0"><?= number_format($totalKm / $activeDays, 1) ?> km</h5>
+                        <small class="text-muted">(active days only)</small>
+                    </div>
+                </div>
+            </div>
+            <?php if ($totalFuel > 0): ?>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted">Avg Daily Fuel</small>
+                        <h5 class="mb-0"><?= number_format($totalFuel / $activeDays, 1) ?> L</h5>
+                        <small class="text-muted">(active days only)</small>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body p-2 text-center">
+                        <small class="text-muted">Utilization Rate</small>
+                        <h5 class="mb-0"><?= round($activeDays / count($logDays) * 100) ?>%</h5>
+                        <small class="text-muted"><?= $activeDays ?> of <?= count($logDays) ?> days</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>

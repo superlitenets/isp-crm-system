@@ -380,7 +380,7 @@ class FleetManagement {
     }
     
     public function getEmployees(): array {
-        $stmt = $this->db->query("SELECT id, name FROM employees WHERE status = 'active' ORDER BY name");
+        $stmt = $this->db->query("SELECT id, name FROM employees WHERE employment_status = 'active' ORDER BY name");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
@@ -536,6 +536,129 @@ class FleetManagement {
             ORDER BY report_date ASC");
         $stmt->execute([$vehicleId, $days]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getVehicleDailyLog(int $vehicleId, string $startDate, string $endDate): array {
+        $vstmt = $this->db->prepare("SELECT v.*, e.name as assigned_to FROM fleet_vehicles v 
+            LEFT JOIN employees e ON v.assigned_employee_id = e.id WHERE v.id = ?");
+        $vstmt->execute([$vehicleId]);
+        $vehicle = $vstmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$vehicle || empty($vehicle['imei'])) return [];
+
+        $imei = $vehicle['imei'];
+        $days = [];
+        $current = new \DateTime($startDate);
+        $end = new \DateTime($endDate);
+
+        $maxDays = 31;
+        $diff = $current->diff($end)->days;
+        if ($diff > $maxDays) {
+            $current = (clone $end)->modify("-{$maxDays} days");
+        }
+
+        while ($current <= $end) {
+            $dateStr = $current->format('Y-m-d');
+            $dayStart = strtotime($dateStr . ' 00:00:00');
+            $dayEnd = strtotime($dateStr . ' 23:59:59');
+
+            $dayData = [
+                'date' => $dateStr,
+                'day_name' => $current->format('D'),
+                'mileage_km' => 0,
+                'fuel_consumed' => 0,
+                'max_speed' => 0,
+                'alarm_count' => 0,
+                'first_move' => null,
+                'last_move' => null,
+                'driving_points' => 0,
+                'total_points' => 0,
+            ];
+
+            try {
+                $mileageResult = $this->protrack->getBatchMileage([$imei], $dayStart, $dayEnd);
+                if ($mileageResult && ($mileageResult['code'] ?? -1) === 0 && !empty($mileageResult['record'])) {
+                    foreach ($mileageResult['record'] as $rec) {
+                        if ($rec['imei'] === $imei) {
+                            $raw = (float)($rec['mileage'] ?? 0);
+                            $dayData['mileage_km'] = $raw > 1000 ? round($raw / 1000, 2) : round($raw, 2);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {}
+
+            if ($dayData['mileage_km'] > 0) {
+                try {
+                    $playback = $this->protrack->getPlayback($imei, $dayStart, $dayEnd);
+                    $points = [];
+                    if ($playback) {
+                        if (!empty($playback['data']) && is_string($playback['data'])) {
+                            $parts = explode(';', trim($playback['data'], ';'));
+                            foreach ($parts as $part) {
+                                $fields = explode(',', $part);
+                                if (count($fields) >= 7) {
+                                    $points[] = [
+                                        'speed' => (float)$fields[4],
+                                        'time' => (int)$fields[6],
+                                    ];
+                                }
+                            }
+                        } elseif (!empty($playback['data']['points'])) {
+                            foreach ($playback['data']['points'] as $pt) {
+                                $points[] = [
+                                    'speed' => (float)($pt['speed'] ?? 0),
+                                    'time' => (int)($pt['time'] ?? $pt['systemtime'] ?? 0),
+                                ];
+                            }
+                        }
+                    }
+
+                    if (!empty($points)) {
+                        $dayData['total_points'] = count($points);
+                        $maxSpeed = 0;
+                        $firstMove = null;
+                        $lastMove = null;
+                        $drivingPoints = 0;
+                        foreach ($points as $pt) {
+                            if ($pt['speed'] > $maxSpeed) $maxSpeed = $pt['speed'];
+                            if ($pt['speed'] > 0) {
+                                $drivingPoints++;
+                                if ($firstMove === null) $firstMove = $pt['time'];
+                                $lastMove = $pt['time'];
+                            }
+                        }
+                        $dayData['max_speed'] = round($maxSpeed, 1);
+                        $dayData['driving_points'] = $drivingPoints;
+                        if ($firstMove) $dayData['first_move'] = date('H:i', $firstMove);
+                        if ($lastMove) $dayData['last_move'] = date('H:i', $lastMove);
+                    }
+                } catch (\Exception $e) {}
+            }
+
+            $fuelRate = (float)($vehicle['fuel_rate'] ?? 0);
+            if ($fuelRate > 0 && $dayData['mileage_km'] > 0) {
+                $dayData['fuel_consumed'] = round($dayData['mileage_km'] * $fuelRate / 100, 2);
+            }
+
+            $alarmStmt = $this->db->prepare("SELECT COUNT(*) FROM fleet_alarms 
+                WHERE vehicle_id = ? AND alarm_time >= ? AND alarm_time <= ?");
+            $alarmStmt->execute([$vehicleId, $dateStr . ' 00:00:00', $dateStr . ' 23:59:59']);
+            $dayData['alarm_count'] = (int)$alarmStmt->fetchColumn();
+
+            $this->storeSingleDayMileage($vehicleId, $imei, $dateStr, $dayData['mileage_km']);
+
+            $days[] = $dayData;
+            $current->modify('+1 day');
+        }
+
+        return ['vehicle' => $vehicle, 'days' => $days];
+    }
+
+    private function storeSingleDayMileage(int $vehicleId, string $imei, string $date, float $mileage): void {
+        if ($mileage <= 0) return;
+        $stmt = $this->db->prepare("INSERT INTO fleet_mileage_reports (vehicle_id, imei, report_date, mileage)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (vehicle_id, report_date) DO UPDATE SET mileage = EXCLUDED.mileage");
+        $stmt->execute([$vehicleId, $imei, $date, $mileage]);
     }
 
     public function updateVehicleFuelRate(int $vehicleId, float $fuelRate): bool {
