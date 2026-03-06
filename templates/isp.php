@@ -1035,7 +1035,7 @@ if ($action === 'ajax_speed_update') {
     exit;
 }
 
-$view = $_GET['view'] ?? 'dashboard';
+$view = $_GET['view'] ?? 'subscriptions';
 $message = '';
 $messageType = 'info';
 
