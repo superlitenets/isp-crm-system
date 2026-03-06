@@ -2607,12 +2607,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             ];
                             $mappedWanMode = $wanModeMap[strtolower($wanMode)] ?? null;
 
-                            $stmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+                            $stmt = $db->prepare("SELECT id, zone_id FROM huawei_onus WHERE sn = ?");
                             $stmt->execute([$sn]);
                             $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
 
                             try {
                                 if ($existing) {
+                                    $effectiveZone = $zone;
+                                    $effectiveZoneId = $zoneId;
+                                    if (!empty($existing['zone_id']) && $existing['zone_id'] != $zoneId) {
+                                        $effectiveZoneId = $existing['zone_id'];
+                                        $stmtZ = $db->prepare("SELECT name FROM huawei_zones WHERE id = ?");
+                                        $stmtZ->execute([$existing['zone_id']]);
+                                        $zRow = $stmtZ->fetch(\PDO::FETCH_ASSOC);
+                                        $effectiveZone = $zRow['name'] ?? $zone;
+                                    }
                                     $stmt = $db->prepare("UPDATE huawei_onus SET 
                                         name = ?, description = ?, slot = ?, port = ?, onu_id = ?,
                                         status = ?, snmp_status = ?, zone = ?, zone_id = ?, onu_type_id = ?,
@@ -2624,7 +2633,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                         WHERE id = ?");
                                     $stmt->execute([
                                         $name ?: $sn, $address, $board, $port, $allocatedOnu,
-                                        $mappedStatus, $mappedStatus, $zone, $zoneId, $onuTypeId,
+                                        $mappedStatus, $mappedStatus, $effectiveZone, $effectiveZoneId, $onuTypeId,
                                         $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat,
                                         $distanceInt, $latitude, $longitude,
                                         $mappedWanMode, $pppoeUsername ?: null, $pppoePassword ?: null, $authDate,
