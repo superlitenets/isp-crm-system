@@ -9610,9 +9610,9 @@ try {
                             <?php endforeach; ?>
                         </select>
                         <select name="sort" class="form-select form-select-sm" style="width:auto;min-width:140px" onchange="this.form.submit()">
-                            <option value="default">Sort: Port</option>
-                            <option value="auth_date_desc" <?= ($_GET['sort'] ?? '') === 'auth_date_desc' ? 'selected' : '' ?>>Auth Date (Newest)</option>
+                            <option value="auth_date_desc" <?= ($_GET['sort'] ?? '') === 'auth_date_desc' || empty($_GET['sort']) ? 'selected' : '' ?>>Auth Date (Newest)</option>
                             <option value="auth_date_asc" <?= ($_GET['sort'] ?? '') === 'auth_date_asc' ? 'selected' : '' ?>>Auth Date (Oldest)</option>
+                            <option value="default" <?= ($_GET['sort'] ?? '') === 'default' ? 'selected' : '' ?>>Sort: Port</option>
                             <option value="name_asc" <?= ($_GET['sort'] ?? '') === 'name_asc' ? 'selected' : '' ?>>Name (A-Z)</option>
                             <option value="name_desc" <?= ($_GET['sort'] ?? '') === 'name_desc' ? 'selected' : '' ?>>Name (Z-A)</option>
                             <option value="signal_asc" <?= ($_GET['sort'] ?? '') === 'signal_asc' ? 'selected' : '' ?>>Signal (Weakest)</option>
@@ -9622,7 +9622,7 @@ try {
                         <input type="text" name="search" class="form-control form-control-sm" style="width:auto;min-width:180px" placeholder="Search SN/Name/Customer..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
                         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
                         <?php
-                        $hasFilters = !empty($_GET['search']) || !empty($_GET['status']) || !empty($_GET['zone_id']) || !empty($_GET['vlan_id']) || (isset($_GET['slot']) && $_GET['slot'] !== '') || (!empty($_GET['sort']) && $_GET['sort'] !== 'default');
+                        $hasFilters = !empty($_GET['search']) || !empty($_GET['status']) || !empty($_GET['zone_id']) || !empty($_GET['vlan_id']) || (isset($_GET['slot']) && $_GET['slot'] !== '') || (!empty($_GET['sort']) && !in_array($_GET['sort'], ['', 'auth_date_desc']));
                         if ($hasFilters): ?>
                         <a href="?page=huawei-olt&view=onus<?= $oltId ? '&olt_id=' . $oltId : '' ?><?= isset($_GET['unconfigured']) ? '&unconfigured=1' : '' ?>" class="btn btn-sm btn-outline-secondary" title="Clear all filters"><i class="bi bi-x-circle"></i> Clear</a>
                         <?php endif; ?>
