@@ -520,7 +520,7 @@ class DiscoveryWorker {
                 WHERE sn = $1 AND olt_id = $2
             `, [onu.sn, olt.id]);
             
-            if (existingOnu.rows.length > 0 && existingOnu.rows[0].is_authorized) {
+            if (existingOnu.rows.length > 0) {
                 const row = existingOnu.rows[0];
                 const hasProvisioningData = (row.name && row.name.trim() !== '' && (row.zone_id || (row.zone && row.zone.trim() !== '')))
                     || row.vlan_id
@@ -528,9 +528,18 @@ class DiscoveryWorker {
                     || (row.name && row.name.trim() !== '' && row.onu_id && row.onu_id > 0);
                 
                 if (hasProvisioningData) {
-                    console.log(`[Discovery] ${onu.sn} found in autofind but has provisioning data (name/zone/vlan) - keeping as authorized`);
-                } else {
-                    console.log(`[Discovery] ${onu.sn} marked authorized in DB but found in autofind with no provisioning data - resetting status`);
+                    if (!row.is_authorized) {
+                        console.log(`[Discovery] ${onu.sn} found in autofind but has provisioning data - correcting to authorized`);
+                        await this.pool.query(`
+                            UPDATE huawei_onus 
+                            SET is_authorized = true
+                            WHERE id = $1
+                        `, [row.id]);
+                    } else {
+                        console.log(`[Discovery] ${onu.sn} found in autofind but has provisioning data - keeping as authorized`);
+                    }
+                } else if (row.is_authorized) {
+                    console.log(`[Discovery] ${onu.sn} marked authorized but no provisioning data - resetting status`);
                     await this.pool.query(`
                         UPDATE huawei_onus 
                         SET is_authorized = false, status = 'pending'

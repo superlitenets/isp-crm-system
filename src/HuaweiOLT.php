@@ -106,12 +106,16 @@ class HuaweiOLT {
     public function getStats(): array {
         $this->autoAuthorizeMislabeledONUs();
         
+        $provisionedExclude = "(name IS NOT NULL AND name != '' AND (zone_id IS NOT NULL OR (zone IS NOT NULL AND zone != '')))
+            OR (name IS NOT NULL AND name != '' AND vlan_id IS NOT NULL)
+            OR (customer_id IS NOT NULL)";
+        
         $losCond = self::losCondition();
         $stats = $this->db->query("
             SELECT 
                 COUNT(*) as total_onus,
                 COUNT(*) FILTER (WHERE is_authorized = TRUE) as authorized_onus,
-                COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured_onus,
+                COUNT(*) FILTER (WHERE is_authorized = FALSE AND NOT ({$provisionedExclude})) as unconfigured_onus,
                 COUNT(*) FILTER (WHERE status = 'online') as online_onus,
                 COUNT(*) FILTER (WHERE (status = 'offline' AND NOT {$losCond}) OR status = 'dying-gasp') as offline_onus,
                 COUNT(*) FILTER (WHERE {$losCond}) as los_onus,
@@ -3646,6 +3650,14 @@ class HuaweiOLT {
             $boolVal = $this->castBoolean($filters['is_authorized']) ? 'true' : 'false';
             $conditions .= " AND o.is_authorized = ?::boolean";
             $params[] = $boolVal;
+            
+            if (!$this->castBoolean($filters['is_authorized'])) {
+                $conditions .= " AND NOT (
+                    (o.name IS NOT NULL AND o.name != '' AND (o.zone_id IS NOT NULL OR (o.zone IS NOT NULL AND o.zone != '')))
+                    OR (o.name IS NOT NULL AND o.name != '' AND o.vlan_id IS NOT NULL)
+                    OR (o.customer_id IS NOT NULL)
+                )";
+            }
         }
         
         if (!empty($filters['max_age_hours']) && isset($filters['is_authorized']) && !$this->castBoolean($filters['is_authorized'])) {
@@ -4820,6 +4832,10 @@ class HuaweiOLT {
         $stats['total_olts'] = (int)$row['total'];
         $stats['active_olts'] = (int)$row['active'];
         
+        $provisionedExclude = "(name IS NOT NULL AND name != '' AND (zone_id IS NOT NULL OR (zone IS NOT NULL AND zone != '')))
+            OR (name IS NOT NULL AND name != '' AND vlan_id IS NOT NULL)
+            OR (customer_id IS NOT NULL)";
+        
         $losCond = self::losCondition();
         $stmt = $this->db->query("
             SELECT COUNT(*) as total,
@@ -4828,7 +4844,7 @@ class HuaweiOLT {
                    COUNT(*) FILTER (WHERE (status = 'offline' AND NOT {$losCond}) OR status = 'dying-gasp') as offline,
                    COUNT(*) FILTER (WHERE {$losCond}) as los,
                    COUNT(*) FILTER (WHERE status = 'dying-gasp') as dying_gasp,
-                   COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured
+                   COUNT(*) FILTER (WHERE is_authorized = FALSE AND NOT ({$provisionedExclude})) as unconfigured
             FROM huawei_onus
         ");
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
