@@ -3119,6 +3119,7 @@ class RadiusBilling {
                 
                 $activePPPoE = [];
                 $activeHotspot = [];
+                $arpTable = [];
                 try {
                     $pppActive = $api->command('/ppp/active/print');
                     foreach ($pppActive as $p) {
@@ -3133,6 +3134,18 @@ class RadiusBilling {
                     }
                 } catch (\Exception $e) {}
                 
+                try {
+                    $arpEntries = $api->command('/ip/arp/print');
+                    foreach ($arpEntries as $a) {
+                        if (!empty($a['address'])) {
+                            $arpTable[$a['address']] = [
+                                'mac' => $a['mac-address'] ?? '',
+                                'complete' => !isset($a['incomplete']) || $a['incomplete'] !== 'true'
+                            ];
+                        }
+                    }
+                } catch (\Exception $e) {}
+                
                 $api->disconnect();
                 
                 foreach ($sessions as $session) {
@@ -3144,6 +3157,14 @@ class RadiusBilling {
                         $isActive = isset($activePPPoE[$username]);
                     } elseif ($accessType === 'hotspot') {
                         $isActive = isset($activeHotspot[$username]);
+                    } elseif (in_array($accessType, ['static', 'dhcp'])) {
+                        $staticIp = $session['framed_ip_address'] ?? '';
+                        if ($staticIp && isset($arpTable[$staticIp]) && $arpTable[$staticIp]['complete']) {
+                            $isActive = true;
+                        }
+                        if (!$isActive) {
+                            continue;
+                        }
                     } else {
                         continue;
                     }
@@ -3204,8 +3225,111 @@ class RadiusBilling {
             'success' => true, 
             'checked' => count($openSessions), 
             'closed' => $closed,
+            'static_synced' => $this->syncStaticIPOnlineStatus(),
             'errors' => $errors
         ];
+    }
+    
+    public function syncStaticIPOnlineStatus(): array {
+        $result = ['checked' => 0, 'online' => 0, 'offline' => 0, 'errors' => []];
+        
+        try {
+            $staticSubs = $this->db->query("
+                SELECT s.id, s.username, s.static_ip, s.online_status, s.nas_id, s.access_type,
+                       n.ip_address as nas_ip, n.api_port, n.api_username, n.api_password_encrypted, n.api_enabled
+                FROM radius_subscriptions s
+                LEFT JOIN radius_nas n ON s.nas_id = n.id
+                WHERE s.access_type IN ('static', 'dhcp')
+                AND s.static_ip IS NOT NULL AND s.static_ip != ''
+                AND s.status = 'active'
+            ")->fetchAll(\PDO::FETCH_ASSOC);
+            
+            if (empty($staticSubs)) {
+                return $result;
+            }
+            
+            $subsByNas = [];
+            foreach ($staticSubs as $sub) {
+                $nasIp = $sub['nas_ip'] ?? '';
+                if ($nasIp && $sub['api_enabled']) {
+                    $subsByNas[$nasIp][] = $sub;
+                }
+            }
+            
+            $encKey = getenv('ENCRYPTION_KEY');
+            if (empty($encKey)) {
+                $encKey = $_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me';
+            }
+            
+            foreach ($subsByNas as $nasIp => $subs) {
+                $nasInfo = $subs[0];
+                
+                try {
+                    $apiPassword = '';
+                    if (!empty($nasInfo['api_password_encrypted'])) {
+                        $decoded = base64_decode($nasInfo['api_password_encrypted']);
+                        if ($decoded !== false && strlen($decoded) > 16) {
+                            $iv = substr($decoded, 0, 16);
+                            $encrypted = substr($decoded, 16);
+                            $apiPassword = openssl_decrypt($encrypted, 'AES-256-CBC', $encKey, 0, $iv) ?: '';
+                        }
+                    }
+                    
+                    require_once __DIR__ . '/MikroTikAPI.php';
+                    $api = new \App\MikroTikAPI(
+                        $nasIp,
+                        (int)($nasInfo['api_port'] ?? 8728),
+                        $nasInfo['api_username'] ?? 'admin',
+                        $apiPassword
+                    );
+                    $api->connect();
+                    
+                    $arpTable = [];
+                    try {
+                        $arpEntries = $api->command('/ip/arp/print');
+                        foreach ($arpEntries as $a) {
+                            if (!empty($a['address']) && (!isset($a['incomplete']) || $a['incomplete'] !== 'true')) {
+                                $arpTable[$a['address']] = $a['mac-address'] ?? '';
+                            }
+                        }
+                    } catch (\Exception $e) {}
+                    
+                    $api->disconnect();
+                    
+                    foreach ($subs as $sub) {
+                        $result['checked']++;
+                        $ip = $sub['static_ip'];
+                        $inArp = isset($arpTable[$ip]);
+                        
+                        if ($inArp && $sub['online_status'] !== 'online') {
+                            $this->db->prepare("
+                                UPDATE radius_subscriptions SET 
+                                    online_status = 'online',
+                                    framed_ip_address = ?,
+                                    last_seen = CURRENT_TIMESTAMP,
+                                    last_session_start = COALESCE(last_session_start, CURRENT_TIMESTAMP)
+                                WHERE id = ?
+                            ")->execute([$ip, $sub['id']]);
+                            $result['online']++;
+                        } elseif (!$inArp && $sub['online_status'] === 'online') {
+                            $this->db->prepare("
+                                UPDATE radius_subscriptions SET 
+                                    online_status = 'offline',
+                                    last_seen = CURRENT_TIMESTAMP
+                                WHERE id = ?
+                            ")->execute([$sub['id']]);
+                            $result['offline']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $result['errors'][] = "NAS $nasIp: " . $e->getMessage();
+                }
+            }
+        } catch (\Exception $e) {
+            $result['errors'][] = $e->getMessage();
+        }
+        
+        return $result;
     }
     
     public function processAutoRenewals(): array {

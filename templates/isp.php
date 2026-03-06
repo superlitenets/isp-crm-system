@@ -3146,6 +3146,9 @@ try {
             $nasDevices = $radiusBilling->getNASDevices();
             $ispLocations = $radiusBilling->getLocations();
             $ispSubLocations = $radiusBilling->getAllSubLocations();
+            if (in_array($filters['access_type'], ['static', 'dhcp'])) {
+                $radiusBilling->syncStaticIPOnlineStatus();
+            }
             $onlineSubscribers = $radiusBilling->getOnlineSubscribers();
             $onlineFilter = $_GET['online'] ?? '';
             
