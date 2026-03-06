@@ -3242,234 +3242,6 @@ try {
                 </div>
             </div>
             
-            <?php
-            $subGraphPeriod = $_GET['graph_period'] ?? 'daily';
-            $dailyGrowth = $radiusBilling->getSubscriberGrowthDaily(30);
-            $weeklyGrowth = $radiusBilling->getSubscriberGrowthWeekly(12);
-            $monthlyGrowth = $radiusBilling->getSubscriberGrowthMonthly(12);
-            $statusBreakdown = $radiusBilling->getSubscriberStatusBreakdown();
-            $packageBreakdown = $radiusBilling->getSubscribersByPackage();
-            ?>
-
-            <div class="row mb-3 g-3">
-                <div class="col-lg-8">
-                    <div class="card shadow-sm border-0">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
-                            <h6 class="mb-0"><i class="bi bi-graph-up me-1"></i> Subscriber Growth</h6>
-                            <div class="btn-group btn-group-sm" role="group" id="growthPeriodToggle">
-                                <button type="button" class="btn btn-outline-primary active" data-period="daily">Daily</button>
-                                <button type="button" class="btn btn-outline-primary" data-period="weekly">Weekly</button>
-                                <button type="button" class="btn btn-outline-primary" data-period="monthly">Monthly</button>
-                            </div>
-                        </div>
-                        <div class="card-body py-2" style="height: 280px;">
-                            <canvas id="subscriberGrowthChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4">
-                    <div class="row g-3 h-100">
-                        <div class="col-12">
-                            <div class="card shadow-sm border-0 h-100">
-                                <div class="card-header bg-white py-2">
-                                    <h6 class="mb-0"><i class="bi bi-pie-chart me-1"></i> Status Distribution</h6>
-                                </div>
-                                <div class="card-body py-1 d-flex align-items-center justify-content-center" style="height: 120px;">
-                                    <canvas id="statusPieChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="card shadow-sm border-0 h-100">
-                                <div class="card-header bg-white py-2">
-                                    <h6 class="mb-0"><i class="bi bi-box me-1"></i> Top Packages</h6>
-                                </div>
-                                <div class="card-body py-1 d-flex align-items-center justify-content-center" style="height: 120px;">
-                                    <canvas id="packageChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-            <script>
-            (function() {
-                const dailyData = <?= json_encode($dailyGrowth) ?>;
-                const weeklyData = <?= json_encode($weeklyGrowth) ?>;
-                const monthlyData = <?= json_encode($monthlyGrowth) ?>;
-                const statusData = <?= json_encode($statusBreakdown) ?>;
-                const packageData = <?= json_encode($packageBreakdown) ?>;
-
-                const statusColors = {
-                    'active': '#198754', 'suspended': '#ffc107', 'expired': '#dc3545',
-                    'terminated': '#6c757d', 'inactive': '#adb5bd', 'grace': '#fd7e14'
-                };
-
-                let growthChart = null;
-
-                function renderGrowthChart(period) {
-                    const canvas = document.getElementById('subscriberGrowthChart');
-                    if (!canvas) return;
-                    if (growthChart) growthChart.destroy();
-
-                    let labels, newSubs, expiredSubs, activeTotal;
-
-                    if (period === 'daily') {
-                        labels = dailyData.map(d => {
-                            const dt = new Date(d.date);
-                            return dt.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
-                        });
-                        newSubs = dailyData.map(d => parseInt(d.new_subscribers));
-                        expiredSubs = dailyData.map(d => parseInt(d.expired_subscribers));
-                        activeTotal = dailyData.map(d => parseInt(d.active_total || 0));
-                    } else if (period === 'weekly') {
-                        labels = weeklyData.map(d => d.label);
-                        newSubs = weeklyData.map(d => parseInt(d.new_subscribers));
-                        expiredSubs = weeklyData.map(d => parseInt(d.expired_subscribers));
-                        activeTotal = null;
-                    } else {
-                        labels = monthlyData.map(d => d.label);
-                        newSubs = monthlyData.map(d => parseInt(d.new_subscribers));
-                        expiredSubs = monthlyData.map(d => parseInt(d.expired_subscribers));
-                        activeTotal = null;
-                    }
-
-                    const datasets = [
-                        {
-                            label: 'New Subscribers',
-                            data: newSubs,
-                            backgroundColor: 'rgba(25, 135, 84, 0.6)',
-                            borderColor: '#198754',
-                            borderWidth: 1,
-                            borderRadius: 3,
-                            order: 2
-                        },
-                        {
-                            label: 'Expired',
-                            data: expiredSubs,
-                            backgroundColor: 'rgba(220, 53, 69, 0.5)',
-                            borderColor: '#dc3545',
-                            borderWidth: 1,
-                            borderRadius: 3,
-                            order: 3
-                        }
-                    ];
-
-                    if (activeTotal && period === 'daily') {
-                        datasets.push({
-                            label: 'Active Total',
-                            data: activeTotal,
-                            type: 'line',
-                            borderColor: '#0d6efd',
-                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            yAxisID: 'y1',
-                            order: 1
-                        });
-                    }
-
-                    const scales = {
-                        y: {
-                            beginAtZero: true,
-                            title: { display: true, text: 'Count', font: {size: 11} },
-                            ticks: { precision: 0, font: {size: 10} },
-                            grid: { color: 'rgba(0,0,0,0.05)' }
-                        },
-                        x: {
-                            ticks: { font: {size: 10}, maxRotation: 45 },
-                            grid: { display: false }
-                        }
-                    };
-
-                    if (activeTotal && period === 'daily') {
-                        scales.y1 = {
-                            position: 'right',
-                            beginAtZero: true,
-                            title: { display: true, text: 'Total Active', font: {size: 11} },
-                            ticks: { precision: 0, font: {size: 10} },
-                            grid: { display: false }
-                        };
-                    }
-
-                    growthChart = new Chart(canvas, {
-                        type: 'bar',
-                        data: { labels, datasets },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            interaction: { intersect: false, mode: 'index' },
-                            scales,
-                            plugins: {
-                                legend: { position: 'top', labels: { boxWidth: 12, font: {size: 11} } },
-                                title: { display: false }
-                            }
-                        }
-                    });
-                }
-
-                const statusPieCtx = document.getElementById('statusPieChart');
-                if (statusPieCtx && statusData.length > 0) {
-                    new Chart(statusPieCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: statusData.map(s => s.status.charAt(0).toUpperCase() + s.status.slice(1)),
-                            datasets: [{
-                                data: statusData.map(s => parseInt(s.cnt)),
-                                backgroundColor: statusData.map(s => statusColors[s.status] || '#6c757d'),
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10}, padding: 8 } }
-                            },
-                            cutout: '55%'
-                        }
-                    });
-                }
-
-                const pkgCtx = document.getElementById('packageChart');
-                if (pkgCtx && packageData.length > 0) {
-                    const pkgColors = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#0dcaf0','#d63384','#6c757d'];
-                    new Chart(pkgCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: packageData.map(p => p.package_name),
-                            datasets: [{
-                                data: packageData.map(p => parseInt(p.cnt)),
-                                backgroundColor: pkgColors.slice(0, packageData.length),
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { position: 'right', labels: { boxWidth: 10, font: {size: 10}, padding: 8 } }
-                            },
-                            cutout: '55%'
-                        }
-                    });
-                }
-
-                document.querySelectorAll('#growthPeriodToggle button').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        document.querySelectorAll('#growthPeriodToggle button').forEach(b => b.classList.remove('active'));
-                        this.classList.add('active');
-                        renderGrowthChart(this.dataset.period);
-                    });
-                });
-
-                renderGrowthChart('daily');
-            })();
-            </script>
 
             <?php
             // Count subscribers by access type
@@ -4006,6 +3778,9 @@ try {
                     $stmt->execute([$customer['id']]);
                     $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
+
+                $bwDaily = $radiusBilling->getSubscriberBandwidthDaily($subId, 30);
+                $bwMonthly = $radiusBilling->getSubscriberBandwidthMonthly($subId, 6);
                 
                 $isOnline = !empty($activeSession);
                 if (!$isOnline && in_array(strtolower($subscriber['access_type'] ?? ''), ['static', 'dhcp'])) {
@@ -4339,6 +4114,11 @@ try {
                         <li class="nav-item" role="presentation">
                             <button class="nav-link rounded-0 py-3 border-end" id="speed-tab" data-bs-toggle="tab" data-bs-target="#speedOverridesTab" type="button">
                                 <i class="bi bi-speedometer2 me-2"></i>Speed
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-0 py-3 border-end" id="bandwidth-tab" data-bs-toggle="tab" data-bs-target="#bandwidthTab" type="button">
+                                <i class="bi bi-bar-chart-line me-2"></i>Bandwidth
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
@@ -5410,6 +5190,226 @@ try {
                             </div>
                         </div>
                         
+                        <!-- Bandwidth Tab -->
+                        <div class="tab-pane fade" id="bandwidthTab">
+                            <?php
+                            $totalDlMb = array_sum(array_column($bwDaily, 'download_mb'));
+                            $totalUlMb = array_sum(array_column($bwDaily, 'upload_mb'));
+                            $totalMb = $totalDlMb + $totalUlMb;
+                            $peakDay = !empty($bwDaily) ? max(array_column($bwDaily, 'total_mb')) : 0;
+                            $avgDailyMb = count($bwDaily) > 0 ? $totalMb / count($bwDaily) : 0;
+                            ?>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Download (30d)</div>
+                                        <div class="fw-bold text-success fs-5"><?= $totalDlMb >= 1024 ? number_format($totalDlMb / 1024, 2) . ' GB' : number_format($totalDlMb, 1) . ' MB' ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Upload (30d)</div>
+                                        <div class="fw-bold text-primary fs-5"><?= $totalUlMb >= 1024 ? number_format($totalUlMb / 1024, 2) . ' GB' : number_format($totalUlMb, 1) . ' MB' ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Peak Day</div>
+                                        <div class="fw-bold text-warning fs-5"><?= $peakDay >= 1024 ? number_format($peakDay / 1024, 2) . ' GB' : number_format($peakDay, 1) . ' MB' ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Avg Daily</div>
+                                        <div class="fw-bold text-info fs-5"><?= $avgDailyMb >= 1024 ? number_format($avgDailyMb / 1024, 2) . ' GB' : number_format($avgDailyMb, 1) . ' MB' ?></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-lg-8">
+                                    <div class="card shadow-sm border-0">
+                                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                                            <h6 class="mb-0"><i class="bi bi-bar-chart-line me-1"></i> Daily Bandwidth (Last 30 Days)</h6>
+                                            <div class="btn-group btn-group-sm" role="group" id="bwPeriodToggle">
+                                                <button type="button" class="btn btn-outline-primary active" data-period="daily">Daily</button>
+                                                <button type="button" class="btn btn-outline-primary" data-period="monthly">Monthly</button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body py-2" style="height: 320px;">
+                                            <canvas id="bwChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4">
+                                    <div class="card shadow-sm border-0 h-100">
+                                        <div class="card-header bg-white py-2">
+                                            <h6 class="mb-0"><i class="bi bi-pie-chart me-1"></i> Download vs Upload</h6>
+                                        </div>
+                                        <div class="card-body py-2 d-flex align-items-center justify-content-center" style="height: 320px;">
+                                            <canvas id="bwRatioChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+                            <script>
+                            (function() {
+                                const bwDailyData = <?= json_encode($bwDaily) ?>;
+                                const bwMonthlyData = <?= json_encode($bwMonthly) ?>;
+                                let bwChart = null;
+
+                                function formatSize(mb) {
+                                    if (mb >= 1024) return (mb / 1024).toFixed(2) + ' GB';
+                                    return mb.toFixed(1) + ' MB';
+                                }
+
+                                function renderBwChart(period) {
+                                    const canvas = document.getElementById('bwChart');
+                                    if (!canvas) return;
+                                    if (bwChart) bwChart.destroy();
+
+                                    let labels, dlData, ulData, unit, titleText;
+
+                                    if (period === 'daily') {
+                                        labels = bwDailyData.map(d => {
+                                            const dt = new Date(d.date);
+                                            return dt.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+                                        });
+                                        dlData = bwDailyData.map(d => parseFloat(d.download_mb));
+                                        ulData = bwDailyData.map(d => parseFloat(d.upload_mb));
+                                        const maxVal = Math.max(...dlData, ...ulData, 0);
+                                        unit = maxVal >= 1024 ? 'GB' : 'MB';
+                                        if (unit === 'GB') {
+                                            dlData = dlData.map(v => (v / 1024));
+                                            ulData = ulData.map(v => (v / 1024));
+                                        }
+                                        titleText = 'Daily Bandwidth (Last 30 Days)';
+                                    } else {
+                                        labels = bwMonthlyData.map(d => d.label);
+                                        dlData = bwMonthlyData.map(d => parseFloat(d.download_gb));
+                                        ulData = bwMonthlyData.map(d => parseFloat(d.upload_gb));
+                                        unit = 'GB';
+                                        titleText = 'Monthly Bandwidth (Last 6 Months)';
+                                    }
+
+                                    document.querySelector('#bwPeriodToggle').closest('.card-header').querySelector('h6').innerHTML =
+                                        '<i class="bi bi-bar-chart-line me-1"></i> ' + titleText;
+
+                                    bwChart = new Chart(canvas, {
+                                        type: 'bar',
+                                        data: {
+                                            labels,
+                                            datasets: [
+                                                {
+                                                    label: 'Download (' + unit + ')',
+                                                    data: dlData,
+                                                    backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                                                    borderColor: '#198754',
+                                                    borderWidth: 1,
+                                                    borderRadius: 3
+                                                },
+                                                {
+                                                    label: 'Upload (' + unit + ')',
+                                                    data: ulData,
+                                                    backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                                                    borderColor: '#0d6efd',
+                                                    borderWidth: 1,
+                                                    borderRadius: 3
+                                                }
+                                            ]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            interaction: { intersect: false, mode: 'index' },
+                                            scales: {
+                                                y: {
+                                                    beginAtZero: true,
+                                                    stacked: true,
+                                                    title: { display: true, text: unit, font: {size: 11} },
+                                                    ticks: { font: {size: 10} },
+                                                    grid: { color: 'rgba(0,0,0,0.05)' }
+                                                },
+                                                x: {
+                                                    stacked: true,
+                                                    ticks: { font: {size: 10}, maxRotation: 45 },
+                                                    grid: { display: false }
+                                                }
+                                            },
+                                            plugins: {
+                                                legend: { position: 'top', labels: { boxWidth: 12, font: {size: 11} } },
+                                                tooltip: {
+                                                    callbacks: {
+                                                        label: function(ctx) {
+                                                            return ctx.dataset.label + ': ' + parseFloat(ctx.raw).toFixed(2) + ' ' + unit;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+
+                                const totalDl = <?= $totalDlMb ?>;
+                                const totalUl = <?= $totalUlMb ?>;
+                                const ratioCtx = document.getElementById('bwRatioChart');
+                                if (ratioCtx && (totalDl > 0 || totalUl > 0)) {
+                                    new Chart(ratioCtx, {
+                                        type: 'doughnut',
+                                        data: {
+                                            labels: ['Download', 'Upload'],
+                                            datasets: [{
+                                                data: [totalDl, totalUl],
+                                                backgroundColor: ['rgba(25, 135, 84, 0.8)', 'rgba(13, 110, 253, 0.8)'],
+                                                borderWidth: 1
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            plugins: {
+                                                legend: { position: 'bottom', labels: { boxWidth: 12, font: {size: 11}, padding: 12 } },
+                                                tooltip: {
+                                                    callbacks: {
+                                                        label: function(ctx) {
+                                                            const val = ctx.raw;
+                                                            const pct = ((val / (totalDl + totalUl)) * 100).toFixed(1);
+                                                            return ctx.label + ': ' + formatSize(val) + ' (' + pct + '%)';
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            cutout: '55%'
+                                        }
+                                    });
+                                } else if (ratioCtx) {
+                                    ratioCtx.parentElement.innerHTML = '<div class="text-muted text-center"><i class="bi bi-info-circle me-1"></i>No bandwidth data available</div>';
+                                }
+
+                                document.querySelectorAll('#bwPeriodToggle button').forEach(btn => {
+                                    btn.addEventListener('click', function() {
+                                        document.querySelectorAll('#bwPeriodToggle button').forEach(b => b.classList.remove('active'));
+                                        this.classList.add('active');
+                                        renderBwChart(this.dataset.period);
+                                    });
+                                });
+
+                                const bwTabBtn = document.getElementById('bandwidth-tab');
+                                let bwInitialized = false;
+                                if (bwTabBtn) {
+                                    bwTabBtn.addEventListener('shown.bs.tab', function() {
+                                        if (!bwInitialized) {
+                                            renderBwChart('daily');
+                                            bwInitialized = true;
+                                        }
+                                    });
+                                }
+                            })();
+                            </script>
+                        </div>
+
                         <!-- Live Traffic Tab -->
                         <div class="tab-pane fade" id="liveTrafficTab">
                             <div class="card shadow-sm">

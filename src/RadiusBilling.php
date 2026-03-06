@@ -4354,66 +4354,39 @@ class RadiusBilling {
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
 
-    public function getSubscriberGrowthDaily(int $days = 30): array {
+    public function getSubscriberBandwidthDaily(int $subscriptionId, int $days = 30): array {
         $stmt = $this->db->prepare("
-            SELECT d.date, 
-                   COALESCE(new_subs.cnt, 0) as new_subscribers,
-                   COALESCE(expired.cnt, 0) as expired_subscribers,
-                   COALESCE(active.cnt, 0) as active_total
+            SELECT d.date,
+                   COALESCE(u.download_mb, 0) as download_mb,
+                   COALESCE(u.upload_mb, 0) as upload_mb,
+                   COALESCE(u.total_mb, 0) as total_mb,
+                   COALESCE(u.session_count, 0) as session_count
             FROM (
                 SELECT generate_series(CURRENT_DATE - INTERVAL '1 day' * ?, CURRENT_DATE, '1 day')::date as date
             ) d
             LEFT JOIN (
-                SELECT created_at::date as dt, COUNT(*) as cnt FROM radius_subscriptions GROUP BY dt
-            ) new_subs ON new_subs.dt = d.date
-            LEFT JOIN (
-                SELECT expiry_date::date as dt, COUNT(*) as cnt FROM radius_subscriptions WHERE status = 'expired' GROUP BY dt
-            ) expired ON expired.dt = d.date
-            LEFT JOIN (
-                SELECT d2.date, COUNT(*) as cnt FROM radius_subscriptions s,
-                (SELECT generate_series(CURRENT_DATE - INTERVAL '1 day' * ?, CURRENT_DATE, '1 day')::date as date) d2
-                WHERE s.created_at::date <= d2.date AND (s.status != 'terminated' OR s.updated_at::date > d2.date)
-                GROUP BY d2.date
-            ) active ON active.date = d.date
+                SELECT log_date,
+                       ROUND(SUM(download_mb)::numeric, 2) as download_mb,
+                       ROUND(SUM(upload_mb)::numeric, 2) as upload_mb,
+                       ROUND(SUM(download_mb + upload_mb)::numeric, 2) as total_mb,
+                       SUM(session_count) as session_count
+                FROM radius_usage_logs
+                WHERE subscription_id = ?
+                GROUP BY log_date
+            ) u ON u.log_date = d.date
             ORDER BY d.date
         ");
-        $stmt->execute([$days - 1, $days - 1]);
+        $stmt->execute([$days - 1, $subscriptionId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-    public function getSubscriberGrowthWeekly(int $weeks = 12): array {
-        $stmt = $this->db->prepare("
-            SELECT w.week_start,
-                   TO_CHAR(w.week_start, 'DD Mon') as label,
-                   COALESCE(new_subs.cnt, 0) as new_subscribers,
-                   COALESCE(expired.cnt, 0) as expired_subscribers
-            FROM (
-                SELECT generate_series(
-                    date_trunc('week', CURRENT_DATE - INTERVAL '1 week' * ?),
-                    date_trunc('week', CURRENT_DATE),
-                    '1 week'
-                )::date as week_start
-            ) w
-            LEFT JOIN (
-                SELECT date_trunc('week', created_at)::date as wk, COUNT(*) as cnt 
-                FROM radius_subscriptions GROUP BY wk
-            ) new_subs ON new_subs.wk = w.week_start
-            LEFT JOIN (
-                SELECT date_trunc('week', expiry_date)::date as wk, COUNT(*) as cnt 
-                FROM radius_subscriptions WHERE status = 'expired' GROUP BY wk
-            ) expired ON expired.wk = w.week_start
-            ORDER BY w.week_start
-        ");
-        $stmt->execute([$weeks - 1]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-    }
-
-    public function getSubscriberGrowthMonthly(int $months = 12): array {
+    public function getSubscriberBandwidthMonthly(int $subscriptionId, int $months = 6): array {
         $stmt = $this->db->prepare("
             SELECT m.month_start,
                    TO_CHAR(m.month_start, 'Mon YYYY') as label,
-                   COALESCE(new_subs.cnt, 0) as new_subscribers,
-                   COALESCE(expired.cnt, 0) as expired_subscribers
+                   COALESCE(u.download_gb, 0) as download_gb,
+                   COALESCE(u.upload_gb, 0) as upload_gb,
+                   COALESCE(u.total_gb, 0) as total_gb
             FROM (
                 SELECT generate_series(
                     date_trunc('month', CURRENT_DATE - INTERVAL '1 month' * ?),
@@ -4422,39 +4395,137 @@ class RadiusBilling {
                 )::date as month_start
             ) m
             LEFT JOIN (
-                SELECT date_trunc('month', created_at)::date as mo, COUNT(*) as cnt 
-                FROM radius_subscriptions GROUP BY mo
-            ) new_subs ON new_subs.mo = m.month_start
+                SELECT date_trunc('month', log_date)::date as mo,
+                       ROUND((SUM(download_mb) / 1024)::numeric, 2) as download_gb,
+                       ROUND((SUM(upload_mb) / 1024)::numeric, 2) as upload_gb,
+                       ROUND((SUM(download_mb + upload_mb) / 1024)::numeric, 2) as total_gb
+                FROM radius_usage_logs
+                WHERE subscription_id = ?
+                GROUP BY mo
+            ) u ON u.mo = m.month_start
+            ORDER BY m.month_start
+        ");
+        $stmt->execute([$months - 1, $subscriptionId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getBandwidthDaily(int $days = 30): array {
+        $stmt = $this->db->prepare("
+            SELECT d.date,
+                   COALESCE(u.download_gb, 0) as download_gb,
+                   COALESCE(u.upload_gb, 0) as upload_gb,
+                   COALESCE(u.total_gb, 0) as total_gb,
+                   COALESCE(u.active_users, 0) as active_users
+            FROM (
+                SELECT generate_series(CURRENT_DATE - INTERVAL '1 day' * ?, CURRENT_DATE, '1 day')::date as date
+            ) d
             LEFT JOIN (
-                SELECT date_trunc('month', expiry_date)::date as mo, COUNT(*) as cnt 
-                FROM radius_subscriptions WHERE status = 'expired' GROUP BY mo
-            ) expired ON expired.mo = m.month_start
+                SELECT log_date,
+                       ROUND(SUM(download_mb) / 1024, 2) as download_gb,
+                       ROUND(SUM(upload_mb) / 1024, 2) as upload_gb,
+                       ROUND(SUM(download_mb + upload_mb) / 1024, 2) as total_gb,
+                       COUNT(DISTINCT subscription_id) as active_users
+                FROM radius_usage_logs
+                GROUP BY log_date
+            ) u ON u.log_date = d.date
+            ORDER BY d.date
+        ");
+        $stmt->execute([$days - 1]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getBandwidthWeekly(int $weeks = 12): array {
+        $stmt = $this->db->prepare("
+            SELECT w.week_start,
+                   TO_CHAR(w.week_start, 'DD Mon') as label,
+                   COALESCE(u.download_gb, 0) as download_gb,
+                   COALESCE(u.upload_gb, 0) as upload_gb,
+                   COALESCE(u.total_gb, 0) as total_gb,
+                   COALESCE(u.active_users, 0) as active_users
+            FROM (
+                SELECT generate_series(
+                    date_trunc('week', CURRENT_DATE - INTERVAL '1 week' * ?),
+                    date_trunc('week', CURRENT_DATE),
+                    '1 week'
+                )::date as week_start
+            ) w
+            LEFT JOIN (
+                SELECT date_trunc('week', log_date)::date as wk,
+                       ROUND(SUM(download_mb) / 1024, 2) as download_gb,
+                       ROUND(SUM(upload_mb) / 1024, 2) as upload_gb,
+                       ROUND(SUM(download_mb + upload_mb) / 1024, 2) as total_gb,
+                       COUNT(DISTINCT subscription_id) as active_users
+                FROM radius_usage_logs
+                GROUP BY wk
+            ) u ON u.wk = w.week_start
+            ORDER BY w.week_start
+        ");
+        $stmt->execute([$weeks - 1]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getBandwidthMonthly(int $months = 12): array {
+        $stmt = $this->db->prepare("
+            SELECT m.month_start,
+                   TO_CHAR(m.month_start, 'Mon YYYY') as label,
+                   COALESCE(u.download_gb, 0) as download_gb,
+                   COALESCE(u.upload_gb, 0) as upload_gb,
+                   COALESCE(u.total_gb, 0) as total_gb,
+                   COALESCE(u.active_users, 0) as active_users
+            FROM (
+                SELECT generate_series(
+                    date_trunc('month', CURRENT_DATE - INTERVAL '1 month' * ?),
+                    date_trunc('month', CURRENT_DATE),
+                    '1 month'
+                )::date as month_start
+            ) m
+            LEFT JOIN (
+                SELECT date_trunc('month', log_date)::date as mo,
+                       ROUND(SUM(download_mb) / 1024, 2) as download_gb,
+                       ROUND(SUM(upload_mb) / 1024, 2) as upload_gb,
+                       ROUND(SUM(download_mb + upload_mb) / 1024, 2) as total_gb,
+                       COUNT(DISTINCT subscription_id) as active_users
+                FROM radius_usage_logs
+                GROUP BY mo
+            ) u ON u.mo = m.month_start
             ORDER BY m.month_start
         ");
         $stmt->execute([$months - 1]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-    public function getSubscriberStatusBreakdown(): array {
-        $stmt = $this->db->query("
-            SELECT status, COUNT(*) as cnt 
-            FROM radius_subscriptions 
-            GROUP BY status 
-            ORDER BY cnt DESC
+    public function getTopBandwidthConsumers(int $days = 30, int $limit = 10): array {
+        $stmt = $this->db->prepare("
+            SELECT s.id, s.username, c.name as customer_name, p.name as package_name,
+                   ROUND(SUM(u.download_mb) / 1024, 2) as download_gb,
+                   ROUND(SUM(u.upload_mb) / 1024, 2) as upload_gb,
+                   ROUND(SUM(u.download_mb + u.upload_mb) / 1024, 2) as total_gb
+            FROM radius_usage_logs u
+            JOIN radius_subscriptions s ON u.subscription_id = s.id
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE u.log_date >= CURRENT_DATE - INTERVAL '1 day' * ?
+            GROUP BY s.id, s.username, c.name, p.name
+            ORDER BY total_gb DESC
+            LIMIT ?
         ");
+        $stmt->execute([$days, $limit]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-    public function getSubscribersByPackage(): array {
-        $stmt = $this->db->query("
-            SELECT p.name as package_name, COUNT(s.id) as cnt
-            FROM radius_subscriptions s
+    public function getBandwidthByPackage(int $days = 30): array {
+        $stmt = $this->db->prepare("
+            SELECT p.name as package_name,
+                   ROUND(SUM(u.download_mb + u.upload_mb) / 1024, 2) as total_gb,
+                   COUNT(DISTINCT u.subscription_id) as user_count
+            FROM radius_usage_logs u
+            JOIN radius_subscriptions s ON u.subscription_id = s.id
             JOIN radius_packages p ON s.package_id = p.id
-            WHERE s.status NOT IN ('terminated')
+            WHERE u.log_date >= CURRENT_DATE - INTERVAL '1 day' * ?
             GROUP BY p.name
-            ORDER BY cnt DESC
-            LIMIT 10
+            ORDER BY total_gb DESC
         ");
+        $stmt->execute([$days]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
