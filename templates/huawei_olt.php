@@ -557,14 +557,15 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         $stmt->execute($params);
         $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
-        // Get discovered ONUs if viewing unconfigured
         $discoveredOnus = [];
         if ($unconfigured) {
+            $excludeAuth = "AND NOT EXISTS (SELECT 1 FROM huawei_onus ho WHERE ho.sn = dl.serial_number AND ho.is_authorized = TRUE)";
             $discSql = "SELECT dl.*, ol.name as olt_name 
                         FROM onu_discovery_log dl
                         LEFT JOIN huawei_olts ol ON dl.olt_id = ol.id
                         WHERE dl.authorized = FALSE 
                         AND dl.last_seen_at > NOW() - INTERVAL '2 hours'
+                        {$excludeAuth}
                         ORDER BY dl.last_seen_at DESC";
             if ($oltId) {
                 $discSql = "SELECT dl.*, ol.name as olt_name 
@@ -573,6 +574,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
                             WHERE dl.authorized = FALSE 
                             AND dl.olt_id = ?
                             AND dl.last_seen_at > NOW() - INTERVAL '2 hours'
+                            {$excludeAuth}
                             ORDER BY dl.last_seen_at DESC";
                 $stmt = $db->prepare($discSql);
                 $stmt->execute([$oltId]);
@@ -580,17 +582,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
                 $stmt = $db->query($discSql);
             }
             $discoveredOnus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            $authorizedSnMap = [];
-            if (!empty($discoveredOnus)) {
-                $snList = array_map(function($d) { return $d['serial_number']; }, $discoveredOnus);
-                $snPlaceholders = implode(',', array_fill(0, count($snList), '?'));
-                $authStmt = $db->prepare("SELECT id, sn, name, description, frame, slot, port, onu_id, olt_id FROM huawei_onus WHERE is_authorized = TRUE AND sn IN ({$snPlaceholders})");
-                $authStmt->execute($snList);
-                foreach ($authStmt->fetchAll(\PDO::FETCH_ASSOC) as $authOnu) {
-                    $authorizedSnMap[$authOnu['sn']] = $authOnu;
-                }
-            }
         }
         
         echo json_encode([

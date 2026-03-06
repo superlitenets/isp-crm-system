@@ -3260,6 +3260,10 @@ class HuaweiOLT {
      * These are ONUs found by the background discovery service
      */
     public function getDiscoveredONUs(?int $oltId = null, bool $pendingOnly = true): array {
+        if ($pendingOnly) {
+            $this->cleanupAuthorizedDiscoveryEntries();
+        }
+        
         $sql = "
             SELECT d.*, 
                    o.name as olt_name, o.ip_address as olt_ip,
@@ -3279,8 +3283,8 @@ class HuaweiOLT {
         }
         
         if ($pendingOnly) {
-            // Only show pending entries from the last 2 hours
             $sql .= " AND d.authorized = false AND d.last_seen_at > NOW() - INTERVAL '2 hours'";
+            $sql .= " AND NOT EXISTS (SELECT 1 FROM huawei_onus ho WHERE ho.sn = d.serial_number AND ho.is_authorized = TRUE)";
         }
         
         $sql .= " ORDER BY d.last_seen_at DESC";
@@ -3291,6 +3295,20 @@ class HuaweiOLT {
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
             return [];
+        }
+    }
+    
+    private function cleanupAuthorizedDiscoveryEntries(): void {
+        try {
+            $this->db->exec("
+                UPDATE onu_discovery_log 
+                SET authorized = true, authorized_at = CURRENT_TIMESTAMP
+                WHERE authorized = false
+                AND serial_number IN (
+                    SELECT sn FROM huawei_onus WHERE is_authorized = TRUE
+                )
+            ");
+        } catch (\Exception $e) {
         }
     }
     
@@ -3314,10 +3332,11 @@ class HuaweiOLT {
      * Cleanup stale discovery entries and unauthorized ONUs
      */
     public function cleanupStalePendingONUs(int $hoursOld = 2): array {
-        $cleaned = ['discovery_log' => 0, 'unauthorized_onus' => 0];
+        $cleaned = ['discovery_log' => 0, 'unauthorized_onus' => 0, 'marked_authorized' => 0];
         
         try {
-            // Delete old unauthorized discovery entries
+            $this->cleanupAuthorizedDiscoveryEntries();
+            
             $stmt = $this->db->prepare("
                 DELETE FROM onu_discovery_log 
                 WHERE authorized = FALSE 
@@ -3326,8 +3345,6 @@ class HuaweiOLT {
             $stmt->execute([$hoursOld]);
             $cleaned['discovery_log'] = $stmt->rowCount();
             
-            // Delete unauthorized ONUs that haven't been seen/updated in a while
-            // Only delete if they're offline and have no customer linked
             $stmt = $this->db->prepare("
                 DELETE FROM huawei_onus 
                 WHERE is_authorized = FALSE 
@@ -3338,7 +3355,6 @@ class HuaweiOLT {
             $cleaned['unauthorized_onus'] = $stmt->rowCount();
             
         } catch (\Exception $e) {
-            // Tables may not exist
         }
         
         return $cleaned;
