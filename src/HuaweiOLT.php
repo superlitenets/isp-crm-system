@@ -3592,10 +3592,14 @@ class HuaweiOLT {
         }
         
         if (isset($filters['is_authorized'])) {
-            // PostgreSQL needs string 'true'/'false' for boolean params via PDO
             $boolVal = $this->castBoolean($filters['is_authorized']) ? 'true' : 'false';
             $conditions .= " AND o.is_authorized = ?::boolean";
             $params[] = $boolVal;
+        }
+        
+        if (!empty($filters['max_age_hours']) && isset($filters['is_authorized']) && !$this->castBoolean($filters['is_authorized'])) {
+            $conditions .= " AND o.updated_at > NOW() - INTERVAL '1 hour' * ?";
+            $params[] = (int)$filters['max_age_hours'];
         }
         
         $sortOption = $filters['sort'] ?? 'auth_date_desc';

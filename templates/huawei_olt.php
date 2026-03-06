@@ -493,6 +493,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         
         if ($unconfigured) {
             $where[] = "o.is_authorized = FALSE";
+            $where[] = "o.updated_at > NOW() - INTERVAL '24 hours'";
         } else {
             $where[] = "o.is_authorized = TRUE";
         }
@@ -6224,14 +6225,17 @@ if ($view === 'onus' || $view === 'dashboard') {
     if (isset($_GET['port']) && $_GET['port'] !== '') $onuFilters['port'] = $_GET['port'];
     if (isset($_GET['unconfigured'])) {
         $onuFilters['is_authorized'] = false;
+        $onuFilters['max_age_hours'] = 24;
+        $lastCleanup = $_SESSION['last_stale_cleanup'] ?? 0;
+        if (time() - $lastCleanup > 300) {
+            $huaweiOLT->cleanupStalePendingONUs(24);
+            $_SESSION['last_stale_cleanup'] = time();
+        }
     } else {
-        // Default view shows only authorized ONUs
         $onuFilters['is_authorized'] = true;
     }
     $onus = $huaweiOLT->getONUs($onuFilters);
     
-    // Always fetch discovered ONUs (auto-populated by OLT Session Manager)
-    // These are pending ONUs waiting to be authorized
     $discoveredOnus = $huaweiOLT->getDiscoveredONUs($oltId, true);
     
     $authorizedSnMap = [];
@@ -6319,15 +6323,24 @@ $onuVlans = [];
 $onuSlots = [];
 if (in_array($view, ["locations", "onus", "onu_detail"])) {
 $zones = $huaweiOLT->getZones(false);
+$isUnconfiguredView = isset($_GET['unconfigured']);
 try {
-    $vlanSql = "SELECT DISTINCT o.vlan_id FROM huawei_onus o WHERE o.vlan_id IS NOT NULL AND o.is_authorized = TRUE";
+    if ($isUnconfiguredView) {
+        $vlanSql = "SELECT DISTINCT o.vlan_id FROM huawei_onus o WHERE o.vlan_id IS NOT NULL AND o.is_authorized = FALSE";
+    } else {
+        $vlanSql = "SELECT DISTINCT o.vlan_id FROM huawei_onus o WHERE o.vlan_id IS NOT NULL AND o.is_authorized = TRUE";
+    }
     $vlanParams = [];
     if ($oltId) { $vlanSql .= " AND o.olt_id = ?"; $vlanParams[] = $oltId; }
     $vlanSql .= " ORDER BY o.vlan_id";
     $vlanStmt = $db->prepare($vlanSql);
     $vlanStmt->execute($vlanParams);
     $onuVlans = $vlanStmt->fetchAll(\PDO::FETCH_COLUMN);
-    $slotSql = "SELECT DISTINCT slot FROM huawei_onus WHERE is_authorized = TRUE";
+    if ($isUnconfiguredView) {
+        $slotSql = "SELECT DISTINCT slot FROM huawei_onus WHERE is_authorized = FALSE AND slot IS NOT NULL";
+    } else {
+        $slotSql = "SELECT DISTINCT slot FROM huawei_onus WHERE is_authorized = TRUE AND slot IS NOT NULL";
+    }
     $slotParams = [];
     if ($oltId) { $slotSql .= " AND olt_id = ?"; $slotParams[] = $oltId; }
     $slotSql .= " ORDER BY slot";
