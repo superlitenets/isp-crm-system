@@ -50,7 +50,8 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **M-Pesa Integration**: Automatic subscription renewal.
   - **Captive Portal Expiry Page**: Public page for expired subscribers with M-Pesa STK Push.
   - **Customer Self-Service Portal**: Usage viewing, session history, invoices, payments, and WiFi management.
-  - **CoA Support**: Change of Authorization for immediate package changes or disconnections.
+  - **CoA Support**: Change of Authorization for immediate package changes or disconnections. Static IP customers use direct MikroTik Simple Queue API updates instead of RADIUS CoA.
+  - **Static IP Online Detection**: ARP table + Simple Queue check on MikroTik routers via `syncStaticIPOnlineStatus()`. Called on dashboard load, subscriptions page load (static tab), and session sync cron. Static customers show online/offline based on ARP presence or active queue on the router.
   - **MAC Binding, IP Pool Management, Bulk Import**: For advanced subscription management.
   - **VLAN Management**: Define VLANs per NAS and sync to MikroTik via RouterOS API.
   - **Static IP Provisioning**: Provision static IPs and manage DHCP leases on MikroTik.

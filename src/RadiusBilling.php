@@ -2189,27 +2189,36 @@ class RadiusBilling {
         }
         
         if (!$nasSecret && !empty($sub['nas_id'])) {
-            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+            $stmt = $this->db->prepare("SELECT ip_address, secret, api_port, api_username, api_password_encrypted, api_enabled FROM radius_nas WHERE id = ?");
             $stmt->execute([$sub['nas_id']]);
             $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
             if ($nas) {
                 $nasSecret = $nas['secret'];
                 if (!$sessionNasIp) $sessionNasIp = $nas['ip_address'];
+                $nasApiInfo = $nas;
             }
         }
         
         if (!$nasSecret) {
-            $stmt = $this->db->query("SELECT ip_address, secret FROM radius_nas WHERE is_active = true ORDER BY id LIMIT 1");
+            $stmt = $this->db->query("SELECT ip_address, secret, api_port, api_username, api_password_encrypted, api_enabled FROM radius_nas WHERE is_active = true ORDER BY id LIMIT 1");
             $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
             if ($nas) {
                 $nasSecret = $nas['secret'];
                 if (!$sessionNasIp) $sessionNasIp = $nas['ip_address'];
+                $nasApiInfo = $nas;
             }
         }
         
         if (!$sessionNasIp || !$nasSecret) return null;
         
-        return ['ip_address' => $sessionNasIp, 'secret' => $nasSecret];
+        $result = ['ip_address' => $sessionNasIp, 'secret' => $nasSecret];
+        if (isset($nasApiInfo)) {
+            $result['api_port'] = $nasApiInfo['api_port'] ?? 8728;
+            $result['api_username'] = $nasApiInfo['api_username'] ?? 'admin';
+            $result['api_password_encrypted'] = $nasApiInfo['api_password_encrypted'] ?? '';
+            $result['api_enabled'] = $nasApiInfo['api_enabled'] ?? false;
+        }
+        return $result;
     }
     
     public function sendSpeedUpdateCoA(int $subscriptionId, ?string $customRateLimit = null): array {
@@ -2225,6 +2234,10 @@ class RadiusBilling {
         }
         
         $rateLimit = $customRateLimit ?: $this->buildRateLimit($sub);
+        
+        if (in_array(strtolower($sub['access_type'] ?? ''), ['static', 'dhcp']) && !empty($sub['static_ip'])) {
+            return $this->updateStaticQueueSpeed($sub, $nas, $rateLimit);
+        }
         
         $oltServiceUrl = (getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002') . '/radius/coa';
         
@@ -2262,6 +2275,68 @@ class RadiusBilling {
             return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nas['ip_address']];
+        }
+    }
+    
+    private function updateStaticQueueSpeed(array $sub, array $nas, string $rateLimit): array {
+        try {
+            $encKey = getenv('ENCRYPTION_KEY');
+            if (empty($encKey)) {
+                $encKey = $_ENV['ENCRYPTION_KEY'] ?? 'default-radius-key-change-me';
+            }
+            
+            $apiPassword = '';
+            if (!empty($nas['api_password_encrypted'])) {
+                $decoded = base64_decode($nas['api_password_encrypted']);
+                if ($decoded !== false && strlen($decoded) > 16) {
+                    $iv = substr($decoded, 0, 16);
+                    $encrypted = substr($decoded, 16);
+                    $apiPassword = openssl_decrypt($encrypted, 'AES-256-CBC', $encKey, 0, $iv) ?: '';
+                }
+            }
+            
+            require_once __DIR__ . '/MikroTikAPI.php';
+            $api = new \App\MikroTikAPI(
+                $nas['ip_address'],
+                (int)($nas['api_port'] ?? 8728),
+                $nas['api_username'] ?? 'admin',
+                $apiPassword
+            );
+            $api->connect();
+            
+            $target = $sub['static_ip'] . '/32';
+            $queues = $api->command('/queue/simple/print', ['?target' => $target]);
+            
+            $parts = explode('/', $rateLimit);
+            $uploadSpeed = trim($parts[0] ?? '0');
+            $downloadSpeed = trim($parts[1] ?? $uploadSpeed);
+            if (strpos($uploadSpeed, 'M') === false && strpos($uploadSpeed, 'k') === false) {
+                $uploadSpeed .= 'M';
+            }
+            if (strpos($downloadSpeed, 'M') === false && strpos($downloadSpeed, 'k') === false) {
+                $downloadSpeed .= 'M';
+            }
+            $maxLimit = "{$uploadSpeed}/{$downloadSpeed}";
+            
+            if (!empty($queues)) {
+                $api->command('/queue/simple/set', [
+                    '.id' => $queues[0]['.id'],
+                    'max-limit' => $maxLimit
+                ]);
+                $api->disconnect();
+                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => "Queue updated: max-limit={$maxLimit}", 'target_ip' => $nas['ip_address'], 'via' => 'queue'];
+            } else {
+                $api->command('/queue/simple/add', [
+                    'name' => $sub['username'] . '-' . $sub['static_ip'],
+                    'target' => $target,
+                    'max-limit' => $maxLimit,
+                    'comment' => 'CRM-managed: ' . ($sub['customer_name'] ?? $sub['username'])
+                ]);
+                $api->disconnect();
+                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => "Queue created: max-limit={$maxLimit}", 'target_ip' => $nas['ip_address'], 'via' => 'queue'];
+            }
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'Queue update failed: ' . $e->getMessage(), 'target_ip' => $nas['ip_address'] ?? ''];
         }
     }
     
@@ -3296,11 +3371,30 @@ class RadiusBilling {
                     $api->connect();
                     
                     $arpTable = [];
+                    $queueIps = [];
                     try {
                         $arpEntries = $api->command('/ip/arp/print');
                         foreach ($arpEntries as $a) {
                             if (!empty($a['address']) && (!isset($a['incomplete']) || $a['incomplete'] !== 'true')) {
                                 $arpTable[$a['address']] = $a['mac-address'] ?? '';
+                            }
+                        }
+                    } catch (\Exception $e) {}
+                    
+                    try {
+                        $queues = $api->command('/queue/simple/print');
+                        foreach ($queues as $q) {
+                            $target = $q['target'] ?? '';
+                            $ip = str_replace('/32', '', $target);
+                            if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
+                                $bytesStr = $q['bytes'] ?? '0/0';
+                                $parts = explode('/', $bytesStr);
+                                $totalBytes = (int)($parts[0] ?? 0) + (int)($parts[1] ?? 0);
+                                $queueIps[$ip] = [
+                                    'has_queue' => true,
+                                    'has_traffic' => $totalBytes > 0,
+                                    'disabled' => ($q['disabled'] ?? 'false') === 'true'
+                                ];
                             }
                         }
                     } catch (\Exception $e) {}
@@ -3311,6 +3405,8 @@ class RadiusBilling {
                         $result['checked']++;
                         $ip = $sub['static_ip'];
                         $inArp = isset($arpTable[$ip]);
+                        $hasActiveQueue = isset($queueIps[$ip]) && !$queueIps[$ip]['disabled'];
+                        $inArp = $inArp || $hasActiveQueue;
                         
                         if ($inArp && $sub['online_status'] !== 'online') {
                             $this->db->prepare("
