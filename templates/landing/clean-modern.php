@@ -1064,10 +1064,35 @@
                     <li class="nav-item"><a class="nav-link" href="#packages">Packages</a></li>
                     <li class="nav-item"><a class="nav-link" href="#testimonials">Testimonials</a></li>
                     <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
-                    <li class="nav-item ms-lg-2">
-                        <a class="btn-nav-login nav-link" href="?page=login">
+                    <li class="nav-item ms-lg-2 dropdown">
+                        <a class="btn-nav-login nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
                             <i class="bi bi-box-arrow-in-right me-1"></i>Login
                         </a>
+                        <div class="dropdown-menu dropdown-menu-end p-4 shadow" style="min-width: 300px; border-radius: 12px;">
+                            <form method="POST" action="?page=login">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken ?? '') ?>">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">Email or Phone</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                        <input type="text" class="form-control" name="email" required placeholder="Enter email or phone" autocomplete="username">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                                        <input type="password" class="form-control" name="password" required placeholder="Enter password" autocomplete="current-password">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+                                </button>
+                                <div class="text-center mt-2">
+                                    <a href="?page=reset-password" class="small text-muted">Forgot password?</a>
+                                </div>
+                            </form>
+                        </div>
                     </li>
                     <li class="nav-item ms-lg-1">
                         <a class="btn-nav-cta nav-link" href="?page=order">Get Started</a>

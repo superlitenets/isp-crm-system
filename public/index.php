@@ -2069,6 +2069,7 @@ if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 $requestUri = strtok($_SERVER['REQUEST_URI'], '?');
 $isHomepage = ($requestUri === '/' || $requestUri === '/index.php') && !isset($_GET['page']);
 if ($page === 'landing' || $isHomepage) {
+    $csrfToken = \App\Auth::generateToken();
     $settingsObj = new \App\Settings();
     $packages = $settingsObj->getActivePackagesForLanding();
     $company = $settingsObj->getCompanyInfo();
