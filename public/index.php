@@ -2162,6 +2162,18 @@ if ($page === 'order') {
             $error = 'Please fill in all required fields.';
         } else {
             try {
+                $existingOrder = $db->prepare("
+                    SELECT id, order_number, order_status 
+                    FROM orders 
+                    WHERE customer_phone = ? AND order_status IN ('new', 'confirmed', 'pending')
+                    ORDER BY created_at DESC LIMIT 1
+                ");
+                $existingOrder->execute([$customerPhone]);
+                $dupOrder = $existingOrder->fetch(\PDO::FETCH_ASSOC);
+                
+                if ($dupOrder) {
+                    $error = 'An order already exists for this phone number. Your order reference is #' . $dupOrder['order_number'] . '.';
+                } else {
                 $orderModel = new \App\Order();
                 $orderId = $orderModel->create([
                     'package_id' => $pkgId,
@@ -2195,6 +2207,7 @@ if ($page === 'order') {
                         error_log("M-Pesa STK push error: " . $mpesaError->getMessage());
                         // Order still successful, just payment initiation failed
                     }
+                }
                 }
             } catch (\Exception $e) {
                 $error = 'An error occurred. Please try again.';
@@ -9605,6 +9618,18 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (empty($customerName) || empty($customerPhone) || empty($packageId)) {
                     $_SESSION['error_message'] = 'Customer name, phone, and service package are required.';
                 } else {
+                    $existingOrder = $db->prepare("
+                        SELECT id, order_number, order_status, created_at 
+                        FROM orders 
+                        WHERE customer_phone = ? AND order_status IN ('new', 'confirmed', 'pending')
+                        ORDER BY created_at DESC LIMIT 1
+                    ");
+                    $existingOrder->execute([$customerPhone]);
+                    $dupOrder = $existingOrder->fetch(\PDO::FETCH_ASSOC);
+                    
+                    if ($dupOrder) {
+                        $_SESSION['error_message'] = 'An active order already exists for this phone number (' . $customerPhone . '). Order #' . $dupOrder['order_number'] . ' is currently "' . $dupOrder['order_status'] . '".';
+                    } else {
                     $orderData = [
                         'customer_name' => $customerName,
                         'customer_phone' => $customerPhone,
@@ -9625,6 +9650,7 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         exit;
                     } else {
                         $_SESSION['error_message'] = 'Failed to create order.';
+                    }
                     }
                 }
             } elseif ($orderId) {

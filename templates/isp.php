@@ -12835,7 +12835,7 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
     function linkOnu(onuId, onuName, onuSn) {
         if (!confirm(`Link ONU "${onuName}" (SN: ${onuSn}) to this subscriber?`)) return;
         
-        fetch('/index.php?page=isp&action=link_huawei_onu', {
+        fetch('/index.php?page=isp&action=link_onu', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -12857,7 +12857,7 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
     function unlinkOnu() {
         if (!confirm('Unlink this ONU from the subscriber? WiFi configuration via TR-069 will no longer be available.')) return;
         
-        fetch('/index.php?page=isp&action=link_huawei_onu', {
+        fetch('/index.php?page=isp&action=link_onu', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
