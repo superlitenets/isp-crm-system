@@ -358,7 +358,7 @@ class SNMPPollingWorker {
                         
                         if (status === 'online' && onu.status !== 'online') {
                             await this.pool.query(`
-                                UPDATE huawei_onus SET status = $1, snmp_status = $1, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2
+                                UPDATE huawei_onus SET status = $1, snmp_status = $1, last_down_cause = NULL, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2
                             `, [status, onu.id]);
                         } else {
                             await this.pool.query(`
@@ -1061,7 +1061,7 @@ class SNMPPollingWorker {
                 if (effectiveStatus === 'online' && prevStatus !== 'online') {
                     result = await client.query(`
                         UPDATE huawei_onus 
-                        SET status = $1, snmp_status = $2, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                        SET status = $1, snmp_status = $2, last_down_cause = NULL, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                         WHERE id = $3
                     `, [effectiveStatus, s.status, dbId]);
                 } else if (effectiveStatus !== 'online' && prevStatus === 'online') {

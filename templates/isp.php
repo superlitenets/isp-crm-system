@@ -558,6 +558,41 @@ if ($action === 'link_onu') {
     exit;
 }
 
+if ($action === 'refresh_onu_status') {
+    header('Content-Type: application/json');
+    
+    if (empty($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $onuId = (int)($_GET['onu_id'] ?? 0);
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    $stmt = $db->prepare("
+        SELECT o.id, o.name, o.sn, o.status, o.rx_power, o.tx_power, o.distance, 
+               o.genieacs_id, o.onu_type, o.frame, o.slot, o.port, o.onu_id,
+               o.last_down_cause, o.online_since, o.updated_at,
+               t.name as olt_name
+        FROM huawei_onus o
+        LEFT JOIN huawei_olts t ON o.olt_id = t.id
+        WHERE o.id = ?
+    ");
+    $stmt->execute([$onuId]);
+    $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$onu) {
+        echo json_encode(['success' => false, 'error' => 'ONU not found']);
+        exit;
+    }
+    
+    echo json_encode(['success' => true, 'onu' => $onu]);
+    exit;
+}
+
 if ($action === 'search_onus') {
     header('Content-Type: application/json');
     
@@ -5755,14 +5790,17 @@ try {
                         <div class="tab-pane fade" id="onuTab">
                             <div id="onuLinkedSection">
                                 <?php if ($linkedOnu): ?>
-                                <div class="card border-0 shadow-sm mb-3">
+                                <div class="card border-0 shadow-sm mb-3" id="onuDetailCard">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-start mb-3">
                                             <div>
-                                                <h6 class="mb-1"><i class="bi bi-diagram-3 me-2 text-primary"></i>Linked ONU</h6>
+                                                <h6 class="mb-1"><i class="bi bi-diagram-3 me-2 text-primary"></i>Linked ONU <span id="onuLiveIndicator" class="badge bg-success-subtle text-success ms-2" style="font-size:0.65rem;"><i class="bi bi-broadcast"></i> Live</span></h6>
                                                 <small class="text-muted">This subscriber is connected via the ONU below</small>
                                             </div>
                                             <div class="d-flex gap-2">
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="refreshOnuLive()" id="btnRefreshOnu">
+                                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                                </button>
                                                 <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $linkedOnu['id'] ?>" class="btn btn-outline-primary btn-sm">
                                                     <i class="bi bi-box-arrow-up-right me-1"></i>View ONU
                                                 </a>
@@ -5777,19 +5815,19 @@ try {
                                                     <tbody>
                                                         <tr>
                                                             <td class="text-muted" style="width:120px;">Name</td>
-                                                            <td class="fw-medium"><?= htmlspecialchars($linkedOnu['name'] ?? '-') ?></td>
+                                                            <td class="fw-medium" id="onuLiveName"><?= htmlspecialchars($linkedOnu['name'] ?? '-') ?></td>
                                                         </tr>
                                                         <tr>
                                                             <td class="text-muted">Serial Number</td>
-                                                            <td><code><?= htmlspecialchars($linkedOnu['sn'] ?? '-') ?></code></td>
+                                                            <td><code id="onuLiveSn"><?= htmlspecialchars($linkedOnu['sn'] ?? '-') ?></code></td>
                                                         </tr>
                                                         <tr>
                                                             <td class="text-muted">Type</td>
-                                                            <td><?= htmlspecialchars($linkedOnu['onu_type'] ?? '-') ?></td>
+                                                            <td id="onuLiveType"><?= htmlspecialchars($linkedOnu['onu_type'] ?? '-') ?></td>
                                                         </tr>
                                                         <tr>
                                                             <td class="text-muted">Status</td>
-                                                            <td>
+                                                            <td id="onuLiveStatus">
                                                                 <?php
                                                                 $onuStatus = strtolower($linkedOnu['status'] ?? 'unknown');
                                                                 $onuStatusClass = match($onuStatus) {
@@ -5811,15 +5849,15 @@ try {
                                                     <tbody>
                                                         <tr>
                                                             <td class="text-muted" style="width:120px;">OLT</td>
-                                                            <td><?= htmlspecialchars($linkedOnu['olt_name'] ?? '-') ?></td>
+                                                            <td id="onuLiveOlt"><?= htmlspecialchars($linkedOnu['olt_name'] ?? '-') ?></td>
                                                         </tr>
                                                         <tr>
                                                             <td class="text-muted">Location</td>
-                                                            <td><?= ($linkedOnu['frame'] ?? '-') ?>/<?= ($linkedOnu['slot'] ?? '-') ?>/<?= ($linkedOnu['port'] ?? '-') ?>/<?= ($linkedOnu['onu_id'] ?? '-') ?></td>
+                                                            <td id="onuLiveLocation"><?= ($linkedOnu['frame'] ?? '-') ?>/<?= ($linkedOnu['slot'] ?? '-') ?>/<?= ($linkedOnu['port'] ?? '-') ?>/<?= ($linkedOnu['onu_id'] ?? '-') ?></td>
                                                         </tr>
                                                         <tr>
                                                             <td class="text-muted">Rx Power</td>
-                                                            <td>
+                                                            <td id="onuLiveRxPower">
                                                                 <?php
                                                                 $rx = $linkedOnu['rx_power'] ?? null;
                                                                 if ($rx !== null) {
@@ -5834,14 +5872,12 @@ try {
                                                         </tr>
                                                         <tr>
                                                             <td class="text-muted">Distance</td>
-                                                            <td><?= $linkedOnu['distance'] ? $linkedOnu['distance'] . ' m' : '-' ?></td>
+                                                            <td id="onuLiveDistance"><?= $linkedOnu['distance'] ? $linkedOnu['distance'] . ' m' : '-' ?></td>
                                                         </tr>
-                                                        <?php if (!empty($linkedOnu['genieacs_id'])): ?>
-                                                        <tr>
+                                                        <tr id="onuLiveTr069Row" <?= empty($linkedOnu['genieacs_id']) ? 'style="display:none;"' : '' ?>>
                                                             <td class="text-muted">TR-069</td>
                                                             <td><span class="badge bg-info-subtle text-info">GenieACS Ready</span></td>
                                                         </tr>
-                                                        <?php endif; ?>
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -12878,6 +12914,76 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
             }
         })
         .catch(err => alert('Error: ' + err.message));
+    }
+    
+    let onuRefreshInterval = null;
+    const linkedOnuId = <?= $linkedOnu['id'] ?? 'null' ?>;
+    
+    function refreshOnuLive() {
+        if (!linkedOnuId) return;
+        const btn = document.getElementById('btnRefreshOnu');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise spin-icon me-1"></i>Refreshing...';
+        }
+        
+        fetch(`/index.php?page=isp&action=refresh_onu_status&onu_id=${linkedOnuId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.onu) {
+                    const o = data.onu;
+                    const status = (o.status || 'unknown').toLowerCase();
+                    const statusMap = {online:'success', offline:'danger', los:'warning', 'dying-gasp':'warning'};
+                    const statusClass = statusMap[status] || 'secondary';
+                    
+                    const el = id => document.getElementById(id);
+                    if (el('onuLiveStatus')) el('onuLiveStatus').innerHTML = `<span class="badge bg-${statusClass}">${status.charAt(0).toUpperCase()+status.slice(1)}</span>`;
+                    
+                    if (el('onuLiveRxPower')) {
+                        if (o.rx_power !== null && o.rx_power !== undefined) {
+                            const rx = parseFloat(o.rx_power);
+                            const rxClass = rx > -25 ? 'success' : (rx > -28 ? 'warning' : 'danger');
+                            el('onuLiveRxPower').innerHTML = `<span class="text-${rxClass} fw-bold">${rx.toFixed(1)} dBm</span>`;
+                        } else {
+                            el('onuLiveRxPower').innerHTML = '<span class="text-muted">-</span>';
+                        }
+                    }
+                    
+                    if (el('onuLiveDistance')) el('onuLiveDistance').textContent = o.distance ? o.distance + ' m' : '-';
+                    if (el('onuLiveTr069Row')) el('onuLiveTr069Row').style.display = o.genieacs_id ? '' : 'none';
+                    if (el('onuLiveName')) el('onuLiveName').textContent = o.name || '-';
+                    if (el('onuLiveOlt')) el('onuLiveOlt').textContent = o.olt_name || '-';
+                    if (el('onuLiveLocation')) el('onuLiveLocation').textContent = `${o.frame||'-'}/${o.slot||'-'}/${o.port||'-'}/${o.onu_id||'-'}`;
+                    
+                    const indicator = el('onuLiveIndicator');
+                    if (indicator) {
+                        indicator.className = `badge bg-${statusClass}-subtle text-${statusClass} ms-2`;
+                        indicator.style.fontSize = '0.65rem';
+                        indicator.innerHTML = `<i class="bi bi-broadcast"></i> ${status.charAt(0).toUpperCase()+status.slice(1)}`;
+                    }
+                }
+            })
+            .catch(() => {})
+            .finally(() => {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Refresh';
+                }
+            });
+    }
+    
+    if (linkedOnuId) {
+        refreshOnuLive();
+        onuRefreshInterval = setInterval(refreshOnuLive, 15000);
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                clearInterval(onuRefreshInterval);
+            } else {
+                refreshOnuLive();
+                onuRefreshInterval = setInterval(refreshOnuLive, 15000);
+            }
+        });
     }
     
     function openRouterPage(ip) {
