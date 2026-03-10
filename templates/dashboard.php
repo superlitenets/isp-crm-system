@@ -31,22 +31,25 @@ try {
     if ($row2) { $kpiNetwork['olt_count'] = (int)($row2['cnt'] ?? 0); }
 } catch (\Throwable $e) { error_log("Dashboard KPI network error: " . $e->getMessage()); }
 
+$canViewFinancial = \App\Auth::canAny(['accounting.view', 'accounting.*']) || \App\Auth::isAdmin();
 $kpiFinancial = ['today_revenue' => 0, 'outstanding_invoices' => 0, 'monthly_revenue' => 0];
-try {
-    $stmt = $kpiDb->prepare("SELECT COALESCE(SUM(trans_amount), 0) as total FROM mpesa_c2b_transactions WHERE DATE(trans_time) = CURRENT_DATE");
-    $stmt->execute();
-    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-    if ($row) { $kpiFinancial['today_revenue'] = (float)($row['total'] ?? 0); }
+if ($canViewFinancial) {
     try {
-        $stmt = $kpiDb->query("SELECT COUNT(*) as cnt FROM accounting_invoices WHERE status != 'paid'");
+        $stmt = $kpiDb->prepare("SELECT COALESCE(SUM(trans_amount), 0) as total FROM mpesa_c2b_transactions WHERE DATE(trans_time) = CURRENT_DATE");
+        $stmt->execute();
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if ($row) { $kpiFinancial['outstanding_invoices'] = (int)($row['cnt'] ?? 0); }
-    } catch (\Throwable $e2) { }
-    $stmt = $kpiDb->prepare("SELECT COALESCE(SUM(trans_amount), 0) as total FROM mpesa_c2b_transactions WHERE DATE(trans_time) >= date_trunc('month', CURRENT_DATE)");
-    $stmt->execute();
-    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-    if ($row) { $kpiFinancial['monthly_revenue'] = (float)($row['total'] ?? 0); }
-} catch (\Throwable $e) { error_log("Dashboard KPI financial error: " . $e->getMessage()); }
+        if ($row) { $kpiFinancial['today_revenue'] = (float)($row['total'] ?? 0); }
+        try {
+            $stmt = $kpiDb->query("SELECT COUNT(*) as cnt FROM accounting_invoices WHERE status != 'paid'");
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row) { $kpiFinancial['outstanding_invoices'] = (int)($row['cnt'] ?? 0); }
+        } catch (\Throwable $e2) { }
+        $stmt = $kpiDb->prepare("SELECT COALESCE(SUM(trans_amount), 0) as total FROM mpesa_c2b_transactions WHERE DATE(trans_time) >= date_trunc('month', CURRENT_DATE)");
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($row) { $kpiFinancial['monthly_revenue'] = (float)($row['total'] ?? 0); }
+    } catch (\Throwable $e) { error_log("Dashboard KPI financial error: " . $e->getMessage()); }
+}
 
 $kpiCustomers = ['active' => 0, 'suspended' => 0];
 try {
@@ -177,6 +180,7 @@ try {
 </div>
 <?php endif; ?>
 
+<?php if ($canViewFinancial): ?>
 <div class="row g-3 mb-4">
     <div class="col-12">
         <h6 class="text-muted text-uppercase fw-bold mb-0"><i class="bi bi-cash-stack me-1"></i> Financial</h6>
@@ -223,6 +227,7 @@ try {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <div class="row g-3 mb-4">
     <div class="col-12">
