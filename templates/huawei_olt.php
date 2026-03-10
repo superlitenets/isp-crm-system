@@ -418,24 +418,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
                 $pppoePassword = trim($_POST['pppoe_password'] ?? '');
                 
-                if ($ztWanType === 'pppoe' && !empty($pppoeUsername) && !empty($pppoePassword)) {
-                    try {
-                        $pppoeConfig = [
-                            'pppoe_vlan' => $serviceVlan,
-                            'pppoe_username' => $pppoeUsername,
-                            'pppoe_password' => $pppoePassword,
-                            'gemport' => 1,
-                            'nat_enabled' => true,
-                            'priority' => 0
-                        ];
-                        $pppoeResult = $huaweiOLT->configureWANPPPoE($onuId, $pppoeConfig);
-                        if ($pppoeResult['success']) {
-                            $ztMessages[] = 'PPPoE WAN configured';
-                            $db->prepare("UPDATE huawei_onus SET wan_mode = 'pppoe', pppoe_username = ? WHERE id = ?")->execute([$pppoeUsername, $onuId]);
-                        }
-                    } catch (Exception $e) {
-                        $debugLog(2, 'ZT PPPoE failed: ' . $e->getMessage());
-                    }
+                if ($ztWanType === 'pppoe' && !empty($pppoeUsername)) {
+                    $db->prepare("UPDATE huawei_onus SET wan_mode = 'pppoe', pppoe_username = ? WHERE id = ?")->execute([$pppoeUsername, $onuId]);
                 }
                 
                 $ztWifiEnable = !empty($_POST['zt_wifi_enable']);
