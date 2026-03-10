@@ -3151,7 +3151,14 @@ if ($page === 'isp') {
                             $sent++;
                             if (isset($pr['time']) && $pr['time'] !== '' && !isset($pr['timeout'])) {
                                 $received++;
-                                $timeMs = (float)str_replace('ms', '', $pr['time']);
+                                $rawTime = $pr['time'];
+                                if (stripos($rawTime, 'us') !== false) {
+                                    $timeMs = (float)str_replace('us', '', $rawTime) / 1000;
+                                } elseif (stripos($rawTime, 's') !== false && stripos($rawTime, 'ms') === false && stripos($rawTime, 'us') === false) {
+                                    $timeMs = (float)str_replace('s', '', $rawTime) * 1000;
+                                } else {
+                                    $timeMs = (float)str_replace('ms', '', $rawTime);
+                                }
                                 $times[] = $timeMs;
                                 $outputLines[] = "seq={$pr['seq']} host={$ipAddress} time={$pr['time']}";
                             } else {

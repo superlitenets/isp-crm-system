@@ -12680,12 +12680,16 @@ add action=redirect dst-host=!*.superlite.co.ke action-data=\\
             .then(data => {
                 if (data.success && data.online) {
                     let statsHtml = '';
+                    function fmtLatency(val) {
+                        if (val < 1) return (val * 1000).toFixed(0) + ' us';
+                        return val.toFixed(2) + ' ms';
+                    }
                     if (data.min_ms !== undefined) {
                         statsHtml = `
                             <div class="d-flex justify-content-center gap-3 mt-2 mb-2">
-                                <div class="text-center"><small class="text-muted d-block">Min</small><strong class="text-success">${data.min_ms} ms</strong></div>
-                                <div class="text-center"><small class="text-muted d-block">Avg</small><strong class="text-primary">${data.latency_ms} ms</strong></div>
-                                <div class="text-center"><small class="text-muted d-block">Max</small><strong class="text-warning">${data.max_ms} ms</strong></div>
+                                <div class="text-center"><small class="text-muted d-block">Min</small><strong class="text-success">${fmtLatency(data.min_ms)}</strong></div>
+                                <div class="text-center"><small class="text-muted d-block">Avg</small><strong class="text-primary">${fmtLatency(data.latency_ms)}</strong></div>
+                                <div class="text-center"><small class="text-muted d-block">Max</small><strong class="text-warning">${fmtLatency(data.max_ms)}</strong></div>
                             </div>`;
                     }
                     let pktHtml = '';
