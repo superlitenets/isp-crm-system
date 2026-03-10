@@ -411,8 +411,106 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                     throw new Exception($result['message'] ?? 'Failed to authorize ONU on OLT');
                 }
                 
+                $ztMessages = [];
+                $serviceVlan = $vlanId ?: 902;
+                
+                $ztWanType = trim($_POST['zt_wan_type'] ?? '');
+                $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
+                $pppoePassword = trim($_POST['pppoe_password'] ?? '');
+                
+                if ($ztWanType === 'pppoe' && !empty($pppoeUsername) && !empty($pppoePassword)) {
+                    try {
+                        $pppoeConfig = [
+                            'pppoe_vlan' => $serviceVlan,
+                            'pppoe_username' => $pppoeUsername,
+                            'pppoe_password' => $pppoePassword,
+                            'gemport' => 1,
+                            'nat_enabled' => true,
+                            'priority' => 0
+                        ];
+                        $pppoeResult = $huaweiOLT->configureWANPPPoE($onuId, $pppoeConfig);
+                        if ($pppoeResult['success']) {
+                            $ztMessages[] = 'PPPoE WAN configured';
+                            $db->prepare("UPDATE huawei_onus SET wan_mode = 'pppoe', pppoe_username = ? WHERE id = ?")->execute([$pppoeUsername, $onuId]);
+                        }
+                    } catch (Exception $e) {
+                        $debugLog(2, 'ZT PPPoE failed: ' . $e->getMessage());
+                    }
+                }
+                
+                $ztWifiEnable = !empty($_POST['zt_wifi_enable']);
+                $ztWifiSsid24 = trim($_POST['zt_wifi_ssid_24'] ?? '');
+                $ztWifiPass24 = trim($_POST['zt_wifi_pass_24'] ?? '');
+                $ztWifiSsid5 = trim($_POST['zt_wifi_ssid_5'] ?? '');
+                $ztWifiPass5 = trim($_POST['zt_wifi_pass_5'] ?? '');
+                $ztWifiSecurity = $_POST['zt_wifi_security'] ?? 'wpa2psk';
+                $ztWifiEncryption = $_POST['zt_wifi_encryption'] ?? 'aes';
+                
+                if (!empty($_POST['zt_wifi_same_5g']) || (empty($ztWifiSsid5) && !empty($ztWifiSsid24))) {
+                    $ztWifiSsid5 = $ztWifiSsid24;
+                    $ztWifiPass5 = $ztWifiPass24;
+                }
+                
+                $hasTr069Config = ($ztWanType && $ztWanType !== '') || ($ztWifiEnable && !empty($ztWifiSsid24));
+                
+                if ($hasTr069Config) {
+                    $tr069Config = [
+                        'onu_id' => $onuId,
+                        'wan_vlan' => $serviceVlan,
+                        'connection_type' => $ztWanType ?: 'none',
+                        'pppoe_username' => $pppoeUsername,
+                        'pppoe_password' => $pppoePassword,
+                        'nat_enable' => true,
+                        'wifi_enabled' => $ztWifiEnable,
+                        'wifi_ssid_24' => $ztWifiSsid24,
+                        'wifi_pass_24' => $ztWifiPass24,
+                        'wifi_ssid_5' => $ztWifiSsid5,
+                        'wifi_pass_5' => $ztWifiPass5,
+                        'wifi_security' => $ztWifiSecurity,
+                        'wifi_encryption' => $ztWifiEncryption,
+                        'static_ip' => trim($_POST['zt_static_ip'] ?? ''),
+                        'static_mask' => trim($_POST['zt_static_mask'] ?? ''),
+                        'static_gateway' => trim($_POST['zt_static_gateway'] ?? ''),
+                        'static_dns1' => trim($_POST['zt_static_dns1'] ?? ''),
+                        'static_dns2' => trim($_POST['zt_static_dns2'] ?? '')
+                    ];
+                    
+                    $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
+                        onu_id INTEGER PRIMARY KEY,
+                        config_data TEXT,
+                        status VARCHAR(20) DEFAULT 'pending',
+                        error_message TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP,
+                        applied_at TIMESTAMP
+                    )");
+                    try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN error_message TEXT"); } catch (Exception $e) {}
+                    try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN applied_at TIMESTAMP"); } catch (Exception $e) {}
+                    
+                    $stmt = $db->prepare("
+                        INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, error_message, created_at)
+                        VALUES (?, ?, 'pending', NULL, CURRENT_TIMESTAMP)
+                        ON CONFLICT (onu_id) DO UPDATE SET
+                            config_data = EXCLUDED.config_data,
+                            status = 'pending',
+                            error_message = NULL,
+                            updated_at = CURRENT_TIMESTAMP
+                    ");
+                    try {
+                        $stmt->execute([$onuId, json_encode($tr069Config)]);
+                        $ztMessages[] = 'TR-069 config queued';
+                    } catch (Exception $e) {
+                        $debugLog(2, 'TR-069 queue failed: ' . $e->getMessage());
+                    }
+                }
+                
+                $finalMessage = $result['message'] ?? 'ONU fully configured';
+                if (!empty($ztMessages)) {
+                    $finalMessage .= ' | Zero Touch: ' . implode(', ', $ztMessages);
+                }
+                
                 $response['success'] = true;
-                $response['message'] = $result['message'] ?? 'ONU fully configured';
+                $response['message'] = $finalMessage;
                 $response['next_stage'] = null;
                 $response['olt_onu_id'] = $result['onu_id'] ?? null;
                 $response['redirect'] = '?page=huawei-olt&view=onu_detail&onu_id=' . $onuId;
@@ -18327,7 +18425,164 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <select name="radius_subscription_id" id="authRadiusSubscriptionId" class="form-select">
                                 <option value="">-- Select to enable WiFi Config --</option>
                             </select>
-                            <small class="text-muted">Link ONU for TR-069 WiFi configuration
+                            <small class="text-muted">Link ONU for TR-069 WiFi configuration</small>
+                        </div>
+                        
+                        <div class="accordion mb-3" id="zeroTouchAccordion">
+                            <div class="accordion-item border-primary">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#zeroTouchPanel">
+                                        <i class="bi bi-magic me-2 text-primary"></i>
+                                        <strong>Zero Touch Provisioning</strong>
+                                        <span class="badge bg-secondary ms-2">Optional</span>
+                                    </button>
+                                </h2>
+                                <div id="zeroTouchPanel" class="accordion-collapse collapse" data-bs-parent="#zeroTouchAccordion">
+                                    <div class="accordion-body pt-2 pb-3">
+                                        <small class="text-muted d-block mb-3">Configure WAN and WiFi during authorization. Leave empty to skip.</small>
+                                        
+                                        <ul class="nav nav-tabs nav-fill" id="zeroTouchTabs" role="tablist">
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link active py-1" id="zt-wan-tab" data-bs-toggle="tab" data-bs-target="#zt-wan-panel" type="button" role="tab">
+                                                    <i class="bi bi-globe me-1"></i>WAN
+                                                </button>
+                                            </li>
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link py-1" id="zt-wifi-tab" data-bs-toggle="tab" data-bs-target="#zt-wifi-panel" type="button" role="tab">
+                                                    <i class="bi bi-wifi me-1"></i>WiFi
+                                                </button>
+                                            </li>
+                                        </ul>
+                                        
+                                        <div class="tab-content border border-top-0 rounded-bottom p-3" id="zeroTouchTabContent">
+                                            <div class="tab-pane fade show active" id="zt-wan-panel" role="tabpanel">
+                                                <div class="mb-2">
+                                                    <label class="form-label small fw-bold">Connection Type</label>
+                                                    <select name="zt_wan_type" id="ztWanType" class="form-select form-select-sm" onchange="toggleZtWanFields()">
+                                                        <option value="">-- No WAN Config --</option>
+                                                        <option value="pppoe">PPPoE</option>
+                                                        <option value="dhcp">DHCP</option>
+                                                        <option value="static">Static IP</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div id="ztPppoeFields" class="d-none">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label small">PPPoE Username</label>
+                                                            <input type="text" name="pppoe_username" id="ztPppoeUsername" class="form-control form-control-sm" placeholder="e.g., user@isp">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label small">PPPoE Password</label>
+                                                            <input type="text" name="pppoe_password" id="ztPppoePassword" class="form-control form-control-sm" placeholder="Password">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div id="ztStaticFields" class="d-none">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-4">
+                                                            <label class="form-label small">IP Address</label>
+                                                            <input type="text" name="zt_static_ip" class="form-control form-control-sm" placeholder="192.168.1.100">
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label small">Subnet Mask</label>
+                                                            <input type="text" name="zt_static_mask" class="form-control form-control-sm" placeholder="255.255.255.0">
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label small">Gateway</label>
+                                                            <input type="text" name="zt_static_gateway" class="form-control form-control-sm" placeholder="192.168.1.1">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label small">Primary DNS</label>
+                                                            <input type="text" name="zt_static_dns1" class="form-control form-control-sm" placeholder="8.8.8.8">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label small">Secondary DNS</label>
+                                                            <input type="text" name="zt_static_dns2" class="form-control form-control-sm" placeholder="8.8.4.4">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div id="ztDhcpFields" class="d-none">
+                                                    <div class="alert alert-info small mb-0 mt-2 py-1">
+                                                        <i class="bi bi-info-circle me-1"></i>DHCP will be configured automatically. No additional settings needed.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="tab-pane fade" id="zt-wifi-panel" role="tabpanel">
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="ztWifiEnable" name="zt_wifi_enable" value="1" onchange="toggleZtWifiFields()">
+                                                    <label class="form-check-label small" for="ztWifiEnable">Configure WiFi</label>
+                                                </div>
+                                                
+                                                <div id="ztWifiFields" class="d-none">
+                                                    <div class="mb-2 p-2 bg-light rounded">
+                                                        <label class="form-label small fw-bold mb-1"><i class="bi bi-broadcast me-1"></i>2.4 GHz</label>
+                                                        <div class="row g-2">
+                                                            <div class="col-md-6">
+                                                                <input type="text" name="zt_wifi_ssid_24" id="ztWifiSsid24" class="form-control form-control-sm" placeholder="SSID Name">
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <div class="input-group input-group-sm">
+                                                                    <input type="password" name="zt_wifi_pass_24" id="ztWifiPass24" class="form-control form-control-sm" placeholder="Password (min 8 chars)">
+                                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('ztWifiPass24', this)">
+                                                                        <i class="bi bi-eye"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-2 p-2 bg-light rounded">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <label class="form-label small fw-bold mb-0"><i class="bi bi-broadcast me-1"></i>5 GHz</label>
+                                                            <div class="form-check form-check-inline mb-0">
+                                                                <input class="form-check-input" type="checkbox" id="ztWifiSame5g" name="zt_wifi_same_5g" value="1" checked onchange="toggleZt5gFields()">
+                                                                <label class="form-check-label small" for="ztWifiSame5g">Same as 2.4 GHz</label>
+                                                            </div>
+                                                        </div>
+                                                        <div id="ztWifi5gFields" class="d-none">
+                                                            <div class="row g-2">
+                                                                <div class="col-md-6">
+                                                                    <input type="text" name="zt_wifi_ssid_5" id="ztWifiSsid5" class="form-control form-control-sm" placeholder="SSID Name">
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="input-group input-group-sm">
+                                                                        <input type="password" name="zt_wifi_pass_5" id="ztWifiPass5" class="form-control form-control-sm" placeholder="Password (min 8 chars)">
+                                                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('ztWifiPass5', this)">
+                                                                            <i class="bi bi-eye"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div id="ztWifi5gSameNote" class="small text-muted">Will use same SSID and password as 2.4 GHz</div>
+                                                    </div>
+                                                    
+                                                    <div class="row g-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label small">Security</label>
+                                                            <select name="zt_wifi_security" class="form-select form-select-sm">
+                                                                <option value="wpa2psk" selected>WPA2-PSK (Recommended)</option>
+                                                                <option value="wpa_wpa2">WPA/WPA2 Mixed</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label small">Encryption</label>
+                                                            <select name="zt_wifi_encryption" class="form-select form-select-sm">
+                                                                <option value="aes" selected>AES (Recommended)</option>
+                                                                <option value="tkip_aes">TKIP/AES Mixed</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="alert alert-secondary small mb-0">
@@ -18350,6 +18605,35 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     function updateZoneName(select) {
         const selectedOption = select.options[select.selectedIndex];
         document.getElementById('authZoneName').value = selectedOption.dataset.name || '';
+    }
+    
+    function toggleZtWanFields() {
+        const type = document.getElementById('ztWanType').value;
+        document.getElementById('ztPppoeFields').classList.toggle('d-none', type !== 'pppoe');
+        document.getElementById('ztStaticFields').classList.toggle('d-none', type !== 'static');
+        document.getElementById('ztDhcpFields').classList.toggle('d-none', type !== 'dhcp');
+    }
+    
+    function toggleZtWifiFields() {
+        const enabled = document.getElementById('ztWifiEnable').checked;
+        document.getElementById('ztWifiFields').classList.toggle('d-none', !enabled);
+    }
+    
+    function toggleZt5gFields() {
+        const same = document.getElementById('ztWifiSame5g').checked;
+        document.getElementById('ztWifi5gFields').classList.toggle('d-none', same);
+        document.getElementById('ztWifi5gSameNote').classList.toggle('d-none', !same);
+    }
+    
+    function togglePasswordVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            input.type = 'password';
+            btn.innerHTML = '<i class="bi bi-eye"></i>';
+        }
     }
     
     function getGPSLocation() {
