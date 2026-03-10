@@ -10699,8 +10699,11 @@ try {
                         </button>
                     </div>
                     
-                    <!-- Reset & Delete -->
+                    <!-- Move, Reset & Delete -->
                     <div class="ms-auto d-flex gap-1">
+                        <button type="button" class="btn btn-outline-warning btn-sm" title="Move ONU to a different port" data-bs-toggle="modal" data-bs-target="#detailMoveOnuModal">
+                            <i class="bi bi-arrow-right-circle"></i><span class="d-none d-md-inline ms-1">Move</span>
+                        </button>
                         <form method="post" class="d-inline" onsubmit="return confirm('Reset this ONU to factory defaults?\n\nThis will restore the ONU configuration to its default state. The device will reboot and temporarily go offline.')">
                             <input type="hidden" name="action" value="reset_onu_config">
                             <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
@@ -10714,6 +10717,68 @@ try {
                             <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete from OLT">
                                 <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Delete</span>
                             </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="detailMoveOnuModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning bg-opacity-10">
+                            <h5 class="modal-title"><i class="bi bi-arrow-right-circle me-2 text-warning"></i>Move ONU to New Port</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post" action="?page=huawei-olt&view=onu_detail&onu_id=<?= $currentOnu['id'] ?>">
+                            <div class="modal-body">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="move_onu">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <input type="hidden" name="redirect_view" value="onu_detail&onu_id=<?= $currentOnu['id'] ?>">
+                                
+                                <div class="alert alert-info mb-3">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">ONU</small>
+                                            <strong><?= htmlspecialchars($currentOnu['sn'] ?? '') ?></strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Current Position</small>
+                                            <strong><?= $currentOnu['frame'] ?? 0 ?>/<?= $currentOnu['slot'] ?? 0 ?>/<?= $currentOnu['port'] ?? 0 ?> : <?= $currentOnu['onu_id'] ?? '-' ?></strong>
+                                        </div>
+                                    </div>
+                                    <?php if (!empty($currentOnu['name'])): ?>
+                                    <div class="mt-1"><small class="text-muted">Name:</small> <?= htmlspecialchars($currentOnu['name']) ?></div>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <h6 class="mb-2"><i class="bi bi-geo-alt me-1"></i>New Location</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Slot</label>
+                                        <input type="number" name="new_slot" class="form-control" min="0" max="20" value="<?= $currentOnu['slot'] ?? 0 ?>" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Port</label>
+                                        <input type="number" name="new_port" class="form-control" min="0" max="15" value="<?= $currentOnu['port'] ?? 0 ?>" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">ONU ID <small class="text-muted">(optional)</small></label>
+                                        <input type="number" name="new_onu_id" class="form-control" min="0" max="127" placeholder="Auto-assign">
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning mt-3 mb-0">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    <strong>Warning:</strong> The ONU will be briefly disconnected during migration. Service-ports and native VLAN config will be automatically re-created on the new port.
+                                </div>
+                            </div>
+                            <div class="modal-footer justify-content-between">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-warning" onclick="return confirm('Move this ONU to the new port?\n\nThe ONU will be briefly disconnected during migration.')">
+                                    <i class="bi bi-arrow-right-circle me-1"></i> Move ONU
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>

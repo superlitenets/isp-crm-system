@@ -12518,7 +12518,67 @@ class HuaweiOLT {
         $lineProfile = $profile['line_profile'] ?? 10;
         $srvProfile = $profile['srv_profile'] ?? 10;
         
-        // Step 1: Add to new location FIRST (less risky)
+        // Step 0: Capture existing service-ports before any changes
+        $captureCmd = "display service-port all";
+        $captureResult = $this->executeCommand($oltId, $captureCmd);
+        $captureOutput = $captureResult['output'] ?? '';
+        $output = "[Capturing existing service-ports]\n";
+        
+        $servicePorts = [];
+        $spPattern = '/(\d+)\s+\d+\s+vlan\s+(\d+)\s+gpon\s+' . preg_quote("{$frame}/{$oldSlot}/{$oldPort}", '/') . '\s+ont\s+' . $oldOnuId . '\s+gemport\s+(\d+)\s+multi-service\s+user-vlan\s+(\d+)\s+tag-transform\s+(\S+)/i';
+        if (preg_match_all($spPattern, $captureOutput, $spMatches, PREG_SET_ORDER)) {
+            foreach ($spMatches as $sp) {
+                $servicePorts[] = [
+                    'sp_id' => $sp[1],
+                    'vlan' => $sp[2],
+                    'gemport' => $sp[3],
+                    'user_vlan' => $sp[4],
+                    'tag_transform' => $sp[5]
+                ];
+            }
+        }
+        
+        if (empty($servicePorts)) {
+            $simplePattern = '/(\d+)\s+.*vlan\s+(\d+)\s+.*gpon\s+' . preg_quote("{$frame}/{$oldSlot}/{$oldPort}", '/') . '\s+ont\s+' . $oldOnuId . '/i';
+            if (preg_match_all($simplePattern, $captureOutput, $spMatches, PREG_SET_ORDER)) {
+                foreach ($spMatches as $sp) {
+                    $servicePorts[] = [
+                        'sp_id' => $sp[1],
+                        'vlan' => $sp[2],
+                        'gemport' => 1,
+                        'user_vlan' => $sp[2],
+                        'tag_transform' => 'translate'
+                    ];
+                }
+            }
+        }
+        
+        $output .= "Found " . count($servicePorts) . " service-port(s) to migrate\n";
+        
+        $trafficProfiles = $onu['traffic_profile_in'] ?? null;
+        $inboundIndex = 6;
+        $outboundIndex = 6;
+        if ($trafficProfiles) {
+            $stmt = $this->db->prepare("SELECT * FROM huawei_traffic_profiles WHERE id = ?");
+            $stmt->execute([$trafficProfiles]);
+            $tp = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($tp) {
+                $inboundIndex = $tp['olt_index'] ?? 6;
+                $outboundIndex = $tp['olt_index'] ?? 6;
+            }
+        }
+        
+        // Step 1: Delete from old location FIRST (ONU can only exist at one SN location)
+        $deleteCmd = "interface gpon {$frame}/{$oldSlot}\r\n";
+        $deleteCmd .= "ont delete {$oldPort} {$oldOnuId}\r\n";
+        $deleteCmd .= "quit";
+        
+        $deleteResult = $this->executeCommand($oltId, $deleteCmd);
+        $output .= "\n[Delete from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId}]\n" . ($deleteResult['output'] ?? '');
+        
+        sleep(1);
+        
+        // Step 2: Add to new location
         $addCmd = "interface gpon {$frame}/{$newSlot}\r\n";
         if ($newOnuId !== null) {
             $addCmd .= "ont add {$newPort} {$newOnuId} sn-auth \"{$sn}\" omci ont-lineprofile-id {$lineProfile} ont-srvprofile-id {$srvProfile} desc \"{$description}\"\r\n";
@@ -12528,14 +12588,12 @@ class HuaweiOLT {
         $addCmd .= "quit";
         
         $addResult = $this->executeCommand($oltId, $addCmd);
-        $output = "[Add to {$frame}/{$newSlot}/{$newPort}" . ($newOnuId !== null ? ":{$newOnuId}" : '') . "]\n" . ($addResult['output'] ?? '');
+        $output .= "\n[Add to {$frame}/{$newSlot}/{$newPort}" . ($newOnuId !== null ? ":{$newOnuId}" : '') . "]\n" . ($addResult['output'] ?? '');
         
-        // Check if add was successful (look for ONTID or no error)
         $addOutput = strtolower($addResult['output'] ?? '');
         $addSuccess = (strpos($addOutput, 'ontid') !== false || strpos($addOutput, 'success') !== false) && 
                       strpos($addOutput, 'error') === false && strpos($addOutput, 'failed') === false;
         
-        // Parse new ONU ID from response
         $assignedOnuId = $newOnuId;
         if (preg_match('/ontid\s*:\s*(\d+)/i', $addResult['output'] ?? '', $m)) {
             $assignedOnuId = (int)$m[1];
@@ -12544,57 +12602,87 @@ class HuaweiOLT {
         }
         
         if (!$addSuccess) {
+            // Rollback: try to re-add at old location
+            $rollbackCmd = "interface gpon {$frame}/{$oldSlot}\r\n";
+            $rollbackCmd .= "ont add {$oldPort} {$oldOnuId} sn-auth \"{$sn}\" omci ont-lineprofile-id {$lineProfile} ont-srvprofile-id {$srvProfile} desc \"{$description}\"\r\n";
+            $rollbackCmd .= "quit";
+            $this->executeCommand($oltId, $rollbackCmd);
+            
             $this->addLog([
                 'olt_id' => $oltId,
                 'onu_id' => $onuDbId,
                 'action' => 'move_onu',
                 'status' => 'error',
-                'message' => "Failed to add ONU {$sn} to new location {$frame}/{$newSlot}/{$newPort}",
+                'message' => "Failed to add ONU {$sn} to new location {$frame}/{$newSlot}/{$newPort} - rolled back to original",
                 'command_sent' => $addCmd,
                 'command_response' => $output,
                 'user_id' => $_SESSION['user_id'] ?? null
             ]);
             return [
                 'success' => false,
-                'error' => 'Failed to add ONU to new location - original location unchanged',
+                'error' => 'Failed to add ONU to new location - rolled back to original port',
                 'output' => $output
             ];
         }
         
-        // Step 2: Delete from old location
-        $deleteCmd = "interface gpon {$frame}/{$oldSlot}\r\n";
-        $deleteCmd .= "ont delete {$oldPort} {$oldOnuId}\r\n";
-        $deleteCmd .= "quit";
+        $finalOnuId = $assignedOnuId ?? $oldOnuId;
         
-        $deleteResult = $this->executeCommand($oltId, $deleteCmd);
-        $output .= "\n\n[Delete from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId}]\n" . ($deleteResult['output'] ?? '');
+        // Step 3: Re-create service-ports on new location
+        $spResults = [];
+        if (!empty($servicePorts)) {
+            $output .= "\n[Re-creating service-ports on new location]\n";
+            foreach ($servicePorts as $sp) {
+                $spCmd = "service-port vlan {$sp['vlan']} gpon {$frame}/{$newSlot}/{$newPort} ont {$finalOnuId} gemport {$sp['gemport']} multi-service user-vlan {$sp['user_vlan']} tag-transform {$sp['tag_transform']} inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}";
+                $spResult = $this->executeCommand($oltId, $spCmd);
+                $spOut = $spResult['output'] ?? '';
+                $output .= "VLAN {$sp['vlan']}: {$spOut}\n";
+                $spResults[] = ['vlan' => $sp['vlan'], 'output' => $spOut];
+            }
+        }
         
-        $success = true;
+        // Step 4: Re-apply native VLAN for bridge/router mode
+        $onuMode = $onu['onu_mode'] ?? 'router';
+        $serviceVlan = $onu['vlan_id'] ?? null;
+        if ($serviceVlan) {
+            $nativeCmd = "interface gpon {$frame}/{$newSlot}\r\n";
+            if ($onuMode === 'bridge') {
+                for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
+                    $nativeCmd .= "ont port native-vlan {$newPort} {$finalOnuId} eth {$ethPort} vlan {$serviceVlan} priority 0\r\n";
+                }
+            } else {
+                $nativeCmd .= "ont port native-vlan {$newPort} {$finalOnuId} eth 1 vlan {$serviceVlan} priority 0\r\n";
+            }
+            $nativeCmd .= "quit";
+            $nativeResult = $this->executeCommand($oltId, $nativeCmd);
+            $output .= "\n[Native VLAN config]\n" . ($nativeResult['output'] ?? '');
+        }
         
         // Update database
         $this->updateONU($onuDbId, [
             'slot' => $newSlot,
             'port' => $newPort,
-            'onu_id' => $assignedOnuId ?? $oldOnuId
+            'onu_id' => $finalOnuId
         ]);
         
+        $spCount = count($servicePorts);
         $this->addLog([
             'olt_id' => $oltId,
             'onu_id' => $onuDbId,
             'action' => 'move_onu',
             'status' => 'success',
-            'message' => "Moved ONU {$sn} from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId} to {$frame}/{$newSlot}/{$newPort}" . ($assignedOnuId ? ":{$assignedOnuId}" : ''),
-            'command_sent' => $addCmd . "\n\n" . $deleteCmd,
+            'message' => "Moved ONU {$sn} from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId} to {$frame}/{$newSlot}/{$newPort}:{$finalOnuId}" . ($spCount ? " ({$spCount} service-ports migrated)" : ''),
+            'command_sent' => $deleteCmd . "\n\n" . $addCmd,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
         return [
             'success' => true,
-            'message' => "ONU moved to {$frame}/{$newSlot}/{$newPort}" . ($assignedOnuId ? " (ID: {$assignedOnuId})" : ''),
+            'message' => "ONU moved to {$frame}/{$newSlot}/{$newPort}:{$finalOnuId}" . ($spCount ? " ({$spCount} service-ports migrated)" : ''),
             'new_slot' => $newSlot,
             'new_port' => $newPort,
-            'new_onu_id' => $assignedOnuId ?? $oldOnuId,
+            'new_onu_id' => $finalOnuId,
+            'service_ports_migrated' => $spCount,
             'output' => $output
         ];
     }
