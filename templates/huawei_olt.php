@@ -18506,10 +18506,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                             </div>
                                                             <div class="col-md-6">
                                                                 <div class="input-group input-group-sm">
-                                                                    <input type="password" name="zt_wifi_pass_24" id="ztWifiPass24" class="form-control form-control-sm" placeholder="Password (min 8 chars)">
-                                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('ztWifiPass24', this)">
-                                                                        <i class="bi bi-eye"></i>
-                                                                    </button>
+                                                                    <input type="text" name="zt_wifi_pass_24" id="ztWifiPass24" class="form-control form-control-sm" placeholder="Password (min 8 chars)">
                                                                 </div>
                                                             </div>
                                                         </div>
