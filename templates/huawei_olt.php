@@ -441,15 +441,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $ztWifiEnable = !empty($_POST['zt_wifi_enable']);
                 $ztWifiSsid24 = trim($_POST['zt_wifi_ssid_24'] ?? '');
                 $ztWifiPass24 = trim($_POST['zt_wifi_pass_24'] ?? '');
-                $ztWifiSsid5 = trim($_POST['zt_wifi_ssid_5'] ?? '');
-                $ztWifiPass5 = trim($_POST['zt_wifi_pass_5'] ?? '');
                 $ztWifiSecurity = $_POST['zt_wifi_security'] ?? 'wpa2psk';
                 $ztWifiEncryption = $_POST['zt_wifi_encryption'] ?? 'aes';
-                
-                if (!empty($_POST['zt_wifi_same_5g']) || (empty($ztWifiSsid5) && !empty($ztWifiSsid24))) {
-                    $ztWifiSsid5 = $ztWifiSsid24;
-                    $ztWifiPass5 = $ztWifiPass24;
-                }
                 
                 $hasTr069Config = ($ztWanType && $ztWanType !== '') || ($ztWifiEnable && !empty($ztWifiSsid24));
                 
@@ -464,8 +457,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                         'wifi_enabled' => $ztWifiEnable,
                         'wifi_ssid_24' => $ztWifiSsid24,
                         'wifi_pass_24' => $ztWifiPass24,
-                        'wifi_ssid_5' => $ztWifiSsid5,
-                        'wifi_pass_5' => $ztWifiPass5,
+                        'wifi_ssid_5' => $ztWifiSsid24,
+                        'wifi_pass_5' => $ztWifiPass24,
                         'wifi_security' => $ztWifiSecurity,
                         'wifi_encryption' => $ztWifiEncryption,
                         'static_ip' => trim($_POST['zt_static_ip'] ?? ''),
@@ -18535,32 +18528,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                         </div>
                                                     </div>
                                                     
-                                                    <div class="mb-2 p-2 bg-light rounded">
-                                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                                            <label class="form-label small fw-bold mb-0"><i class="bi bi-broadcast me-1"></i>5 GHz</label>
-                                                            <div class="form-check form-check-inline mb-0">
-                                                                <input class="form-check-input" type="checkbox" id="ztWifiSame5g" name="zt_wifi_same_5g" value="1" checked onchange="toggleZt5gFields()">
-                                                                <label class="form-check-label small" for="ztWifiSame5g">Same as 2.4 GHz</label>
-                                                            </div>
-                                                        </div>
-                                                        <div id="ztWifi5gFields" class="d-none">
-                                                            <div class="row g-2">
-                                                                <div class="col-md-6">
-                                                                    <input type="text" name="zt_wifi_ssid_5" id="ztWifiSsid5" class="form-control form-control-sm" placeholder="SSID Name">
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <div class="input-group input-group-sm">
-                                                                        <input type="password" name="zt_wifi_pass_5" id="ztWifiPass5" class="form-control form-control-sm" placeholder="Password (min 8 chars)">
-                                                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('ztWifiPass5', this)">
-                                                                            <i class="bi bi-eye"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div id="ztWifi5gSameNote" class="small text-muted">Will use same SSID and password as 2.4 GHz</div>
-                                                    </div>
-                                                    
                                                     <div class="row g-2">
                                                         <div class="col-md-6">
                                                             <label class="form-label small">Security</label>
@@ -18617,12 +18584,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     function toggleZtWifiFields() {
         const enabled = document.getElementById('ztWifiEnable').checked;
         document.getElementById('ztWifiFields').classList.toggle('d-none', !enabled);
-    }
-    
-    function toggleZt5gFields() {
-        const same = document.getElementById('ztWifiSame5g').checked;
-        document.getElementById('ztWifi5gFields').classList.toggle('d-none', same);
-        document.getElementById('ztWifi5gSameNote').classList.toggle('d-none', !same);
     }
     
     function togglePasswordVisibility(inputId, btn) {
