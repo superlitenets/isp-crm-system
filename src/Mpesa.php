@@ -37,6 +37,10 @@ class Mpesa {
         return new self();
     }
     
+    public function setAccountConfig(array $config): void {
+        $this->loadNasConfig($config);
+    }
+
     private function loadNasConfig(array $config): void {
         $this->consumerKey = $config['consumer_key'] ?? '';
         $this->consumerSecret = $config['consumer_secret'] ?? '';

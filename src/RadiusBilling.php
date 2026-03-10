@@ -366,6 +366,23 @@ class RadiusBilling {
         ];
     }
     
+    public function getMpesaAccountConfig(int $accountId): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM mpesa_accounts WHERE id = ? AND is_active = true");
+        $stmt->execute([$accountId]);
+        $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$account) return null;
+        return [
+            'shortcode' => $account['shortcode'],
+            'consumer_key' => $this->decrypt($account['consumer_key']),
+            'consumer_secret' => $this->decrypt($account['consumer_secret']),
+            'passkey' => $this->decrypt($account['passkey']),
+            'account_type' => $account['account_type'] ?? 'paybill',
+            'environment' => $account['environment'] ?? 'production',
+            'callback_url' => $account['callback_url'] ?? null,
+            'account_name' => $account['name']
+        ];
+    }
+
     // ==================== M-Pesa Accounts Management ====================
     
     public function getMpesaAccounts(): array {

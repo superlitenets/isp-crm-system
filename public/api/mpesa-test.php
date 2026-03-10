@@ -23,6 +23,7 @@ $input = json_decode(file_get_contents('php://input'), true);
 
 $phone = $input['phone'] ?? '';
 $amount = floatval($input['amount'] ?? 0);
+$accountId = isset($input['account_id']) ? (int)$input['account_id'] : null;
 
 if (empty($phone) || $amount <= 0) {
     echo json_encode(['success' => false, 'error' => 'Phone and amount required']);
@@ -37,7 +38,18 @@ if (!preg_match('/^254\d{9}$/', $phone)) {
 try {
     $db = Database::getConnection();
     $mpesa = new \App\Mpesa();
-    
+
+    if ($accountId) {
+        require_once __DIR__ . '/../../src/RadiusBilling.php';
+        $radiusBilling = new \App\RadiusBilling($db);
+        $acctConfig = $radiusBilling->getMpesaAccountConfig($accountId);
+        if (!$acctConfig) {
+            echo json_encode(['success' => false, 'error' => 'M-Pesa account not found or inactive']);
+            exit;
+        }
+        $mpesa->setAccountConfig($acctConfig);
+    }
+
     if (!$mpesa->isConfigured()) {
         echo json_encode(['success' => false, 'error' => 'M-Pesa not configured. Please save your API credentials first.']);
         exit;

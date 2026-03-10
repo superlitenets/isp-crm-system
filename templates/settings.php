@@ -4347,218 +4347,180 @@ $mpesaConfig = $mpesa->getConfig();
 $radiusBilling = new \App\RadiusBilling(\Database::getConnection());
 ?>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-collection"></i> M-Pesa Accounts</h5>
-        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addMpesaAccountModal">
-            <i class="bi bi-plus-lg"></i> Add Account
-        </button>
+<?php
+$mpesaAccounts = $radiusBilling->getMpesaAccounts();
+$nasDevicesForMpesa = [];
+try {
+    $nasMpesaStmt = $dbConn->query("SELECT id, name, mpesa_account_id FROM radius_nas ORDER BY name");
+    $nasDevicesForMpesa = $nasMpesaStmt->fetchAll(\PDO::FETCH_ASSOC);
+} catch (\Throwable $e) {}
+?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h5 class="mb-1"><i class="bi bi-phone me-2"></i>M-Pesa Payment Gateways</h5>
+        <small class="text-muted">Each gateway can be assigned to one or more NAS devices (sites)</small>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Name</th>
-                        <th>Shortcode</th>
-                        <th>Type</th>
-                        <th>Environment</th>
-                        <th>NAS Devices</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    $mpesaAccounts = $radiusBilling->getMpesaAccounts();
-                    foreach ($mpesaAccounts as $acct): ?>
-                    <tr>
-                        <td><strong><?= htmlspecialchars($acct['name']) ?></strong></td>
-                        <td><code><?= htmlspecialchars($acct['shortcode']) ?></code></td>
-                        <td><span class="badge bg-<?= $acct['account_type'] === 'paybill' ? 'primary' : 'info' ?>"><?= ucfirst($acct['account_type']) ?></span></td>
-                        <td><?= ucfirst($acct['environment']) ?></td>
-                        <td><span class="badge bg-secondary"><?= $acct['nas_count'] ?? 0 ?></span></td>
-                        <td><span class="badge bg-<?= $acct['is_active'] ? 'success' : 'danger' ?>"><?= $acct['is_active'] ? 'Active' : 'Inactive' ?></span></td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="editMpesaAccount(<?= htmlspecialchars(json_encode($acct)) ?>)" data-bs-toggle="modal" data-bs-target="#editMpesaAccountModal"><i class="bi bi-pencil"></i></button>
-                            <form method="post" class="d-inline" onsubmit="return confirm('Delete this M-Pesa account?')">
-                                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
-                                <input type="hidden" name="action" value="delete_mpesa_account">
-                                <input type="hidden" name="account_id" value="<?= $acct['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                            </form>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($mpesaAccounts)): ?>
-                    <tr><td colspan="7" class="text-center text-muted py-3">No M-Pesa accounts configured. Add one to assign to NAS devices.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMpesaAccountModal">
+        <i class="bi bi-plus-lg me-1"></i> Add Gateway
+    </button>
+</div>
+
+<?php if (empty($mpesaAccounts)): ?>
+<div class="card shadow-sm mb-4">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-phone text-muted" style="font-size: 3rem;"></i>
+        <h5 class="mt-3 text-muted">No Payment Gateways Configured</h5>
+        <p class="text-muted mb-3">Add an M-Pesa gateway to start accepting payments on your NAS sites.</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMpesaAccountModal">
+            <i class="bi bi-plus-lg me-1"></i> Add Your First Gateway
+        </button>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-lg-8">
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Global Fallback Configuration</h6>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info small mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            This global configuration is used as a fallback when no per-gateway account is assigned to a NAS device. Once you add gateway accounts above, assign them to your NAS devices instead.
+        </div>
         <form method="POST">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="save_mpesa_settings">
-            
-            <div class="card mb-4">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-phone"></i> M-Pesa API Credentials</h5>
+            <input type="hidden" name="mpesa_environment" value="production">
+            <div class="mb-3">
+                <label class="form-label">Shortcode (Paybill/Till)</label>
+                <input type="text" class="form-control" name="mpesa_shortcode" value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '') ?>" placeholder="e.g. 174379">
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Consumer Key</label>
+                    <input type="text" class="form-control" name="mpesa_consumer_key" value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_key'] ?? '') ?>">
                 </div>
-                <div class="card-body">
-                    <input type="hidden" name="mpesa_environment" value="production">
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Shortcode (Paybill/Till)</label>
-                        <input type="text" class="form-control" name="mpesa_shortcode" 
-                               value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '') ?>"
-                               placeholder="e.g. 174379">
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Consumer Key</label>
-                            <input type="text" class="form-control" name="mpesa_consumer_key" 
-                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_key'] ?? '') ?>">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Consumer Secret</label>
-                            <input type="password" class="form-control" name="mpesa_consumer_secret" 
-                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_secret'] ?? '') ?>">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Passkey</label>
-                        <input type="text" class="form-control" name="mpesa_passkey" 
-                               value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? '') ?>">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Callback URL</label>
-                        <input type="url" class="form-control" name="mpesa_callback_url" 
-                               value="<?= htmlspecialchars($mpesaConfig['mpesa_callback_url'] ?? $mpesa->getCallbackUrl()) ?>">
-                    </div>
-                    
-                    <input type="hidden" name="mpesa_validation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_validation_url'] ?? $mpesa->getValidationUrl()) ?>">
-                    <input type="hidden" name="mpesa_confirmation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
-                    
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-lg"></i> Save Settings
-                    </button>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Consumer Secret</label>
+                    <input type="password" class="form-control" name="mpesa_consumer_secret" value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_secret'] ?? '') ?>">
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label">Passkey</label>
+                <input type="text" class="form-control" name="mpesa_passkey" value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? '') ?>">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Callback URL</label>
+                <input type="url" class="form-control" name="mpesa_callback_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_callback_url'] ?? $mpesa->getCallbackUrl()) ?>">
+            </div>
+            <input type="hidden" name="mpesa_validation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_validation_url'] ?? $mpesa->getValidationUrl()) ?>">
+            <input type="hidden" name="mpesa_confirmation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Global Settings</button>
         </form>
     </div>
-    
-    <div class="col-lg-4">
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-shield-check"></i> Connection Status</h5>
-            </div>
-            <div class="card-body">
-                <?php if ($mpesa->isConfigured()): ?>
-                    <?php 
-                    $token = $mpesa->getAccessToken();
-                    if ($token): 
-                    ?>
-                    <div class="alert alert-success mb-0">
-                        <i class="bi bi-check-circle"></i> <strong>Connected!</strong><br>
-                        <small>Successfully authenticated with M-Pesa API</small>
+</div>
+<?php else: ?>
+
+<div class="accordion" id="mpesaGatewayAccordion">
+    <?php foreach ($mpesaAccounts as $idx => $acct): 
+        $linkedNas = array_filter($nasDevicesForMpesa, fn($n) => (int)($n['mpesa_account_id'] ?? 0) === (int)$acct['id']);
+    ?>
+    <div class="accordion-item shadow-sm mb-3 border rounded">
+        <h2 class="accordion-header" id="mpesaHead<?= $acct['id'] ?>">
+            <div class="d-flex align-items-center w-100">
+                <button class="accordion-button <?= $idx !== 0 ? 'collapsed' : '' ?> flex-grow-1 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#mpesaGw<?= $acct['id'] ?>" aria-expanded="<?= $idx === 0 ? 'true' : 'false' ?>">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center <?= $acct['is_active'] ? 'bg-success' : 'bg-danger' ?> bg-opacity-10" style="width:40px;height:40px;">
+                            <i class="bi bi-phone <?= $acct['is_active'] ? 'text-success' : 'text-danger' ?>"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">
+                                <?= htmlspecialchars($acct['name']) ?>
+                                <span class="badge bg-<?= $acct['is_active'] ? 'success' : 'danger' ?> ms-2"><?= $acct['is_active'] ? 'Active' : 'Inactive' ?></span>
+                            </h6>
+                            <small class="text-muted">
+                                <code><?= htmlspecialchars($acct['shortcode']) ?></code>
+                                <span class="mx-1">&bull;</span>
+                                <?= ucfirst($acct['account_type'] ?? 'paybill') ?>
+                                <span class="mx-1">&bull;</span>
+                                <?= ucfirst($acct['environment'] ?? 'production') ?>
+                                <span class="mx-1">&bull;</span>
+                                <span class="badge bg-secondary"><?= count($linkedNas) ?> NAS</span>
+                            </small>
+                        </div>
                     </div>
-                    <?php else: ?>
-                    <div class="alert alert-danger mb-0">
-                        <i class="bi bi-x-circle"></i> <strong>Connection Failed</strong><br>
-                        <small>Check your Consumer Key and Secret</small>
-                    </div>
-                    <?php endif; ?>
-                <?php else: ?>
-                <div class="alert alert-warning mb-0">
-                    <i class="bi bi-exclamation-triangle"></i> <strong>Not Configured</strong><br>
-                    <small>Enter your API credentials to enable M-Pesa</small>
-                </div>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <div class="card mb-4">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-phone"></i> Test STK Push</h5>
-            </div>
-            <div class="card-body">
-                <?php if ($mpesa->isConfigured()): ?>
-                <div class="mb-3">
-                    <label class="form-label">Phone Number</label>
-                    <input type="tel" class="form-control" id="testPhone" placeholder="254712345678">
-                    <small class="text-muted">Format: 254XXXXXXXXX</small>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Amount (KES)</label>
-                    <input type="number" class="form-control" id="testAmount" value="1" min="1">
-                </div>
-                <button type="button" class="btn btn-success w-100" onclick="testStkPush()">
-                    <i class="bi bi-send"></i> Send Test STK Push
                 </button>
-                <div id="stkResult" class="mt-3"></div>
-                <?php else: ?>
-                <div class="alert alert-warning mb-0">
-                    <i class="bi bi-exclamation-triangle"></i> Configure M-Pesa first to test STK Push
+                <div class="d-flex gap-1 pe-3 flex-shrink-0" style="z-index:2;">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editMpesaAccount(<?= htmlspecialchars(json_encode($acct)) ?>)" data-bs-toggle="modal" data-bs-target="#editMpesaAccountModal" title="Edit"><i class="bi bi-pencil"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation(); if(confirm('Delete this gateway?')) document.getElementById('delMpesaForm<?= $acct['id'] ?>').submit();"><i class="bi bi-trash"></i></button>
+                    <form id="delMpesaForm<?= $acct['id'] ?>" method="post" style="display:none;">
+                        <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                        <input type="hidden" name="action" value="delete_mpesa_account">
+                        <input type="hidden" name="account_id" value="<?= $acct['id'] ?>">
+                    </form>
                 </div>
-                <?php endif; ?>
+            </div>
+        </h2>
+        <div id="mpesaGw<?= $acct['id'] ?>" class="accordion-collapse collapse <?= $idx === 0 ? 'show' : '' ?>" aria-labelledby="mpesaHead<?= $acct['id'] ?>" data-bs-parent="#mpesaGatewayAccordion">
+            <div class="accordion-body">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3"><i class="bi bi-key me-1"></i> API Credentials</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-0">Consumer Key</label>
+                                <div class="form-control-plaintext"><code><?= htmlspecialchars($acct['consumer_key_masked'] ?? '••••••••') ?></code></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-0">Consumer Secret</label>
+                                <div class="form-control-plaintext"><code><?= htmlspecialchars($acct['consumer_secret_masked'] ?? '••••••••') ?></code></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-0">Passkey</label>
+                                <div class="form-control-plaintext"><code><?= htmlspecialchars($acct['passkey_masked'] ?? '••••••••') ?></code></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-0">Callback URL</label>
+                                <div class="form-control-plaintext"><code class="small"><?= htmlspecialchars($acct['callback_url'] ?? 'Not set') ?></code></div>
+                            </div>
+                        </div>
+
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3 mt-4"><i class="bi bi-diagram-3 me-1"></i> Linked NAS Devices</h6>
+                        <?php if (!empty($linkedNas)): ?>
+                        <div class="d-flex flex-wrap gap-2">
+                            <?php foreach ($linkedNas as $ln): ?>
+                            <span class="badge bg-primary bg-opacity-10 text-primary border px-3 py-2">
+                                <i class="bi bi-router me-1"></i><?= htmlspecialchars($ln['name']) ?>
+                            </span>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php else: ?>
+                        <div class="alert alert-warning small mb-0 py-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i> No NAS devices assigned. Go to ISP &rarr; NAS Devices and assign this gateway.
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="col-lg-4">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3"><i class="bi bi-send me-1"></i> Test STK Push</h6>
+                        <div class="mb-2">
+                            <input type="tel" class="form-control form-control-sm" id="testPhone_<?= $acct['id'] ?>" placeholder="254712345678">
+                        </div>
+                        <div class="mb-2">
+                            <input type="number" class="form-control form-control-sm" id="testAmount_<?= $acct['id'] ?>" value="1" min="1" placeholder="Amount (KES)">
+                        </div>
+                        <button type="button" class="btn btn-sm btn-success w-100" onclick="testStkPushAccount(<?= $acct['id'] ?>)">
+                            <i class="bi bi-send me-1"></i> Send Test
+                        </button>
+                        <div id="stkResult_<?= $acct['id'] ?>" class="mt-2"></div>
+                    </div>
+                </div>
             </div>
         </div>
-        
     </div>
+    <?php endforeach; ?>
 </div>
 
-<script>
-async function testStkPush() {
-    const phone = document.getElementById('testPhone').value.trim();
-    const amount = document.getElementById('testAmount').value;
-    const resultDiv = document.getElementById('stkResult');
-    
-    if (!phone || !amount) {
-        resultDiv.innerHTML = '<div class="alert alert-warning">Please enter phone and amount</div>';
-        return;
-    }
-    
-    if (!phone.match(/^254\d{9}$/)) {
-        resultDiv.innerHTML = '<div class="alert alert-warning">Phone must be in format 254XXXXXXXXX</div>';
-        return;
-    }
-    
-    resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Sending STK Push...</div>';
-    
-    try {
-        const response = await fetch('/api/mpesa-test.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({phone, amount: parseFloat(amount)})
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            resultDiv.innerHTML = `<div class="alert alert-success">
-                <i class="bi bi-check-circle"></i> <strong>STK Push Sent!</strong><br>
-                <small>Check your phone for the payment prompt.</small><br>
-                <small class="text-muted">Checkout ID: ${data.checkoutRequestId || 'N/A'}</small>
-            </div>`;
-        } else {
-            resultDiv.innerHTML = `<div class="alert alert-danger">
-                <i class="bi bi-x-circle"></i> <strong>Failed</strong><br>
-                <small>${data.error || 'Unknown error'}</small>
-            </div>`;
-        }
-    } catch (e) {
-        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
-    }
-}
-</script>
+<?php endif; ?>
 
 <!-- Add M-Pesa Account Modal -->
 <div class="modal fade" id="addMpesaAccountModal" tabindex="-1">
@@ -4711,6 +4673,30 @@ function editMpesaAccount(acct) {
     document.getElementById('edit_ma_environment').value = acct.environment || 'production';
     document.getElementById('edit_ma_is_active').value = acct.is_active ? '1' : '0';
     document.getElementById('edit_ma_callback_url').value = acct.callback_url || '';
+}
+
+async function testStkPushAccount(accountId) {
+    const phone = document.getElementById('testPhone_' + accountId).value.trim();
+    const amount = document.getElementById('testAmount_' + accountId).value;
+    const resultDiv = document.getElementById('stkResult_' + accountId);
+    if (!phone || !amount) { resultDiv.innerHTML = '<div class="alert alert-warning small py-1">Enter phone and amount</div>'; return; }
+    if (!phone.match(/^254\d{9}$/)) { resultDiv.innerHTML = '<div class="alert alert-warning small py-1">Format: 254XXXXXXXXX</div>'; return; }
+    resultDiv.innerHTML = '<div class="alert alert-info small py-1"><i class="bi bi-hourglass-split"></i> Sending...</div>';
+    try {
+        const response = await fetch('/api/mpesa-test.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({phone, amount: parseFloat(amount), account_id: accountId})
+        });
+        const data = await response.json();
+        if (data.success) {
+            resultDiv.innerHTML = '<div class="alert alert-success small py-1"><i class="bi bi-check-circle"></i> STK Push sent! Check phone.</div>';
+        } else {
+            resultDiv.innerHTML = '<div class="alert alert-danger small py-1"><i class="bi bi-x-circle"></i> ' + (data.error || 'Failed') + '</div>';
+        }
+    } catch (e) {
+        resultDiv.innerHTML = '<div class="alert alert-danger small py-1">Error: ' + e.message + '</div>';
+    }
 }
 </script>
 
