@@ -26,6 +26,8 @@ The system features a responsive design, including a mobile PWA. Both the main C
 - **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning via the SmartOLT cloud API.
 - **Huawei OLT Module**: Standalone direct management for Huawei OLT devices via Telnet/SSH/SNMP.
   - **SNMP-First Architecture**: Prioritizes SNMP for read operations, CLI for write.
+  - **Separate SNMP Service**: Standalone `snmp-service` (port 3003) handles all SNMP polling independently from CLI operations. Communicates with `olt-service` via HTTP for CLI fallback.
+  - **OLT Session Manager**: `olt-service` (port 3002) handles only CLI/SSH sessions, discovery, and background jobs — no SNMP polling.
   - **Persistent Session Manager**: Node.js service for managing Telnet/SSH sessions.
   - **SSH Protocol Support**: Includes support for legacy SSH algorithms.
   - **TR-069/GenieACS Integration**: Remote ONU configuration via TR-069 CWMP for WiFi, password changes, reboots, and firmware upgrades.

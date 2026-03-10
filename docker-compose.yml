@@ -167,11 +167,27 @@ services:
       - OLT_SERVICE_PORT=3002
       - PHP_API_URL=http://127.0.0.1:80
       - DISCOVERY_INTERVAL=*/30 * * * * *
-      - SNMP_POLL_INTERVAL=30
+      - SNMP_SERVICE_URL=http://127.0.0.1:3003
       - SESSION_SECRET=${SESSION_SECRET}
       - TZ=Africa/Nairobi
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+  snmp-service:
+    build:
+      context: ./snmp-service
+      dockerfile: Dockerfile
+    container_name: isp_crm_snmp_service
+    restart: unless-stopped
+    depends_on:
+      - db
+    network_mode: host
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5433/${POSTGRES_DB}
+      - SNMP_SERVICE_PORT=3003
+      - SNMP_POLL_INTERVAL=30
+      - OLT_SERVICE_URL=http://127.0.0.1:3002
+      - TZ=Africa/Nairobi
 
   wireguard:
     image: lscr.io/linuxserver/wireguard

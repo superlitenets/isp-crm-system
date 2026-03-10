@@ -1,7 +1,7 @@
 {
   "name": "olt-session-manager",
   "version": "1.0.0",
-  "description": "Persistent OLT session manager for Huawei OLTs with SNMP polling",
+  "description": "Persistent OLT session manager for Huawei OLTs (CLI/SSH only)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

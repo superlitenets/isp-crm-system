@@ -1,7 +1,6 @@
 const express = require('express');
 const OLTSessionManager = require('./OLTSessionManager');
 const DiscoveryWorker = require('./DiscoveryWorker');
-const SNMPPollingWorker = require('./SNMPPollingWorker');
 const axios = require('axios');
 const radius = require('radius');
 const dgram = require('dgram');
@@ -18,7 +17,6 @@ const BackgroundJobWorker = require('./BackgroundJobWorker');
 
 const sessionManager = new OLTSessionManager();
 const discoveryWorker = new DiscoveryWorker(sessionManager);
-const snmpWorker = new SNMPPollingWorker(sessionManager, discoveryWorker);
 const jobWorker = new BackgroundJobWorker(sessionManager, sharedPool);
 
 app.get('/health', (req, res) => {
@@ -204,24 +202,23 @@ app.get('/discovery/status', (req, res) => {
     });
 });
 
+const SNMP_SERVICE_URL = process.env.SNMP_SERVICE_URL || 'http://localhost:3003';
+
 app.post('/snmp/poll', async (req, res) => {
     try {
-        await snmpWorker.runPolling();
-        res.json({ success: true, message: 'SNMP polling completed' });
+        const resp = await axios.post(`${SNMP_SERVICE_URL}/snmp/poll`, {}, { timeout: 30000 });
+        res.json(resp.data);
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(502).json({ success: false, error: 'SNMP service unavailable: ' + error.message });
     }
 });
 
 app.get('/snmp/status', async (req, res) => {
     try {
-        const status = await snmpWorker.getPollingStatus();
-        res.json({ 
-            isRunning: snmpWorker.isRunning,
-            olts: status 
-        });
+        const resp = await axios.get(`${SNMP_SERVICE_URL}/snmp/status`, { timeout: 10000 });
+        res.json(resp.data);
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(502).json({ success: false, error: 'SNMP service unavailable: ' + error.message });
     }
 });
 
@@ -1263,7 +1260,6 @@ app.post('/radius/coa', async (req, res) => {
 
 const PORT = process.env.OLT_SERVICE_PORT || 3002;
 const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '0 * * * * *';
-const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 300;
 const SESSION_SYNC_INTERVAL = parseInt(process.env.SESSION_SYNC_INTERVAL) || 180;
 
 let sessionSyncTimer = null;
@@ -1288,10 +1284,9 @@ async function periodicSessionSync() {
 const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
     discoveryWorker.start(DISCOVERY_INTERVAL);
-    snmpWorker.start(SNMP_INTERVAL);
     jobWorker.start();
     console.log(`[Discovery] CLI autofind started (every 60s - for new unconfigured ONUs)`);
-    console.log(`[SNMP] Background polling started (every ${SNMP_INTERVAL}s - for status updates)`);
+    console.log(`[SNMP] Polling delegated to standalone snmp-service on port 3003`);
     
     sessionSyncTimer = setInterval(periodicSessionSync, SESSION_SYNC_INTERVAL * 1000);
     console.log(`[SessionSync] RADIUS session sync started (every ${SESSION_SYNC_INTERVAL}s)`);
@@ -1304,7 +1299,6 @@ process.on('SIGTERM', async () => {
     console.log('Shutting down OLT Session Manager...');
     if (sessionSyncTimer) clearInterval(sessionSyncTimer);
     discoveryWorker.stop();
-    snmpWorker.stop();
     jobWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
@@ -1314,7 +1308,6 @@ process.on('SIGINT', async () => {
     console.log('Shutting down OLT Session Manager...');
     if (sessionSyncTimer) clearInterval(sessionSyncTimer);
     discoveryWorker.stop();
-    snmpWorker.stop();
     jobWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
