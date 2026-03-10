@@ -1871,6 +1871,11 @@ $ticketTab = $_GET['tab'] ?? 'active';
             <span class="badge bg-success ms-1"><?= $dashboardStats['completed_tickets'] ?? 0 ?></span>
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $ticketTab === 'map' ? 'active' : '' ?>" href="?page=tickets&tab=map">
+            <i class="bi bi-geo-alt"></i> Map View
+        </a>
+    </li>
 </ul>
 
 <?php if ($ticketTab === 'active'): ?>
@@ -2036,6 +2041,215 @@ $ticketTab = $_GET['tab'] ?? 'active';
         </div>
     </div>
 </div>
+
+<?php elseif ($ticketTab === 'map'): ?>
+
+<?php
+$mapTicketFilters = ['exclude_resolved' => true];
+if (\App\Auth::isBranchManager()) {
+    $branchId = \App\Auth::getUserBranchId();
+    if ($branchId) $mapTicketFilters['branch_id'] = $branchId;
+} elseif (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
+    $mapTicketFilters['user_id'] = $_SESSION['user_id'];
+}
+try {
+    $mapTickets = $ticket->getAll($mapTicketFilters, 500);
+} catch (\Throwable $e) {
+    $mapTickets = [];
+}
+
+$mapVehicles = [];
+try {
+    $fleetMgr = new \App\FleetManagement();
+    $mapVehicles = $fleetMgr->getVehicles(['status' => 'active']);
+} catch (\Throwable $e) {
+    $mapVehicles = [];
+}
+
+$ticketMarkers = [];
+foreach ($mapTickets as $mt) {
+    $ticketMarkers[] = [
+        'id' => $mt['id'],
+        'ticket_number' => $mt['ticket_number'],
+        'subject' => $mt['subject'],
+        'customer_name' => $mt['customer_name'] ?? 'N/A',
+        'priority' => $mt['priority'],
+        'status' => $mt['status'],
+        'assigned_name' => $mt['assigned_name'] ?? 'Unassigned',
+    ];
+}
+
+$techMarkers = [];
+foreach ($mapVehicles as $mv) {
+    if (!empty($mv['last_latitude']) && !empty($mv['last_longitude']) && $mv['last_latitude'] != 0 && $mv['last_longitude'] != 0) {
+        $techMarkers[] = [
+            'id' => $mv['id'],
+            'name' => $mv['name'],
+            'plate_number' => $mv['plate_number'] ?? '',
+            'employee_name' => $mv['employee_name'] ?? 'Unassigned',
+            'lat' => (float)$mv['last_latitude'],
+            'lng' => (float)$mv['last_longitude'],
+            'speed' => (float)($mv['last_speed'] ?? 0),
+            'last_update' => $mv['last_update'] ?? null,
+        ];
+    }
+}
+?>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div class="row mb-3">
+    <div class="col-md-8">
+        <div class="d-flex gap-3 align-items-center">
+            <span class="badge bg-primary p-2"><i class="bi bi-geo-alt-fill"></i> Technicians: <?= count($techMarkers) ?></span>
+            <span class="badge bg-danger p-2"><i class="bi bi-ticket-perforated"></i> Open Tickets: <?= count($ticketMarkers) ?></span>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <button class="btn btn-sm btn-outline-secondary" onclick="technicianMap.invalidateSize(); fitAllMarkers();">
+            <i class="bi bi-arrows-fullscreen"></i> Fit All
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div id="technicianMap" style="height: 600px; width: 100%; border-radius: 0.375rem;"></div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="bi bi-geo-alt-fill"></i> Technician Locations</h6>
+            </div>
+            <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                <?php if (empty($techMarkers)): ?>
+                <p class="text-muted text-center py-3 mb-0">No technician GPS data available</p>
+                <?php else: ?>
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light"><tr><th>Vehicle</th><th>Technician</th><th>Speed</th><th>Last Update</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($techMarkers as $tm): ?>
+                    <tr style="cursor:pointer" onclick="panToTechnician(<?= $tm['lat'] ?>, <?= $tm['lng'] ?>)">
+                        <td><?= htmlspecialchars($tm['name']) ?> <?= $tm['plate_number'] ? '(' . htmlspecialchars($tm['plate_number']) . ')' : '' ?></td>
+                        <td><?= htmlspecialchars($tm['employee_name']) ?></td>
+                        <td><?= $tm['speed'] ?> km/h</td>
+                        <td><?= $tm['last_update'] ? date('M j, g:i A', strtotime($tm['last_update'])) : '-' ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0"><i class="bi bi-ticket-perforated"></i> Open Tickets</h6>
+            </div>
+            <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                <?php if (empty($ticketMarkers)): ?>
+                <p class="text-muted text-center py-3 mb-0">No open tickets</p>
+                <?php else: ?>
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light"><tr><th>Ticket</th><th>Customer</th><th>Priority</th><th>Assigned</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($ticketMarkers as $tkm): ?>
+                    <tr>
+                        <td><a href="?page=tickets&action=view&id=<?= $tkm['id'] ?>"><?= htmlspecialchars($tkm['ticket_number']) ?></a></td>
+                        <td><?= htmlspecialchars($tkm['customer_name']) ?></td>
+                        <td><span class="badge badge-priority-<?= $tkm['priority'] ?>"><?= ucfirst($tkm['priority']) ?></span></td>
+                        <td><?= htmlspecialchars($tkm['assigned_name']) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var techMarkers = <?= json_encode($techMarkers) ?>;
+    var allMapMarkers = [];
+
+    var map = L.map('technicianMap').setView([-1.2921, 36.8219], 7);
+    window.technicianMap = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    var techIcon = L.divIcon({
+        className: 'custom-tech-marker',
+        html: '<div style="background:#0d6efd;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:16px;"><i class="bi bi-truck"></i></div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16]
+    });
+
+    var ticketIconCritical = L.divIcon({
+        className: 'custom-ticket-marker',
+        html: '<div style="background:#dc3545;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:14px;"><i class="bi bi-exclamation-circle-fill"></i></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
+    });
+
+    var ticketIconHigh = L.divIcon({
+        className: 'custom-ticket-marker',
+        html: '<div style="background:#fd7e14;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:14px;"><i class="bi bi-exclamation-triangle-fill"></i></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
+    });
+
+    var ticketIconNormal = L.divIcon({
+        className: 'custom-ticket-marker',
+        html: '<div style="background:#dc3545;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:12px;"><i class="bi bi-ticket-perforated"></i></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12]
+    });
+
+    techMarkers.forEach(function(t) {
+        var popup = '<div style="min-width:180px">' +
+            '<strong style="color:#0d6efd"><i class="bi bi-truck"></i> ' + t.name + '</strong>' +
+            (t.plate_number ? ' <span class="badge bg-secondary">' + t.plate_number + '</span>' : '') +
+            '<br><i class="bi bi-person"></i> ' + t.employee_name +
+            '<br><i class="bi bi-speedometer2"></i> ' + t.speed + ' km/h' +
+            (t.last_update ? '<br><small class="text-muted"><i class="bi bi-clock"></i> ' + t.last_update + '</small>' : '') +
+            '</div>';
+        var marker = L.marker([t.lat, t.lng], {icon: techIcon}).addTo(map).bindPopup(popup);
+        allMapMarkers.push(marker);
+    });
+
+    if (allMapMarkers.length > 0) {
+        var group = new L.featureGroup(allMapMarkers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+
+    window.fitAllMarkers = function() {
+        if (allMapMarkers.length > 0) {
+            var group = new L.featureGroup(allMapMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    };
+
+    window.panToTechnician = function(lat, lng) {
+        map.setView([lat, lng], 15);
+    };
+
+    setTimeout(function() { map.invalidateSize(); }, 100);
+})();
+</script>
 
 <?php else: ?>
 

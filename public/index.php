@@ -135,6 +135,11 @@ if ($page === 'ticket-wallboard') {
     exit;
 }
 
+if ($page === 'customer-portal') {
+    include __DIR__ . '/../templates/customer_portal.php';
+    exit;
+}
+
 if ($page === 'logout') {
     \App\Auth::logout();
     header('Location: ?page=login');
@@ -145,7 +150,7 @@ if ($page === 'logout') {
 // Only pages that work without a valid license: login, logout, order, reset-password,
 // ticket-wallboard, download, and the license settings page (so admin can fix it)
 if (!getenv('REPLIT_DEV_DOMAIN') && \App\Auth::isLoggedIn()) {
-    $licenseExemptPages = ['login', 'logout', 'order', 'reset-password', 'ticket-wallboard', 'download'];
+    $licenseExemptPages = ['login', 'logout', 'order', 'reset-password', 'ticket-wallboard', 'customer-portal', 'download'];
     $isLicenseSettingsPage = ($page === 'settings' && (($_GET['section'] ?? '') === 'license' || ($_GET['subpage'] ?? '') === 'license'));
     $isLicensePayment = in_array($page, ['license_pay_initiate', 'license_pay_status', 'license_subscription_info']);
     if (!in_array($page, $licenseExemptPages) && !$isLicenseSettingsPage && !$isLicensePayment) {
@@ -6390,7 +6395,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'wa_template_complaint_received',
                         'wa_template_complaint_review',
                         'wa_template_complaint_approved',
-                        'wa_template_complaint_rejected'
+                        'wa_template_complaint_rejected',
+                        'wa_template_onu_los',
+                        'wa_template_onu_restored'
                     ];
                     foreach ($templateKeys as $key) {
                         if (isset($_POST[$key])) {
@@ -10367,6 +10374,13 @@ $csrfToken = \App\Auth::generateToken();
                         <i class="bi bi-chat-dots"></i> Quick Chat
                     </a>
                 </li>
+                <?php if (\App\Auth::can('settings.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'maintenance' ? 'active' : '' ?>" href="?page=maintenance">
+                        <i class="bi bi-tools"></i> Maintenance
+                    </a>
+                </li>
+                <?php endif; ?>
                 <?php if ($currentUser['role'] !== 'admin'): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'my-hr' ? 'active' : '' ?>" href="?page=my-hr">
@@ -10501,6 +10515,13 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-chat-dots"></i> Quick Chat
                 </a>
             </li>
+            <?php if (\App\Auth::can('settings.view')): ?>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'maintenance' ? 'active' : '' ?>" href="?page=maintenance">
+                    <i class="bi bi-tools"></i> Maintenance
+                </a>
+            </li>
+            <?php endif; ?>
             <?php if ($currentUser['role'] !== 'admin'): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'my-hr' ? 'active' : '' ?>" href="?page=my-hr">
@@ -10772,6 +10793,13 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/accounting.php';
+                }
+                break;
+            case 'maintenance':
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/maintenance.php';
                 }
                 break;
             case 'whatsapp-chat':

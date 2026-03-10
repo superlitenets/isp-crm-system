@@ -1647,6 +1647,30 @@ function resetToDefaults() {
                             <small class="text-muted">Department employees' clock-out summaries will be sent to their department's group</small>
                         </div>
                     </div>
+                    
+                    <hr class="my-3">
+                    <h6 class="text-primary"><i class="bi bi-router"></i> Network Event Notifications</h6>
+                    <p class="text-muted small mb-2">Automatically send WhatsApp notifications to customers when their ONU connection goes down (LOS) or is restored.</p>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Network Notifications</label>
+                            <select class="form-select" name="wa_network_notifications_enabled">
+                                <option value="1" <?= $settings->get('wa_network_notifications_enabled', '1') === '1' ? 'selected' : '' ?>>Enabled</option>
+                                <option value="0" <?= $settings->get('wa_network_notifications_enabled', '1') === '0' ? 'selected' : '' ?>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-9">
+                            <label class="form-label">Cron Setup (Check ONU events every 5 mins)</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm bg-light" readonly 
+                                       value="*/5 * * * * curl -s '<?= (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'your-domain.com') ?>/isp-cron.php?action=check_onu_events&secret=<?= htmlspecialchars($settings->get('cron_secret', 'isp-crm-cron-2024')) ?>'">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(this.previousElementSibling.value); alert('Copied!')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Customers linked via ONU or RADIUS subscription will receive WhatsApp messages on LOS/restore events. Templates can be customized below.</small>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -2044,7 +2068,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 'wa_template_complaint_received' => ['label' => 'Complaint Received', 'icon' => 'envelope-check', 'group' => 'Complaints'],
                 'wa_template_complaint_review' => ['label' => 'Under Review', 'icon' => 'hourglass-split', 'group' => 'Complaints'],
                 'wa_template_complaint_approved' => ['label' => 'Complaint Approved', 'icon' => 'check-circle', 'group' => 'Complaints'],
-                'wa_template_complaint_rejected' => ['label' => 'Complaint Rejected', 'icon' => 'x-circle', 'group' => 'Complaints']
+                'wa_template_complaint_rejected' => ['label' => 'Complaint Rejected', 'icon' => 'x-circle', 'group' => 'Complaints'],
+                'wa_template_onu_los' => ['label' => 'ONU Connection Down (LOS)', 'icon' => 'wifi-off', 'group' => 'Network Events'],
+                'wa_template_onu_restored' => ['label' => 'ONU Connection Restored', 'icon' => 'wifi', 'group' => 'Network Events']
             ];
             
             $waTemplateDefaults = [
@@ -2059,7 +2085,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 'wa_template_complaint_received' => "Hi {customer_name},\n\nWe have received your complaint (Ref: {complaint_number}).\n\nCategory: {category}\n\nOur team will review and respond within 24 hours.\n\nThank you for your feedback.",
                 'wa_template_complaint_review' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nWe are currently reviewing your issue and will update you soon.\n\nThank you for your patience.",
                 'wa_template_complaint_approved' => "Hi {customer_name},\n\nYour complaint {complaint_number} has been approved and a support ticket will be created.\n\nOur team will contact you shortly to resolve the issue.\n\nThank you!",
-                'wa_template_complaint_rejected' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nAfter careful review, we were unable to proceed with this complaint.\n\nIf you have any questions, please contact our support team.\n\nThank you."
+                'wa_template_complaint_rejected' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nAfter careful review, we were unable to proceed with this complaint.\n\nIf you have any questions, please contact our support team.\n\nThank you.",
+                'wa_template_onu_los' => "Hi {customer_name},\n\n⚠️ We have detected that your internet connection is currently down.\n\nONU: {onu_name}\nTime: {event_time}\n\nOur team has been notified and is working to restore your service. We apologize for the inconvenience.\n\nIf you need assistance, please contact our support team.",
+                'wa_template_onu_restored' => "Hi {customer_name},\n\n✅ Great news! Your internet connection has been restored.\n\nONU: {onu_name}\nRestored at: {event_time}\n\nIf you experience any further issues, please don't hesitate to contact us.\n\nThank you for your patience!"
             ];
             ?>
             
@@ -2072,7 +2100,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             <?php foreach ($groups as $groupName => $groupTemplates): ?>
             <h6 class="text-muted mb-3 mt-<?= $groupName === 'Tickets' ? '0' : '4' ?>">
-                <i class="bi bi-<?= $groupName === 'Tickets' ? 'ticket' : ($groupName === 'Orders' ? 'cart' : 'exclamation-triangle') ?>"></i> 
+                <i class="bi bi-<?= $groupName === 'Tickets' ? 'ticket' : ($groupName === 'Orders' ? 'cart' : ($groupName === 'Network Events' ? 'router' : 'exclamation-triangle')) ?>"></i> 
                 <?= $groupName ?>
             </h6>
             <div class="row g-3 mb-3">
@@ -2199,7 +2227,27 @@ After careful review, we were unable to proceed with this complaint.
 
 If you have any questions, please contact our support team.
 
-Thank you.`
+Thank you.`,
+        'wa_template_onu_los': `Hi {customer_name},
+
+⚠️ We have detected that your internet connection is currently down.
+
+ONU: {onu_name}
+Time: {event_time}
+
+Our team has been notified and is working to restore your service. We apologize for the inconvenience.
+
+If you need assistance, please contact our support team.`,
+        'wa_template_onu_restored': `Hi {customer_name},
+
+✅ Great news! Your internet connection has been restored.
+
+ONU: {onu_name}
+Restored at: {event_time}
+
+If you experience any further issues, please don't hesitate to contact us.
+
+Thank you for your patience!`
     };
     
     for (const [key, value] of Object.entries(defaults)) {

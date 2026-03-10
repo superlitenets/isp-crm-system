@@ -716,7 +716,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024122208'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122209'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -1929,6 +1929,23 @@ function runMigrations(PDO $db): void {
                 latitude DECIMAL(10, 8),
                 longitude DECIMAL(11, 8),
                 is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'maintenance_windows' => "
+            CREATE TABLE IF NOT EXISTS maintenance_windows (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                olt_id INTEGER,
+                slot INTEGER,
+                port INTEGER,
+                start_time TIMESTAMP NOT NULL,
+                end_time TIMESTAMP NOT NULL,
+                status VARCHAR(20) DEFAULT 'scheduled',
+                notify_customers BOOLEAN DEFAULT FALSE,
+                notifications_sent BOOLEAN DEFAULT FALSE,
+                created_by INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"

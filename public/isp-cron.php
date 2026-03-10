@@ -4,6 +4,7 @@ require_once __DIR__ . '/../src/RadiusBilling.php';
 require_once __DIR__ . '/../src/MikroTikAPI.php';
 require_once __DIR__ . '/../src/SMSGateway.php';
 require_once __DIR__ . '/../src/Settings.php';
+require_once __DIR__ . '/../src/WhatsApp.php';
 
 date_default_timezone_set('Africa/Nairobi');
 header('Content-Type: application/json');
@@ -71,6 +72,16 @@ switch ($action) {
         echo json_encode($result);
         break;
         
+    case 'check_inventory_alerts':
+        $result = checkInventoryAlerts($db, $settings);
+        echo json_encode($result);
+        break;
+
+    case 'check_onu_events':
+        $result = checkOnuNetworkEvents($db, $settings);
+        echo json_encode($result);
+        break;
+
     case 'all':
         $results = [];
         $results['expired'] = processExpiredSubscriptions($radiusBilling, $db, $settings);
@@ -82,13 +93,15 @@ switch ($action) {
         $results['speed_overrides'] = applySpeedOverrides($radiusBilling, $db);
         $results['blocked_list_sync'] = $radiusBilling->syncMikroTikBlockedList();
         $results['static_bandwidth'] = $radiusBilling->pollStaticBandwidth();
+        $results['inventory_alerts'] = checkInventoryAlerts($db, $settings);
+        $results['onu_events'] = checkOnuNetworkEvents($db, $settings);
         echo json_encode(['success' => true, 'results' => $results]);
         break;
         
     default:
         echo json_encode([
             'error' => 'Unknown action',
-            'available' => ['process_expired', 'send_expiry_alerts', 'send_quota_alerts', 'auto_renew', 'scheduled_disconnect', 'sync_sessions', 'apply_speed_overrides', 'sync_blocked_list', 'all']
+            'available' => ['process_expired', 'send_expiry_alerts', 'send_quota_alerts', 'auto_renew', 'scheduled_disconnect', 'sync_sessions', 'apply_speed_overrides', 'sync_blocked_list', 'check_inventory_alerts', 'check_onu_events', 'all']
         ]);
 }
 
@@ -285,4 +298,235 @@ function applySpeedOverrides($radiusBilling, $db): array {
     }
     
     return ['success' => true, 'updated' => $updated, 'errors' => $errors];
+}
+
+function checkOnuNetworkEvents($db, $settings): array {
+    $sent = 0;
+    $errors = [];
+    
+    if ($settings->get('wa_network_notifications_enabled', '1') !== '1') {
+        return ['success' => true, 'sent' => 0, 'message' => 'Network notifications disabled'];
+    }
+    
+    try {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS network_notifications (
+                id SERIAL PRIMARY KEY,
+                onu_id INTEGER NOT NULL,
+                customer_id INTEGER,
+                event_type VARCHAR(50) NOT NULL,
+                notification_sent BOOLEAN DEFAULT FALSE,
+                sent_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_network_notifications_onu_event ON network_notifications (onu_id, event_type, created_at)");
+    } catch (Exception $e) {}
+    
+    $losStmt = $db->query("
+        SELECT o.id AS onu_id, o.name AS onu_name, o.sn, o.status, o.last_down_time,
+               o.customer_id AS onu_customer_id,
+               c.id AS customer_id, c.name AS customer_name, c.phone
+        FROM huawei_onus o
+        LEFT JOIN radius_subscriptions rs ON rs.huawei_onu_id = o.id
+        LEFT JOIN customers c ON (c.id = rs.customer_id OR c.id = o.customer_id)
+        WHERE o.status IN ('LOS', 'los', 'offline', 'DyingGasp')
+        AND c.phone IS NOT NULL AND c.phone != ''
+        AND NOT EXISTS (
+            SELECT 1 FROM network_notifications nn 
+            WHERE nn.onu_id = o.id 
+            AND nn.event_type = 'los' 
+            AND nn.notification_sent = TRUE
+            AND nn.created_at > NOW() - INTERVAL '6 hours'
+        )
+    ");
+    
+    $whatsapp = new \App\WhatsApp();
+    
+    while ($row = $losStmt->fetch(PDO::FETCH_ASSOC)) {
+        try {
+            $eventTime = !empty($row['last_down_time']) 
+                ? date('M j, Y g:i A', strtotime($row['last_down_time'])) 
+                : date('M j, Y g:i A');
+            $onuName = $row['onu_name'] ?: $row['sn'];
+            
+            $result = $whatsapp->notifyNetworkEvent(
+                $row['phone'],
+                $row['customer_name'],
+                $onuName,
+                'los',
+                $eventTime
+            );
+            
+            $logStmt = $db->prepare("
+                INSERT INTO network_notifications (onu_id, customer_id, event_type, notification_sent, sent_at)
+                VALUES (?, ?, 'los', TRUE, NOW())
+            ");
+            $logStmt->execute([$row['onu_id'], $row['customer_id']]);
+            
+            if ($result['success'] ?? false) {
+                $sent++;
+            }
+        } catch (Exception $e) {
+            $errors[] = "LOS notification for ONU {$row['onu_id']}: " . $e->getMessage();
+        }
+    }
+    
+    $restoredStmt = $db->query("
+        SELECT o.id AS onu_id, o.name AS onu_name, o.sn, o.status, o.last_up_time,
+               c.id AS customer_id, c.name AS customer_name, c.phone
+        FROM huawei_onus o
+        INNER JOIN network_notifications nn ON nn.onu_id = o.id 
+            AND nn.event_type = 'los' 
+            AND nn.notification_sent = TRUE
+            AND nn.created_at > NOW() - INTERVAL '48 hours'
+        LEFT JOIN radius_subscriptions rs ON rs.huawei_onu_id = o.id
+        LEFT JOIN customers c ON (c.id = rs.customer_id OR c.id = o.customer_id)
+        WHERE o.status IN ('online', 'Online', 'active')
+        AND c.phone IS NOT NULL AND c.phone != ''
+        AND NOT EXISTS (
+            SELECT 1 FROM network_notifications nn2 
+            WHERE nn2.onu_id = o.id 
+            AND nn2.event_type = 'restored' 
+            AND nn2.notification_sent = TRUE
+            AND nn2.created_at > nn.created_at
+        )
+    ");
+    
+    while ($row = $restoredStmt->fetch(PDO::FETCH_ASSOC)) {
+        try {
+            $eventTime = !empty($row['last_up_time']) 
+                ? date('M j, Y g:i A', strtotime($row['last_up_time'])) 
+                : date('M j, Y g:i A');
+            $onuName = $row['onu_name'] ?: $row['sn'];
+            
+            $result = $whatsapp->notifyNetworkEvent(
+                $row['phone'],
+                $row['customer_name'],
+                $onuName,
+                'restored',
+                $eventTime
+            );
+            
+            $logStmt = $db->prepare("
+                INSERT INTO network_notifications (onu_id, customer_id, event_type, notification_sent, sent_at)
+                VALUES (?, ?, 'restored', TRUE, NOW())
+            ");
+            $logStmt->execute([$row['onu_id'], $row['customer_id']]);
+            
+            if ($result['success'] ?? false) {
+                $sent++;
+            }
+        } catch (Exception $e) {
+            $errors[] = "Restored notification for ONU {$row['onu_id']}: " . $e->getMessage();
+        }
+    }
+    
+    return ['success' => true, 'sent' => $sent, 'errors' => $errors];
+}
+
+function checkInventoryAlerts($db, $settings): array {
+    $sent = 0;
+    $errors = [];
+
+    try {
+        $stmt = $db->query("
+            SELECT e.id, e.name, e.quantity, e.reorder_point, c.name as category_name
+            FROM equipment e
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            WHERE e.reorder_point > 0 AND e.quantity <= e.reorder_point
+            ORDER BY e.quantity ASC, e.name
+        ");
+        $lowStockItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        return ['success' => false, 'error' => 'Failed to query inventory: ' . $e->getMessage()];
+    }
+
+    if (empty($lowStockItems)) {
+        return ['success' => true, 'sent' => 0, 'low_stock_count' => 0, 'message' => 'No low stock items'];
+    }
+
+    $alreadyNotified = [];
+    try {
+        $stmt = $db->query("
+            SELECT DISTINCT equipment_id FROM inventory_depletion_alerts
+            WHERE DATE(alerted_at) = CURRENT_DATE
+        ");
+        $alreadyNotified = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'equipment_id');
+    } catch (Exception $e) {
+        try {
+            $db->exec("
+                CREATE TABLE IF NOT EXISTS inventory_depletion_alerts (
+                    id SERIAL PRIMARY KEY,
+                    equipment_id INTEGER NOT NULL,
+                    item_name VARCHAR(200),
+                    quantity INTEGER,
+                    reorder_point INTEGER,
+                    alerted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+        } catch (Exception $e2) {
+            error_log("Failed to create inventory_depletion_alerts table: " . $e2->getMessage());
+        }
+    }
+
+    $newAlerts = [];
+    foreach ($lowStockItems as $item) {
+        if (!in_array($item['id'], $alreadyNotified)) {
+            $newAlerts[] = $item;
+        }
+    }
+
+    if (empty($newAlerts)) {
+        return ['success' => true, 'sent' => 0, 'low_stock_count' => count($lowStockItems), 'message' => 'All alerts already sent today'];
+    }
+
+    $adminPhone = $settings->get('admin_phone', '');
+    if (empty($adminPhone)) {
+        $adminPhone = $settings->get('company_phone', '');
+    }
+
+    if (!empty($adminPhone)) {
+        $lines = ["⚠️ *INVENTORY LOW STOCK ALERT*\n"];
+        foreach ($newAlerts as $item) {
+            $category = $item['category_name'] ? " ({$item['category_name']})" : '';
+            $status = $item['quantity'] <= 0 ? '🔴 OUT OF STOCK' : '🟡 LOW STOCK';
+            $lines[] = "{$status}: {$item['name']}{$category} — Qty: {$item['quantity']}, Reorder at: {$item['reorder_point']}";
+        }
+        $lines[] = "\nTotal low stock items: " . count($lowStockItems);
+        $message = implode("\n", $lines);
+
+        try {
+            require_once __DIR__ . '/../src/WhatsApp.php';
+            $wa = new \App\WhatsApp();
+            $result = $wa->send($adminPhone, $message);
+            if ($result['success'] ?? false) {
+                $sent++;
+            } else {
+                $errors[] = 'WhatsApp send failed: ' . ($result['error'] ?? 'unknown');
+            }
+        } catch (Exception $e) {
+            $errors[] = 'WhatsApp error: ' . $e->getMessage();
+        }
+    }
+
+    foreach ($newAlerts as $item) {
+        try {
+            $stmt = $db->prepare("
+                INSERT INTO inventory_depletion_alerts (equipment_id, item_name, quantity, reorder_point)
+                VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([$item['id'], $item['name'], $item['quantity'], $item['reorder_point']]);
+        } catch (Exception $e) {
+            error_log("Failed to log inventory alert for {$item['name']}: " . $e->getMessage());
+        }
+    }
+
+    return [
+        'success' => true,
+        'sent' => $sent,
+        'low_stock_count' => count($lowStockItems),
+        'new_alerts' => count($newAlerts),
+        'errors' => $errors
+    ];
 }

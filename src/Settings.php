@@ -374,7 +374,8 @@ class Settings {
             'min_clock_out_hour',
             'sla_notifications_enabled',
             'sla_supervisor_phone',
-            'attendance_reminder_hour'
+            'attendance_reminder_hour',
+            'wa_network_notifications_enabled'
         ];
         
         $this->set('whatsapp_enabled', $data['whatsapp_enabled'] ?? '1');

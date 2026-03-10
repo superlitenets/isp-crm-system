@@ -369,6 +369,20 @@ class WhatsApp {
         return $this->send($phone, $text);
     }
     
+    public function notifyNetworkEvent(string $phone, string $customerName, string $onuName, string $eventType, string $eventTime): array {
+        $settings = new Settings();
+        $templateKey = $eventType === 'los' ? 'wa_template_onu_los' : 'wa_template_onu_restored';
+        $defaultLos = "Hi {customer_name},\n\n⚠️ We have detected that your internet connection is currently down.\n\nONU: {onu_name}\nTime: {event_time}\n\nOur team has been notified and is working to restore your service. We apologize for the inconvenience.\n\nIf you need assistance, please contact our support team.";
+        $defaultRestored = "Hi {customer_name},\n\n✅ Great news! Your internet connection has been restored.\n\nONU: {onu_name}\nRestored at: {event_time}\n\nIf you experience any further issues, please don't hesitate to contact us.\n\nThank you for your patience!";
+        $template = $settings->get($templateKey, $eventType === 'los' ? $defaultLos : $defaultRestored);
+        $text = str_replace(
+            ['{customer_name}', '{onu_name}', '{event_time}'],
+            [$customerName, $onuName, $eventTime],
+            $template
+        );
+        return $this->send($phone, $text);
+    }
+    
     public function sendMessage(string $phone, string $message): array {
         return $this->send($phone, $message);
     }

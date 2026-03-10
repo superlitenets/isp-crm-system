@@ -67,6 +67,17 @@ The system features a responsive design, including a mobile PWA. Both the main C
   - **M-Pesa License Payments**: Users can pay for license subscriptions directly via M-Pesa STK Push.
 - **Hotspot Captive Portal**: URL-based NAS routing for package selection, MAC-based auto-login, M-Pesa STK Push, voucher redemption, and MikroTik CHAP integration.
 - **Core Network Monitoring**: Ping-based uptime monitoring for core equipment with WhatsApp notifications for status changes and uptime logging.
+- **OMS Enhancements** (10 features):
+  - **Unified Dashboard KPIs**: Network (ONUs/OLTs), Financial (M-Pesa revenue/invoices), Customer (active/suspended) cards on main dashboard.
+  - **Ticket Trend Charts**: Chart.js line chart (tickets/day, 30 days) and doughnut chart (tickets by status) on dashboard.
+  - **ONU Signal Health Alerts**: Dashboard warning card + dedicated view (`?page=huawei-olt&view=signal_alerts`) for ONUs with RX power between -25 and -28 dBm.
+  - **Port Utilization Dashboard**: Color-coded PON port capacity view (`?page=huawei-olt&view=port_utilization`).
+  - **Batch TR-069 Config Push**: Multi-ONU WiFi/WAN config push via `?page=huawei-olt&view=batch_tr069`.
+  - **Automated WhatsApp Notifications**: Cron-based LOS/restore notifications to linked customers via WhatsApp.
+  - **Scheduled Maintenance Windows**: `?page=maintenance` with scheduling, OLT/port scoping, customer notification, and dashboard banner.
+  - **Field Technician Map**: Leaflet.js map on tickets page showing technician GPS positions and open ticket locations.
+  - **Inventory Depletion Alerts**: Dashboard low-stock warning card with cron-based WhatsApp alerts.
+  - **Customer Self-Service Portal**: Public `?page=customer-portal` with login, connection status, ticket creation, and payment history.
 - **Fleet Management (Protrack365 GPS)**: Integrated vehicle tracking within the Inventory module.
   - **Vehicle Management**: CRUD operations for vehicles, including assignment tracking.
   - **Real-Time GPS Tracking**: Live map view with color-coded status markers (green=moving, blue=idle, red=offline), auto-refresh every 30s.

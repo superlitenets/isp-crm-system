@@ -6275,6 +6275,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Content-Type: application/json');
                 echo json_encode($result);
                 exit;
+            case 'batch_tr069_push':
+                $selectedOnuIds = $_POST['onu_ids'] ?? [];
+                $configType = $_POST['config_type'] ?? '';
+                if (empty($selectedOnuIds) || !is_array($selectedOnuIds)) {
+                    $message = 'No ONUs selected';
+                    $messageType = 'warning';
+                    break;
+                }
+                if (!in_array($configType, ['wifi', 'wan'])) {
+                    $message = 'Invalid config type';
+                    $messageType = 'warning';
+                    break;
+                }
+                $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
+                    onu_id INTEGER PRIMARY KEY,
+                    config_data TEXT,
+                    status VARCHAR(20) DEFAULT 'pending',
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP,
+                    applied_at TIMESTAMP
+                )");
+                try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN error_message TEXT"); } catch (Exception $e) {}
+                try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN applied_at TIMESTAMP"); } catch (Exception $e) {}
+                $batchInsertStmt = $db->prepare("
+                    INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, error_message, created_at)
+                    VALUES (?, ?, 'pending', NULL, CURRENT_TIMESTAMP)
+                    ON CONFLICT (onu_id) DO UPDATE SET
+                        config_data = EXCLUDED.config_data,
+                        status = 'pending',
+                        error_message = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                ");
+                $queued = 0;
+                $failed = 0;
+                foreach ($selectedOnuIds as $batchOnuId) {
+                    $batchOnuId = (int)$batchOnuId;
+                    $tr069Config = ['onu_id' => $batchOnuId];
+                    if ($configType === 'wifi') {
+                        $tr069Config['connection_type'] = 'none';
+                        $tr069Config['wifi_enabled'] = true;
+                        $tr069Config['wifi_ssid_24'] = trim($_POST['batch_wifi_ssid'] ?? '');
+                        $tr069Config['wifi_pass_24'] = trim($_POST['batch_wifi_password'] ?? '');
+                        $tr069Config['wifi_ssid_5'] = trim($_POST['batch_wifi_ssid'] ?? '');
+                        $tr069Config['wifi_pass_5'] = trim($_POST['batch_wifi_password'] ?? '');
+                        $tr069Config['wifi_security'] = $_POST['batch_wifi_security'] ?? 'wpa2psk';
+                        $tr069Config['wifi_encryption'] = $_POST['batch_wifi_encryption'] ?? 'aes';
+                    } elseif ($configType === 'wan') {
+                        $tr069Config['connection_type'] = $_POST['batch_wan_type'] ?? 'dhcp';
+                        $tr069Config['wan_vlan'] = (int)($_POST['batch_wan_vlan'] ?? 0);
+                        $tr069Config['nat_enable'] = true;
+                        $tr069Config['wifi_enabled'] = false;
+                        if ($tr069Config['connection_type'] === 'pppoe') {
+                            $tr069Config['pppoe_username'] = trim($_POST['batch_pppoe_username'] ?? '');
+                            $tr069Config['pppoe_password'] = trim($_POST['batch_pppoe_password'] ?? '');
+                        } elseif ($tr069Config['connection_type'] === 'static') {
+                            $tr069Config['static_ip'] = trim($_POST['batch_static_ip'] ?? '');
+                            $tr069Config['static_mask'] = trim($_POST['batch_static_mask'] ?? '');
+                            $tr069Config['static_gateway'] = trim($_POST['batch_static_gateway'] ?? '');
+                            $tr069Config['static_dns1'] = trim($_POST['batch_static_dns1'] ?? '');
+                            $tr069Config['static_dns2'] = trim($_POST['batch_static_dns2'] ?? '');
+                        }
+                    }
+                    try {
+                        $batchInsertStmt->execute([$batchOnuId, json_encode($tr069Config)]);
+                        $queued++;
+                    } catch (Exception $e) {
+                        $failed++;
+                    }
+                }
+                $message = "Batch TR-069 config queued for {$queued} ONU(s)";
+                if ($failed > 0) $message .= " ({$failed} failed)";
+                $messageType = $failed > 0 ? 'warning' : 'success';
+                break;
             default:
                 break;
         }
@@ -6342,6 +6416,122 @@ if ($view === 'logs') {
 }
 if ($view === 'alerts' || $view === 'dashboard') {
     $alerts = $huaweiOLT->getAlerts(false, 100);
+}
+if ($view === 'batch_tr069') {
+    $batchOltFilter = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
+    $batchSlotFilter = (isset($_GET['batch_slot']) && $_GET['batch_slot'] !== '') ? (int)$_GET['batch_slot'] : null;
+    $batchPortFilter = (isset($_GET['batch_port']) && $_GET['batch_port'] !== '') ? (int)$_GET['batch_port'] : null;
+    $batchVlanFilter = (isset($_GET['batch_vlan']) && $_GET['batch_vlan'] !== '') ? (int)$_GET['batch_vlan'] : null;
+    $batchSearch = trim($_GET['batch_search'] ?? '');
+
+    $batchOnuSql = "SELECT o.id, o.sn, o.name, o.frame, o.slot, o.port, o.onu_id, o.status, o.vlan_id, 
+                           o.olt_id, olt.name as olt_name, o.customer_id, c.name as customer_name
+                    FROM huawei_onus o
+                    LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+                    LEFT JOIN customers c ON o.customer_id = c.id
+                    WHERE o.is_authorized = TRUE";
+    $batchOnuParams = [];
+    if ($batchOltFilter) { $batchOnuSql .= " AND o.olt_id = ?"; $batchOnuParams[] = $batchOltFilter; }
+    if ($batchSlotFilter !== null) { $batchOnuSql .= " AND o.slot = ?"; $batchOnuParams[] = $batchSlotFilter; }
+    if ($batchPortFilter !== null) { $batchOnuSql .= " AND o.port = ?"; $batchOnuParams[] = $batchPortFilter; }
+    if ($batchVlanFilter) { $batchOnuSql .= " AND o.vlan_id = ?"; $batchOnuParams[] = $batchVlanFilter; }
+    if (!empty($batchSearch)) {
+        $batchOnuSql .= " AND (o.sn ILIKE ? OR o.name ILIKE ? OR c.name ILIKE ?)";
+        $bs = '%' . $batchSearch . '%';
+        $batchOnuParams[] = $bs;
+        $batchOnuParams[] = $bs;
+        $batchOnuParams[] = $bs;
+    }
+    $batchOnuSql .= " ORDER BY olt.name, o.frame, o.slot, o.port, o.onu_id";
+    $batchOnuStmt = $db->prepare($batchOnuSql);
+    $batchOnuStmt->execute($batchOnuParams);
+    $batchOnus = $batchOnuStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $batchVlansSql = "SELECT DISTINCT vlan_id FROM huawei_onus WHERE is_authorized = TRUE AND vlan_id IS NOT NULL";
+    $bvParams = [];
+    if ($batchOltFilter) { $batchVlansSql .= " AND olt_id = ?"; $bvParams[] = $batchOltFilter; }
+    $batchVlansSql .= " ORDER BY vlan_id";
+    $bvStmt = $db->prepare($batchVlansSql);
+    $bvStmt->execute($bvParams);
+    $batchVlanOptions = $bvStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $batchSlotsSql = "SELECT DISTINCT slot FROM huawei_onus WHERE is_authorized = TRUE AND slot IS NOT NULL";
+    $bsParams = [];
+    if ($batchOltFilter) { $batchSlotsSql .= " AND olt_id = ?"; $bsParams[] = $batchOltFilter; }
+    $batchSlotsSql .= " ORDER BY slot";
+    $bsStmt = $db->prepare($batchSlotsSql);
+    $bsStmt->execute($bsParams);
+    $batchSlotOptions = $bsStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $batchPortsSql = "SELECT DISTINCT port FROM huawei_onus WHERE is_authorized = TRUE AND port IS NOT NULL";
+    $bpParams = [];
+    if ($batchOltFilter) { $batchPortsSql .= " AND olt_id = ?"; $bpParams[] = $batchOltFilter; }
+    if ($batchSlotFilter !== null) { $batchPortsSql .= " AND slot = ?"; $bpParams[] = $batchSlotFilter; }
+    $batchPortsSql .= " ORDER BY port";
+    $bpStmt = $db->prepare($batchPortsSql);
+    $bpStmt->execute($bpParams);
+    $batchPortOptions = $bpStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $batchPendingConfigs = [];
+    try {
+        $batchPendingStmt = $db->query("SELECT t.onu_id, t.status, t.created_at, t.applied_at, o.name as onu_name, o.sn
+                                        FROM huawei_onu_tr069_config t
+                                        LEFT JOIN huawei_onus o ON t.onu_id = o.id
+                                        ORDER BY t.created_at DESC LIMIT 50");
+        $batchPendingConfigs = $batchPendingStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Throwable $e) { }
+}
+if ($view === 'signal_alerts') {
+    $saFilterOltId = isset($_GET['sa_olt_id']) ? (int)$_GET['sa_olt_id'] : null;
+    $signalAlertSql = "
+        SELECT o.id, o.sn, o.name, o.frame, o.slot, o.port, o.onu_id, o.status,
+               o.rx_power, o.tx_power, o.distance, o.olt_id, o.last_down_cause,
+               o.updated_at,
+               olt.name as olt_name,
+               c.name as customer_name, c.phone as customer_phone, c.account_number
+        FROM huawei_onus o
+        LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+        LEFT JOIN customers c ON o.customer_id = c.id
+        WHERE o.is_authorized = TRUE
+          AND o.rx_power IS NOT NULL
+          AND CAST(o.rx_power AS DECIMAL) BETWEEN -28 AND -25
+    ";
+    $saParams = [];
+    if ($saFilterOltId) {
+        $signalAlertSql .= " AND o.olt_id = ?";
+        $saParams[] = $saFilterOltId;
+    }
+    $signalAlertSql .= " ORDER BY CAST(o.rx_power AS DECIMAL) ASC";
+    $saStmt = $db->prepare($signalAlertSql);
+    $saStmt->execute($saParams);
+    $signalAlertOnus = $saStmt->fetchAll(\PDO::FETCH_ASSOC);
+}
+if ($view === 'port_utilization') {
+    $losCond = \App\HuaweiOLT::losCondition();
+    $portUtilSql = "
+        SELECT o.olt_id, olt.name as olt_name, o.slot, o.port,
+            COUNT(*) as total_onus,
+            COUNT(*) FILTER (WHERE o.status = 'online') as online_count,
+            COUNT(*) FILTER (WHERE {$losCond}) as los_count,
+            COUNT(*) FILTER (WHERE o.status = 'offline' AND NOT ({$losCond})) as offline_count
+        FROM huawei_onus o
+        JOIN huawei_olts olt ON o.olt_id = olt.id
+        WHERE o.is_authorized = TRUE
+    ";
+    $portUtilParams = [];
+    $puFilterOltId = isset($_GET['pu_olt_id']) ? (int)$_GET['pu_olt_id'] : null;
+    if ($puFilterOltId) {
+        $portUtilSql .= " AND o.olt_id = ?";
+        $portUtilParams[] = $puFilterOltId;
+    }
+    $portUtilSql .= " GROUP BY o.olt_id, olt.name, o.slot, o.port ORDER BY olt.name, o.slot, o.port";
+    $puStmt = $db->prepare($portUtilSql);
+    $puStmt->execute($portUtilParams);
+    $portUtilData = $puStmt->fetchAll(\PDO::FETCH_ASSOC);
+    $portUtilByOlt = [];
+    foreach ($portUtilData as $row) {
+        $portUtilByOlt[$row['olt_name']][] = $row;
+    }
 }
 if ($view === 'dashboard') {
     $onusByOltData = $huaweiOLT->getONUsByOLT();
@@ -8005,6 +8195,12 @@ try {
                 <a class="nav-link <?= $view === 'topology' ? 'active' : '' ?>" href="?page=huawei-olt&view=topology">
                     <i class="bi bi-diagram-3 me-2"></i> Network Map
                 </a>
+                <a class="nav-link <?= $view === 'port_utilization' ? 'active' : '' ?>" href="?page=huawei-olt&view=port_utilization">
+                    <i class="bi bi-bar-chart-fill me-2"></i> Port Utilization
+                </a>
+                <a class="nav-link <?= $view === 'signal_alerts' ? 'active' : '' ?>" href="?page=huawei-olt&view=signal_alerts">
+                    <i class="bi bi-broadcast me-2"></i> Signal Alerts
+                </a>
                 <a class="nav-link <?= $view === 'logs' ? 'active' : '' ?>" href="?page=huawei-olt&view=logs">
                     <i class="bi bi-journal-text me-2"></i> Logs
                 </a>
@@ -8020,6 +8216,9 @@ try {
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
                     <i class="bi bi-gear-wide-connected me-2"></i> TR-069
+                </a>
+                <a class="nav-link <?= $view === 'batch_tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=batch_tr069">
+                    <i class="bi bi-collection me-2"></i> Batch TR-069
                 </a>
                 <a class="nav-link <?= $view === 'vpn' ? 'active' : '' ?>" href="?page=huawei-olt&view=vpn">
                     <i class="bi bi-shield-lock-fill me-2"></i> VPN
@@ -8072,6 +8271,12 @@ try {
                 <a class="nav-link <?= $view === 'topology' ? 'active' : '' ?>" href="?page=huawei-olt&view=topology">
                     <i class="bi bi-diagram-3 me-2"></i> Network Map
                 </a>
+                <a class="nav-link <?= $view === 'port_utilization' ? 'active' : '' ?>" href="?page=huawei-olt&view=port_utilization">
+                    <i class="bi bi-bar-chart-fill me-2"></i> Port Utilization
+                </a>
+                <a class="nav-link <?= $view === 'signal_alerts' ? 'active' : '' ?>" href="?page=huawei-olt&view=signal_alerts">
+                    <i class="bi bi-broadcast me-2"></i> Signal Alerts
+                </a>
                 <a class="nav-link <?= $view === 'logs' ? 'active' : '' ?>" href="?page=huawei-olt&view=logs">
                     <i class="bi bi-journal-text me-2"></i> Provisioning Logs
                 </a>
@@ -8090,6 +8295,9 @@ try {
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
                     <i class="bi bi-gear-wide-connected me-2"></i> TR-069 / ACS
+                </a>
+                <a class="nav-link <?= $view === 'batch_tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=batch_tr069">
+                    <i class="bi bi-collection me-2"></i> Batch TR-069
                 </a>
                 <a class="nav-link <?= $view === 'vpn' ? 'active' : '' ?>" href="?page=huawei-olt&view=vpn">
                     <i class="bi bi-shield-lock-fill me-2"></i> VPN
@@ -13908,6 +14116,331 @@ try {
                 </div>
             </div>
             
+            <?php elseif ($view === 'signal_alerts'): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-broadcast me-2"></i>ONU Signal Health Alerts</h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <form method="get" class="d-flex gap-2">
+                        <input type="hidden" name="page" value="huawei-olt">
+                        <input type="hidden" name="view" value="signal_alerts">
+                        <select name="sa_olt_id" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width:180px;">
+                            <option value="">All OLTs</option>
+                            <?php foreach ($olts as $o): ?>
+                            <option value="<?= $o['id'] ?>" <?= ($saFilterOltId ?? null) == $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <div class="fs-3 fw-bold text-warning"><?= count($signalAlertOnus ?? []) ?></div>
+                            <div class="text-muted small">ONUs with Degrading Signal</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <div class="fs-5 fw-bold text-info">-25 to -28 dBm</div>
+                            <div class="text-muted small">Warning Zone Range</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <div class="fs-5 fw-bold text-danger">&lt; -28 dBm</div>
+                            <div class="text-muted small">LOS Threshold</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-warning">
+                <div class="card-header bg-warning bg-opacity-10 d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                    <strong>ONUs Approaching LOS Threshold</strong>
+                    <span class="badge bg-warning text-dark ms-2"><?= count($signalAlertOnus ?? []) ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($signalAlertOnus)): ?>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-check-circle fs-1 text-success mb-2 d-block"></i>
+                        No ONUs with degrading signal detected. All signals are healthy.
+                    </div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ONU</th>
+                                    <th>Customer</th>
+                                    <th>OLT / Port</th>
+                                    <th>Account</th>
+                                    <th>RX Power</th>
+                                    <th>TX Power</th>
+                                    <th>Signal Level</th>
+                                    <th>Status</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($signalAlertOnus as $saOnu):
+                                    $rxVal = (float)$saOnu['rx_power'];
+                                    if ($rxVal >= -26) { $signalClass = 'bg-warning text-dark'; $signalLabel = 'Warning'; }
+                                    elseif ($rxVal >= -27) { $signalClass = 'bg-orange text-white'; $signalLabel = 'Poor'; }
+                                    else { $signalClass = 'bg-danger'; $signalLabel = 'Critical'; }
+                                    $pctToLos = round((($rxVal - (-28)) / (-25 - (-28))) * 100, 0);
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold"><?= htmlspecialchars($saOnu['name'] ?: $saOnu['sn']) ?></div>
+                                        <small class="text-muted"><?= htmlspecialchars($saOnu['sn']) ?></small>
+                                    </td>
+                                    <td>
+                                        <?php if ($saOnu['customer_name']): ?>
+                                            <div><?= htmlspecialchars($saOnu['customer_name']) ?></div>
+                                            <?php if ($saOnu['customer_phone']): ?>
+                                            <small class="text-muted"><?= htmlspecialchars($saOnu['customer_phone']) ?></small>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div><?= htmlspecialchars($saOnu['olt_name'] ?? '') ?></div>
+                                        <small class="text-muted">0/<?= $saOnu['slot'] ?>/<?= $saOnu['port'] ?> ONU <?= $saOnu['onu_id'] ?></small>
+                                    </td>
+                                    <td><?= htmlspecialchars($saOnu['customer_name'] ? ($saOnu['account_number'] ?? '-') : '-') ?></td>
+                                    <td>
+                                        <span class="fw-bold text-danger"><?= number_format($rxVal, 2) ?> dBm</span>
+                                    </td>
+                                    <td>
+                                        <?= $saOnu['tx_power'] ? number_format((float)$saOnu['tx_power'], 2) . ' dBm' : '-' ?>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 8px; min-width: 60px; background: linear-gradient(to right, #dc3545, #ffc107, #198754);">
+                                                <div style="width: <?= max(0, min(100, $pctToLos)) ?>%; background: transparent; border-right: 3px solid #000;"></div>
+                                            </div>
+                                            <span class="badge <?= $signalClass ?>" style="<?= $signalClass === 'bg-orange text-white' ? 'background-color: #fd7e14;' : '' ?>"><?= $signalLabel ?></span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $effStatus = \App\HuaweiOLT::resolveEffectiveStatus($saOnu['status'] ?? 'offline', $saOnu['last_down_cause'] ?? null);
+                                        $statusBadge = match($effStatus) {
+                                            'online' => 'bg-success',
+                                            'los' => 'bg-danger',
+                                            'dying-gasp' => 'bg-warning text-dark',
+                                            default => 'bg-secondary'
+                                        };
+                                        ?>
+                                        <span class="badge <?= $statusBadge ?>"><?= ucfirst($effStatus) ?></span>
+                                    </td>
+                                    <td>
+                                        <?php if ($saOnu['updated_at']): ?>
+                                        <small class="text-muted"><?= date('M j, g:i A', strtotime($saOnu['updated_at'])) ?></small>
+                                        <?php else: ?>
+                                        <small class="text-muted">-</small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $saOnu['id'] ?>" class="btn btn-sm btn-outline-primary" title="View Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-info-circle me-1"></i>Signal Level Guide</h6>
+                    <div class="d-flex gap-4 flex-wrap">
+                        <span><span class="badge bg-success">&nbsp;&nbsp;</span> Excellent: &gt; -15 dBm</span>
+                        <span><span class="badge bg-primary">&nbsp;&nbsp;</span> Good: -15 to -20 dBm</span>
+                        <span><span class="badge bg-info">&nbsp;&nbsp;</span> Fair: -20 to -25 dBm</span>
+                        <span><span class="badge bg-warning text-dark">&nbsp;&nbsp;</span> Warning: -25 to -28 dBm (shown here)</span>
+                        <span><span class="badge bg-danger">&nbsp;&nbsp;</span> Critical/LOS: &lt; -28 dBm</span>
+                    </div>
+                    <div class="text-muted small mt-2">ONUs in the warning zone (-25 to -28 dBm) are at risk of going into LOS. Consider checking fiber connections, splitters, or scheduling maintenance.</div>
+                </div>
+            </div>
+
+            <?php elseif ($view === 'port_utilization'): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-bar-chart-fill me-2"></i>PON Port Utilization</h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <form method="get" class="d-flex gap-2">
+                        <input type="hidden" name="page" value="huawei-olt">
+                        <input type="hidden" name="view" value="port_utilization">
+                        <select name="pu_olt_id" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width:180px;">
+                            <option value="">All OLTs</option>
+                            <?php foreach ($olts as $o): ?>
+                            <option value="<?= $o['id'] ?>" <?= ($puFilterOltId ?? null) == $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <?php
+                $puTotalPorts = count($portUtilData ?? []);
+                $puTotalOnus = array_sum(array_column($portUtilData ?? [], 'total_onus'));
+                $puHighPorts = 0;
+                $puMedPorts = 0;
+                $puLowPorts = 0;
+                foreach ($portUtilData ?? [] as $pd) {
+                    $pct = ($pd['total_onus'] / 128) * 100;
+                    if ($pct > 80) $puHighPorts++;
+                    elseif ($pct >= 50) $puMedPorts++;
+                    else $puLowPorts++;
+                }
+                ?>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <div class="fs-3 fw-bold text-primary"><?= $puTotalPorts ?></div>
+                            <div class="text-muted small">Active PON Ports</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <div class="fs-3 fw-bold"><?= $puTotalOnus ?></div>
+                            <div class="text-muted small">Total ONUs</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <div class="fs-3 fw-bold text-danger"><?= $puHighPorts ?></div>
+                            <div class="text-muted small">High Utilization (&gt;80%)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body text-center">
+                            <div class="fs-3 fw-bold text-warning"><?= $puMedPorts ?></div>
+                            <div class="text-muted small">Medium (50-80%)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <?php if (empty($portUtilByOlt)): ?>
+            <div class="card shadow-sm">
+                <div class="card-body text-center p-5 text-muted">
+                    <i class="bi bi-bar-chart fs-1 d-block mb-2"></i>
+                    No port utilization data available. Authorize ONUs to see port usage.
+                </div>
+            </div>
+            <?php else: ?>
+            <?php foreach ($portUtilByOlt as $oltName => $ports): ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-hdd-rack me-2"></i><?= htmlspecialchars($oltName) ?></h6>
+                    <span class="badge bg-primary"><?= count($ports) ?> ports</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <?php foreach ($ports as $p):
+                            $pct = round(($p['total_onus'] / 128) * 100, 1);
+                            if ($pct > 80) { $bgClass = 'bg-danger'; $borderColor = '#dc3545'; $textClass = 'text-danger'; }
+                            elseif ($pct >= 50) { $bgClass = 'bg-warning'; $borderColor = '#ffc107'; $textClass = 'text-warning'; }
+                            else { $bgClass = 'bg-success'; $borderColor = '#198754'; $textClass = 'text-success'; }
+                        ?>
+                        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                            <div class="border rounded p-2 text-center h-100" style="border-color: <?= $borderColor ?> !important; border-width: 2px !important;">
+                                <div class="fw-bold small mb-1">0/<?= $p['slot'] ?>/<?= $p['port'] ?></div>
+                                <div class="progress mb-1" style="height: 8px;">
+                                    <div class="progress-bar <?= $bgClass ?>" style="width: <?= min($pct, 100) ?>%"></div>
+                                </div>
+                                <div class="<?= $textClass ?> fw-bold" style="font-size: 0.85rem;"><?= $p['total_onus'] ?>/128</div>
+                                <div style="font-size: 0.7rem;" class="text-muted"><?= $pct ?>%</div>
+                                <div class="d-flex justify-content-center gap-2 mt-1" style="font-size: 0.65rem;">
+                                    <span class="text-success" title="Online"><i class="bi bi-circle-fill"></i> <?= $p['online_count'] ?></span>
+                                    <span class="text-danger" title="LOS"><i class="bi bi-circle-fill"></i> <?= $p['los_count'] ?></span>
+                                    <span class="text-secondary" title="Offline"><i class="bi bi-circle-fill"></i> <?= $p['offline_count'] ?></span>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Port</th>
+                                    <th>Total ONUs</th>
+                                    <th>Online</th>
+                                    <th>LOS</th>
+                                    <th>Offline</th>
+                                    <th>Utilization</th>
+                                    <th>Capacity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($ports as $p):
+                                    $pct = round(($p['total_onus'] / 128) * 100, 1);
+                                    if ($pct > 80) { $badgeClass = 'bg-danger'; }
+                                    elseif ($pct >= 50) { $badgeClass = 'bg-warning text-dark'; }
+                                    else { $badgeClass = 'bg-success'; }
+                                    $remaining = 128 - $p['total_onus'];
+                                ?>
+                                <tr>
+                                    <td><code>0/<?= $p['slot'] ?>/<?= $p['port'] ?></code></td>
+                                    <td class="fw-bold"><?= $p['total_onus'] ?></td>
+                                    <td><span class="text-success"><?= $p['online_count'] ?></span></td>
+                                    <td><span class="text-danger"><?= $p['los_count'] ?></span></td>
+                                    <td><span class="text-secondary"><?= $p['offline_count'] ?></span></td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 6px; min-width: 60px;">
+                                                <div class="progress-bar <?= $badgeClass ?>" style="width: <?= min($pct, 100) ?>%"></div>
+                                            </div>
+                                            <span class="badge <?= $badgeClass ?>"><?= $pct ?>%</span>
+                                        </div>
+                                    </td>
+                                    <td><span class="text-muted"><?= $remaining ?> remaining</span></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-info-circle me-1"></i>Legend</h6>
+                    <div class="d-flex gap-4 flex-wrap">
+                        <span><span class="badge bg-success">&nbsp;&nbsp;</span> Low (&lt;50%) — Plenty of capacity</span>
+                        <span><span class="badge bg-warning text-dark">&nbsp;&nbsp;</span> Medium (50-80%) — Monitor usage</span>
+                        <span><span class="badge bg-danger">&nbsp;&nbsp;</span> High (&gt;80%) — Near capacity, plan expansion</span>
+                    </div>
+                    <div class="text-muted small mt-2">Max capacity: 128 ONUs per GPON port</div>
+                </div>
+            </div>
+            
             <?php elseif ($view === 'alerts'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-bell me-2"></i>Alerts</h4>
@@ -15741,6 +16274,301 @@ try {
             </div>
             <?php endif; ?>
             
+            <?php elseif ($view === 'batch_tr069'): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-collection me-2"></i>Batch TR-069 Config Push</h4>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-funnel me-2"></i>Filter ONUs</h6>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-2 align-items-end">
+                        <input type="hidden" name="page" value="huawei-olt">
+                        <input type="hidden" name="view" value="batch_tr069">
+                        <div class="col-md-2">
+                            <label class="form-label small">OLT</label>
+                            <select name="olt_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="">All OLTs</option>
+                                <?php foreach ($olts as $olt): ?>
+                                <option value="<?= $olt['id'] ?>" <?= $batchOltFilter == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small">Slot</label>
+                            <select name="batch_slot" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="">All Slots</option>
+                                <?php foreach ($batchSlotOptions as $s): ?>
+                                <option value="<?= $s ?>" <?= ($batchSlotFilter !== null && $batchSlotFilter == $s) ? 'selected' : '' ?>>Slot <?= $s ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small">Port</label>
+                            <select name="batch_port" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="">All Ports</option>
+                                <?php foreach ($batchPortOptions as $p): ?>
+                                <option value="<?= $p ?>" <?= ($batchPortFilter !== null && $batchPortFilter == $p) ? 'selected' : '' ?>>Port <?= $p ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small">VLAN</label>
+                            <select name="batch_vlan" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="">All VLANs</option>
+                                <?php foreach ($batchVlanOptions as $v): ?>
+                                <option value="<?= $v ?>" <?= ($batchVlanFilter !== null && $batchVlanFilter == $v) ? 'selected' : '' ?>>VLAN <?= $v ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">Search</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="batch_search" class="form-control" placeholder="SN / Name / Customer..." value="<?= htmlspecialchars($batchSearch) ?>">
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <a href="?page=huawei-olt&view=batch_tr069" class="btn btn-sm btn-outline-secondary w-100" title="Clear filters"><i class="bi bi-x-circle"></i></a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <form method="post" id="batchTr069Form" onsubmit="return validateBatchTr069()">
+                <input type="hidden" name="action" value="batch_tr069_push">
+
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="bi bi-check2-square me-2"></i>Select ONUs <span class="badge bg-secondary" id="batchSelectedCount">0</span> selected</h6>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <span class="text-muted small"><?= count($batchOnus) ?> ONU(s) found</span>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <?php if (empty($batchOnus)): ?>
+                                <div class="p-4 text-center text-muted">
+                                    <i class="bi bi-inbox fs-1 mb-2 d-block"></i>
+                                    No authorized ONUs found. Adjust filters to find ONUs.
+                                </div>
+                                <?php else: ?>
+                                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                    <table class="table table-hover table-sm mb-0">
+                                        <thead class="sticky-top bg-light">
+                                            <tr>
+                                                <th style="width:40px"><input type="checkbox" class="form-check-input" id="batchSelectAll" onchange="toggleBatchSelectAll(this)"></th>
+                                                <th>ONU</th>
+                                                <th>SN</th>
+                                                <th>OLT</th>
+                                                <th>Port</th>
+                                                <th>VLAN</th>
+                                                <th>Status</th>
+                                                <th>Customer</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($batchOnus as $bonu): ?>
+                                            <tr>
+                                                <td><input type="checkbox" class="form-check-input batch-onu-cb" name="onu_ids[]" value="<?= $bonu['id'] ?>" onchange="updateBatchCount()"></td>
+                                                <td><?= htmlspecialchars($bonu['name'] ?: '-') ?></td>
+                                                <td><code class="small"><?= htmlspecialchars($bonu['sn']) ?></code></td>
+                                                <td class="small"><?= htmlspecialchars($bonu['olt_name'] ?? '-') ?></td>
+                                                <td class="small"><?= $bonu['frame'] ?>/<?= $bonu['slot'] ?>/<?= $bonu['port'] ?></td>
+                                                <td class="small"><?= $bonu['vlan_id'] ?: '-' ?></td>
+                                                <td>
+                                                    <span class="badge bg-<?= $bonu['status'] === 'online' ? 'success' : ($bonu['status'] === 'los' ? 'danger' : 'secondary') ?> badge-sm">
+                                                        <?= ucfirst($bonu['status'] ?? 'unknown') ?>
+                                                    </span>
+                                                </td>
+                                                <td class="small"><?= htmlspecialchars($bonu['customer_name'] ?? '-') ?></td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-white">
+                                <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Config to Push</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Config Type</label>
+                                    <select name="config_type" id="batchConfigType" class="form-select" onchange="toggleBatchConfigFields()" required>
+                                        <option value="">-- Select --</option>
+                                        <option value="wifi">WiFi Config (SSID/Password)</option>
+                                        <option value="wan">WAN Config (PPPoE/DHCP/Static)</option>
+                                    </select>
+                                </div>
+
+                                <div id="batchWifiFields" style="display:none">
+                                    <div class="mb-3">
+                                        <label class="form-label">SSID (2.4GHz & 5GHz)</label>
+                                        <input type="text" name="batch_wifi_ssid" class="form-control" placeholder="MyNetwork">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">WiFi Password</label>
+                                        <input type="text" name="batch_wifi_password" class="form-control" placeholder="min 8 characters">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Security</label>
+                                        <select name="batch_wifi_security" class="form-select">
+                                            <option value="wpa2psk">WPA2-PSK</option>
+                                            <option value="wpapsk">WPA-PSK</option>
+                                            <option value="wpa2wpa3">WPA2/WPA3</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Encryption</label>
+                                        <select name="batch_wifi_encryption" class="form-select">
+                                            <option value="aes">AES</option>
+                                            <option value="tkip">TKIP</option>
+                                            <option value="auto">Auto</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div id="batchWanFields" style="display:none">
+                                    <div class="mb-3">
+                                        <label class="form-label">WAN Type</label>
+                                        <select name="batch_wan_type" id="batchWanType" class="form-select" onchange="toggleBatchWanSubfields()">
+                                            <option value="dhcp">DHCP</option>
+                                            <option value="pppoe">PPPoE</option>
+                                            <option value="static">Static IP</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">WAN VLAN</label>
+                                        <input type="number" name="batch_wan_vlan" class="form-control" placeholder="e.g. 100">
+                                    </div>
+                                    <div id="batchPppoeFields" style="display:none">
+                                        <div class="mb-3">
+                                            <label class="form-label">PPPoE Username</label>
+                                            <input type="text" name="batch_pppoe_username" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">PPPoE Password</label>
+                                            <input type="text" name="batch_pppoe_password" class="form-control">
+                                        </div>
+                                    </div>
+                                    <div id="batchStaticFields" style="display:none">
+                                        <div class="mb-3">
+                                            <label class="form-label">IP Address</label>
+                                            <input type="text" name="batch_static_ip" class="form-control" placeholder="192.168.1.100">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Subnet Mask</label>
+                                            <input type="text" name="batch_static_mask" class="form-control" placeholder="255.255.255.0">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Gateway</label>
+                                            <input type="text" name="batch_static_gateway" class="form-control" placeholder="192.168.1.1">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">DNS 1</label>
+                                            <input type="text" name="batch_static_dns1" class="form-control" placeholder="8.8.8.8">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">DNS 2</label>
+                                            <input type="text" name="batch_static_dns2" class="form-control" placeholder="8.8.4.4">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary w-100" id="batchSubmitBtn" disabled>
+                                    <i class="bi bi-send me-1"></i> Push Config to <span id="batchSubmitCount">0</span> ONU(s)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <?php if (!empty($batchPendingConfigs)): ?>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Queued Configs</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ONU</th>
+                                    <th>SN</th>
+                                    <th>Status</th>
+                                    <th>Queued At</th>
+                                    <th>Applied At</th>
+                                    <th>Error</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($batchPendingConfigs as $pc): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($pc['onu_name'] ?? '-') ?></td>
+                                    <td><code class="small"><?= htmlspecialchars($pc['sn'] ?? '-') ?></code></td>
+                                    <td>
+                                        <span class="badge bg-<?= $pc['status'] === 'applied' ? 'success' : ($pc['status'] === 'pending' ? 'warning' : 'danger') ?>">
+                                            <?= ucfirst($pc['status']) ?>
+                                        </span>
+                                    </td>
+                                    <td class="small"><?= $pc['created_at'] ? date('M j, H:i', strtotime($pc['created_at'])) : '-' ?></td>
+                                    <td class="small"><?= $pc['applied_at'] ? date('M j, H:i', strtotime($pc['applied_at'])) : '-' ?></td>
+                                    <td class="small text-danger"><?= htmlspecialchars($pc['error_message'] ?? '') ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <script>
+            function toggleBatchSelectAll(el) {
+                document.querySelectorAll('.batch-onu-cb').forEach(cb => cb.checked = el.checked);
+                updateBatchCount();
+            }
+            function updateBatchCount() {
+                const count = document.querySelectorAll('.batch-onu-cb:checked').length;
+                document.getElementById('batchSelectedCount').textContent = count;
+                document.getElementById('batchSubmitCount').textContent = count;
+                document.getElementById('batchSubmitBtn').disabled = count === 0;
+            }
+            function toggleBatchConfigFields() {
+                const type = document.getElementById('batchConfigType').value;
+                document.getElementById('batchWifiFields').style.display = type === 'wifi' ? 'block' : 'none';
+                document.getElementById('batchWanFields').style.display = type === 'wan' ? 'block' : 'none';
+            }
+            function toggleBatchWanSubfields() {
+                const wanType = document.getElementById('batchWanType').value;
+                document.getElementById('batchPppoeFields').style.display = wanType === 'pppoe' ? 'block' : 'none';
+                document.getElementById('batchStaticFields').style.display = wanType === 'static' ? 'block' : 'none';
+            }
+            function validateBatchTr069() {
+                const count = document.querySelectorAll('.batch-onu-cb:checked').length;
+                if (count === 0) { alert('Please select at least one ONU.'); return false; }
+                const configType = document.getElementById('batchConfigType').value;
+                if (!configType) { alert('Please select a config type.'); return false; }
+                if (configType === 'wifi') {
+                    const ssid = document.querySelector('input[name="batch_wifi_ssid"]').value.trim();
+                    const pass = document.querySelector('input[name="batch_wifi_password"]').value.trim();
+                    if (!ssid) { alert('WiFi SSID is required.'); return false; }
+                    if (pass.length > 0 && pass.length < 8) { alert('WiFi password must be at least 8 characters.'); return false; }
+                }
+                return confirm('Push TR-069 config to ' + count + ' ONU(s)? This will queue configuration changes for all selected devices.');
+            }
+            </script>
+
             <?php elseif ($view === 'settings'): ?>
             <?php
             $settingsTab = $_GET['tab'] ?? 'genieacs';
