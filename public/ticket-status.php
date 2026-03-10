@@ -39,7 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
             try {
                 $pdo->beginTransaction();
                 
-                $resolvedByUserId = !empty($tokenRecord['employee_id']) ? (int)$tokenRecord['employee_id'] : null;
+                $assignedStmt = $pdo->prepare("SELECT assigned_to FROM tickets WHERE id = ?");
+                $assignedStmt->execute([$tokenRecord['ticket_id']]);
+                $currentAssigned = $assignedStmt->fetchColumn();
+                $resolvedByUserId = $currentAssigned ? (int)$currentAssigned : (!empty($tokenRecord['employee_id']) ? (int)$tokenRecord['employee_id'] : null);
                 
                 if ($newStatus === 'Resolved') {
                     $resolutionNotes = trim($_POST['resolution_notes'] ?? '');
@@ -83,7 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     }
                 }
                 
-                $techName = $tokenRecord['assigned_to_name'] ?? 'Technician';
+                $techNameStmt = $pdo->prepare("SELECT name FROM employees WHERE id = ?");
+                $techNameStmt->execute([$resolvedByUserId]);
+                $techName = $techNameStmt->fetchColumn() ?: ($tokenRecord['assigned_to_name'] ?? 'Technician');
                 $logDescription = "Status changed to '{$newStatus}' via quick link by {$techName}" . ($comment ? ". Note: {$comment}" : "");
                 try {
                     $pdo->exec("SAVEPOINT log_save");
