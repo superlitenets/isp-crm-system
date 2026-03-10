@@ -9840,10 +9840,55 @@ try {
                         No ONUs found
                     </div>
                     <?php elseif (empty($onus) && !empty($discoveredOnus)): ?>
+                    <?php
+                    $movableCount = 0;
+                    foreach ($discoveredOnus as $d) {
+                        if (isset($authorizedSnMap[$d['serial_number']])) $movableCount++;
+                    }
+                    ?>
+                    <?php if ($movableCount > 0): ?>
+                    <div id="bulkMoveBar" class="d-none bg-warning bg-opacity-10 border-bottom px-3 py-2">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="checkbox" id="bulkMoveSelectAll" class="form-check-input" onchange="toggleAllMoveCheckboxes(this.checked)">
+                                <span class="fw-medium"><span id="bulkMoveSelectedCount">0</span> of <?= $movableCount ?> movable ONUs selected</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="form-label mb-0 small">Time limit:</label>
+                                <select id="bulkMoveTimeLimit" class="form-select form-select-sm" style="width:auto;">
+                                    <option value="5">5 min</option>
+                                    <option value="10">10 min</option>
+                                    <option value="15" selected>15 min</option>
+                                    <option value="30">30 min</option>
+                                    <option value="60">60 min</option>
+                                    <option value="0">No limit</option>
+                                </select>
+                                <button type="button" class="btn btn-warning btn-sm" id="bulkMoveStartBtn" onclick="startBulkMove()" disabled>
+                                    <i class="bi bi-arrow-left-right me-1"></i> Bulk Move
+                                </button>
+                            </div>
+                        </div>
+                        <div id="bulkMoveProgress" class="d-none mt-2">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <small><span id="bulkMoveStatus">Starting...</span></small>
+                                <small><span id="bulkMoveCounter">0</span> / <span id="bulkMoveTotal">0</span> &mdash; <span class="text-success" id="bulkMoveOk">0</span> OK, <span class="text-danger" id="bulkMoveFail">0</span> Failed</small>
+                            </div>
+                            <div class="progress" style="height:6px;">
+                                <div id="bulkMoveProgressBar" class="progress-bar bg-warning" style="width:0%"></div>
+                            </div>
+                            <div id="bulkMoveLog" class="mt-2 small" style="max-height:150px;overflow-y:auto;font-family:monospace;"></div>
+                            <div class="mt-2 d-flex gap-2">
+                                <button type="button" class="btn btn-outline-danger btn-sm" id="bulkMoveStopBtn" onclick="stopBulkMove()"><i class="bi bi-stop-circle me-1"></i>Stop</button>
+                                <span id="bulkMoveTimeLeft" class="text-muted small align-self-center"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead>
                                 <tr>
+                                    <?php if ($movableCount > 0): ?><th style="width:30px;"></th><?php endif; ?>
                                     <th>Serial Number</th>
                                     <th>ONU Type</th>
                                     <th>OLT / Port</th>
@@ -9854,7 +9899,30 @@ try {
                             </thead>
                             <tbody>
                                 <?php foreach ($discoveredOnus as $disc): ?>
-                                <tr>
+                                <?php 
+                                $existingAuth = $authorizedSnMap[$disc['serial_number']] ?? null;
+                                $existingPort = $existingAuth ? "{$existingAuth['frame']}/{$existingAuth['slot']}/{$existingAuth['port']}:{$existingAuth['onu_id']}" : '';
+                                $detectedFsp = $disc['frame_slot_port'] ?? '';
+                                $detectedParts = explode('/', str_replace(' ', '', $detectedFsp));
+                                $detNewSlot = isset($detectedParts[1]) ? (int)$detectedParts[1] : 0;
+                                $detPortParts = isset($detectedParts[2]) ? explode(':', $detectedParts[2]) : [0];
+                                $detNewPort = (int)($detPortParts[0] ?? 0);
+                                ?>
+                                <tr id="bulkMoveRow_<?= $existingAuth ? $existingAuth['id'] : '' ?>">
+                                    <?php if ($movableCount > 0): ?>
+                                    <td>
+                                        <?php if ($existingAuth): ?>
+                                        <input type="checkbox" class="form-check-input bulk-move-check" 
+                                            data-onu-db-id="<?= $existingAuth['id'] ?>"
+                                            data-sn="<?= htmlspecialchars($disc['serial_number']) ?>"
+                                            data-old-port="<?= $existingPort ?>"
+                                            data-new-slot="<?= $detNewSlot ?>"
+                                            data-new-port="<?= $detNewPort ?>"
+                                            data-new-fsp="<?= htmlspecialchars($detectedFsp) ?>"
+                                            onchange="updateBulkMoveCount()">
+                                        <?php endif; ?>
+                                    </td>
+                                    <?php endif; ?>
                                     <td>
                                         <code><?= htmlspecialchars($disc['serial_number']) ?></code>
                                         <?php if (!empty($disc['equipment_id'])): ?>
@@ -9874,7 +9942,7 @@ try {
                                     </td>
                                     <td>
                                         <span class="text-muted"><?= htmlspecialchars($disc['olt_name'] ?? '-') ?></span>
-                                        <br><small><?= htmlspecialchars($disc['frame_slot_port'] ?? '-') ?></small>
+                                        <br><small><?= htmlspecialchars($detectedFsp ?: '-') ?></small>
                                     </td>
                                     <td>
                                         <small><?= date('Y-m-d H:i', strtotime($disc['first_seen_at'])) ?></small>
@@ -9883,19 +9951,15 @@ try {
                                         <small><?= date('Y-m-d H:i', strtotime($disc['last_seen_at'])) ?></small>
                                     </td>
                                     <td>
-                                        <?php 
-                                        $existingAuth = $authorizedSnMap[$disc['serial_number']] ?? null;
-                                        if ($existingAuth): 
-                                            $existingPort = "{$existingAuth['frame']}/{$existingAuth['slot']}/{$existingAuth['port']}:{$existingAuth['onu_id']}";
-                                        ?>
+                                        <?php if ($existingAuth): ?>
                                         <button type="button" class="btn btn-sm btn-warning" 
-                                            onclick="openDiscoveryMoveModal(<?= $existingAuth['id'] ?>, '<?= htmlspecialchars($disc['serial_number']) ?>', <?= (int)$existingAuth['slot'] ?>, <?= (int)$existingAuth['port'] ?>, <?= (int)$existingAuth['onu_id'] ?>, '<?= htmlspecialchars($disc['frame_slot_port'] ?? '') ?>')">
+                                            onclick="openDiscoveryMoveModal(<?= $existingAuth['id'] ?>, '<?= htmlspecialchars($disc['serial_number']) ?>', <?= (int)$existingAuth['slot'] ?>, <?= (int)$existingAuth['port'] ?>, <?= (int)$existingAuth['onu_id'] ?>, '<?= htmlspecialchars($detectedFsp) ?>')">
                                             <i class="bi bi-arrow-right-circle me-1"></i> Move
                                         </button>
                                         <br><small class="text-muted">Currently on <?= $existingPort ?></small>
                                         <?php else: ?>
                                         <button type="button" class="btn btn-sm btn-success" 
-                                            onclick="openAuthModal('<?= htmlspecialchars($disc['serial_number']) ?>', '<?= $disc['olt_id'] ?>', '<?= htmlspecialchars($disc['frame_slot_port'] ?? '') ?>', '<?= $disc['onu_type_id'] ?? '' ?>')">
+                                            onclick="openAuthModal('<?= htmlspecialchars($disc['serial_number']) ?>', '<?= $disc['olt_id'] ?>', '<?= htmlspecialchars($detectedFsp) ?>', '<?= $disc['onu_type_id'] ?? '' ?>')">
                                             <i class="bi bi-check-lg"></i> Authorize
                                         </button>
                                         <?php endif; ?>
@@ -10535,6 +10599,185 @@ try {
                 
                 updateDiscMoveNewPortDisplay();
                 new bootstrap.Modal(document.getElementById('discoveryMoveModal')).show();
+            }
+            
+            let bulkMoveRunning = false;
+            let bulkMoveAbort = false;
+            let bulkMoveTimer = null;
+            
+            function toggleAllMoveCheckboxes(checked) {
+                document.querySelectorAll('.bulk-move-check').forEach(cb => cb.checked = checked);
+                updateBulkMoveCount();
+            }
+            
+            function updateBulkMoveCount() {
+                const checked = document.querySelectorAll('.bulk-move-check:checked').length;
+                document.getElementById('bulkMoveSelectedCount').textContent = checked;
+                document.getElementById('bulkMoveStartBtn').disabled = checked === 0;
+                const bar = document.getElementById('bulkMoveBar');
+                const anyChecked = document.querySelectorAll('.bulk-move-check:checked').length > 0;
+                const anyExists = document.querySelectorAll('.bulk-move-check').length > 0;
+                if (anyExists) bar.classList.remove('d-none');
+                if (!anyChecked && !bulkMoveRunning) bar.classList.add('d-none');
+            }
+            
+            document.querySelectorAll('.bulk-move-check').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const bar = document.getElementById('bulkMoveBar');
+                    bar.classList.remove('d-none');
+                });
+            });
+            
+            if (document.querySelectorAll('.bulk-move-check').length > 0) {
+                document.getElementById('bulkMoveBar').classList.remove('d-none');
+            }
+            
+            function stopBulkMove() {
+                bulkMoveAbort = true;
+                document.getElementById('bulkMoveStatus').textContent = 'Stopping...';
+                document.getElementById('bulkMoveStopBtn').disabled = true;
+            }
+            
+            async function startBulkMove() {
+                const selected = document.querySelectorAll('.bulk-move-check:checked');
+                if (selected.length === 0) return;
+                
+                const timeLimitMin = parseInt(document.getElementById('bulkMoveTimeLimit').value) || 0;
+                const items = [];
+                selected.forEach(cb => {
+                    items.push({
+                        onuDbId: cb.dataset.onuDbId,
+                        sn: cb.dataset.sn,
+                        oldPort: cb.dataset.oldPort,
+                        newSlot: cb.dataset.newSlot,
+                        newPort: cb.dataset.newPort,
+                        newFsp: cb.dataset.newFsp
+                    });
+                });
+                
+                if (!confirm('Move ' + items.length + ' ONU(s) to their detected ports?' + 
+                    (timeLimitMin > 0 ? '\n\nTime limit: ' + timeLimitMin + ' minutes' : '\n\nNo time limit set.') +
+                    '\n\nEach ONU will be briefly disconnected during migration.')) return;
+                
+                bulkMoveRunning = true;
+                bulkMoveAbort = false;
+                
+                document.getElementById('bulkMoveStartBtn').disabled = true;
+                document.getElementById('bulkMoveSelectAll').disabled = true;
+                document.querySelectorAll('.bulk-move-check').forEach(cb => cb.disabled = true);
+                document.getElementById('bulkMoveProgress').classList.remove('d-none');
+                document.getElementById('bulkMoveTotal').textContent = items.length;
+                document.getElementById('bulkMoveStopBtn').disabled = false;
+                
+                const startTime = Date.now();
+                const endTime = timeLimitMin > 0 ? startTime + (timeLimitMin * 60 * 1000) : 0;
+                let processed = 0, ok = 0, fail = 0;
+                const log = document.getElementById('bulkMoveLog');
+                
+                if (endTime > 0) {
+                    bulkMoveTimer = setInterval(() => {
+                        const remaining = Math.max(0, endTime - Date.now());
+                        const mins = Math.floor(remaining / 60000);
+                        const secs = Math.floor((remaining % 60000) / 1000);
+                        document.getElementById('bulkMoveTimeLeft').textContent = 'Time remaining: ' + mins + 'm ' + secs + 's';
+                        if (remaining <= 0) {
+                            bulkMoveAbort = true;
+                            document.getElementById('bulkMoveStatus').textContent = 'Time limit reached';
+                        }
+                    }, 1000);
+                }
+                
+                const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+                
+                for (let i = 0; i < items.length; i++) {
+                    if (bulkMoveAbort) {
+                        log.innerHTML += '<div class="text-warning">⏹ Stopped at ' + processed + '/' + items.length + '</div>';
+                        break;
+                    }
+                    
+                    if (endTime > 0 && Date.now() >= endTime) {
+                        log.innerHTML += '<div class="text-warning">⏱ Time limit reached at ' + processed + '/' + items.length + '</div>';
+                        break;
+                    }
+                    
+                    const item = items[i];
+                    processed++;
+                    document.getElementById('bulkMoveCounter').textContent = processed;
+                    document.getElementById('bulkMoveStatus').textContent = 'Moving ' + item.sn + ' (' + processed + '/' + items.length + ')...';
+                    document.getElementById('bulkMoveProgressBar').style.width = ((processed / items.length) * 100) + '%';
+                    
+                    const row = document.getElementById('bulkMoveRow_' + item.onuDbId);
+                    if (row) row.style.backgroundColor = 'rgba(255, 193, 7, 0.15)';
+                    
+                    try {
+                        const formData = new FormData();
+                        formData.append('csrf_token', csrfToken);
+                        formData.append('action', 'move_onu');
+                        formData.append('onu_id', item.onuDbId);
+                        formData.append('new_slot', item.newSlot);
+                        formData.append('new_port', item.newPort);
+                        formData.append('ajax', '1');
+                        
+                        const resp = await fetch('?page=huawei-olt', {
+                            method: 'POST',
+                            body: formData,
+                            redirect: 'manual'
+                        });
+                        
+                        let success = false;
+                        let msg = '';
+                        
+                        if (resp.type === 'opaqueredirect' || resp.status === 302 || resp.status === 0) {
+                            const loc = resp.headers.get('Location') || '';
+                            if (loc.includes('msg_type=success')) {
+                                success = true;
+                                const msgMatch = loc.match(/msg=([^&]*)/);
+                                msg = msgMatch ? decodeURIComponent(msgMatch[1]) : 'Moved successfully';
+                            } else {
+                                success = true;
+                                msg = 'Move submitted';
+                            }
+                        } else {
+                            const text = await resp.text();
+                            if (text.includes('"success":true') || text.includes('success')) {
+                                success = true;
+                                msg = 'Moved successfully';
+                            } else {
+                                msg = 'Move may have failed';
+                            }
+                        }
+                        
+                        if (success) {
+                            ok++;
+                            log.innerHTML += '<div class="text-success">✓ ' + item.sn + ': ' + item.oldPort + ' → ' + item.newFsp + '</div>';
+                            if (row) row.style.backgroundColor = 'rgba(25, 135, 84, 0.1)';
+                        } else {
+                            fail++;
+                            log.innerHTML += '<div class="text-danger">✗ ' + item.sn + ': ' + msg + '</div>';
+                            if (row) row.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+                        }
+                    } catch (e) {
+                        fail++;
+                        log.innerHTML += '<div class="text-danger">✗ ' + item.sn + ': ' + e.message + '</div>';
+                        if (row) row.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+                    }
+                    
+                    document.getElementById('bulkMoveOk').textContent = ok;
+                    document.getElementById('bulkMoveFail').textContent = fail;
+                    log.scrollTop = log.scrollHeight;
+                    
+                    if (i < items.length - 1 && !bulkMoveAbort) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+                
+                if (bulkMoveTimer) clearInterval(bulkMoveTimer);
+                bulkMoveRunning = false;
+                document.getElementById('bulkMoveStatus').textContent = 'Complete — ' + ok + ' moved, ' + fail + ' failed';
+                document.getElementById('bulkMoveProgressBar').classList.replace('bg-warning', ok > 0 && fail === 0 ? 'bg-success' : 'bg-info');
+                document.getElementById('bulkMoveProgressBar').style.width = '100%';
+                document.getElementById('bulkMoveStopBtn').disabled = true;
+                document.getElementById('bulkMoveTimeLeft').textContent = '';
             }
             </script>
 
