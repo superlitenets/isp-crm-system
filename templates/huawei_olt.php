@@ -2103,7 +2103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Only mark discovery log and queue TR-069 if authorization succeeded
                 if ($messageType === 'success') {
-                    $db->prepare("UPDATE huawei_onus SET authorized_at = NOW() WHERE id = ? AND authorized_at IS NULL")->execute([$onuId]);
+                    $db->prepare("UPDATE huawei_onus SET is_authorized = TRUE, authorized_at = NOW() WHERE id = ?")->execute([$onuId]);
                     $onuSn = $onu['sn'] ?? $sn;
                     if (!empty($onuSn)) {
                         $db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = NOW() WHERE serial_number = ?")->execute([$onuSn]);

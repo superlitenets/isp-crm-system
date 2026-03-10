@@ -483,3 +483,16 @@ BEGIN
     END IF;
 END
 $$;
+
+-- ==================== Fix ONUs authorized but still marked is_authorized=FALSE ====================
+UPDATE huawei_onus 
+SET is_authorized = TRUE 
+WHERE is_authorized = FALSE 
+AND authorized_at IS NOT NULL;
+
+UPDATE onu_discovery_log 
+SET authorized = true, authorized_at = CURRENT_TIMESTAMP
+WHERE authorized = false
+AND serial_number IN (
+    SELECT sn FROM huawei_onus WHERE is_authorized = TRUE
+);
