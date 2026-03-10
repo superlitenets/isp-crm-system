@@ -413,71 +413,74 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 
                 $ztMessages = [];
                 $serviceVlan = $vlanId ?: 902;
+                $authMode = $_POST['auth_mode'] ?? 'standard';
                 
                 $ztWanType = trim($_POST['zt_wan_type'] ?? '');
                 $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
                 $pppoePassword = trim($_POST['pppoe_password'] ?? '');
                 
-                if ($ztWanType === 'pppoe' && !empty($pppoeUsername)) {
-                    $db->prepare("UPDATE huawei_onus SET wan_mode = 'pppoe', pppoe_username = ? WHERE id = ?")->execute([$pppoeUsername, $onuId]);
-                }
-                
-                $ztWifiEnable = !empty($_POST['zt_wifi_enable']);
-                $ztWifiSsid24 = trim($_POST['zt_wifi_ssid_24'] ?? '');
-                $ztWifiPass24 = trim($_POST['zt_wifi_pass_24'] ?? '');
-                $ztWifiSecurity = $_POST['zt_wifi_security'] ?? 'wpa2psk';
-                $ztWifiEncryption = $_POST['zt_wifi_encryption'] ?? 'aes';
-                
-                $hasTr069Config = ($ztWanType && $ztWanType !== '') || ($ztWifiEnable && !empty($ztWifiSsid24));
-                
-                if ($hasTr069Config) {
-                    $tr069Config = [
-                        'onu_id' => $onuId,
-                        'wan_vlan' => $serviceVlan,
-                        'connection_type' => $ztWanType ?: 'none',
-                        'pppoe_username' => $pppoeUsername,
-                        'pppoe_password' => $pppoePassword,
-                        'nat_enable' => true,
-                        'wifi_enabled' => $ztWifiEnable,
-                        'wifi_ssid_24' => $ztWifiSsid24,
-                        'wifi_pass_24' => $ztWifiPass24,
-                        'wifi_ssid_5' => $ztWifiSsid24,
-                        'wifi_pass_5' => $ztWifiPass24,
-                        'wifi_security' => $ztWifiSecurity,
-                        'wifi_encryption' => $ztWifiEncryption,
-                        'static_ip' => trim($_POST['zt_static_ip'] ?? ''),
-                        'static_mask' => trim($_POST['zt_static_mask'] ?? ''),
-                        'static_gateway' => trim($_POST['zt_static_gateway'] ?? ''),
-                        'static_dns1' => trim($_POST['zt_static_dns1'] ?? ''),
-                        'static_dns2' => trim($_POST['zt_static_dns2'] ?? '')
-                    ];
+                if ($authMode === 'zero_touch') {
+                    if ($ztWanType === 'pppoe' && !empty($pppoeUsername)) {
+                        $db->prepare("UPDATE huawei_onus SET wan_mode = 'pppoe', pppoe_username = ? WHERE id = ?")->execute([$pppoeUsername, $onuId]);
+                    }
                     
-                    $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
-                        onu_id INTEGER PRIMARY KEY,
-                        config_data TEXT,
-                        status VARCHAR(20) DEFAULT 'pending',
-                        error_message TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP,
-                        applied_at TIMESTAMP
-                    )");
-                    try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN error_message TEXT"); } catch (Exception $e) {}
-                    try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN applied_at TIMESTAMP"); } catch (Exception $e) {}
+                    $ztWifiEnable = !empty($_POST['zt_wifi_enable']);
+                    $ztWifiSsid24 = trim($_POST['zt_wifi_ssid_24'] ?? '');
+                    $ztWifiPass24 = trim($_POST['zt_wifi_pass_24'] ?? '');
+                    $ztWifiSecurity = $_POST['zt_wifi_security'] ?? 'wpa2psk';
+                    $ztWifiEncryption = $_POST['zt_wifi_encryption'] ?? 'aes';
                     
-                    $stmt = $db->prepare("
-                        INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, error_message, created_at)
-                        VALUES (?, ?, 'pending', NULL, CURRENT_TIMESTAMP)
-                        ON CONFLICT (onu_id) DO UPDATE SET
-                            config_data = EXCLUDED.config_data,
-                            status = 'pending',
-                            error_message = NULL,
-                            updated_at = CURRENT_TIMESTAMP
-                    ");
-                    try {
-                        $stmt->execute([$onuId, json_encode($tr069Config)]);
-                        $ztMessages[] = 'TR-069 config queued';
-                    } catch (Exception $e) {
-                        $debugLog(2, 'TR-069 queue failed: ' . $e->getMessage());
+                    $hasTr069Config = ($ztWanType && $ztWanType !== '') || ($ztWifiEnable && !empty($ztWifiSsid24));
+                    
+                    if ($hasTr069Config) {
+                        $tr069Config = [
+                            'onu_id' => $onuId,
+                            'wan_vlan' => $serviceVlan,
+                            'connection_type' => $ztWanType ?: 'none',
+                            'pppoe_username' => $pppoeUsername,
+                            'pppoe_password' => $pppoePassword,
+                            'nat_enable' => true,
+                            'wifi_enabled' => $ztWifiEnable,
+                            'wifi_ssid_24' => $ztWifiSsid24,
+                            'wifi_pass_24' => $ztWifiPass24,
+                            'wifi_ssid_5' => $ztWifiSsid24,
+                            'wifi_pass_5' => $ztWifiPass24,
+                            'wifi_security' => $ztWifiSecurity,
+                            'wifi_encryption' => $ztWifiEncryption,
+                            'static_ip' => trim($_POST['zt_static_ip'] ?? ''),
+                            'static_mask' => trim($_POST['zt_static_mask'] ?? ''),
+                            'static_gateway' => trim($_POST['zt_static_gateway'] ?? ''),
+                            'static_dns1' => trim($_POST['zt_static_dns1'] ?? ''),
+                            'static_dns2' => trim($_POST['zt_static_dns2'] ?? '')
+                        ];
+                        
+                        $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
+                            onu_id INTEGER PRIMARY KEY,
+                            config_data TEXT,
+                            status VARCHAR(20) DEFAULT 'pending',
+                            error_message TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP,
+                            applied_at TIMESTAMP
+                        )");
+                        try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN error_message TEXT"); } catch (Exception $e) {}
+                        try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN applied_at TIMESTAMP"); } catch (Exception $e) {}
+                        
+                        $stmt = $db->prepare("
+                            INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, error_message, created_at)
+                            VALUES (?, ?, 'pending', NULL, CURRENT_TIMESTAMP)
+                            ON CONFLICT (onu_id) DO UPDATE SET
+                                config_data = EXCLUDED.config_data,
+                                status = 'pending',
+                                error_message = NULL,
+                                updated_at = CURRENT_TIMESTAMP
+                        ");
+                        try {
+                            $stmt->execute([$onuId, json_encode($tr069Config)]);
+                            $ztMessages[] = 'TR-069 config queued';
+                        } catch (Exception $e) {
+                            $debugLog(2, 'TR-069 queue failed: ' . $e->getMessage());
+                        }
                     }
                 }
                 
@@ -18541,11 +18544,17 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured. Installation date will be set to today.
                         </div>
                     </div>
+                    <input type="hidden" name="auth_mode" id="authModeInput" value="standard">
                     <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success" id="authSubmitBtn">
-                            <i class="bi bi-check-circle me-1"></i> Authorize & Configure
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success" id="authSubmitBtn" onclick="document.getElementById('authModeInput').value='standard'">
+                                <i class="bi bi-check-circle me-1"></i> Authorize
+                            </button>
+                            <button type="submit" class="btn btn-primary" id="authZtSubmitBtn" onclick="document.getElementById('authModeInput').value='zero_touch'">
+                                <i class="bi bi-magic me-1"></i> Zero Touch Authorize
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -18557,6 +18566,16 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const selectedOption = select.options[select.selectedIndex];
         document.getElementById('authZoneName').value = selectedOption.dataset.name || '';
     }
+    
+    document.getElementById('authZtSubmitBtn')?.addEventListener('click', function(e) {
+        const panel = document.getElementById('zeroTouchPanel');
+        if (!panel.classList.contains('show')) {
+            new bootstrap.Collapse(panel, { toggle: true });
+            e.preventDefault();
+            setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350);
+            return;
+        }
+    });
     
     function toggleZtWanFields() {
         const type = document.getElementById('ztWanType').value;
