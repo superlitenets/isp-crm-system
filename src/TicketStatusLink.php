@@ -37,7 +37,7 @@ class TicketStatusLink {
         $tokenLookup = substr(hash('sha256', $plainToken), 0, 32);
         
         $stmt = $this->pdo->prepare("
-            SELECT tst.*, t.id as ticket_exists, t.status as current_status, t.subject, t.priority,
+            SELECT tst.*, t.id as ticket_exists, t.status as current_status, t.subject, t.priority, t.category,
                    c.name as customer_name, e.name as assigned_to_name
             FROM ticket_status_tokens tst
             JOIN tickets t ON tst.ticket_id = t.id

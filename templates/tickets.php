@@ -1515,6 +1515,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                         <i class="bi bi-info-circle"></i> Please provide resolution details and upload photos of the completed work.
                     </div>
                     
+                    <?php if (strtolower($ticketData['category'] ?? '') === 'installation'): ?>
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Router Serial Number</label>
@@ -1536,6 +1537,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                             <input type="text" class="form-control" name="equipment_installed" placeholder="e.g., ONU, Router, Switch">
                         </div>
                     </div>
+                    <?php endif; ?>
                     
                     <div class="mb-3">
                         <label class="form-label">Resolution Notes *</label>

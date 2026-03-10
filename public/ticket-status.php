@@ -44,6 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                 $currentAssigned = $assignedStmt->fetchColumn();
                 $resolvedByUserId = $currentAssigned ? (int)$currentAssigned : (!empty($tokenRecord['employee_id']) ? (int)$tokenRecord['employee_id'] : null);
                 
+                $ticketCategory = strtolower($tokenRecord['category'] ?? '');
+                $isInstallation = ($ticketCategory === 'installation');
+                
                 if ($newStatus === 'Resolved') {
                     $resolutionNotes = trim($_POST['resolution_notes'] ?? '');
                     $routerSerial = trim($_POST['router_serial'] ?? '');
@@ -55,11 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     if (empty($resolutionNotes)) {
                         throw new Exception('Resolution notes are required.');
                     }
-                    if (empty($routerSerial)) {
-                        throw new Exception('Router serial number is required.');
-                    }
-                    if (empty($cableUsed)) {
-                        throw new Exception('Cable used is required.');
+                    if ($isInstallation) {
+                        if (empty($routerSerial)) {
+                            throw new Exception('Router serial number is required.');
+                        }
+                        if (empty($cableUsed)) {
+                            throw new Exception('Cable used is required.');
+                        }
                     }
                 }
                 
@@ -150,6 +155,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
             }
         }
     }
+}
+
+$isInstallation = false;
+if ($tokenRecord) {
+    $isInstallation = strtolower($tokenRecord['category'] ?? '') === 'installation';
 }
 ?>
 <!DOCTYPE html>
@@ -312,6 +322,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                         <input type="hidden" name="token" value="<?= htmlspecialchars($tokenParam) ?>">
                         <input type="hidden" name="new_status" value="Resolved">
                         
+                        <?php if ($isInstallation): ?>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small">Router Serial <span style="color:red">*</span></label>
@@ -333,6 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                                 <input type="text" class="form-control form-control-sm" name="equipment_installed" placeholder="ONU, Router">
                             </div>
                         </div>
+                        <?php endif; ?>
                         
                         <div class="mb-3">
                             <label class="form-label small">Resolution Notes *</label>

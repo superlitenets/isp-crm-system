@@ -550,6 +550,7 @@ const app = {
                             <i class="bi bi-info-circle"></i> Please provide details about the completed work.
                         </div>
                         <form id="resolve-ticket-form-${ticket.id}" onsubmit="app.submitResolveForm(event, ${ticket.id}); return false;">
+                            ${(ticket.category || '').toLowerCase() === 'installation' ? `
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">Router Serial Number</label>
                                 <input type="text" class="form-control form-control-sm" name="router_serial" placeholder="e.g., SN123456789">
@@ -566,6 +567,7 @@ const app = {
                                 <label class="form-label small fw-bold">Equipment Installed</label>
                                 <input type="text" class="form-control form-control-sm" name="equipment_installed" placeholder="e.g., ONU, Router, Switch">
                             </div>
+                            ` : ''}
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">Resolution Notes *</label>
                                 <textarea class="form-control form-control-sm" name="resolution_notes" rows="3" required placeholder="Describe what was done to resolve this ticket..."></textarea>
@@ -1465,6 +1467,7 @@ const app = {
                             <i class="bi bi-info-circle"></i> Please provide details about the completed work.
                         </div>
                         <form id="resolve-ticket-form-${ticket.id}" onsubmit="app.submitResolveForm(event, ${ticket.id}); return false;">
+                            ${(ticket.category || '').toLowerCase() === 'installation' ? `
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">Router Serial Number</label>
                                 <input type="text" class="form-control form-control-sm" name="router_serial" placeholder="e.g., SN123456789">
@@ -1481,6 +1484,7 @@ const app = {
                                 <label class="form-label small fw-bold">Equipment Installed</label>
                                 <input type="text" class="form-control form-control-sm" name="equipment_installed" placeholder="e.g., ONU, Router, Switch">
                             </div>
+                            ` : ''}
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">Resolution Notes *</label>
                                 <textarea class="form-control form-control-sm" name="resolution_notes" rows="3" required placeholder="Describe what was done to resolve this ticket..."></textarea>
