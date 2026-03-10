@@ -2165,7 +2165,7 @@ if ($page === 'order') {
                 $existingOrder = $db->prepare("
                     SELECT id, order_number, order_status 
                     FROM orders 
-                    WHERE customer_phone = ? AND order_status IN ('new', 'confirmed', 'pending')
+                    WHERE customer_phone = ?
                     ORDER BY created_at DESC LIMIT 1
                 ");
                 $existingOrder->execute([$customerPhone]);
@@ -9621,14 +9621,14 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $existingOrder = $db->prepare("
                         SELECT id, order_number, order_status, created_at 
                         FROM orders 
-                        WHERE customer_phone = ? AND order_status IN ('new', 'confirmed', 'pending')
+                        WHERE customer_phone = ?
                         ORDER BY created_at DESC LIMIT 1
                     ");
                     $existingOrder->execute([$customerPhone]);
                     $dupOrder = $existingOrder->fetch(\PDO::FETCH_ASSOC);
                     
                     if ($dupOrder) {
-                        $_SESSION['error_message'] = 'An active order already exists for this phone number (' . $customerPhone . '). Order #' . $dupOrder['order_number'] . ' is currently "' . $dupOrder['order_status'] . '".';
+                        $_SESSION['error_message'] = 'An order already exists for this phone number (' . $customerPhone . '). Order #' . $dupOrder['order_number'] . '.';
                     } else {
                     $orderData = [
                         'customer_name' => $customerName,
