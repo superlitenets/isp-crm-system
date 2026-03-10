@@ -18498,34 +18498,31 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                 </div>
                                                 
                                                 <div id="ztWifiFields" class="d-none">
-                                                    <div class="mb-2 p-2 bg-light rounded">
-                                                        <label class="form-label small fw-bold mb-1"><i class="bi bi-broadcast me-1"></i>2.4 GHz</label>
-                                                        <div class="row g-2">
-                                                            <div class="col-md-6">
-                                                                <input type="text" name="zt_wifi_ssid_24" id="ztWifiSsid24" class="form-control form-control-sm" placeholder="SSID Name">
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <div class="input-group input-group-sm">
-                                                                    <input type="text" name="zt_wifi_pass_24" id="ztWifiPass24" class="form-control form-control-sm" placeholder="Password (min 8 chars)">
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-bold mb-1"><i class="bi bi-broadcast me-1"></i>SSID Name</label>
+                                                        <input type="text" name="zt_wifi_ssid_24" id="ztWifiSsid24" class="form-control form-control-sm" placeholder="e.g., MyNetwork">
                                                     </div>
                                                     
                                                     <div class="row g-2">
-                                                        <div class="col-md-6">
+                                                        <div class="col-md-4">
                                                             <label class="form-label small">Security</label>
-                                                            <select name="zt_wifi_security" class="form-select form-select-sm">
-                                                                <option value="wpa2psk" selected>WPA2-PSK (Recommended)</option>
+                                                            <select name="zt_wifi_security" id="ztWifiSecurity" class="form-select form-select-sm" onchange="toggleZtWifiSecurity()">
+                                                                <option value="wpa2psk" selected>WPA2-PSK</option>
                                                                 <option value="wpa_wpa2">WPA/WPA2 Mixed</option>
+                                                                <option value="open">Open (No Password)</option>
+                                                                <option value="none">None</option>
                                                             </select>
                                                         </div>
-                                                        <div class="col-md-6">
+                                                        <div class="col-md-4" id="ztEncryptionGroup">
                                                             <label class="form-label small">Encryption</label>
                                                             <select name="zt_wifi_encryption" class="form-select form-select-sm">
-                                                                <option value="aes" selected>AES (Recommended)</option>
+                                                                <option value="aes" selected>AES</option>
                                                                 <option value="tkip_aes">TKIP/AES Mixed</option>
                                                             </select>
+                                                        </div>
+                                                        <div class="col-md-4" id="ztPskGroup">
+                                                            <label class="form-label small">Pre-shared Key</label>
+                                                            <input type="text" name="zt_wifi_pass_24" id="ztWifiPass24_2" class="form-control form-control-sm" placeholder="Min 8 chars">
                                                         </div>
                                                     </div>
                                                 </div>
@@ -18584,6 +18581,13 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     function toggleZtWifiFields() {
         const enabled = document.getElementById('ztWifiEnable').checked;
         document.getElementById('ztWifiFields').classList.toggle('d-none', !enabled);
+    }
+    
+    function toggleZtWifiSecurity() {
+        const sec = document.getElementById('ztWifiSecurity').value;
+        const needsKey = (sec === 'wpa2psk' || sec === 'wpa_wpa2');
+        document.getElementById('ztPskGroup').classList.toggle('d-none', !needsKey);
+        document.getElementById('ztEncryptionGroup').classList.toggle('d-none', !needsKey);
     }
     
     function togglePasswordVisibility(inputId, btn) {
