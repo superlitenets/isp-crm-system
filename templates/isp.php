@@ -547,6 +547,10 @@ if ($action === 'link_onu') {
         }
     }
     
+    try {
+        $db->exec("ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS huawei_onu_id INTEGER");
+    } catch (\Exception $e) {}
+    
     $stmt = $db->prepare("UPDATE radius_subscriptions SET huawei_onu_id = ? WHERE id = ?");
     $stmt->execute([$onuId > 0 ? $onuId : null, $subscriptionId]);
     
