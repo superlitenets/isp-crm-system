@@ -10454,14 +10454,28 @@ try {
                                 <input type="hidden" name="onu_id" id="discMoveOnuId">
                                 <input type="hidden" name="redirect_view" value="onus&unconfigured=1">
                                 
-                                <div class="alert alert-warning mb-3">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                    This ONU is already authorized on another port. It will be moved to the new location.
-                                </div>
-                                <div class="alert alert-info mb-3">
-                                    <strong>ONU:</strong> <span id="discMoveSn"></span><br>
-                                    <strong>Current Port:</strong> <span id="discMoveCurrent"></span><br>
-                                    <strong>Detected at:</strong> <span id="discMoveDetected"></span>
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center justify-content-center mb-2">
+                                        <span class="badge bg-secondary px-2 py-1" style="font-size:0.75rem;">ONU</span>
+                                        <code class="ms-2 fw-bold" id="discMoveSn" style="font-size:1rem;"></code>
+                                    </div>
+                                    <div class="row g-2 align-items-center text-center">
+                                        <div class="col-5">
+                                            <div class="border rounded p-2 bg-danger bg-opacity-10">
+                                                <small class="text-muted d-block mb-1">Previous Port</small>
+                                                <code class="fw-bold text-danger" id="discMoveCurrent" style="font-size:1.1rem;"></code>
+                                            </div>
+                                        </div>
+                                        <div class="col-2">
+                                            <i class="bi bi-arrow-right-circle-fill text-warning" style="font-size:1.5rem;"></i>
+                                        </div>
+                                        <div class="col-5">
+                                            <div class="border rounded p-2 bg-success bg-opacity-10">
+                                                <small class="text-muted d-block mb-1">New Port</small>
+                                                <code class="fw-bold text-success" id="discMoveDetected" style="font-size:1.1rem;"></code>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <div class="row g-3">
@@ -10478,6 +10492,11 @@ try {
                                         <input type="number" name="new_onu_id" id="discMoveNewOnuId" class="form-control" min="0" max="127" placeholder="Auto">
                                     </div>
                                 </div>
+                                
+                                <div class="alert alert-warning mt-3 mb-0">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    The ONU will be briefly disconnected during migration. Service-ports will be automatically re-created.
+                                </div>
                             </div>
                             <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -10488,11 +10507,21 @@ try {
                 </div>
             </div>
             <script>
+            function updateDiscMoveNewPortDisplay() {
+                var s = document.getElementById('discMoveNewSlot').value;
+                var p = document.getElementById('discMoveNewPort').value;
+                var id = document.getElementById('discMoveNewOnuId').value;
+                document.getElementById('discMoveDetected').textContent = '0/' + s + '/' + p + (id ? ':' + id : '');
+            }
+            
+            document.getElementById('discMoveNewSlot')?.addEventListener('input', updateDiscMoveNewPortDisplay);
+            document.getElementById('discMoveNewPort')?.addEventListener('input', updateDiscMoveNewPortDisplay);
+            document.getElementById('discMoveNewOnuId')?.addEventListener('input', updateDiscMoveNewPortDisplay);
+            
             function openDiscoveryMoveModal(onuDbId, sn, currentSlot, currentPort, currentOnuId, detectedFsp) {
                 document.getElementById('discMoveOnuId').value = onuDbId;
                 document.getElementById('discMoveSn').textContent = sn;
                 document.getElementById('discMoveCurrent').textContent = '0/' + currentSlot + '/' + currentPort + ':' + currentOnuId;
-                document.getElementById('discMoveDetected').textContent = detectedFsp || 'Unknown';
                 
                 var parts = (detectedFsp || '').replace(/\s/g, '').split('/');
                 if (parts.length >= 3) {
@@ -10504,6 +10533,7 @@ try {
                     }
                 }
                 
+                updateDiscMoveNewPortDisplay();
                 new bootstrap.Modal(document.getElementById('discoveryMoveModal')).show();
             }
             </script>
