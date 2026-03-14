@@ -10220,9 +10220,9 @@ try {
                                         $portMismatch = ($existingPort !== trim($detectedFsp));
                                         ?>
                                         <?php if ($portMismatch): ?>
-                                        <button type="button" class="btn btn-sm btn-success" 
+                                        <button type="button" class="btn btn-sm btn-warning" 
                                             onclick="openReauthorizeModal(<?= $existingAuth['id'] ?>, '<?= htmlspecialchars($disc['serial_number']) ?>', '<?= htmlspecialchars($existingPort) ?>', '<?= htmlspecialchars($detectedFsp) ?>', '<?= $disc['olt_id'] ?>', '<?= $disc['onu_type_id'] ?? '' ?>')">
-                                            <i class="bi bi-check-lg me-1"></i> Authorize
+                                            <i class="bi bi-arrow-right-circle me-1"></i> Move
                                         </button>
                                         <br><small class="text-muted">Was on <?= $existingPort ?></small>
                                         <?php else: ?>
