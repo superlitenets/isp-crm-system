@@ -492,12 +492,6 @@ class GenieACS {
             ];
         }
         
-        $hasCRCredentials = !empty($this->crUsername) && $this->crUsername !== 'genieacs';
-        if (!$hasCRCredentials) {
-            $this->clearCRCredentialsViaOLT($serial);
-            error_log("[GenieACS] CR cleared via OLT for {$serial}");
-        }
-        
         $maxRetries = 3;
         error_log("[GenieACS] sendConnectionRequest got HTTP {$httpCode} for {$serial}, retrying up to {$maxRetries} times");
         
@@ -793,15 +787,9 @@ class GenieACS {
             error_log("[GenieACS] setParameterValues delivered instantly to {$deviceId}");
         } else {
             $serial = $this->extractSerialFromDeviceId($deviceId);
-            $hasCRCredentials = !empty($this->crUsername) && $this->crUsername !== 'genieacs';
             $delivered = false;
             
             error_log("[GenieACS] setParameterValues got HTTP {$httpCode} for {$deviceId}, attempting recovery");
-            
-            if ($serial && !$hasCRCredentials) {
-                $this->clearCRCredentialsViaOLT($serial);
-                error_log("[GenieACS] CR credentials cleared via OLT for {$serial}");
-            }
             
             for ($retry = 1; $retry <= 3; $retry++) {
                 sleep(3 + $retry);
@@ -902,11 +890,11 @@ class GenieACS {
             $huaweiOLT = new HuaweiOLT($this->db);
             
             $cmd = "interface gpon {$frame}/{$slot}\r\n";
-            $cmd .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"\" connection-request-password \"\"\r\n";
+            $cmd .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"{$this->crUsername}\" connection-request-password \"{$this->crPassword}\"\r\n";
             $cmd .= "quit";
             
             $result = $huaweiOLT->executeCommand($oltId, $cmd);
-            error_log("[GenieACS] Clear CR credentials via OLT for {$serial} (F{$frame}/S{$slot}/P{$port}/O{$onuId}): " . 
+            error_log("[GenieACS] Reset CR credentials via OLT for {$serial} to '{$this->crUsername}' (F{$frame}/S{$slot}/P{$port}/O{$onuId}): " . 
                 ($result['success'] ? 'SUCCESS' : 'FAILED'));
             
             return $result;
@@ -5073,19 +5061,19 @@ PROVISION;
      */
     public function clearConnectionRequestAuth(string $deviceId): array {
         $params = [
-            ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', '', 'xsd:string'],
-            ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', '', 'xsd:string'],
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $this->crUsername, 'xsd:string'],
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $this->crPassword, 'xsd:string'],
         ];
         
-        error_log("[GenieACS] Clearing Connection Request auth for {$deviceId}");
+        error_log("[GenieACS] Resetting Connection Request credentials to configured values for {$deviceId}");
         
         $result = $this->setParameterValues($deviceId, $params);
         
         return [
             'success' => $result['success'] ?? false,
             'message' => ($result['success'] ?? false)
-                ? 'Connection Request authentication cleared - instant push now enabled'
-                : 'Failed to clear Connection Request auth',
+                ? "Connection Request credentials reset to '{$this->crUsername}'"
+                : 'Failed to reset Connection Request credentials',
             'error' => $result['error'] ?? null
         ];
     }
@@ -5096,27 +5084,24 @@ PROVISION;
      */
     public function enableInstantProvisioning(string $deviceId, string $acsUrl = ''): array {
         $params = [
-            // Clear connection request auth
-            ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', '', 'xsd:string'],
-            ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', '', 'xsd:string'],
-            // Enable periodic inform
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $this->crUsername, 'xsd:string'],
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $this->crPassword, 'xsd:string'],
             ['InternetGatewayDevice.ManagementServer.PeriodicInformEnable', true, 'xsd:boolean'],
-            ['InternetGatewayDevice.ManagementServer.PeriodicInformInterval', 60, 'xsd:unsignedInt'],
+            ['InternetGatewayDevice.ManagementServer.PeriodicInformInterval', 300, 'xsd:unsignedInt'],
         ];
         
-        // Set ACS URL if provided
         if (!empty($acsUrl)) {
             $params[] = ['InternetGatewayDevice.ManagementServer.URL', $acsUrl, 'xsd:string'];
         }
         
-        error_log("[GenieACS] Enabling instant provisioning for {$deviceId}");
+        error_log("[GenieACS] Enabling instant provisioning for {$deviceId} with CR user '{$this->crUsername}'");
         
         $result = $this->setParameterValues($deviceId, $params);
         
         return [
             'success' => $result['success'] ?? false,
             'message' => ($result['success'] ?? false)
-                ? 'Instant provisioning enabled - device will respond to immediate push commands'
+                ? "Instant provisioning enabled with CR credentials '{$this->crUsername}'"
                 : 'Failed to enable instant provisioning',
             'error' => $result['error'] ?? null
         ];
@@ -5124,7 +5109,7 @@ PROVISION;
 
 
     /**
-     * Queue auth clear WITHOUT connection_request
+     * Queue CR credential reset WITHOUT connection_request
      * This queues the task to execute on next device inform (avoids 401)
      */
     public function queueClearAuth(string $deviceId): array {
@@ -5133,16 +5118,16 @@ PROVISION;
         $result = $this->request('POST', "/devices/{$encodedId}/tasks", [
             'name' => 'setParameterValues',
             'parameterValues' => [
-                ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', '', 'xsd:string'],
-                ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', '', 'xsd:string'],
+                ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $this->crUsername, 'xsd:string'],
+                ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $this->crPassword, 'xsd:string'],
             ]
         ]);
         
-        error_log("[GenieACS] Queued auth clear for {$deviceId} (will execute on next inform)");
+        error_log("[GenieACS] Queued CR credential reset to '{$this->crUsername}' for {$deviceId} (will execute on next inform)");
         
         return [
             'success' => $result['success'] ?? false,
-            'message' => 'Auth clear queued - will execute on next device inform (usually within 60 seconds)',
+            'message' => "CR credentials queued to reset to '{$this->crUsername}' - will execute on next device inform",
             'result' => $result
         ];
     }

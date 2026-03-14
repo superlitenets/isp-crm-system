@@ -13,8 +13,9 @@ class Tr069Authorization
     {
         $this->acs = $acs;
         $this->acsUrl = $acsUrl ?? ($_ENV['GENIEACS_URL'] ?? 'http://localhost:7547');
-        $this->connReqUser = $_ENV['TR069_CONN_REQ_USER'] ?? 'genieacs';
-        $this->connReqPass = $_ENV['TR069_CONN_REQ_PASS'] ?? 'genieacs';
+        $crCreds = $acs->getCRCredentials();
+        $this->connReqUser = $_ENV['TR069_CONN_REQ_USER'] ?? $crCreds['username'];
+        $this->connReqPass = $_ENV['TR069_CONN_REQ_PASS'] ?? $crCreds['password'];
     }
 
     public function handle(string $deviceId): array

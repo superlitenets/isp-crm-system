@@ -16665,16 +16665,16 @@ try {
                                 </div>
 
                                 <hr>
-                                <h6 class="mb-3"><i class="bi bi-shield-lock me-2"></i>ConnectionRequest Credentials</h6>
-                                <p class="small text-muted">Optional. These are cleared per-ONU during TR-069 setup to allow GenieACS to summon devices without authentication. Huawei ONUs work fine without CR credentials.</p>
+                                <h6 class="mb-3"><i class="bi bi-shield-lock me-2"></i>Connection Request Credentials</h6>
+                                <p class="small text-muted">Credentials GenieACS uses to authenticate when sending connection requests to ONUs. Must match what your GenieACS provision sets on devices. Defaults to <code>genieacs</code> / <code>genieacs</code> if left blank.</p>
                                 <div class="row">
                                     <div class="col-6 mb-3">
                                         <label class="form-label">CR Username</label>
-                                        <input type="text" name="genieacs_cr_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_username'] ?? '') ?>" placeholder="Leave blank for no auth">
+                                        <input type="text" name="genieacs_cr_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_username'] ?? '') ?>" placeholder="genieacs">
                                     </div>
                                     <div class="col-6 mb-3">
                                         <label class="form-label">CR Password</label>
-                                        <input type="text" name="genieacs_cr_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_password'] ?? '') ?>" placeholder="Leave blank for no auth">
+                                        <input type="text" name="genieacs_cr_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_cr_password'] ?? '') ?>" placeholder="genieacs">
                                     </div>
                                 </div>
 
