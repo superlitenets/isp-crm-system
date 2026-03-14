@@ -2390,6 +2390,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 exit;
                 break;
+            case 'reauthorize_onu':
+                $onuId = (int)$_POST['onu_id'];
+                $newFrame = isset($_POST['new_frame']) && $_POST['new_frame'] !== '' ? (int)$_POST['new_frame'] : 0;
+                $newSlot = (int)($_POST['new_slot'] ?? 0);
+                $newPort = (int)($_POST['new_port'] ?? 0);
+                
+                $onu = $huaweiOLT->getONU($onuId);
+                if (!$onu) {
+                    $message = 'ONU not found';
+                    $messageType = 'danger';
+                } else {
+                    $oldLocation = ($onu['frame'] ?? 0) . '/' . $onu['slot'] . '/' . $onu['port'] . ':' . $onu['onu_id'];
+                    $huaweiOLT->updateONU($onuId, [
+                        'frame' => $newFrame,
+                        'slot' => $newSlot,
+                        'port' => $newPort,
+                    ]);
+                    
+                    $tr069Msg = '';
+                    try {
+                        $genieacs = new \App\GenieACS($db);
+                        if ($genieacs->isConfigured()) {
+                            $genieacsId = $onu['genieacs_id'] ?? null;
+                            if ($genieacsId) {
+                                $crCreds = $genieacs->getCRCredentials();
+                                $params = [
+                                    ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $crCreds['username'], 'xsd:string'],
+                                    ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $crCreds['password'], 'xsd:string'],
+                                    ['InternetGatewayDevice.ManagementServer.PeriodicInformEnable', true, 'xsd:boolean'],
+                                    ['InternetGatewayDevice.ManagementServer.PeriodicInformInterval', 300, 'xsd:unsignedInt'],
+                                ];
+                                $genieacs->setParameterValues($genieacsId, $params);
+                                $tr069Msg = ' - TR-069 credentials re-pushed';
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $tr069Msg = ' (TR-069 push skipped: ' . $e->getMessage() . ')';
+                    }
+                    
+                    $huaweiOLT->addLog([
+                        'olt_id' => $onu['olt_id'],
+                        'onu_id' => $onuId,
+                        'action' => 'reauthorize_onu',
+                        'status' => 'success',
+                        'message' => "Re-authorized ONU {$onu['sn']} from {$oldLocation} to {$newFrame}/{$newSlot}/{$newPort}:{$onu['onu_id']}{$tr069Msg}",
+                        'user_id' => $_SESSION['user_id'] ?? null
+                    ]);
+                    
+                    $message = "ONU re-authorized at {$newFrame}/{$newSlot}/{$newPort}" . $tr069Msg;
+                    $messageType = 'success';
+                }
+                $redirectView = isset($_POST['redirect_view']) ? $_POST['redirect_view'] : 'onu_detail&onu_id=' . $onuId;
+                header('Location: ?page=huawei-olt&view=' . $redirectView . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
             case 'move_onu':
                 $onuId = (int)$_POST['onu_id'];
                 $newSlot = (int)$_POST['new_slot'];
@@ -10161,11 +10216,19 @@ try {
                                     </td>
                                     <td>
                                         <?php if ($existingAuth): ?>
-                                        <button type="button" class="btn btn-sm btn-warning" 
-                                            onclick="openDiscoveryMoveModal(<?= $existingAuth['id'] ?>, '<?= htmlspecialchars($disc['serial_number']) ?>', <?= (int)$existingAuth['slot'] ?>, <?= (int)$existingAuth['port'] ?>, <?= (int)$existingAuth['onu_id'] ?>, '<?= htmlspecialchars($detectedFsp) ?>')">
-                                            <i class="bi bi-arrow-right-circle me-1"></i> Move
+                                        <?php
+                                        $portMismatch = ($existingPort !== trim($detectedFsp));
+                                        ?>
+                                        <?php if ($portMismatch): ?>
+                                        <button type="button" class="btn btn-sm btn-success" 
+                                            onclick="openReauthorizeModal(<?= $existingAuth['id'] ?>, '<?= htmlspecialchars($disc['serial_number']) ?>', '<?= htmlspecialchars($existingPort) ?>', '<?= htmlspecialchars($detectedFsp) ?>', '<?= $disc['olt_id'] ?>', '<?= $disc['onu_type_id'] ?? '' ?>')">
+                                            <i class="bi bi-check-lg me-1"></i> Authorize
                                         </button>
-                                        <br><small class="text-muted">Currently on <?= $existingPort ?></small>
+                                        <br><small class="text-muted">Was on <?= $existingPort ?></small>
+                                        <?php else: ?>
+                                        <span class="badge bg-secondary"><i class="bi bi-check-circle me-1"></i>Already authorized</span>
+                                        <br><small class="text-muted">On <?= $existingPort ?></small>
+                                        <?php endif; ?>
                                         <?php else: ?>
                                         <button type="button" class="btn btn-sm btn-success" 
                                             onclick="openAuthModal('<?= htmlspecialchars($disc['serial_number']) ?>', '<?= $disc['olt_id'] ?>', '<?= htmlspecialchars($detectedFsp) ?>', '<?= $disc['onu_type_id'] ?? '' ?>')">
@@ -10713,6 +10776,63 @@ try {
             }
             </style>
             
+            <div class="modal fade" id="reauthorizeModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-check-circle me-2 text-success"></i>Re-authorize ONU</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post" action="?page=huawei-olt&view=onus">
+                            <div class="modal-body">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="reauthorize_onu">
+                                <input type="hidden" name="onu_id" id="reauthOnuId">
+                                <input type="hidden" name="olt_id" id="reauthOltId">
+                                <input type="hidden" name="redirect_view" value="onus&unconfigured=1">
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center justify-content-center mb-2">
+                                        <span class="badge bg-secondary px-2 py-1" style="font-size:0.75rem;">ONU</span>
+                                        <code class="ms-2 fw-bold" id="reauthSn" style="font-size:1rem;"></code>
+                                    </div>
+                                    <div class="row g-2 align-items-center text-center">
+                                        <div class="col-5">
+                                            <div class="border rounded p-2 bg-danger bg-opacity-10">
+                                                <small class="text-muted d-block mb-1">Old Location</small>
+                                                <code class="fw-bold text-danger" id="reauthOldPort" style="font-size:1.1rem;"></code>
+                                            </div>
+                                        </div>
+                                        <div class="col-2">
+                                            <i class="bi bi-arrow-right-circle-fill text-success" style="font-size:1.5rem;"></i>
+                                        </div>
+                                        <div class="col-5">
+                                            <div class="border rounded p-2 bg-success bg-opacity-10">
+                                                <small class="text-muted d-block mb-1">Detected Location</small>
+                                                <code class="fw-bold text-success" id="reauthNewPort" style="font-size:1.1rem;"></code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <input type="hidden" name="new_frame" id="reauthNewFrameInput">
+                                <input type="hidden" name="new_slot" id="reauthNewSlotInput">
+                                <input type="hidden" name="new_port" id="reauthNewPortInput">
+                                
+                                <div class="alert alert-info mt-3 mb-0">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    This ONU was already authorized but has been physically moved. Clicking <strong>Authorize</strong> will update the CRM records to match the new location and re-push TR-069 credentials.
+                                </div>
+                            </div>
+                            <div class="modal-footer justify-content-between">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i> Authorize</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
             <div class="modal fade" id="discoveryMoveModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -10796,6 +10916,24 @@ try {
             document.getElementById('discMoveNewSlot')?.addEventListener('input', updateDiscMoveNewPortDisplay);
             document.getElementById('discMoveNewPort')?.addEventListener('input', updateDiscMoveNewPortDisplay);
             document.getElementById('discMoveNewOnuId')?.addEventListener('input', updateDiscMoveNewPortDisplay);
+            
+            function openReauthorizeModal(onuDbId, sn, oldPort, detectedFsp, oltId, onuTypeId) {
+                document.getElementById('reauthOnuId').value = onuDbId;
+                document.getElementById('reauthOltId').value = oltId;
+                document.getElementById('reauthSn').textContent = sn;
+                document.getElementById('reauthOldPort').textContent = oldPort;
+                document.getElementById('reauthNewPort').textContent = detectedFsp;
+                
+                var parts = (detectedFsp || '').replace(/\s/g, '').split('/');
+                if (parts.length >= 3) {
+                    var portParts = parts[2].split(':');
+                    document.getElementById('reauthNewFrameInput').value = parseInt(parts[0]) || 0;
+                    document.getElementById('reauthNewSlotInput').value = parseInt(parts[1]) || 0;
+                    document.getElementById('reauthNewPortInput').value = parseInt(portParts[0]) || 0;
+                }
+                
+                new bootstrap.Modal(document.getElementById('reauthorizeModal')).show();
+            }
             
             function openDiscoveryMoveModal(onuDbId, sn, currentSlot, currentPort, currentOnuId, detectedFsp) {
                 document.getElementById('discMoveOnuId').value = onuDbId;
