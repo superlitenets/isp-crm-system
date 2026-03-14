@@ -12481,22 +12481,22 @@ class HuaweiOLT {
         return $result;
     }
     
-    public function moveONU(int $onuDbId, int $newSlot, int $newPort, ?int $newOnuId = null): array {
+    public function moveONU(int $onuDbId, int $newSlot, int $newPort, ?int $newOnuId = null, ?int $newFrame = null): array {
         $onu = $this->getONU($onuDbId);
         if (!$onu) {
             return ['success' => false, 'error' => 'ONU not found'];
         }
         
         $oltId = $onu['olt_id'];
-        $frame = $onu['frame'] ?? 0;
+        $oldFrame = $onu['frame'] ?? 0;
+        $frame = $newFrame ?? $oldFrame;
         $oldSlot = $onu['slot'];
         $oldPort = $onu['port'];
         $oldOnuId = $onu['onu_id'];
         $sn = $onu['sn'];
         $description = $onu['name'] ?? $onu['description'] ?? $sn;
         
-        // Validate: not moving to same location
-        if ($oldSlot == $newSlot && $oldPort == $newPort && ($newOnuId === null || $newOnuId == $oldOnuId)) {
+        if ($oldFrame == $frame && $oldSlot == $newSlot && $oldPort == $newPort && ($newOnuId === null || $newOnuId == $oldOnuId)) {
             return ['success' => false, 'error' => 'ONU is already at this location'];
         }
         
@@ -12569,12 +12569,12 @@ class HuaweiOLT {
         }
         
         // Step 1: Delete from old location FIRST (ONU can only exist at one SN location)
-        $deleteCmd = "interface gpon {$frame}/{$oldSlot}\r\n";
+        $deleteCmd = "interface gpon {$oldFrame}/{$oldSlot}\r\n";
         $deleteCmd .= "ont delete {$oldPort} {$oldOnuId}\r\n";
         $deleteCmd .= "quit";
         
         $deleteResult = $this->executeCommand($oltId, $deleteCmd);
-        $output .= "\n[Delete from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId}]\n" . ($deleteResult['output'] ?? '');
+        $output .= "\n[Delete from {$oldFrame}/{$oldSlot}/{$oldPort}:{$oldOnuId}]\n" . ($deleteResult['output'] ?? '');
         
         sleep(1);
         
@@ -12603,7 +12603,7 @@ class HuaweiOLT {
         
         if (!$addSuccess) {
             // Rollback: try to re-add at old location
-            $rollbackCmd = "interface gpon {$frame}/{$oldSlot}\r\n";
+            $rollbackCmd = "interface gpon {$oldFrame}/{$oldSlot}\r\n";
             $rollbackCmd .= "ont add {$oldPort} {$oldOnuId} sn-auth \"{$sn}\" omci ont-lineprofile-id {$lineProfile} ont-srvprofile-id {$srvProfile} desc \"{$description}\"\r\n";
             $rollbackCmd .= "quit";
             $this->executeCommand($oltId, $rollbackCmd);
@@ -12657,12 +12657,36 @@ class HuaweiOLT {
             $output .= "\n[Native VLAN config]\n" . ($nativeResult['output'] ?? '');
         }
         
-        // Update database
+        // Update database with all location fields
         $this->updateONU($onuDbId, [
+            'frame' => $frame,
             'slot' => $newSlot,
             'port' => $newPort,
             'onu_id' => $finalOnuId
         ]);
+        
+        // Step 5: Push TR-069 config if GenieACS is enabled
+        $tr069Pushed = false;
+        try {
+            $genieacs = new \App\GenieACS($this->db);
+            if ($genieacs->isConfigured()) {
+                $genieacsId = $onu['genieacs_id'] ?? null;
+                if ($genieacsId) {
+                    $crCreds = $genieacs->getCRCredentials();
+                    $params = [
+                        ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $crCreds['username'], 'xsd:string'],
+                        ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $crCreds['password'], 'xsd:string'],
+                        ['InternetGatewayDevice.ManagementServer.PeriodicInformEnable', true, 'xsd:boolean'],
+                        ['InternetGatewayDevice.ManagementServer.PeriodicInformInterval', 300, 'xsd:unsignedInt'],
+                    ];
+                    $genieacs->setParameterValues($genieacsId, $params);
+                    $tr069Pushed = true;
+                    $output .= "\n[TR-069 credentials re-pushed to GenieACS device]\n";
+                }
+            }
+        } catch (\Exception $e) {
+            $output .= "\n[TR-069 push skipped: " . $e->getMessage() . "]\n";
+        }
         
         $spCount = count($servicePorts);
         $this->addLog([
@@ -12670,7 +12694,7 @@ class HuaweiOLT {
             'onu_id' => $onuDbId,
             'action' => 'move_onu',
             'status' => 'success',
-            'message' => "Moved ONU {$sn} from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId} to {$frame}/{$newSlot}/{$newPort}:{$finalOnuId}" . ($spCount ? " ({$spCount} service-ports migrated)" : ''),
+            'message' => "Moved ONU {$sn} from {$oldFrame}/{$oldSlot}/{$oldPort}:{$oldOnuId} to {$frame}/{$newSlot}/{$newPort}:{$finalOnuId}" . ($spCount ? " ({$spCount} service-ports migrated)" : '') . ($tr069Pushed ? ' [TR-069 re-pushed]' : ''),
             'command_sent' => $deleteCmd . "\n\n" . $addCmd,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
@@ -12678,11 +12702,13 @@ class HuaweiOLT {
         
         return [
             'success' => true,
-            'message' => "ONU moved to {$frame}/{$newSlot}/{$newPort}:{$finalOnuId}" . ($spCount ? " ({$spCount} service-ports migrated)" : ''),
+            'message' => "ONU moved to {$frame}/{$newSlot}/{$newPort}:{$finalOnuId}" . ($spCount ? " ({$spCount} service-ports migrated)" : '') . ($tr069Pushed ? ' - TR-069 credentials re-pushed' : ''),
+            'new_frame' => $frame,
             'new_slot' => $newSlot,
             'new_port' => $newPort,
             'new_onu_id' => $finalOnuId,
             'service_ports_migrated' => $spCount,
+            'tr069_pushed' => $tr069Pushed,
             'output' => $output
         ];
     }
@@ -12695,16 +12721,17 @@ class HuaweiOLT {
         foreach ($migrations as $migration) {
             $onuDbId = (int)($migration['onu_id'] ?? 0);
             $newSlot = (int)($migration['new_slot'] ?? 0);
-            $newPort = (int)($migration['new_port'] ?? 0);
-            $newOnuId = !empty($migration['new_onu_id']) ? (int)$migration['new_onu_id'] : null;
+            $newPort = isset($migration['new_port']) ? (int)$migration['new_port'] : -1;
+            $newOnuId = isset($migration['new_onu_id']) && $migration['new_onu_id'] !== '' ? (int)$migration['new_onu_id'] : null;
+            $newFrame = isset($migration['new_frame']) ? (int)$migration['new_frame'] : null;
             
-            if (!$onuDbId || !$newSlot || !$newPort) {
+            if (!$onuDbId || $newPort < 0) {
                 $results[] = ['onu_id' => $onuDbId, 'success' => false, 'error' => 'Missing required parameters'];
                 $failed++;
                 continue;
             }
             
-            $result = $this->moveONU($onuDbId, $newSlot, $newPort, $newOnuId);
+            $result = $this->moveONU($onuDbId, $newSlot, $newPort, $newOnuId, $newFrame);
             $results[] = array_merge(['onu_id' => $onuDbId], $result);
             
             if ($result['success']) {

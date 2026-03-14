@@ -2394,8 +2394,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $onuId = (int)$_POST['onu_id'];
                 $newSlot = (int)$_POST['new_slot'];
                 $newPort = (int)$_POST['new_port'];
-                $newOnuId = !empty($_POST['new_onu_id']) ? (int)$_POST['new_onu_id'] : null;
-                $result = $huaweiOLT->moveONU($onuId, $newSlot, $newPort, $newOnuId);
+                $newOnuId = isset($_POST['new_onu_id']) && $_POST['new_onu_id'] !== '' ? (int)$_POST['new_onu_id'] : null;
+                $newFrame = isset($_POST['new_frame']) && $_POST['new_frame'] !== '' ? (int)$_POST['new_frame'] : null;
+                $result = $huaweiOLT->moveONU($onuId, $newSlot, $newPort, $newOnuId, $newFrame);
                 $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 $redirectView = isset($_POST['redirect_view']) ? $_POST['redirect_view'] : 'onu_detail&onu_id=' . $onuId;
@@ -10751,16 +10752,20 @@ try {
                                 </div>
                                 
                                 <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">New Slot</label>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Frame</label>
+                                        <input type="number" name="new_frame" id="discMoveNewFrame" class="form-control" min="0" max="7" placeholder="0">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Slot</label>
                                         <input type="number" name="new_slot" id="discMoveNewSlot" class="form-control" min="0" max="20" required>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">New Port</label>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Port</label>
                                         <input type="number" name="new_port" id="discMoveNewPort" class="form-control" min="0" max="15" required>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">ONU ID <small class="text-muted">(optional)</small></label>
+                                    <div class="col-md-3">
+                                        <label class="form-label">ONU ID <small class="text-muted">(auto)</small></label>
                                         <input type="number" name="new_onu_id" id="discMoveNewOnuId" class="form-control" min="0" max="127" placeholder="Auto">
                                     </div>
                                 </div>
@@ -10780,12 +10785,14 @@ try {
             </div>
             <script>
             function updateDiscMoveNewPortDisplay() {
+                var f = document.getElementById('discMoveNewFrame').value || '0';
                 var s = document.getElementById('discMoveNewSlot').value;
                 var p = document.getElementById('discMoveNewPort').value;
                 var id = document.getElementById('discMoveNewOnuId').value;
-                document.getElementById('discMoveDetected').textContent = '0/' + s + '/' + p + (id ? ':' + id : '');
+                document.getElementById('discMoveDetected').textContent = f + '/' + s + '/' + p + (id ? ':' + id : '');
             }
             
+            document.getElementById('discMoveNewFrame')?.addEventListener('input', updateDiscMoveNewPortDisplay);
             document.getElementById('discMoveNewSlot')?.addEventListener('input', updateDiscMoveNewPortDisplay);
             document.getElementById('discMoveNewPort')?.addEventListener('input', updateDiscMoveNewPortDisplay);
             document.getElementById('discMoveNewOnuId')?.addEventListener('input', updateDiscMoveNewPortDisplay);
@@ -10798,6 +10805,7 @@ try {
                 var parts = (detectedFsp || '').replace(/\s/g, '').split('/');
                 if (parts.length >= 3) {
                     var portParts = parts[2].split(':');
+                    document.getElementById('discMoveNewFrame').value = parseInt(parts[0]) || 0;
                     document.getElementById('discMoveNewSlot').value = parseInt(parts[1]) || 0;
                     document.getElementById('discMoveNewPort').value = parseInt(portParts[0]) || 0;
                     if (portParts.length > 1) {
@@ -16035,7 +16043,7 @@ try {
                                             </td>
                                             <td><?= $monu['rx_power'] ? number_format((float)$monu['rx_power'], 2) . ' dBm' : '-' ?></td>
                                             <td class="text-end">
-                                                <button class="btn btn-sm btn-outline-primary" onclick="openMoveModal(<?= $monu['id'] ?>, '<?= htmlspecialchars($monu['sn']) ?>', <?= $monu['slot'] ?>, <?= $monu['port'] ?>, <?= $monu['onu_id'] ?>)">
+                                                <button class="btn btn-sm btn-outline-primary" onclick="openMoveModal(<?= $monu['id'] ?>, '<?= htmlspecialchars($monu['sn']) ?>', <?= $monu['slot'] ?>, <?= $monu['port'] ?>, <?= $monu['onu_id'] ?>, <?= $monu['frame'] ?? 0 ?>)">
                                                     <i class="bi bi-arrow-right-circle"></i> Move
                                                 </button>
                                             </td>
@@ -16189,24 +16197,28 @@ try {
                                 </div>
                                 
                                 <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">New Slot</label>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Frame</label>
+                                        <input type="number" name="new_frame" id="moveNewFrame" class="form-control" min="0" max="7" placeholder="0">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Slot</label>
                                         <select name="new_slot" id="moveNewSlot" class="form-select" required>
                                             <?php foreach ($usedSlots as $s): ?>
                                             <option value="<?= $s ?>">Slot <?= $s ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">New Port</label>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Port</label>
                                         <select name="new_port" id="moveNewPort" class="form-select" required>
                                             <?php for ($p = 0; $p < 16; $p++): ?>
                                             <option value="<?= $p ?>">Port <?= $p ?></option>
                                             <?php endfor; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">ONU ID <small class="text-muted">(optional)</small></label>
+                                    <div class="col-md-3">
+                                        <label class="form-label">ONU ID <small class="text-muted">(auto)</small></label>
                                         <input type="number" name="new_onu_id" id="moveNewOnuId" class="form-control" min="0" max="127" placeholder="Auto">
                                     </div>
                                 </div>
@@ -16226,10 +16238,11 @@ try {
             </div>
             
             <script>
-            function openMoveModal(onuId, sn, slot, port, onuIdNum) {
+            function openMoveModal(onuId, sn, slot, port, onuIdNum, frame) {
                 document.getElementById('moveOnuId').value = onuId;
                 document.getElementById('moveOnuSn').textContent = sn;
-                document.getElementById('moveOnuCurrent').textContent = '0/' + slot + '/' + port + ':' + onuIdNum;
+                document.getElementById('moveOnuCurrent').textContent = (frame || 0) + '/' + slot + '/' + port + ':' + onuIdNum;
+                document.getElementById('moveNewFrame').value = frame || 0;
                 new bootstrap.Modal(document.getElementById('moveOnuModal')).show();
             }
             
