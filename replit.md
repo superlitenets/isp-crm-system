@@ -18,7 +18,7 @@ The system features a responsive design, including a mobile PWA. Both the main C
 - **SMS & WhatsApp Integration**: Support for custom SMS gateways, Twilio, and a Node.js Baileys service for real-time WhatsApp chat.
 - **Template Engine**: A custom `TemplateEngine.php` for dynamic content rendering.
 - **Biometric Integration**: An abstract `BiometricDevice.php` with concrete implementations for ZKTeco, Hikvision, and BioTime Cloud.
-- **M-Pesa Integration**: Handles STK Push payments, C2B, and real-time callback processing with error handling and retry logic. Supports multiple PayBill/Till numbers per NAS device.
+- **M-Pesa Integration**: Handles STK Push payments, C2B, and real-time callback processing with error handling and retry logic. Supports multiple PayBill/Till numbers per NAS device. Gateway settings page uses per-account accordion cards with edit/delete, C2B URL registration with Safaricom (automatic on save + manual button), STK push testing, and linked NAS display. API endpoints: `/api/mpesa-test.php` (STK push test), `/api/mpesa-register-urls.php` (C2B URL registration).
 - **Landing Page Templates**: Multiple switchable landing page designs managed through system settings.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
 - **Inventory Management**: Comprehensive multi-warehouse stock management, including intake, disbursement, field usage, returns, loss reporting, and audit trails.

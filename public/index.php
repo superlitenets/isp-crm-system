@@ -7275,8 +7275,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $savedCount += $mpesa->saveConfig('mpesa_validation_url', $_POST['mpesa_validation_url'] ?? '') ? 1 : 0;
                     $savedCount += $mpesa->saveConfig('mpesa_confirmation_url', $_POST['mpesa_confirmation_url'] ?? '') ? 1 : 0;
                     error_log("M-Pesa settings saved count: $savedCount");
+                    
+                    $regMsg = '';
+                    $mpesaFresh = new \App\Mpesa();
+                    if ($mpesaFresh->isConfigured()) {
+                        $regResult = $mpesaFresh->registerC2BUrls();
+                        if ($regResult['success']) {
+                            $regMsg = ' | C2B URL Registration: ' . ($regResult['message'] ?? 'Success');
+                        } else {
+                            $regMsg = ' | C2B URL Registration failed: ' . ($regResult['message'] ?? 'Unknown error');
+                        }
+                    }
+                    
                     \App\Auth::regenerateToken();
-                    $_SESSION['flash_message'] = "M-Pesa settings saved successfully! ($savedCount items)";
+                    $_SESSION['flash_message'] = "M-Pesa settings saved successfully! ($savedCount items)" . $regMsg;
                     $_SESSION['flash_type'] = 'success';
                     header('Location: ?page=settings&subpage=mpesa');
                     exit;
@@ -7293,7 +7305,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $result = $radiusBilling->createMpesaAccount($_POST);
                     \App\Auth::regenerateToken();
                     if ($result['success']) {
-                        $_SESSION['flash_message'] = 'M-Pesa account created successfully!';
+                        $regMsg = '';
+                        $newAccountId = $result['id'] ?? null;
+                        if ($newAccountId) {
+                            $acctConfig = $radiusBilling->getMpesaAccountConfig((int)$newAccountId);
+                            if ($acctConfig) {
+                                $mpesaInst = new \App\Mpesa($acctConfig);
+                                $regResult = $mpesaInst->registerC2BUrls();
+                                if ($regResult['success']) {
+                                    $regMsg = ' | C2B URL Registration: ' . ($regResult['message'] ?? 'Success');
+                                    if (!empty($regResult['urls_registered'])) {
+                                        $regMsg .= ' (Confirmation: ' . $regResult['urls_registered']['confirmation'] . ')';
+                                    }
+                                } else {
+                                    $regMsg = ' | C2B URL Registration failed: ' . ($regResult['message'] ?? 'Unknown error');
+                                }
+                            }
+                        }
+                        $_SESSION['flash_message'] = 'M-Pesa account created successfully!' . $regMsg;
                         $_SESSION['flash_type'] = 'success';
                     } else {
                         $_SESSION['flash_message'] = 'Error creating M-Pesa account: ' . ($result['error'] ?? 'Unknown error');
@@ -7310,10 +7339,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'update_mpesa_account':
                 try {
                     $radiusBilling = new \App\RadiusBilling($db);
-                    $result = $radiusBilling->updateMpesaAccount((int)$_POST['account_id'], $_POST);
+                    $accountId = (int)$_POST['account_id'];
+                    $result = $radiusBilling->updateMpesaAccount($accountId, $_POST);
                     \App\Auth::regenerateToken();
                     if ($result['success']) {
-                        $_SESSION['flash_message'] = 'M-Pesa account updated successfully!';
+                        $regMsg = '';
+                        $acctConfig = $radiusBilling->getMpesaAccountConfig($accountId);
+                        if ($acctConfig) {
+                            $mpesaInst = new \App\Mpesa($acctConfig);
+                            $regResult = $mpesaInst->registerC2BUrls();
+                            if ($regResult['success']) {
+                                $regMsg = ' | C2B URL Registration: ' . ($regResult['message'] ?? 'Success');
+                                if (!empty($regResult['urls_registered'])) {
+                                    $regMsg .= ' (Confirmation: ' . $regResult['urls_registered']['confirmation'] . ')';
+                                }
+                            } else {
+                                $regMsg = ' | C2B URL Registration failed: ' . ($regResult['message'] ?? 'Unknown error');
+                            }
+                        }
+                        $_SESSION['flash_message'] = 'M-Pesa account updated successfully!' . $regMsg;
                         $_SESSION['flash_type'] = 'success';
                     } else {
                         $_SESSION['flash_message'] = 'Error updating M-Pesa account: ' . ($result['error'] ?? 'Unknown error');

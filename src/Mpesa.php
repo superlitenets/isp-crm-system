@@ -394,47 +394,79 @@ class Mpesa {
         return json_decode($result, true) ?? ['success' => false, 'message' => 'Invalid response'];
     }
     
-    public function registerC2BUrls(): array {
+    public function registerC2BUrls(?string $overrideCallbackBase = null): array {
         $accessToken = $this->getAccessToken();
         
         if (!$accessToken) {
-            return ['success' => false, 'message' => 'Failed to get access token'];
+            return [
+                'success' => false, 
+                'message' => 'Failed to get access token. Check your Consumer Key and Consumer Secret.',
+                'error_detail' => $this->lastError
+            ];
+        }
+        
+        $confirmUrl = $this->confirmationUrl;
+        $validUrl = $this->validationUrl;
+        if ($overrideCallbackBase) {
+            $base = rtrim($overrideCallbackBase, '/');
+            $confirmUrl = "{$base}/?page=mpesa_callback&type=confirmation";
+            $validUrl = "{$base}/?page=mpesa_callback&type=validation";
         }
         
         $data = [
             'ShortCode' => $this->shortcode,
             'ResponseType' => 'Completed',
-            'ConfirmationURL' => $this->confirmationUrl,
-            'ValidationURL' => $this->validationUrl
+            'ConfirmationURL' => $confirmUrl,
+            'ValidationURL' => $validUrl
         ];
         
         $url = "{$this->baseUrl}/mpesa/c2b/v1/registerurl";
         
-        $curl = curl_init($url);
-        curl_setopt_array($curl, [
+        error_log("M-Pesa C2B URL registration: shortcode={$this->shortcode}, confirmation={$confirmUrl}, validation={$validUrl}");
+        
+        $apiResponse = $this->makeRequest($url, [
             CURLOPT_HTTPHEADER => [
                 'Content-Type:application/json',
                 'Authorization:Bearer ' . $accessToken
             ],
-            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_TIMEOUT => 30
-        ]);
+        ], 2);
         
-        $result = curl_exec($curl);
-        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
+        if (!$apiResponse['success']) {
+            return [
+                'success' => false, 
+                'message' => $apiResponse['error'] ?? 'Network error during URL registration',
+                'urls_sent' => $data
+            ];
+        }
         
-        $response = json_decode($result, true);
+        $response = json_decode($apiResponse['result'], true);
+        $httpCode = $apiResponse['httpCode'];
         
         if ($httpCode === 200 && isset($response['ResponseDescription'])) {
             $this->saveConfig('c2b_urls_registered', date('Y-m-d H:i:s'));
-            return ['success' => true, 'message' => $response['ResponseDescription'], 'data' => $response];
+            error_log("M-Pesa C2B URL registration successful: " . json_encode($response));
+            return [
+                'success' => true, 
+                'message' => $response['ResponseDescription'], 
+                'data' => $response,
+                'urls_registered' => [
+                    'confirmation' => $confirmUrl,
+                    'validation' => $validUrl,
+                    'shortcode' => $this->shortcode
+                ]
+            ];
         }
         
-        return ['success' => false, 'message' => $response['errorMessage'] ?? 'C2B URL registration failed', 'data' => $response];
+        error_log("M-Pesa C2B URL registration failed: HTTP {$httpCode} - " . json_encode($response));
+        return [
+            'success' => false, 
+            'message' => $response['errorMessage'] ?? $response['ResponseDescription'] ?? "C2B URL registration failed (HTTP {$httpCode})", 
+            'data' => $response,
+            'urls_sent' => $data
+        ];
     }
     
     public function handleStkCallback(array $data): bool {

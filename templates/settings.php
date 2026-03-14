@@ -4426,41 +4426,40 @@ try {
         $linkedNas = array_filter($nasDevicesForMpesa, fn($n) => (int)($n['mpesa_account_id'] ?? 0) === (int)$acct['id']);
     ?>
     <div class="accordion-item shadow-sm mb-3 border rounded">
-        <h2 class="accordion-header" id="mpesaHead<?= $acct['id'] ?>">
-            <div class="d-flex align-items-center w-100">
-                <button class="accordion-button <?= $idx !== 0 ? 'collapsed' : '' ?> flex-grow-1 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#mpesaGw<?= $acct['id'] ?>" aria-expanded="<?= $idx === 0 ? 'true' : 'false' ?>">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center <?= $acct['is_active'] ? 'bg-success' : 'bg-danger' ?> bg-opacity-10" style="width:40px;height:40px;">
-                            <i class="bi bi-phone <?= $acct['is_active'] ? 'text-success' : 'text-danger' ?>"></i>
-                        </div>
-                        <div>
-                            <h6 class="mb-0">
-                                <?= htmlspecialchars($acct['name']) ?>
-                                <span class="badge bg-<?= $acct['is_active'] ? 'success' : 'danger' ?> ms-2"><?= $acct['is_active'] ? 'Active' : 'Inactive' ?></span>
-                            </h6>
-                            <small class="text-muted">
-                                <code><?= htmlspecialchars($acct['shortcode']) ?></code>
-                                <span class="mx-1">&bull;</span>
-                                <?= ucfirst($acct['account_type'] ?? 'paybill') ?>
-                                <span class="mx-1">&bull;</span>
-                                <?= ucfirst($acct['environment'] ?? 'production') ?>
-                                <span class="mx-1">&bull;</span>
-                                <span class="badge bg-secondary"><?= count($linkedNas) ?> NAS</span>
-                            </small>
-                        </div>
-                    </div>
-                </button>
-                <div class="d-flex gap-1 pe-3 flex-shrink-0" style="z-index:2;">
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); editMpesaAccount(<?= htmlspecialchars(json_encode($acct)) ?>)" data-bs-toggle="modal" data-bs-target="#editMpesaAccountModal" title="Edit"><i class="bi bi-pencil"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation(); if(confirm('Delete this gateway?')) document.getElementById('delMpesaForm<?= $acct['id'] ?>').submit();"><i class="bi bi-trash"></i></button>
-                    <form id="delMpesaForm<?= $acct['id'] ?>" method="post" style="display:none;">
-                        <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
-                        <input type="hidden" name="action" value="delete_mpesa_account">
-                        <input type="hidden" name="account_id" value="<?= $acct['id'] ?>">
-                    </form>
-                </div>
-            </div>
-        </h2>
+        <div class="accordion-header d-flex align-items-center" id="mpesaHead<?= $acct['id'] ?>">
+            <button class="accordion-button <?= $idx !== 0 ? 'collapsed' : '' ?> flex-grow-1 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#mpesaGw<?= $acct['id'] ?>" aria-expanded="<?= $idx === 0 ? 'true' : 'false' ?>">
+                <span class="d-flex align-items-center gap-3">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center <?= $acct['is_active'] ? 'bg-success' : 'bg-danger' ?> bg-opacity-10" style="width:40px;height:40px;">
+                        <i class="bi bi-phone <?= $acct['is_active'] ? 'text-success' : 'text-danger' ?>"></i>
+                    </span>
+                    <span>
+                        <span class="fw-bold">
+                            <?= htmlspecialchars($acct['name']) ?>
+                            <span class="badge bg-<?= $acct['is_active'] ? 'success' : 'danger' ?> ms-2"><?= $acct['is_active'] ? 'Active' : 'Inactive' ?></span>
+                        </span>
+                        <br>
+                        <small class="text-muted">
+                            <code><?= htmlspecialchars($acct['shortcode']) ?></code>
+                            <span class="mx-1">&bull;</span>
+                            <?= ucfirst($acct['account_type'] ?? 'paybill') ?>
+                            <span class="mx-1">&bull;</span>
+                            <?= ucfirst($acct['environment'] ?? 'production') ?>
+                            <span class="mx-1">&bull;</span>
+                            <span class="badge bg-secondary"><?= count($linkedNas) ?> NAS</span>
+                        </small>
+                    </span>
+                </span>
+            </button>
+            <span class="d-flex gap-1 pe-3 flex-shrink-0">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editMpesaAccount(<?= htmlspecialchars(json_encode($acct)) ?>)" data-bs-toggle="modal" data-bs-target="#editMpesaAccountModal" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="if(confirm('Delete this gateway?')) document.getElementById('delMpesaForm<?= $acct['id'] ?>').submit();"><i class="bi bi-trash"></i></button>
+            </span>
+            <form id="delMpesaForm<?= $acct['id'] ?>" method="post" style="display:none;">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="delete_mpesa_account">
+                <input type="hidden" name="account_id" value="<?= $acct['id'] ?>">
+            </form>
+        </div>
         <div id="mpesaGw<?= $acct['id'] ?>" class="accordion-collapse collapse <?= $idx === 0 ? 'show' : '' ?>" aria-labelledby="mpesaHead<?= $acct['id'] ?>" data-bs-parent="#mpesaGatewayAccordion">
             <div class="accordion-body">
                 <div class="row g-4">
@@ -4501,6 +4500,14 @@ try {
                         <?php endif; ?>
                     </div>
                     <div class="col-lg-4">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3"><i class="bi bi-link-45deg me-1"></i> C2B URL Registration</h6>
+                        <p class="small text-muted mb-2">Register confirmation &amp; validation URLs with Safaricom for this shortcode.</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="registerC2BUrls(<?= $acct['id'] ?>)">
+                            <i class="bi bi-globe me-1"></i> Register URLs with Safaricom
+                        </button>
+                        <div id="regUrlResult_<?= $acct['id'] ?>" class="mt-1"></div>
+
+                        <hr class="my-3">
                         <h6 class="text-muted text-uppercase small fw-bold mb-3"><i class="bi bi-send me-1"></i> Test STK Push</h6>
                         <div class="mb-2">
                             <input type="tel" class="form-control form-control-sm" id="testPhone_<?= $acct['id'] ?>" placeholder="254712345678">
@@ -4527,7 +4534,7 @@ try {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                 <input type="hidden" name="action" value="create_mpesa_account">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Add M-Pesa Account</h5>
@@ -4596,7 +4603,7 @@ try {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                 <input type="hidden" name="action" value="update_mpesa_account">
                 <input type="hidden" name="account_id" id="edit_ma_id">
                 <div class="modal-header">
@@ -4673,6 +4680,33 @@ function editMpesaAccount(acct) {
     document.getElementById('edit_ma_environment').value = acct.environment || 'production';
     document.getElementById('edit_ma_is_active').value = acct.is_active ? '1' : '0';
     document.getElementById('edit_ma_callback_url').value = acct.callback_url || '';
+}
+
+async function registerC2BUrls(accountId) {
+    const resultDiv = document.getElementById('regUrlResult_' + accountId);
+    resultDiv.innerHTML = '<div class="alert alert-info small py-1"><i class="bi bi-hourglass-split me-1"></i> Registering URLs with Safaricom...</div>';
+    try {
+        const response = await fetch('/api/mpesa-register-urls.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({account_id: accountId})
+        });
+        const data = await response.json();
+        if (data.success) {
+            let msg = '<i class="bi bi-check-circle me-1"></i> ' + (data.message || 'URLs registered successfully');
+            if (data.urls_registered) {
+                msg += '<br><small class="text-muted">Confirmation: ' + data.urls_registered.confirmation + '</small>';
+                msg += '<br><small class="text-muted">Validation: ' + data.urls_registered.validation + '</small>';
+            }
+            resultDiv.innerHTML = '<div class="alert alert-success small py-2">' + msg + '</div>';
+        } else {
+            let errMsg = data.error || data.message || 'Registration failed';
+            if (data.error_detail) errMsg += '<br><small>' + data.error_detail + '</small>';
+            resultDiv.innerHTML = '<div class="alert alert-danger small py-2"><i class="bi bi-x-circle me-1"></i> ' + errMsg + '</div>';
+        }
+    } catch (e) {
+        resultDiv.innerHTML = '<div class="alert alert-danger small py-1"><i class="bi bi-x-circle me-1"></i> Error: ' + e.message + '</div>';
+    }
 }
 
 async function testStkPushAccount(accountId) {
