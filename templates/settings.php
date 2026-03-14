@@ -1647,30 +1647,6 @@ function resetToDefaults() {
                             <small class="text-muted">Department employees' clock-out summaries will be sent to their department's group</small>
                         </div>
                     </div>
-                    
-                    <hr class="my-3">
-                    <h6 class="text-primary"><i class="bi bi-router"></i> Network Event Notifications</h6>
-                    <p class="text-muted small mb-2">Automatically send WhatsApp notifications to customers when their ONU connection goes down (LOS) or is restored.</p>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-3">
-                            <label class="form-label">Network Notifications</label>
-                            <select class="form-select" name="wa_network_notifications_enabled">
-                                <option value="1" <?= $settings->get('wa_network_notifications_enabled', '1') === '1' ? 'selected' : '' ?>>Enabled</option>
-                                <option value="0" <?= $settings->get('wa_network_notifications_enabled', '1') === '0' ? 'selected' : '' ?>>Disabled</option>
-                            </select>
-                        </div>
-                        <div class="col-md-9">
-                            <label class="form-label">Cron Setup (Check ONU events every 5 mins)</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control form-control-sm bg-light" readonly 
-                                       value="*/5 * * * * curl -s '<?= (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'your-domain.com') ?>/isp-cron.php?action=check_onu_events&secret=<?= htmlspecialchars($settings->get('cron_secret', 'isp-crm-cron-2024')) ?>'">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(this.previousElementSibling.value); alert('Copied!')">
-                                    <i class="bi bi-clipboard"></i>
-                                </button>
-                            </div>
-                            <small class="text-muted">Customers linked via ONU or RADIUS subscription will receive WhatsApp messages on LOS/restore events. Templates can be customized below.</small>
-                        </div>
-                    </div>
                 </div>
             </div>
             
@@ -2068,9 +2044,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'wa_template_complaint_received' => ['label' => 'Complaint Received', 'icon' => 'envelope-check', 'group' => 'Complaints'],
                 'wa_template_complaint_review' => ['label' => 'Under Review', 'icon' => 'hourglass-split', 'group' => 'Complaints'],
                 'wa_template_complaint_approved' => ['label' => 'Complaint Approved', 'icon' => 'check-circle', 'group' => 'Complaints'],
-                'wa_template_complaint_rejected' => ['label' => 'Complaint Rejected', 'icon' => 'x-circle', 'group' => 'Complaints'],
-                'wa_template_onu_los' => ['label' => 'ONU Connection Down (LOS)', 'icon' => 'wifi-off', 'group' => 'Network Events'],
-                'wa_template_onu_restored' => ['label' => 'ONU Connection Restored', 'icon' => 'wifi', 'group' => 'Network Events']
+                'wa_template_complaint_rejected' => ['label' => 'Complaint Rejected', 'icon' => 'x-circle', 'group' => 'Complaints']
             ];
             
             $waTemplateDefaults = [
@@ -2085,9 +2059,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'wa_template_complaint_received' => "Hi {customer_name},\n\nWe have received your complaint (Ref: {complaint_number}).\n\nCategory: {category}\n\nOur team will review and respond within 24 hours.\n\nThank you for your feedback.",
                 'wa_template_complaint_review' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nWe are currently reviewing your issue and will update you soon.\n\nThank you for your patience.",
                 'wa_template_complaint_approved' => "Hi {customer_name},\n\nYour complaint {complaint_number} has been approved and a support ticket will be created.\n\nOur team will contact you shortly to resolve the issue.\n\nThank you!",
-                'wa_template_complaint_rejected' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nAfter careful review, we were unable to proceed with this complaint.\n\nIf you have any questions, please contact our support team.\n\nThank you.",
-                'wa_template_onu_los' => "Hi {customer_name},\n\n⚠️ We have detected that your internet connection is currently down.\n\nONU: {onu_name}\nTime: {event_time}\n\nOur team has been notified and is working to restore your service. We apologize for the inconvenience.\n\nIf you need assistance, please contact our support team.",
-                'wa_template_onu_restored' => "Hi {customer_name},\n\n✅ Great news! Your internet connection has been restored.\n\nONU: {onu_name}\nRestored at: {event_time}\n\nIf you experience any further issues, please don't hesitate to contact us.\n\nThank you for your patience!"
+                'wa_template_complaint_rejected' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nAfter careful review, we were unable to proceed with this complaint.\n\nIf you have any questions, please contact our support team.\n\nThank you."
             ];
             ?>
             
@@ -2100,7 +2072,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             <?php foreach ($groups as $groupName => $groupTemplates): ?>
             <h6 class="text-muted mb-3 mt-<?= $groupName === 'Tickets' ? '0' : '4' ?>">
-                <i class="bi bi-<?= $groupName === 'Tickets' ? 'ticket' : ($groupName === 'Orders' ? 'cart' : ($groupName === 'Network Events' ? 'router' : 'exclamation-triangle')) ?>"></i> 
+                <i class="bi bi-<?= $groupName === 'Tickets' ? 'ticket' : ($groupName === 'Orders' ? 'cart' : 'exclamation-triangle') ?>"></i> 
                 <?= $groupName ?>
             </h6>
             <div class="row g-3 mb-3">
@@ -2227,27 +2199,7 @@ After careful review, we were unable to proceed with this complaint.
 
 If you have any questions, please contact our support team.
 
-Thank you.`,
-        'wa_template_onu_los': `Hi {customer_name},
-
-⚠️ We have detected that your internet connection is currently down.
-
-ONU: {onu_name}
-Time: {event_time}
-
-Our team has been notified and is working to restore your service. We apologize for the inconvenience.
-
-If you need assistance, please contact our support team.`,
-        'wa_template_onu_restored': `Hi {customer_name},
-
-✅ Great news! Your internet connection has been restored.
-
-ONU: {onu_name}
-Restored at: {event_time}
-
-If you experience any further issues, please don't hesitate to contact us.
-
-Thank you for your patience!`
+Thank you.`
     };
     
     for (const [key, value] of Object.entries(defaults)) {
@@ -3869,111 +3821,7 @@ if ($action === 'edit_package' && $id) {
 
 <?php
 $landingSettings = $settings->getLandingPageSettings();
-$currentTemplate = $landingSettings['template'] ?? 'dark-tech';
-$templateOptions = [
-    'dark-tech' => [
-        'name' => 'Dark Tech',
-        'description' => 'Dark hero with animated particle network, floating orbs, and modern tech feel',
-        'icon' => 'bi-moon-stars-fill',
-        'color' => '#4F46E5',
-        'tags' => ['Dark', 'Animated', 'Tech']
-    ],
-    'clean-modern' => [
-        'name' => 'Clean Modern',
-        'description' => 'Light, professional design with soft shadows, wave backgrounds, and clean layout',
-        'icon' => 'bi-sun-fill',
-        'color' => '#2563EB',
-        'tags' => ['Light', 'Professional', 'Clean']
-    ],
-    'bold-gradient' => [
-        'name' => 'Bold Gradient',
-        'description' => 'Vibrant gradients with glassmorphism cards, bold typography, and animated elements',
-        'icon' => 'bi-palette-fill',
-        'color' => '#7C3AED',
-        'tags' => ['Colorful', 'Bold', 'Modern']
-    ],
-    'minimalist' => [
-        'name' => 'Minimalist',
-        'description' => 'Clean whitespace-heavy design with minimal colors and elegant simplicity',
-        'icon' => 'bi-grid-1x2-fill',
-        'color' => '#111827',
-        'tags' => ['Minimal', 'Elegant', 'Simple']
-    ]
-];
 ?>
-
-<div class="row g-4">
-    <div class="col-12">
-        <form method="POST" id="templateForm">
-            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-            <input type="hidden" name="action" value="save_landing_settings">
-            <input type="hidden" name="landing_template" id="selectedTemplate" value="<?= htmlspecialchars($currentTemplate) ?>">
-
-            <div class="card mb-4">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-layout-text-window-reverse"></i> Choose Template</h5>
-                    <a href="?page=landing" target="_blank" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-eye"></i> Preview Live
-                    </a>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <?php foreach ($templateOptions as $tplKey => $tpl): ?>
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card h-100 template-card <?= $currentTemplate === $tplKey ? 'border-primary shadow' : 'border' ?>"
-                                 style="cursor:pointer; transition: all 0.2s ease;"
-                                 onclick="selectTemplate('<?= $tplKey ?>')" id="tpl-<?= $tplKey ?>">
-                                <div class="card-body text-center p-3">
-                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                                         style="width:56px;height:56px;background:<?= $tpl['color'] ?>20;">
-                                        <i class="<?= $tpl['icon'] ?> fs-4" style="color:<?= $tpl['color'] ?>;"></i>
-                                    </div>
-                                    <h6 class="mb-1"><?= $tpl['name'] ?></h6>
-                                    <p class="text-muted small mb-2" style="font-size:0.8rem;"><?= $tpl['description'] ?></p>
-                                    <div class="d-flex gap-1 justify-content-center flex-wrap">
-                                        <?php foreach ($tpl['tags'] as $tag): ?>
-                                        <span class="badge bg-light text-dark" style="font-size:0.7rem;"><?= $tag ?></span>
-                                        <?php endforeach; ?>
-                                    </div>
-                                    <?php if ($currentTemplate === $tplKey): ?>
-                                    <div class="mt-2"><span class="badge bg-primary"><i class="bi bi-check-circle me-1"></i>Active</span></div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<style>
-.template-card:hover { border-color: var(--bs-primary) !important; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.template-card.border-primary { border-width: 2px !important; }
-</style>
-
-<script>
-function selectTemplate(tplKey) {
-    document.getElementById('selectedTemplate').value = tplKey;
-    document.querySelectorAll('.template-card').forEach(c => {
-        c.classList.remove('border-primary', 'shadow');
-        c.classList.add('border');
-        const badge = c.querySelector('.badge.bg-primary');
-        if (badge) badge.closest('.mt-2').remove();
-    });
-    const card = document.getElementById('tpl-' + tplKey);
-    card.classList.remove('border');
-    card.classList.add('border-primary', 'shadow');
-    const body = card.querySelector('.card-body');
-    const activeDiv = document.createElement('div');
-    activeDiv.className = 'mt-2';
-    activeDiv.innerHTML = '<span class="badge bg-primary"><i class="bi bi-check-circle me-1"></i>Active</span>';
-    body.appendChild(activeDiv);
-    document.getElementById('templateForm').submit();
-}
-</script>
 
 <div class="row g-4">
     <div class="col-lg-8">
@@ -4347,194 +4195,225 @@ $mpesaConfig = $mpesa->getConfig();
 $radiusBilling = new \App\RadiusBilling(\Database::getConnection());
 ?>
 
-<?php
-$mpesaAccounts = $radiusBilling->getMpesaAccounts();
-$nasDevicesForMpesa = [];
-try {
-    $nasMpesaStmt = $dbConn->query("SELECT id, name, mpesa_account_id FROM radius_nas ORDER BY name");
-    $nasDevicesForMpesa = $nasMpesaStmt->fetchAll(\PDO::FETCH_ASSOC);
-} catch (\Throwable $e) {}
-?>
-
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h5 class="mb-1"><i class="bi bi-phone me-2"></i>M-Pesa Payment Gateways</h5>
-        <small class="text-muted">Each gateway can be assigned to one or more NAS devices (sites)</small>
-    </div>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMpesaAccountModal">
-        <i class="bi bi-plus-lg me-1"></i> Add Gateway
-    </button>
-</div>
-
-<?php if (empty($mpesaAccounts)): ?>
 <div class="card shadow-sm mb-4">
-    <div class="card-body text-center py-5">
-        <i class="bi bi-phone text-muted" style="font-size: 3rem;"></i>
-        <h5 class="mt-3 text-muted">No Payment Gateways Configured</h5>
-        <p class="text-muted mb-3">Add an M-Pesa gateway to start accepting payments on your NAS sites.</p>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMpesaAccountModal">
-            <i class="bi bi-plus-lg me-1"></i> Add Your First Gateway
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-collection"></i> M-Pesa Accounts</h5>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addMpesaAccountModal">
+            <i class="bi bi-plus-lg"></i> Add Account
         </button>
     </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Shortcode</th>
+                        <th>Type</th>
+                        <th>Environment</th>
+                        <th>NAS Devices</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $mpesaAccounts = $radiusBilling->getMpesaAccounts();
+                    foreach ($mpesaAccounts as $acct): ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($acct['name']) ?></strong></td>
+                        <td><code><?= htmlspecialchars($acct['shortcode']) ?></code></td>
+                        <td><span class="badge bg-<?= $acct['account_type'] === 'paybill' ? 'primary' : 'info' ?>"><?= ucfirst($acct['account_type']) ?></span></td>
+                        <td><?= ucfirst($acct['environment']) ?></td>
+                        <td><span class="badge bg-secondary"><?= $acct['nas_count'] ?? 0 ?></span></td>
+                        <td><span class="badge bg-<?= $acct['is_active'] ? 'success' : 'danger' ?>"><?= $acct['is_active'] ? 'Active' : 'Inactive' ?></span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editMpesaAccount(<?= htmlspecialchars(json_encode($acct)) ?>)" data-bs-toggle="modal" data-bs-target="#editMpesaAccountModal"><i class="bi bi-pencil"></i></button>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Delete this M-Pesa account?')">
+                                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                                <input type="hidden" name="action" value="delete_mpesa_account">
+                                <input type="hidden" name="account_id" value="<?= $acct['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($mpesaAccounts)): ?>
+                    <tr><td colspan="7" class="text-center text-muted py-3">No M-Pesa accounts configured. Add one to assign to NAS devices.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-white">
-        <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Global Fallback Configuration</h6>
-    </div>
-    <div class="card-body">
-        <div class="alert alert-info small mb-3">
-            <i class="bi bi-info-circle me-1"></i>
-            This global configuration is used as a fallback when no per-gateway account is assigned to a NAS device. Once you add gateway accounts above, assign them to your NAS devices instead.
-        </div>
+<div class="row">
+    <div class="col-lg-8">
         <form method="POST">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="save_mpesa_settings">
-            <input type="hidden" name="mpesa_environment" value="production">
-            <div class="mb-3">
-                <label class="form-label">Shortcode (Paybill/Till)</label>
-                <input type="text" class="form-control" name="mpesa_shortcode" value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '') ?>" placeholder="e.g. 174379">
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Consumer Key</label>
-                    <input type="text" class="form-control" name="mpesa_consumer_key" value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_key'] ?? '') ?>">
+            
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-phone"></i> M-Pesa API Credentials</h5>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Consumer Secret</label>
-                    <input type="password" class="form-control" name="mpesa_consumer_secret" value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_secret'] ?? '') ?>">
+                <div class="card-body">
+                    <input type="hidden" name="mpesa_environment" value="production">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Shortcode (Paybill/Till)</label>
+                        <input type="text" class="form-control" name="mpesa_shortcode" 
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '') ?>"
+                               placeholder="e.g. 174379">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Consumer Key</label>
+                            <input type="text" class="form-control" name="mpesa_consumer_key" 
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_key'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Consumer Secret</label>
+                            <input type="password" class="form-control" name="mpesa_consumer_secret" 
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_secret'] ?? '') ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Passkey</label>
+                        <input type="text" class="form-control" name="mpesa_passkey" 
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? '') ?>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Callback URL</label>
+                        <input type="url" class="form-control" name="mpesa_callback_url" 
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_callback_url'] ?? $mpesa->getCallbackUrl()) ?>">
+                    </div>
+                    
+                    <input type="hidden" name="mpesa_validation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_validation_url'] ?? $mpesa->getValidationUrl()) ?>">
+                    <input type="hidden" name="mpesa_confirmation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save Settings
+                    </button>
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Passkey</label>
-                <input type="text" class="form-control" name="mpesa_passkey" value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? '') ?>">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Callback URL</label>
-                <input type="url" class="form-control" name="mpesa_callback_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_callback_url'] ?? $mpesa->getCallbackUrl()) ?>">
-            </div>
-            <input type="hidden" name="mpesa_validation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_validation_url'] ?? $mpesa->getValidationUrl()) ?>">
-            <input type="hidden" name="mpesa_confirmation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Global Settings</button>
         </form>
     </div>
-</div>
-<?php else: ?>
-
-<div class="accordion" id="mpesaGatewayAccordion">
-    <?php foreach ($mpesaAccounts as $idx => $acct): 
-        $linkedNas = array_filter($nasDevicesForMpesa, fn($n) => (int)($n['mpesa_account_id'] ?? 0) === (int)$acct['id']);
-    ?>
-    <div class="accordion-item shadow-sm mb-3 border rounded">
-        <div class="accordion-header d-flex align-items-center" id="mpesaHead<?= $acct['id'] ?>">
-            <button class="accordion-button <?= $idx !== 0 ? 'collapsed' : '' ?> flex-grow-1 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#mpesaGw<?= $acct['id'] ?>" aria-expanded="<?= $idx === 0 ? 'true' : 'false' ?>">
-                <span class="d-flex align-items-center gap-3">
-                    <span class="rounded-circle d-flex align-items-center justify-content-center <?= $acct['is_active'] ? 'bg-success' : 'bg-danger' ?> bg-opacity-10" style="width:40px;height:40px;">
-                        <i class="bi bi-phone <?= $acct['is_active'] ? 'text-success' : 'text-danger' ?>"></i>
-                    </span>
-                    <span>
-                        <span class="fw-bold">
-                            <?= htmlspecialchars($acct['name']) ?>
-                            <span class="badge bg-<?= $acct['is_active'] ? 'success' : 'danger' ?> ms-2"><?= $acct['is_active'] ? 'Active' : 'Inactive' ?></span>
-                        </span>
-                        <br>
-                        <small class="text-muted">
-                            <code><?= htmlspecialchars($acct['shortcode']) ?></code>
-                            <span class="mx-1">&bull;</span>
-                            <?= ucfirst($acct['account_type'] ?? 'paybill') ?>
-                            <span class="mx-1">&bull;</span>
-                            <?= ucfirst($acct['environment'] ?? 'production') ?>
-                            <span class="mx-1">&bull;</span>
-                            <span class="badge bg-secondary"><?= count($linkedNas) ?> NAS</span>
-                        </small>
-                    </span>
-                </span>
-            </button>
-            <span class="d-flex gap-1 pe-3 flex-shrink-0">
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editMpesaAccount(<?= htmlspecialchars(json_encode($acct)) ?>)" data-bs-toggle="modal" data-bs-target="#editMpesaAccountModal" title="Edit"><i class="bi bi-pencil"></i></button>
-                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="if(confirm('Delete this gateway?')) document.getElementById('delMpesaForm<?= $acct['id'] ?>').submit();"><i class="bi bi-trash"></i></button>
-            </span>
-            <form id="delMpesaForm<?= $acct['id'] ?>" method="post" style="display:none;">
-                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                <input type="hidden" name="action" value="delete_mpesa_account">
-                <input type="hidden" name="account_id" value="<?= $acct['id'] ?>">
-            </form>
-        </div>
-        <div id="mpesaGw<?= $acct['id'] ?>" class="accordion-collapse collapse <?= $idx === 0 ? 'show' : '' ?>" aria-labelledby="mpesaHead<?= $acct['id'] ?>" data-bs-parent="#mpesaGatewayAccordion">
-            <div class="accordion-body">
-                <div class="row g-4">
-                    <div class="col-lg-8">
-                        <h6 class="text-muted text-uppercase small fw-bold mb-3"><i class="bi bi-key me-1"></i> API Credentials</h6>
-                        <div class="row g-2 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted mb-0">Consumer Key</label>
-                                <div class="form-control-plaintext"><code><?= htmlspecialchars($acct['consumer_key_masked'] ?? '••••••••') ?></code></div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted mb-0">Consumer Secret</label>
-                                <div class="form-control-plaintext"><code><?= htmlspecialchars($acct['consumer_secret_masked'] ?? '••••••••') ?></code></div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted mb-0">Passkey</label>
-                                <div class="form-control-plaintext"><code><?= htmlspecialchars($acct['passkey_masked'] ?? '••••••••') ?></code></div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted mb-0">Callback URL</label>
-                                <div class="form-control-plaintext"><code class="small"><?= htmlspecialchars($acct['callback_url'] ?? 'Not set') ?></code></div>
-                            </div>
-                        </div>
-
-                        <h6 class="text-muted text-uppercase small fw-bold mb-3 mt-4"><i class="bi bi-diagram-3 me-1"></i> Linked NAS Devices</h6>
-                        <?php if (!empty($linkedNas)): ?>
-                        <div class="d-flex flex-wrap gap-2">
-                            <?php foreach ($linkedNas as $ln): ?>
-                            <span class="badge bg-primary bg-opacity-10 text-primary border px-3 py-2">
-                                <i class="bi bi-router me-1"></i><?= htmlspecialchars($ln['name']) ?>
-                            </span>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php else: ?>
-                        <div class="alert alert-warning small mb-0 py-2">
-                            <i class="bi bi-exclamation-triangle me-1"></i> No NAS devices assigned. Go to ISP &rarr; NAS Devices and assign this gateway.
-                        </div>
-                        <?php endif; ?>
+    
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-shield-check"></i> Connection Status</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($mpesa->isConfigured()): ?>
+                    <?php 
+                    $token = $mpesa->getAccessToken();
+                    if ($token): 
+                    ?>
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-check-circle"></i> <strong>Connected!</strong><br>
+                        <small>Successfully authenticated with M-Pesa API</small>
                     </div>
-                    <div class="col-lg-4">
-                        <h6 class="text-muted text-uppercase small fw-bold mb-3"><i class="bi bi-link-45deg me-1"></i> C2B URL Registration</h6>
-                        <p class="small text-muted mb-2">Register confirmation &amp; validation URLs with Safaricom for this shortcode.</p>
-                        <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="registerC2BUrls(<?= $acct['id'] ?>)">
-                            <i class="bi bi-globe me-1"></i> Register URLs with Safaricom
-                        </button>
-                        <div id="regUrlResult_<?= $acct['id'] ?>" class="mt-1"></div>
-
-                        <hr class="my-3">
-                        <h6 class="text-muted text-uppercase small fw-bold mb-3"><i class="bi bi-send me-1"></i> Test STK Push</h6>
-                        <div class="mb-2">
-                            <input type="tel" class="form-control form-control-sm" id="testPhone_<?= $acct['id'] ?>" placeholder="254712345678">
-                        </div>
-                        <div class="mb-2">
-                            <input type="number" class="form-control form-control-sm" id="testAmount_<?= $acct['id'] ?>" value="1" min="1" placeholder="Amount (KES)">
-                        </div>
-                        <button type="button" class="btn btn-sm btn-success w-100" onclick="testStkPushAccount(<?= $acct['id'] ?>)">
-                            <i class="bi bi-send me-1"></i> Send Test
-                        </button>
-                        <div id="stkResult_<?= $acct['id'] ?>" class="mt-2"></div>
+                    <?php else: ?>
+                    <div class="alert alert-danger mb-0">
+                        <i class="bi bi-x-circle"></i> <strong>Connection Failed</strong><br>
+                        <small>Check your Consumer Key and Secret</small>
                     </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> <strong>Not Configured</strong><br>
+                    <small>Enter your API credentials to enable M-Pesa</small>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-phone"></i> Test STK Push</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($mpesa->isConfigured()): ?>
+                <div class="mb-3">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" class="form-control" id="testPhone" placeholder="254712345678">
+                    <small class="text-muted">Format: 254XXXXXXXXX</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Amount (KES)</label>
+                    <input type="number" class="form-control" id="testAmount" value="1" min="1">
+                </div>
+                <button type="button" class="btn btn-success w-100" onclick="testStkPush()">
+                    <i class="bi bi-send"></i> Send Test STK Push
+                </button>
+                <div id="stkResult" class="mt-3"></div>
+                <?php else: ?>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> Configure M-Pesa first to test STK Push
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
     </div>
-    <?php endforeach; ?>
 </div>
 
-<?php endif; ?>
+<script>
+async function testStkPush() {
+    const phone = document.getElementById('testPhone').value.trim();
+    const amount = document.getElementById('testAmount').value;
+    const resultDiv = document.getElementById('stkResult');
+    
+    if (!phone || !amount) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Please enter phone and amount</div>';
+        return;
+    }
+    
+    if (!phone.match(/^254\d{9}$/)) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Phone must be in format 254XXXXXXXXX</div>';
+        return;
+    }
+    
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Sending STK Push...</div>';
+    
+    try {
+        const response = await fetch('/api/mpesa-test.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({phone, amount: parseFloat(amount)})
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> <strong>STK Push Sent!</strong><br>
+                <small>Check your phone for the payment prompt.</small><br>
+                <small class="text-muted">Checkout ID: ${data.checkoutRequestId || 'N/A'}</small>
+            </div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">
+                <i class="bi bi-x-circle"></i> <strong>Failed</strong><br>
+                <small>${data.error || 'Unknown error'}</small>
+            </div>`;
+        }
+    } catch (e) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+    }
+}
+</script>
 
 <!-- Add M-Pesa Account Modal -->
 <div class="modal fade" id="addMpesaAccountModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
                 <input type="hidden" name="action" value="create_mpesa_account">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Add M-Pesa Account</h5>
@@ -4603,7 +4482,7 @@ try {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
                 <input type="hidden" name="action" value="update_mpesa_account">
                 <input type="hidden" name="account_id" id="edit_ma_id">
                 <div class="modal-header">
@@ -4680,57 +4559,6 @@ function editMpesaAccount(acct) {
     document.getElementById('edit_ma_environment').value = acct.environment || 'production';
     document.getElementById('edit_ma_is_active').value = acct.is_active ? '1' : '0';
     document.getElementById('edit_ma_callback_url').value = acct.callback_url || '';
-}
-
-async function registerC2BUrls(accountId) {
-    const resultDiv = document.getElementById('regUrlResult_' + accountId);
-    resultDiv.innerHTML = '<div class="alert alert-info small py-1"><i class="bi bi-hourglass-split me-1"></i> Registering URLs with Safaricom...</div>';
-    try {
-        const response = await fetch('/api/mpesa-register-urls.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({account_id: accountId})
-        });
-        const data = await response.json();
-        if (data.success) {
-            let msg = '<i class="bi bi-check-circle me-1"></i> ' + (data.message || 'URLs registered successfully');
-            if (data.urls_registered) {
-                msg += '<br><small class="text-muted">Confirmation: ' + data.urls_registered.confirmation + '</small>';
-                msg += '<br><small class="text-muted">Validation: ' + data.urls_registered.validation + '</small>';
-            }
-            resultDiv.innerHTML = '<div class="alert alert-success small py-2">' + msg + '</div>';
-        } else {
-            let errMsg = data.error || data.message || 'Registration failed';
-            if (data.error_detail) errMsg += '<br><small>' + data.error_detail + '</small>';
-            resultDiv.innerHTML = '<div class="alert alert-danger small py-2"><i class="bi bi-x-circle me-1"></i> ' + errMsg + '</div>';
-        }
-    } catch (e) {
-        resultDiv.innerHTML = '<div class="alert alert-danger small py-1"><i class="bi bi-x-circle me-1"></i> Error: ' + e.message + '</div>';
-    }
-}
-
-async function testStkPushAccount(accountId) {
-    const phone = document.getElementById('testPhone_' + accountId).value.trim();
-    const amount = document.getElementById('testAmount_' + accountId).value;
-    const resultDiv = document.getElementById('stkResult_' + accountId);
-    if (!phone || !amount) { resultDiv.innerHTML = '<div class="alert alert-warning small py-1">Enter phone and amount</div>'; return; }
-    if (!phone.match(/^254\d{9}$/)) { resultDiv.innerHTML = '<div class="alert alert-warning small py-1">Format: 254XXXXXXXXX</div>'; return; }
-    resultDiv.innerHTML = '<div class="alert alert-info small py-1"><i class="bi bi-hourglass-split"></i> Sending...</div>';
-    try {
-        const response = await fetch('/api/mpesa-test.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({phone, amount: parseFloat(amount), account_id: accountId})
-        });
-        const data = await response.json();
-        if (data.success) {
-            resultDiv.innerHTML = '<div class="alert alert-success small py-1"><i class="bi bi-check-circle"></i> STK Push sent! Check phone.</div>';
-        } else {
-            resultDiv.innerHTML = '<div class="alert alert-danger small py-1"><i class="bi bi-x-circle"></i> ' + (data.error || 'Failed') + '</div>';
-        }
-    } catch (e) {
-        resultDiv.innerHTML = '<div class="alert alert-danger small py-1">Error: ' + e.message + '</div>';
-    }
 }
 </script>
 
@@ -7749,7 +7577,6 @@ $licenseEnabled = $licenseClient->isEnabled();
 $licenseInfo = null;
 $licenseStatus = null;
 $licenseError = null;
-$appVersion = \LicenseClient::APP_VERSION;
 
 $licenseServerUrl = $settings->get('license_server_url', getenv('LICENSE_SERVER_URL') ?: '');
 $licenseKey = $settings->get('license_key', getenv('LICENSE_KEY') ?: '');
@@ -7787,29 +7614,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csrf_token'])) {
         $licenseClient->deactivate();
         $licenseStatus = 'deactivated';
     }
-    
-    if ($licenseAction === 'save_remote_update_setting') {
-        try {
-            $val = $_POST['allow_remote_updates'] ?? '1';
-            $settings->set('allow_remote_updates', $val);
-            $licenseStatus = 'remote_update_' . ($val === '0' ? 'disabled' : 'enabled');
-        } catch (Exception $e) {
-            $licenseError = 'Error: ' . $e->getMessage();
-        }
-    }
-    
-    if ($licenseAction === 'check_license_updates') {
-        try {
-            $updateResult = $licenseClient->checkForUpdates();
-            if (!empty($updateResult['update_available'])) {
-                $licenseStatus = 'update_available';
-            } else {
-                $licenseStatus = 'up_to_date';
-            }
-        } catch (Exception $e) {
-            $licenseError = 'Update check failed: ' . $e->getMessage();
-        }
-    }
 }
 
 $licenseValidation = $licenseClient->validate();
@@ -7832,16 +7636,6 @@ $mode = $licenseValidation['mode'] ?? '';
 <?php elseif ($licenseStatus === 'deactivated'): ?>
 <div class="alert alert-warning alert-dismissible fade show">
     <i class="bi bi-exclamation-triangle me-1"></i> License deactivated from this installation.
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-<?php elseif ($licenseStatus === 'update_available'): ?>
-<div class="alert alert-info alert-dismissible fade show">
-    <i class="bi bi-cloud-arrow-down me-1"></i> A new update is available! See the Software Updates section below.
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-<?php elseif ($licenseStatus === 'up_to_date'): ?>
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle me-1"></i> You are running the latest version.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 <?php endif; ?>
@@ -7930,35 +7724,21 @@ $mode = $licenseValidation['mode'] ?? '';
                             <div class="border rounded p-3 text-center">
                                 <i class="bi bi-people fs-4 text-primary d-block mb-1"></i>
                                 <small class="text-muted d-block">Max Users</small>
-                                <strong class="fs-5"><?= ($licenseData['max_users'] ?? 0) > 0 ? $licenseData['max_users'] : 'Unlimited' ?></strong>
+                                <strong class="fs-5"><?= $licenseData['max_users'] > 0 ? $licenseData['max_users'] : 'Unlimited' ?></strong>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-3 text-center">
                                 <i class="bi bi-person-lines-fill fs-4 text-info d-block mb-1"></i>
                                 <small class="text-muted d-block">Max Customers</small>
-                                <strong class="fs-5"><?= ($licenseData['max_customers'] ?? 0) > 0 ? $licenseData['max_customers'] : 'Unlimited' ?></strong>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="border rounded p-3 text-center">
-                                <i class="bi bi-wifi fs-4 text-warning d-block mb-1"></i>
-                                <small class="text-muted d-block">Max Subscribers</small>
-                                <strong class="fs-5"><?= ($licenseData['max_subscribers'] ?? 0) > 0 ? $licenseData['max_subscribers'] : 'Unlimited' ?></strong>
+                                <strong class="fs-5"><?= $licenseData['max_customers'] > 0 ? $licenseData['max_customers'] : 'Unlimited' ?></strong>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-3 text-center">
                                 <i class="bi bi-router fs-4 text-success d-block mb-1"></i>
                                 <small class="text-muted d-block">Max ONUs</small>
-                                <strong class="fs-5"><?= ($licenseData['max_onus'] ?? 0) > 0 ? $licenseData['max_onus'] : 'Unlimited' ?></strong>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="border rounded p-3 text-center">
-                                <i class="bi bi-hdd-rack fs-4 text-danger d-block mb-1"></i>
-                                <small class="text-muted d-block">Max OLTs</small>
-                                <strong class="fs-5"><?= ($licenseData['max_olts'] ?? 0) > 0 ? $licenseData['max_olts'] : 'Unlimited' ?></strong>
+                                <strong class="fs-5"><?= $licenseData['max_onus'] > 0 ? $licenseData['max_onus'] : 'Unlimited' ?></strong>
                             </div>
                         </div>
                     </div>
@@ -8042,346 +7822,9 @@ $mode = $licenseValidation['mode'] ?? '';
             </div>
             <?php endif; ?>
         </div>
-
-        <?php
-        $updateAvailable = $licenseValidation['update_available'] ?? null;
-        if (!$updateAvailable && $licenseEnabled) {
-            $updateAvailable = $licenseClient->getUpdateFromCache();
-        }
-        ?>
-        <div class="card mb-4">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down me-2"></i>Software Updates</h5>
-                <span class="badge bg-secondary">v<?= htmlspecialchars($appVersion) ?></span>
-            </div>
-            <div class="card-body">
-                <?php if ($updateAvailable): ?>
-                <div class="alert alert-<?= !empty($updateAvailable['is_critical']) ? 'danger' : 'info' ?> mb-3">
-                    <div class="d-flex align-items-start">
-                        <i class="bi bi-<?= !empty($updateAvailable['is_critical']) ? 'exclamation-triangle' : 'cloud-arrow-down' ?> me-2 mt-1"></i>
-                        <div class="flex-grow-1">
-                            <strong>v<?= htmlspecialchars($updateAvailable['version']) ?> Available</strong>
-                            <?php if (!empty($updateAvailable['is_critical'])): ?>
-                                <span class="badge bg-danger ms-1">Critical</span>
-                            <?php endif; ?>
-                            <p class="mb-1 small"><?= htmlspecialchars($updateAvailable['title'] ?? '') ?></p>
-                            <?php if (!empty($updateAvailable['changelog'])): ?>
-                            <details class="mt-1">
-                                <summary class="small">View Changelog</summary>
-                                <pre class="mt-1 p-2 bg-light rounded small" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;"><?= htmlspecialchars($updateAvailable['changelog']) ?></pre>
-                            </details>
-                            <?php endif; ?>
-                            <div class="small text-muted mt-1">
-                                <?php if (!empty($updateAvailable['release_type'])): ?>
-                                    <span class="badge bg-secondary"><?= htmlspecialchars($updateAvailable['release_type']) ?></span>
-                                <?php endif; ?>
-                                <?php if (!empty($updateAvailable['min_php_version'])): ?>
-                                    Requires PHP >= <?= htmlspecialchars($updateAvailable['min_php_version']) ?>
-                                <?php endif; ?>
-                                <?php if (!empty($updateAvailable['published_at'])): ?>
-                                    | Released <?= date('M d, Y', strtotime($updateAvailable['published_at'])) ?>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php if (!empty($updateAvailable['download_url'])): ?>
-                <a href="<?= htmlspecialchars($updateAvailable['download_url']) ?>" class="btn btn-primary btn-sm mb-2" target="_blank">
-                    <i class="bi bi-download me-1"></i> Download v<?= htmlspecialchars($updateAvailable['version']) ?>
-                </a>
-                <?php endif; ?>
-                <?php else: ?>
-                <div class="text-center py-3">
-                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
-                    <p class="mb-0 mt-2">You are running the latest version <strong>(v<?= htmlspecialchars($appVersion) ?>)</strong></p>
-                </div>
-                <?php endif; ?>
-            </div>
-            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-                <div>
-                    <form method="POST" class="d-inline">
-                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                        <input type="hidden" name="license_action" value="check_license_updates">
-                        <button type="submit" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Check for Updates
-                        </button>
-                    </form>
-                    <span class="text-muted small ms-2">Current: v<?= htmlspecialchars($appVersion) ?></span>
-                </div>
-                <form method="POST" class="d-inline">
-                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                    <input type="hidden" name="license_action" value="save_remote_update_setting">
-                    <?php $remoteUpdatesAllowed = $settings->get('allow_remote_updates', '1') !== '0'; ?>
-                    <input type="hidden" name="allow_remote_updates" value="<?= $remoteUpdatesAllowed ? '0' : '1' ?>">
-                    <button type="submit" class="btn btn-sm <?= $remoteUpdatesAllowed ? 'btn-outline-success' : 'btn-outline-secondary' ?>" title="<?= $remoteUpdatesAllowed ? 'Remote updates are enabled — the license server can push updates to this installation' : 'Remote updates are disabled' ?>">
-                        <i class="bi bi-<?= $remoteUpdatesAllowed ? 'cloud-check' : 'cloud-slash' ?> me-1"></i>
-                        Remote Updates <?= $remoteUpdatesAllowed ? 'ON' : 'OFF' ?>
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <?php
-        require_once __DIR__ . '/../src/UpdateManager.php';
-        $updateMgr = new UpdateManager();
-        $updateHistory = $updateMgr->getHistory();
-        ?>
-        <?php if (!empty($updateHistory)): ?>
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Update History</h5>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-sm table-hover mb-0">
-                    <thead><tr><th>Version</th><th>Status</th><th>Message</th><th>Date</th></tr></thead>
-                    <tbody>
-                        <?php foreach (array_slice($updateHistory, 0, 10) as $hist): ?>
-                        <tr>
-                            <td><code>v<?= htmlspecialchars($hist['version'] ?? '') ?></code></td>
-                            <td>
-                                <?php
-                                $statusClass = match($hist['status'] ?? '') {
-                                    'completed' => 'success',
-                                    'failed' => 'danger',
-                                    'started' => 'warning',
-                                    default => 'secondary'
-                                };
-                                ?>
-                                <span class="badge bg-<?= $statusClass ?>"><?= htmlspecialchars($hist['status'] ?? '') ?></span>
-                            </td>
-                            <td class="small"><?= htmlspecialchars($hist['message'] ?? '') ?></td>
-                            <td class="small text-muted"><?= htmlspecialchars($hist['timestamp'] ?? '') ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <?php endif; ?>
     </div>
 
     <div class="col-lg-4">
-        <?php if ($licenseEnabled): ?>
-        <div class="card mb-4 border-success">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-phone me-2"></i>Pay with M-Pesa</h5>
-                <button class="btn btn-sm btn-outline-light" onclick="loadSubscriptionInfo()">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="subscriptionLoading" class="text-center py-3">
-                    <div class="spinner-border spinner-border-sm text-success" role="status"></div>
-                    <small class="text-muted ms-2">Loading...</small>
-                </div>
-
-                <div id="subscriptionContent" style="display:none;">
-                    <div class="bg-light rounded p-2 mb-3 small">
-                        <div class="d-flex justify-content-between">
-                            <span class="text-muted">Plan</span>
-                            <strong id="subTierName">-</strong>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="text-muted">Expires</span>
-                            <span id="subExpires">-</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="text-muted">Monthly</span>
-                            <span id="subPriceMonthly">-</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="text-muted">Yearly</span>
-                            <span id="subPriceYearly">-</span>
-                        </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <div class="btn-group w-100" role="group">
-                            <input type="radio" class="btn-check" name="billingCycle" id="cycleMonthly" value="monthly" checked onchange="updatePayAmount()">
-                            <label class="btn btn-outline-success btn-sm" for="cycleMonthly">Monthly</label>
-                            <input type="radio" class="btn-check" name="billingCycle" id="cycleYearly" value="yearly" onchange="updatePayAmount()">
-                            <label class="btn btn-outline-success btn-sm" for="cycleYearly">Yearly</label>
-                        </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text"><i class="bi bi-telephone"></i></span>
-                            <input type="tel" class="form-control" id="mpesaPhone" placeholder="0712345678" maxlength="13">
-                        </div>
-                    </div>
-
-                    <button class="btn btn-success w-100" id="payBtn" onclick="initiateMpesaPayment()">
-                        <i class="bi bi-phone me-1"></i>Pay <span id="payAmountLabel">KES 0</span>
-                    </button>
-
-                    <div id="paymentProgress" style="display:none;" class="mt-2">
-                        <div class="alert alert-info py-2 mb-0 small">
-                            <div class="d-flex align-items-center">
-                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-                                <div>
-                                    <strong>Waiting for M-Pesa...</strong>
-                                    <div id="paymentStatusText">Check your phone</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="paymentSuccess" style="display:none;" class="mt-2">
-                        <div class="alert alert-success py-2 mb-0 small">
-                            <i class="bi bi-check-circle-fill me-1"></i>
-                            <strong>Payment Successful!</strong>
-                            <div>Receipt: <span id="paymentReceipt"></span></div>
-                        </div>
-                    </div>
-
-                    <div id="paymentFailed" style="display:none;" class="mt-2">
-                        <div class="alert alert-danger py-2 mb-0 small">
-                            <i class="bi bi-x-circle-fill me-1"></i>
-                            <strong>Failed</strong>
-                            <div id="paymentErrorText"></div>
-                        </div>
-                    </div>
-
-                    <hr class="my-2">
-                    <h6 class="small text-muted mb-2"><i class="bi bi-clock-history me-1"></i>Recent Payments</h6>
-                    <div class="small" style="max-height:200px; overflow-y:auto;">
-                        <table class="table table-sm table-borderless mb-0">
-                            <tbody id="paymentHistoryBody">
-                                <tr><td class="text-center text-muted" colspan="3">No payments</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div id="subscriptionError" style="display:none;">
-                    <div class="text-center py-2 small text-muted">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        <span id="subscriptionErrorText">Could not load info</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <script>
-        let subData = null;
-        function loadSubscriptionInfo() {
-            document.getElementById('subscriptionLoading').style.display = '';
-            document.getElementById('subscriptionContent').style.display = 'none';
-            document.getElementById('subscriptionError').style.display = 'none';
-            fetch('?page=license_subscription_info').then(r => r.json()).then(data => {
-                document.getElementById('subscriptionLoading').style.display = 'none';
-                if (data.success && data.license) {
-                    subData = data;
-                    renderSubscription(data);
-                    document.getElementById('subscriptionContent').style.display = '';
-                } else {
-                    document.getElementById('subscriptionErrorText').textContent = data.error || 'Could not load info';
-                    document.getElementById('subscriptionError').style.display = '';
-                }
-            }).catch(err => {
-                document.getElementById('subscriptionLoading').style.display = 'none';
-                document.getElementById('subscriptionErrorText').textContent = err.message;
-                document.getElementById('subscriptionError').style.display = '';
-            });
-        }
-        function renderSubscription(data) {
-            const lic = data.license;
-            document.getElementById('subTierName').textContent = lic.tier_name || 'N/A';
-            if (lic.expires_at) {
-                const exp = new Date(lic.expires_at);
-                const days = Math.max(0, Math.ceil((exp - new Date()) / 86400000));
-                let badge = days <= 7 ? ' <span class="badge bg-danger">' + days + 'd</span>'
-                    : days <= 30 ? ' <span class="badge bg-warning">' + days + 'd</span>' : '';
-                document.getElementById('subExpires').innerHTML = exp.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + badge;
-            } else {
-                document.getElementById('subExpires').innerHTML = '<span class="badge bg-success">Lifetime</span>';
-            }
-            document.getElementById('subPriceMonthly').textContent = 'KES ' + Number(lic.price_monthly).toLocaleString();
-            document.getElementById('subPriceYearly').textContent = 'KES ' + Number(lic.price_yearly).toLocaleString();
-            if (lic.customer_phone) document.getElementById('mpesaPhone').value = lic.customer_phone;
-            updatePayAmount();
-            const tbody = document.getElementById('paymentHistoryBody');
-            if (data.payments && data.payments.length > 0) {
-                tbody.innerHTML = data.payments.slice(0, 5).map(p => {
-                    const d = p.paid_at ? new Date(p.paid_at).toLocaleDateString() : new Date(p.created_at).toLocaleDateString();
-                    const s = p.status === 'completed' ? '<span class="text-success">Paid</span>'
-                        : p.status === 'failed' ? '<span class="text-danger">Failed</span>'
-                        : '<span class="text-warning">Pending</span>';
-                    return '<tr><td>' + d + '</td><td>KES ' + Number(p.amount).toLocaleString() + '</td><td>' + s + '</td></tr>';
-                }).join('');
-            }
-        }
-        function updatePayAmount() {
-            if (!subData) return;
-            const cycle = document.querySelector('input[name="billingCycle"]:checked').value;
-            const amt = cycle === 'yearly' ? subData.license.price_yearly : subData.license.price_monthly;
-            document.getElementById('payAmountLabel').textContent = 'KES ' + Number(amt).toLocaleString();
-        }
-        function initiateMpesaPayment() {
-            const phone = document.getElementById('mpesaPhone').value.trim();
-            if (!phone || phone.length < 10) { alert('Enter a valid phone number'); return; }
-            const cycle = document.querySelector('input[name="billingCycle"]:checked').value;
-            const btn = document.getElementById('payBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
-            ['paymentProgress','paymentSuccess','paymentFailed'].forEach(id => document.getElementById(id).style.display = 'none');
-            fetch('?page=license_pay_initiate', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({phone, billing_cycle: cycle})
-            }).then(r => r.json()).then(data => {
-                if (data.success && data.checkout_request_id) {
-                    document.getElementById('paymentProgress').style.display = '';
-                    document.getElementById('paymentStatusText').textContent = data.message || 'Check your phone';
-                    pollPaymentStatus(data.checkout_request_id, 0);
-                } else {
-                    resetPayButton();
-                    document.getElementById('paymentFailed').style.display = '';
-                    document.getElementById('paymentErrorText').textContent = data.error || 'Failed';
-                }
-            }).catch(err => {
-                resetPayButton();
-                document.getElementById('paymentFailed').style.display = '';
-                document.getElementById('paymentErrorText').textContent = err.message;
-            });
-        }
-        function pollPaymentStatus(cid, attempt) {
-            if (attempt > 40) {
-                document.getElementById('paymentProgress').style.display = 'none';
-                document.getElementById('paymentFailed').style.display = '';
-                document.getElementById('paymentErrorText').textContent = 'Timed out. Payment may still process.';
-                resetPayButton(); return;
-            }
-            setTimeout(() => {
-                fetch('?page=license_pay_status', {
-                    method: 'POST', headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({checkout_request_id: cid})
-                }).then(r => r.json()).then(data => {
-                    if (data.status === 'completed') {
-                        document.getElementById('paymentProgress').style.display = 'none';
-                        document.getElementById('paymentSuccess').style.display = '';
-                        document.getElementById('paymentReceipt').textContent = data.mpesa_receipt || 'N/A';
-                        resetPayButton();
-                        setTimeout(() => location.reload(), 3000);
-                    } else if (data.status === 'failed') {
-                        document.getElementById('paymentProgress').style.display = 'none';
-                        document.getElementById('paymentFailed').style.display = '';
-                        document.getElementById('paymentErrorText').textContent = 'Cancelled or failed';
-                        resetPayButton();
-                    } else { pollPaymentStatus(cid, attempt + 1); }
-                }).catch(() => pollPaymentStatus(cid, attempt + 1));
-            }, 3000);
-        }
-        function resetPayButton() {
-            const btn = document.getElementById('payBtn');
-            btn.disabled = false;
-            const cycle = document.querySelector('input[name="billingCycle"]:checked')?.value || 'monthly';
-            const amt = subData ? (cycle === 'yearly' ? subData.license.price_yearly : subData.license.price_monthly) : 0;
-            btn.innerHTML = '<i class="bi bi-phone me-1"></i>Pay KES ' + Number(amt).toLocaleString();
-        }
-        document.addEventListener('DOMContentLoaded', loadSubscriptionInfo);
-        </script>
-        <?php endif; ?>
-
         <div class="card mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0"><i class="bi bi-gear me-2"></i>License Configuration</h5>
@@ -8441,8 +7884,6 @@ $mode = $licenseValidation['mode'] ?? '';
                     <li>7-day grace period if the server is unreachable</li>
                     <li>Features are enabled/disabled based on your plan tier</li>
                     <li>Leave both fields empty to run without license restrictions</li>
-                    <li>Server stats (users, customers, ONUs) are reported during heartbeat</li>
-                    <li>Software updates are checked automatically during validation</li>
                 </ul>
             </div>
         </div>
