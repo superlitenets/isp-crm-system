@@ -7,15 +7,14 @@ class GenieACS {
     private string $username;
     private string $password;
     private int $timeout;
+    private string $crUsername;
+    private string $crPassword;
     
     public function __construct(\PDO $db) {
         $this->db = $db;
         $this->loadSettings();
     }
     
-    private string $crUsername;
-    private string $crPassword;
-
     private function loadSettings(): void {
         $stmt = $this->db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'genieacs_%'");
         $settings = [];
@@ -147,216 +146,6 @@ class GenieACS {
         ];
     }
     
-    public function addTag(string $deviceId, string $tag): array {
-        $tag = $this->sanitizeTag($tag);
-        $url = $this->baseUrl . '/devices/' . rawurlencode($deviceId) . '/tags/' . rawurlencode($tag);
-        
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $this->timeout,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => '',
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json']
-        ]);
-        
-        if (!empty($this->username)) {
-            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-        }
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        if ($error) return ['success' => false, 'error' => $error];
-        return ($httpCode >= 200 && $httpCode < 300)
-            ? ['success' => true, 'tag' => $tag]
-            : ['success' => false, 'error' => "HTTP {$httpCode}"];
-    }
-
-    public function removeTag(string $deviceId, string $tag): array {
-        $tag = $this->sanitizeTag($tag);
-        $url = $this->baseUrl . '/devices/' . rawurlencode($deviceId) . '/tags/' . rawurlencode($tag);
-        
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $this->timeout,
-            CURLOPT_CUSTOMREQUEST => 'DELETE'
-        ]);
-        
-        if (!empty($this->username)) {
-            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-        }
-        
-        curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        if ($error) return ['success' => false, 'error' => $error];
-        return ($httpCode >= 200 && $httpCode < 300)
-            ? ['success' => true]
-            : ['success' => false, 'error' => "HTTP {$httpCode}"];
-    }
-
-    public function getDeviceTags(string $deviceId): array {
-        $result = $this->getDevice($deviceId, false);
-        if (!$result['success'] || empty($result['data'])) return [];
-        $device = $result['data'];
-        return $device['_tags'] ?? [];
-    }
-
-    public function syncCustomerTags(\PDO $db): array {
-        $results = ['success' => 0, 'failed' => 0, 'skipped' => 0, 'errors' => []];
-
-        $genieDevices = $this->fetchAllGenieACSDevices();
-        if (empty($genieDevices)) {
-            $results['errors'][] = 'Could not fetch devices from GenieACS';
-            return $results;
-        }
-
-        $genieMap = [];
-        foreach ($genieDevices as $dev) {
-            $id = $dev['_id'] ?? '';
-            if (empty($id)) continue;
-            $genieMap[$id] = $id;
-            $serial = $dev['_deviceId']['_SerialNumber'] ?? '';
-            if (!empty($serial)) {
-                $genieMap[strtoupper($serial)] = $id;
-            }
-            if (preg_match('/[0-9A-Fa-f]{8,}$/', $id, $m)) {
-                $suffix = strtoupper($m[0]);
-                if (!isset($genieMap[$suffix])) {
-                    $genieMap[$suffix] = $id;
-                }
-            }
-        }
-
-        $stmt = $db->query("
-            SELECT o.id, o.sn, o.name, o.customer_name, o.customer_id, o.tr069_device_id, o.genieacs_id
-            FROM huawei_onus o
-            WHERE o.is_authorized = true
-        ");
-
-        $updateGenieId = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
-
-        while ($onu = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            $deviceId = null;
-            if (!empty($onu['genieacs_id']) && isset($genieMap[$onu['genieacs_id']])) {
-                $deviceId = $onu['genieacs_id'];
-            } elseif (!empty($onu['tr069_device_id']) && isset($genieMap[$onu['tr069_device_id']])) {
-                $deviceId = $onu['tr069_device_id'];
-                $updateGenieId->execute([$deviceId, $onu['id']]);
-            }
-
-            if (!$deviceId) {
-                $sn = strtoupper(trim($onu['sn'] ?? ''));
-                if (!empty($sn)) {
-                    if (isset($genieMap[$sn])) {
-                        $deviceId = $genieMap[$sn];
-                        $updateGenieId->execute([$deviceId, $onu['id']]);
-                    } else {
-                        $snHex = preg_match('/^[A-Z]{4}(.+)$/i', $sn, $m) ? strtoupper($m[1]) : '';
-                        if (!empty($snHex) && isset($genieMap[$snHex])) {
-                            $deviceId = $genieMap[$snHex];
-                            $updateGenieId->execute([$deviceId, $onu['id']]);
-                        } else {
-                            $asciiSn = '';
-                            for ($i = 0; $i < strlen($sn); $i++) {
-                                $asciiSn .= strtoupper(dechex(ord($sn[$i])));
-                            }
-                            if (isset($genieMap[$asciiSn])) {
-                                $deviceId = $genieMap[$asciiSn];
-                                $updateGenieId->execute([$deviceId, $onu['id']]);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!$deviceId) {
-                $results['skipped']++;
-                continue;
-            }
-
-            $onuName = trim($onu['name'] ?? '');
-            $customerName = '';
-            if (!empty($onuName) && !preg_match('/^(HWTC|TDTC|ZTEG|[A-F0-9]{12,})/i', $onuName)) {
-                $customerName = $onuName;
-            } else {
-                $customerName = trim($onu['customer_name'] ?? '');
-                if (empty($customerName) && !empty($onu['customer_id'])) {
-                    $custStmt = $db->prepare("SELECT name FROM customers WHERE id = ?");
-                    $custStmt->execute([$onu['customer_id']]);
-                    $cust = $custStmt->fetch(\PDO::FETCH_ASSOC);
-                    $customerName = $cust['name'] ?? '';
-                }
-                if (empty($customerName) && !empty($onuName)) {
-                    $customerName = $onuName;
-                }
-            }
-
-            if (empty($customerName)) {
-                $results['skipped']++;
-                continue;
-            }
-
-            $tag = $this->sanitizeTag($customerName);
-            $result = $this->addTag($deviceId, $tag);
-
-            if ($result['success']) {
-                $results['success']++;
-            } else {
-                $results['failed']++;
-                if (count($results['errors']) < 10) {
-                    $results['errors'][] = "ONU {$onu['sn']}: {$result['error']}";
-                }
-            }
-        }
-
-        return $results;
-    }
-
-    private function fetchAllGenieACSDevices(): array {
-        $allDevices = [];
-        $skip = 0;
-        $limit = 500;
-        $maxPages = 20;
-
-        for ($page = 0; $page < $maxPages; $page++) {
-            $query = ['limit' => $limit, 'skip' => $skip];
-            $query['projection'] = '_id,_deviceId._SerialNumber';
-            $result = $this->request('GET', '/devices', null, $query);
-            if (!$result['success'] || empty($result['data'])) break;
-            $allDevices = array_merge($allDevices, $result['data']);
-            if (count($result['data']) < $limit) break;
-            $skip += $limit;
-        }
-
-        return $allDevices;
-    }
-
-    public function syncSingleOnuTag(string $deviceId, string $customerName): array {
-        if (empty($deviceId) || empty($customerName)) {
-            return ['success' => false, 'error' => 'Device ID and customer name are required'];
-        }
-        $tag = $this->sanitizeTag($customerName);
-        return $this->addTag($deviceId, $tag);
-    }
-
-    private function sanitizeTag(string $tag): string {
-        $tag = trim($tag);
-        $tag = preg_replace('/[\/\\\\#?%&=+]/', '_', $tag);
-        $tag = preg_replace('/\s+/', '_', $tag);
-        $tag = preg_replace('/_+/', '_', $tag);
-        $tag = trim($tag, '_');
-        return substr($tag, 0, 100);
-    }
-
     public function testConnection(): array {
         $result = $this->request('GET', '/devices', null, ['limit' => 1]);
         if ($result['success']) {
@@ -492,37 +281,14 @@ class GenieACS {
             ];
         }
         
-        $maxRetries = 3;
-        error_log("[GenieACS] sendConnectionRequest got HTTP {$httpCode} for {$serial}, retrying up to {$maxRetries} times");
-        
-        for ($retry = 1; $retry <= $maxRetries; $retry++) {
-            sleep(3);
-            $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
-            $retryCode = $retryResult['http_code'] ?? 0;
-            error_log("[GenieACS] sendConnectionRequest retry {$retry}/{$maxRetries} got HTTP {$retryCode} for {$serial}");
-            if ($retryCode == 200) {
-                return [
-                    'success' => true,
-                    'message' => 'Device responded on retry ' . $retry,
-                    'connection_request_url' => $connReqUrl,
-                    'http_code' => 200,
-                    'queued' => false
-                ];
-            }
-        }
-        
-        $this->deletePendingTasks($deviceId);
         $queueResult = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
         $queueCode = $queueResult['http_code'] ?? 0;
         
         if ($queueCode == 200 || $queueCode == 202) {
-            if ($serial) {
-                $this->triggerInformViaOLT($serial);
-            }
             return [
                 'success' => true,
                 'queued' => true,
-                'message' => 'Device unreachable for instant push. Task queued for next inform (usually within 60s).',
+                'message' => 'Device unreachable for instant push. Task queued for next inform.',
                 'connection_request_url' => $connReqUrl,
                 'http_code' => $queueCode
             ];
@@ -530,9 +296,9 @@ class GenieACS {
         
         return [
             'success' => false,
-            'message' => "Device unreachable and failed to queue task",
+            'message' => 'Device unreachable and failed to queue task',
             'connection_request_url' => $connReqUrl,
-            'http_code' => $retryCode ?? $httpCode,
+            'http_code' => $httpCode,
             'queued' => false
         ];
     }
@@ -758,8 +524,10 @@ class GenieACS {
     }
     
     public function setParameterValues(string $deviceId, array $parameterValues): array {
+        // Use rawurlencode for path safety with special characters
         $encodedId = rawurlencode($deviceId);
         
+        // GenieACS expects parameterValues as array of [name, value, type] arrays
         $formattedParams = [];
         foreach ($parameterValues as $key => $value) {
             if (is_array($value) && isset($value[0], $value[1])) {
@@ -775,60 +543,11 @@ class GenieACS {
             }
         }
         
-        $task = [
+        // Use connection_request with 60s timeout for instant push
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=60000", [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
-        ];
-        
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=15000", $task);
-        $httpCode = $result['http_code'] ?? 0;
-        
-        if ($httpCode == 200) {
-            error_log("[GenieACS] setParameterValues delivered instantly to {$deviceId}");
-        } else {
-            $serial = $this->extractSerialFromDeviceId($deviceId);
-            $delivered = false;
-            
-            error_log("[GenieACS] setParameterValues got HTTP {$httpCode} for {$deviceId}, attempting recovery");
-            
-            for ($retry = 1; $retry <= 3; $retry++) {
-                sleep(3 + $retry);
-                error_log("[GenieACS] Retry {$retry}/3 for {$deviceId}");
-                $retryResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=20000", $task);
-                $retryCode = $retryResult['http_code'] ?? 0;
-                if ($retryCode == 200) {
-                    $result = $retryResult;
-                    $result['http_code'] = 200;
-                    $delivered = true;
-                    error_log("[GenieACS] Retry {$retry} succeeded for {$deviceId}");
-                    break;
-                }
-                error_log("[GenieACS] Retry {$retry} got HTTP {$retryCode} for {$deviceId}");
-            }
-            
-            if (!$delivered) {
-                error_log("[GenieACS] Connection request failed, queuing task for next inform for {$deviceId}");
-                $this->deletePendingTasks($deviceId);
-                $queueResult = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-                $queueCode = $queueResult['http_code'] ?? 0;
-                
-                if ($queueCode == 200 || $queueCode == 202) {
-                    $result['success'] = true;
-                    $result['queued'] = true;
-                    $result['error'] = null;
-                    $result['message'] = 'Device unreachable for instant push. Changes queued and will apply on next device inform (usually within 60s).';
-                    error_log("[GenieACS] Task queued for next inform for {$deviceId}");
-                    
-                    if ($serial) {
-                        $this->triggerInformViaOLT($serial);
-                    }
-                } else {
-                    $result['success'] = false;
-                    $result['error'] = "Failed to deliver or queue changes. Device may be offline.";
-                    error_log("[GenieACS] FAILED to queue task for {$deviceId}, HTTP {$queueCode}");
-                }
-            }
-        }
+        ]);
         
         error_log("[GenieACS] setParameterValues to {$deviceId}: " . json_encode([
             'params_count' => count($formattedParams), 
@@ -837,71 +556,6 @@ class GenieACS {
         ]));
         
         return $result;
-    }
-    
-    private function extractSerialFromDeviceId(string $deviceId): ?string {
-        if (preg_match('/([A-Z0-9]{16})/i', $deviceId, $m)) {
-            return $m[1];
-        }
-        if (preg_match('/([A-Z]{4}[A-Fa-f0-9]{8,})/i', $deviceId, $m)) {
-            return $m[1];
-        }
-        $parts = explode('-', $deviceId);
-        foreach ($parts as $part) {
-            if (strlen($part) >= 12 && preg_match('/^[A-Z0-9]+$/i', $part)) {
-                return $part;
-            }
-        }
-        return null;
-    }
-    
-    public function clearCRCredentialsViaOLT(string $serial): array {
-        try {
-            $stmt = $this->db->prepare("
-                SELECT o.olt_id, o.frame, o.slot, o.port, o.onu_id 
-                FROM huawei_onus o 
-                WHERE o.sn = ? AND o.olt_id IS NOT NULL
-            ");
-            $stmt->execute([$serial]);
-            $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
-            if (!$onu) {
-                $stmt2 = $this->db->prepare("
-                    SELECT o.olt_id, o.frame, o.slot, o.port, o.onu_id 
-                    FROM huawei_onus o 
-                    WHERE o.tr069_serial = ? AND o.olt_id IS NOT NULL
-                ");
-                $stmt2->execute([$serial]);
-                $onu = $stmt2->fetch(\PDO::FETCH_ASSOC);
-            }
-            
-            if (!$onu) {
-                error_log("[GenieACS] ONU not found in DB for serial {$serial}, cannot clear CR via OLT");
-                return ['success' => false, 'error' => 'ONU not found in database'];
-            }
-            
-            $frame = $onu['frame'] ?? 0;
-            $slot = $onu['slot'];
-            $port = $onu['port'];
-            $onuId = $onu['onu_id'];
-            $oltId = $onu['olt_id'];
-            
-            require_once __DIR__ . '/HuaweiOLT.php';
-            $huaweiOLT = new HuaweiOLT($this->db);
-            
-            $cmd = "interface gpon {$frame}/{$slot}\r\n";
-            $cmd .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"{$this->crUsername}\" connection-request-password \"{$this->crPassword}\"\r\n";
-            $cmd .= "quit";
-            
-            $result = $huaweiOLT->executeCommand($oltId, $cmd);
-            error_log("[GenieACS] Reset CR credentials via OLT for {$serial} to '{$this->crUsername}' (F{$frame}/S{$slot}/P{$port}/O{$onuId}): " . 
-                ($result['success'] ? 'SUCCESS' : 'FAILED'));
-            
-            return $result;
-        } catch (\Exception $e) {
-            error_log("[GenieACS] Error clearing CR credentials for {$serial}: " . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
     }
     
     /**
@@ -1028,221 +682,9 @@ class GenieACS {
     }
     
     public function createProvision(string $name, string $script): array {
-        $url = $this->baseUrl . "/provisions/" . rawurlencode($name);
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $this->timeout,
-            CURLOPT_CUSTOMREQUEST => 'PUT',
-            CURLOPT_POSTFIELDS => $script,
-            CURLOPT_HTTPHEADER => ['Content-Type: text/plain']
-        ]);
-        if (!empty($this->username)) {
-            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-        }
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        if ($error) return ['success' => false, 'error' => $error];
-        return ['success' => $httpCode >= 200 && $httpCode < 300, 'http_code' => $httpCode];
-    }
-
-    public function setConfig(string $key, string $value): array {
-        $url = $this->baseUrl . "/config/" . rawurlencode($key);
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $this->timeout,
-            CURLOPT_CUSTOMREQUEST => 'PUT',
-            CURLOPT_POSTFIELDS => json_encode($value),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json']
-        ]);
-        if (!empty($this->username)) {
-            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-        }
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        if ($error) return ['success' => false, 'error' => "cURL error: $error"];
-        if ($httpCode >= 200 && $httpCode < 300) {
-            return ['success' => true, 'http_code' => $httpCode];
-        }
-        return ['success' => false, 'error' => "HTTP $httpCode - " . ($response ?: 'No response'), 'http_code' => $httpCode];
-    }
-
-    public function getConfig(string $key): array {
-        $url = $this->baseUrl . "/config/" . rawurlencode($key);
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $this->timeout,
-            CURLOPT_CUSTOMREQUEST => 'GET',
-            CURLOPT_HTTPHEADER => ['Accept: application/json']
-        ]);
-        if (!empty($this->username)) {
-            curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-        }
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        if ($error) return ['success' => false, 'error' => $error];
-        if ($httpCode >= 200 && $httpCode < 300) {
-            return ['success' => true, 'data' => json_decode($response, true), 'http_code' => $httpCode];
-        }
-        return ['success' => false, 'http_code' => $httpCode];
-    }
-
-    public function setupPeriodicInform(int $intervalSeconds = 300): array {
-        $results = [];
-        $messages = [];
-        $errors = [];
-
-        $provisionName = 'bootstrap-setup';
-        $script = <<<JS
-declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", null, {value: "{$this->crUsername}"});
-declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", null, {value: "{$this->crPassword}"});
-declare("InternetGatewayDevice.ManagementServer.PeriodicInformEnable", null, {value: true});
-declare("InternetGatewayDevice.ManagementServer.PeriodicInformInterval", null, {value: {$intervalSeconds}});
-JS;
-
-        $provResult = $this->createProvision($provisionName, $script);
-        $results['provision'] = $provResult;
-        if ($provResult['success'] ?? false) {
-            $messages[] = "Provision: periodic inform {$intervalSeconds}s + set CR credentials to '{$this->crUsername}' (takes effect immediately via TR-069 Set, like SmartOLT).";
-        } else {
-            $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
-        }
-
-        $preset = [
-            '_id' => 'bootstrap-setup',
-            'channel' => 'default',
-            'weight' => 0,
-            'precondition' => '{}',
-            'events' => ['0 BOOTSTRAP', '1 BOOT'],
-            'configurations' => [
-                ['type' => 'provision', 'name' => $provisionName, 'args' => []]
-            ]
-        ];
-        $presetResult = $this->createPreset($preset);
-        $results['preset'] = $presetResult;
-        if ($presetResult['success'] ?? false) {
-            $messages[] = 'Preset runs on BOOTSTRAP and BOOT events.';
-        } else {
-            $errors[] = 'Preset: ' . ($presetResult['error'] ?? 'Unknown');
-        }
-
-        $this->deletePreset('set-periodic-inform');
-
-        $anySuccess = !empty($messages);
-        $fullMessage = '';
-        if (!empty($messages)) {
-            $fullMessage .= implode(' ', $messages);
-        }
-        if (!empty($errors)) {
-            $fullMessage .= ($fullMessage ? ' | Errors: ' : 'Errors: ') . implode('; ', $errors);
-        }
-
-        return [
-            'success' => $anySuccess && empty($errors),
-            'message' => $fullMessage,
-            'error' => !empty($errors) ? implode('; ', $errors) : null,
-            'details' => $results
-        ];
+        return $this->request('PUT', "/provisions/{$name}", null);
     }
     
-    public function pushConnectionRequestCredentials(string $deviceId, ?string $username = null, ?string $password = null): array {
-        $username = $username ?? $this->crUsername;
-        $password = $password ?? $this->crPassword;
-        $encodedId = rawurlencode($deviceId);
-
-        $dataModel = $this->detectDataModel($deviceId);
-        $root = ($dataModel === 'tr181') ? 'Device' : 'InternetGatewayDevice';
-
-        $task = [
-            'name' => 'setParameterValues',
-            'parameterValues' => [
-                ["{$root}.ManagementServer.ConnectionRequestUsername", $username, 'xsd:string'],
-                ["{$root}.ManagementServer.ConnectionRequestPassword", $password, 'xsd:string']
-            ]
-        ];
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-        error_log("[GenieACS] pushConnectionRequestCredentials to {$deviceId} (model={$dataModel}): " . json_encode([
-            'username' => $username,
-            'success' => $result['success'] ?? false,
-            'http_code' => $result['http_code'] ?? 0
-        ]));
-
-        if ($result['success'] ?? false) {
-            $faults = $this->getFaults($deviceId);
-            $faultData = $faults['data'] ?? [];
-            if (!empty($faultData)) {
-                $latestFault = end($faultData);
-                $faultDetail = $latestFault['detail'] ?? ($latestFault['message'] ?? 'Unknown fault');
-                error_log("[GenieACS] Device {$deviceId} has faults after CR push: " . json_encode($faultDetail));
-                $result['warning'] = "Task queued but device has faults: {$faultDetail}";
-            }
-        }
-
-        return $result;
-    }
-
-    public function pushConnectionRequestCredentialsToAll(?string $username = null, ?string $password = null): array {
-        $username = $username ?? $this->crUsername;
-        $password = $password ?? $this->crPassword;
-        $success = 0;
-        $failed = 0;
-        $errors = [];
-        $skip = 0;
-        $limit = 100;
-
-        while (true) {
-            $devicesResult = $this->getDevices([], $limit, $skip);
-            if (!($devicesResult['success'] ?? false)) {
-                if ($skip === 0) {
-                    return ['success' => false, 'error' => 'Failed to fetch devices: ' . ($devicesResult['error'] ?? 'Unknown')];
-                }
-                break;
-            }
-
-            $devices = $devicesResult['data'] ?? [];
-            if (empty($devices)) break;
-
-            foreach ($devices as $device) {
-                $deviceId = $device['_id'] ?? null;
-                if (!$deviceId) continue;
-
-                $result = $this->pushConnectionRequestCredentials($deviceId, $username, $password);
-                if ($result['success'] ?? false) {
-                    $success++;
-                } else {
-                    $failed++;
-                    if (count($errors) < 10) {
-                        $errors[] = "{$deviceId}: " . ($result['error'] ?? 'Unknown');
-                    }
-                }
-            }
-
-            if (count($devices) < $limit) break;
-            $skip += $limit;
-        }
-
-        $total = $success + $failed;
-        return [
-            'success' => $total > 0 && $failed === 0,
-            'message' => "Queued CR credentials for {$success} device(s)" . ($failed > 0 ? ", {$failed} failed" : '') . ". Tasks will execute on each device's next Inform.",
-            'total' => $total,
-            'success_count' => $success,
-            'failed_count' => $failed,
-            'errors' => $errors
-        ];
-    }
-
     public function getFiles(): array {
         return $this->request('GET', '/files');
     }
@@ -1541,7 +983,7 @@ JS;
     }
     
     public function getWiFiSettings(string $deviceId): array {
-        $result = $this->getDevice($deviceId, false);
+        $result = $this->getDevice($deviceId);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => 'Failed to fetch device: ' . ($result['error'] ?? 'Unknown')];
@@ -1611,10 +1053,7 @@ JS;
             $standard = $getValue($config, 'Standard');
             $beaconType = $getValue($config, 'BeaconType');
             $vlanId = $getValue($config, 'X_HW_VLANID') ?? $getValue($config, 'VLANID');
-            $vlanMode = $getValue($config, 'X_HW_VLANMode');
             $broadcast = $getValue($config, 'SSIDAdvertisementEnabled');
-            $accessMode = $getValue($config, 'X_HW_WlanAccessMode') ?? $getValue($config, 'X_HW_AccessMode');
-            $bindWan = $getValue($config, 'X_HW_BindWan');
             
             // Get password from nested PreSharedKey structure
             $password = null;
@@ -1629,10 +1068,7 @@ JS;
             $wifiData[] = ["{$basePath}.Standard", $standard];
             $wifiData[] = ["{$basePath}.BeaconType", $beaconType];
             $wifiData[] = ["{$basePath}.X_HW_VLANID", $vlanId];
-            $wifiData[] = ["{$basePath}.X_HW_VLANMode", $vlanMode];
             $wifiData[] = ["{$basePath}.SSIDAdvertisementEnabled", $broadcast];
-            $wifiData[] = ["{$basePath}.X_HW_WlanAccessMode", $accessMode];
-            $wifiData[] = ["{$basePath}.X_HW_BindWan", $bindWan];
             if ($password !== null) {
                 $wifiData[] = ["{$basePath}.PreSharedKey.1.KeyPassphrase", $password];
             }
@@ -1642,73 +1078,7 @@ JS;
             return ['success' => false, 'error' => 'No WiFi interfaces found in device data'];
         }
         
-        $bridgeData = $this->getWifiBridgeBindings($device, $getValue);
-        
-        return ['success' => true, 'data' => $wifiData, 'bridge_bindings' => $bridgeData];
-    }
-    
-    private function getWifiBridgeBindings(array $device, callable $getValue): array {
-        $bindings = [];
-        
-        $policyRoutes = $device['InternetGatewayDevice']['Layer3Forwarding']['X_HW_policy_route'] ?? [];
-        $ssidRoutes = [];
-        foreach ($policyRoutes as $routeIdx => $route) {
-            if (!is_numeric($routeIdx) || !is_array($route)) continue;
-            $phyPort = $getValue($route, 'PhyPortName');
-            $wanName = $getValue($route, 'WanName');
-            $routeType = $getValue($route, 'PolicyRouteType');
-            if ($phyPort && preg_match('/^SSID(\d+)$/i', $phyPort, $m)) {
-                $ssidRoutes[(int)$m[1]] = [
-                    'route_index' => $routeIdx,
-                    'phy_port' => $phyPort,
-                    'wan_name' => $wanName,
-                    'route_type' => $routeType
-                ];
-            }
-        }
-        
-        $wanDevice = $device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
-        $wanConnections = [];
-        foreach ($wanDevice as $connIdx => $connDev) {
-            if (!is_numeric($connIdx) || !is_array($connDev)) continue;
-            
-            $ipConns = $connDev['WANIPConnection'] ?? [];
-            foreach ($ipConns as $ipIdx => $ipConn) {
-                if (!is_numeric($ipIdx) || !is_array($ipConn)) continue;
-                $connType = $getValue($ipConn, 'ConnectionType');
-                $connName = $getValue($ipConn, 'Name');
-                $vlan = $getValue($ipConn, 'X_HW_VLAN');
-                $enabled = $getValue($ipConn, 'Enable');
-                
-                if (strtolower($connType ?? '') === 'ip_bridged') {
-                    $wanConnections["wan1.{$connIdx}.ip{$ipIdx}"] = [
-                        'conn_device' => $connIdx,
-                        'ip_index' => $ipIdx,
-                        'name' => $connName,
-                        'vlan' => $vlan,
-                        'enabled' => $enabled,
-                        'type' => 'IP_Bridged'
-                    ];
-                }
-            }
-        }
-        
-        foreach ($ssidRoutes as $ssidIdx => $route) {
-            $wanName = $route['wan_name'] ?? '';
-            $wanInfo = $wanConnections[$wanName] ?? null;
-            $bindings[$ssidIdx] = [
-                'ssid_index' => $ssidIdx,
-                'has_bridge' => true,
-                'wan_name' => $wanName,
-                'vlan' => $wanInfo['vlan'] ?? null,
-                'bridge_name' => $wanInfo['name'] ?? null,
-                'wan_enabled' => $wanInfo['enabled'] ?? null,
-                'route_index' => $route['route_index'],
-                'conn_device' => $wanInfo['conn_device'] ?? null,
-            ];
-        }
-        
-        return $bindings;
+        return ['success' => true, 'data' => $wifiData];
     }
     public function setPPPoECredentials(string $deviceId, string $username, string $password): array {
         $params = [
@@ -1862,18 +1232,10 @@ JS;
             
             $deviceId = $device['_id'] ?? '';
             
-            $oltSerial = $this->convertGeniSerialToOlt($serial);
-            
-            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR sn = ? OR tr069_serial = ? OR tr069_serial = ? OR tr069_device_id = ? OR genieacs_id = ?");
-            $stmt->execute([$serial, $oltSerial, $serial, $oltSerial, $deviceId, $deviceId]);
+            // Match by: sn, tr069_serial, or tr069_device_id (already linked)
+            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR tr069_serial = ? OR tr069_device_id = ?");
+            $stmt->execute([$serial, $serial, $deviceId]);
             $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
-            if (!$onu && preg_match('/[0-9A-Fa-f]{8,}$/', $deviceId, $m)) {
-                $hexSuffix = strtoupper($m[0]);
-                $stmt2 = $this->db->prepare("SELECT id FROM huawei_onus WHERE UPPER(SUBSTRING(sn FROM 5)) = ?");
-                $stmt2->execute([$hexSuffix]);
-                $onu = $stmt2->fetch(\PDO::FETCH_ASSOC);
-            }
             
             if (!$onu) {
                 $unlinked[] = ['serial' => $serial, 'device_id' => $deviceId];
@@ -1953,6 +1315,7 @@ JS;
         if ($refresh) {
             $refreshResult = $this->refreshDevice($deviceId);
             if ($refreshResult['success'] ?? false) {
+                // Wait for values to populate (refresh has 10s timeout, device may take a moment)
                 sleep(2);
             }
         }
@@ -1965,53 +1328,22 @@ JS;
         $device = $result['data'];
         $categories = [];
         
-        // Count actual parameter values to detect sparse/incomplete data
-        $valueCount = 0;
-        $lastInformTime = null;
+        // Check if device has actual values (not just parameter structure)
+        $hasValues = false;
         foreach ($device as $key => $val) {
             if (is_array($val) && isset($val['_value'])) {
-                $valueCount++;
-            }
-            if ($key === '_lastInform' && is_array($val) && isset($val['_value'])) {
-                $lastInformTime = $val['_value'];
+                $hasValues = true;
+                break;
             }
         }
         
-        // If no values at all and not already refreshing, suggest refresh
-        if ($valueCount === 0 && !$refresh) {
+        // If no values and not already refreshing, suggest refresh
+        if (!$hasValues && !$refresh) {
             return [
                 'success' => false,
                 'error' => 'Device parameters not yet fetched. Click Refresh to load data from device.',
                 'needs_refresh' => true
             ];
-        }
-        
-        // Auto-refresh if data is sparse (newly onboarded device with minimal params)
-        // or if last inform was stale (>5 minutes ago)
-        if (!$refresh) {
-            $needsAutoRefresh = false;
-            
-            if ($valueCount < 20) {
-                $needsAutoRefresh = true;
-                error_log("[GenieACS] Auto-refresh: sparse data ({$valueCount} params) for device {$deviceId}");
-            } elseif ($lastInformTime) {
-                $informTs = is_string($lastInformTime) ? strtotime($lastInformTime) : (int)($lastInformTime / 1000);
-                if ($informTs && (time() - $informTs) > 300) {
-                    $needsAutoRefresh = true;
-                    error_log("[GenieACS] Auto-refresh: stale data (last inform " . date('Y-m-d H:i:s', $informTs) . ") for device {$deviceId}");
-                }
-            }
-            
-            if ($needsAutoRefresh) {
-                $refreshResult = $this->refreshDevice($deviceId);
-                if ($refreshResult['success'] ?? false) {
-                    sleep(3);
-                    $result = $this->getDevice($deviceId);
-                    if (($result['success'] ?? false) && !empty($result['data'])) {
-                        $device = $result['data'];
-                    }
-                }
-            }
         }
         
         // Helper to extract parameter value - checks for _value in array or direct value
@@ -2509,6 +1841,7 @@ JS;
         
         // AUTO-CATEGORIZE ALL REMAINING PARAMETERS by path prefix
         $autoCats = [
+            'ppp_interface' => ['label' => 'PPP Interface (WAN)', 'icon' => 'bi-globe', 'prefix' => 'WANDevice', 'match' => ['PPPConnection', 'WANPPPConnection'], 'editable' => true],
             'port_forward' => ['label' => 'Port Forward', 'icon' => 'bi-arrow-left-right', 'prefix' => 'WANDevice', 'match' => ['PortMapping', 'NAT'], 'editable' => true],
             'ip_interface' => ['label' => 'IP Interface', 'icon' => 'bi-diagram-3', 'prefix' => 'WANDevice', 'match' => ['IPConnection', 'WANIPConnection', 'ExternalIP', 'DefaultGateway'], 'editable' => true],
             'lan_dhcp' => ['label' => 'LAN DHCP Server', 'icon' => 'bi-hdd-network', 'prefix' => 'LANDevice', 'match' => ['DHCPServer', 'DHCP'], 'editable' => true],
@@ -2890,437 +2223,6 @@ JS;
         return $this->setParameterValues($deviceId, $params);
     }
     
-
-    /**
-     * Configure WiFi Access VLAN (Bridge mode for specific SSID)
-     * 
-     * This follows the exact sequence from Huawei ONU logs:
-     * 1. Add WLANConfiguration (if needed)
-     * 2. Add WANConnectionDevice
-     * 3. Set WLAN settings
-     * 4. Add WANIPConnection
-     * 5. Set ConnectionType: IP_Bridged
-     * 6. Add Layer3Forwarding.X_HW_policy_route
-     * 7. Set policy_route with PhyPortName, WanName
-     * 8. Set WANIPConnection Name and X_HW_VLAN
-     * 
-     * @param string $deviceId GenieACS device ID
-     * @param int $wifiIndex WiFi index (1=2.4GHz primary, 2=2.4GHz secondary, 5=5GHz primary)
-     * @param int $vlanId VLAN ID to assign
-     * @param string $ssidName Optional SSID name
-     * @return array Result with success status
-     */
-    public function configureWifiAccessVlan(string $deviceId, int $wifiIndex, int $vlanId, string $ssidName = '', string $password = '', string $encryption = 'AES'): array {
-        $results = [];
-        $errors = [];
-        
-        $ssidPortName = 'SSID' . $wifiIndex;
-        $wanConnectionName = "WIFI_Bridge_VLAN_{$vlanId}";
-        
-        $deviceIdEncoded = rawurlencode($deviceId);
-        
-        error_log("[configureWifiAccessVlan] Starting: device={$deviceId}, wlan={$wifiIndex}, vlan={$vlanId}, ssid={$ssidName}");
-        
-        try {
-            $deviceResult = $this->getDevice($deviceId, false);
-            $existingWanIndices = [];
-            $existingRouteIndices = [];
-            $existingSsidBridge = null;
-            
-            if ($deviceResult['success'] && !empty($deviceResult['data'])) {
-                $device = $deviceResult['data'];
-                $getValue = function($obj, $key) {
-                    if (!isset($obj[$key])) return null;
-                    $val = $obj[$key];
-                    if (is_array($val) && isset($val['_value'])) return $val['_value'];
-                    return $val;
-                };
-                
-                $wanDevices = $device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
-                foreach ($wanDevices as $idx => $dev) {
-                    if (!is_numeric($idx)) continue;
-                    $existingWanIndices[] = (int)$idx;
-                    $ipConns = $dev['WANIPConnection'] ?? [];
-                    foreach ($ipConns as $ipIdx => $ipConn) {
-                        if (!is_numeric($ipIdx) || !is_array($ipConn)) continue;
-                        $connName = $getValue($ipConn, 'Name');
-                        if ($connName && strpos($connName, 'WIFI_Bridge') !== false) {
-                            $connType = $getValue($ipConn, 'ConnectionType');
-                            if (strtolower($connType ?? '') === 'ip_bridged') {
-                                $routes = $device['InternetGatewayDevice']['Layer3Forwarding']['X_HW_policy_route'] ?? [];
-                                foreach ($routes as $rIdx => $route) {
-                                    if (!is_numeric($rIdx) || !is_array($route)) continue;
-                                    $phyPort = $getValue($route, 'PhyPortName');
-                                    if ($phyPort === $ssidPortName) {
-                                        $existingSsidBridge = [
-                                            'wan_device_index' => (int)$idx,
-                                            'ip_index' => (int)$ipIdx,
-                                            'route_index' => (int)$rIdx
-                                        ];
-                                        break 2;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                $routes = $device['InternetGatewayDevice']['Layer3Forwarding']['X_HW_policy_route'] ?? [];
-                foreach ($routes as $rIdx => $route) {
-                    if (is_numeric($rIdx)) $existingRouteIndices[] = (int)$rIdx;
-                }
-            }
-            
-            if ($existingSsidBridge) {
-                $wanDeviceIndex = $existingSsidBridge['wan_device_index'];
-                $ipIndex = $existingSsidBridge['ip_index'];
-                $routeIndex = $existingSsidBridge['route_index'];
-                $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.{$ipIndex}";
-                $wanName = "wan1.{$wanDeviceIndex}.ip{$ipIndex}";
-                
-                error_log("[configureWifiAccessVlan] Existing bridge found: WAN device={$wanDeviceIndex}, IP={$ipIndex}, route={$routeIndex}. Updating VLAN to {$vlanId}");
-                
-                $setVlanResult = $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    [
-                        'name' => 'setParameterValues',
-                        'parameterValues' => [
-                            ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
-                            ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
-                            ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
-                            ["{$wanIpPath}.X_HW_VLANPriority", 0, 'xsd:unsignedInt']
-                        ]
-                    ]
-                );
-                $results[] = ['step' => 'update_existing_vlan', 'result' => $setVlanResult];
-                usleep(500000);
-                
-                $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
-                $wlanParams = [
-                    ["{$wlanPath}.Enable", true, 'xsd:boolean'],
-                ];
-                if ($ssidName) {
-                    $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
-                }
-                if (strcasecmp($encryption, 'Open') === 0) {
-                    $wlanParams[] = ["{$wlanPath}.BeaconType", 'Basic', 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.BasicEncryptionModes", 'None', 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.BasicAuthenticationMode", 'None', 'xsd:string'];
-                } elseif ($password && strlen($password) >= 8) {
-                    $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                    $encMap = ['AES' => 'AESEncryption', 'TKIP' => 'TKIPEncryption', 'TKIP+AES' => 'TKIPandAESEncryption'];
-                    $encValue = $encMap[$encryption] ?? 'AESEncryption';
-                    $wlanParams[] = ["{$wlanPath}.WPAEncryptionModes", $encValue, 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.IEEE11iEncryptionModes", $encValue, 'xsd:string'];
-                    $wlanParams[] = ["{$wlanPath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
-                }
-                $setWlanResult = $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    [
-                        'name' => 'setParameterValues',
-                        'parameterValues' => $wlanParams
-                    ]
-                );
-                $results[] = ['step' => 'set_wlan_config', 'result' => $setWlanResult];
-                error_log("[configureWifiAccessVlan] Existing bridge: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged') . ", encryption={$encryption}");
-                
-                return [
-                    'success' => true,
-                    'message' => "WiFi {$wifiIndex} bridge updated to VLAN {$vlanId} (reused existing WAN {$wanDeviceIndex})",
-                    'results' => $results,
-                    'wan_name' => $wanName,
-                    'ssid_port' => $ssidPortName
-                ];
-            }
-            
-            error_log("[configureWifiAccessVlan] Creating new bridge: NEW WANConnectionDevice pattern (from working router), existingWAN=" . json_encode($existingWanIndices));
-            
-            // Step 0: Ensure WLAN configuration exists (secondary SSIDs may need creation)
-            if ($wifiIndex > 1 && $wifiIndex != 5) {
-                $addWlanResult = $this->request(
-                    "POST",
-                    "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                    [
-                        'name' => 'addObject',
-                        'objectName' => 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.'
-                    ]
-                );
-                $results[] = ['step' => 'add_wlan_config', 'result' => $addWlanResult];
-                usleep(500000);
-            }
-            
-            // Step 0b: Enable WLAN and set SSID, password, encryption
-            $wlanPath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wifiIndex}";
-            $wlanParams = [
-                ["{$wlanPath}.Enable", true, 'xsd:boolean'],
-            ];
-            if ($ssidName) {
-                $wlanParams[] = ["{$wlanPath}.SSID", $ssidName, 'xsd:string'];
-            }
-            if (strcasecmp($encryption, 'Open') === 0) {
-                $wlanParams[] = ["{$wlanPath}.BeaconType", 'Basic', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.BasicEncryptionModes", 'None', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.BasicAuthenticationMode", 'None', 'xsd:string'];
-            } elseif ($password && strlen($password) >= 8) {
-                $wlanParams[] = ["{$wlanPath}.BeaconType", '11i', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.IEEE11iAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
-                $encMap = ['AES' => 'AESEncryption', 'TKIP' => 'TKIPEncryption', 'TKIP+AES' => 'TKIPandAESEncryption'];
-                $encValue = $encMap[$encryption] ?? 'AESEncryption';
-                $wlanParams[] = ["{$wlanPath}.WPAEncryptionModes", $encValue, 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.IEEE11iEncryptionModes", $encValue, 'xsd:string'];
-                $wlanParams[] = ["{$wlanPath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
-            }
-            $setWlanResult = $this->request(
-                "POST",
-                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                [
-                    'name' => 'setParameterValues',
-                    'parameterValues' => $wlanParams
-                ]
-            );
-            $results[] = ['step' => 'set_wlan_config', 'result' => $setWlanResult];
-            error_log("[configureWifiAccessVlan] Step 0b: Set WLAN {$wifiIndex} Enable=true, SSID=" . ($ssidName ?: 'unchanged') . ", password=" . ($password ? 'set' : 'unchanged') . ", encryption={$encryption}");
-            usleep(500000);
-            
-            // Step 1: Add NEW WANConnectionDevice under WANDevice.1
-            // Working router pattern: each service gets its own WANConnectionDevice
-            // WANConnectionDevice.1 = TR-069, .2 = PPPoE, .3 = Guest bridge, etc.
-            error_log("[configureWifiAccessVlan] Step 1: Adding NEW WANConnectionDevice under WANDevice.1");
-            
-            // Helper: execute a GenieACS task via direct curl with auth and proper timeouts
-            // Returns: ['http_code' => int, 'response' => string, 'error' => string]
-            $execGenieTask = function(string $deviceId, array $taskBody, int $genieTimeout = 45000) {
-                $url = $this->baseUrl . "/devices/" . urlencode($deviceId) . "/tasks?connection_request&timeout={$genieTimeout}";
-                $ch = curl_init($url);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => json_encode($taskBody),
-                    CURLOPT_TIMEOUT => (int)($genieTimeout / 1000) + 15,
-                    CURLOPT_CONNECTTIMEOUT => 10
-                ]);
-                if (!empty($this->username)) {
-                    curl_setopt($ch, CURLOPT_USERPWD, "{$this->username}:{$this->password}");
-                }
-                $resp = curl_exec($ch);
-                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $err = curl_error($ch);
-                curl_close($ch);
-                return ['http_code' => $code, 'response' => $resp ?: '', 'error' => $err];
-            };
-            
-            // Helper: scan GenieACS device data for WANConnectionDevice indices
-            $scanWanDeviceIndices = function($deviceId) {
-                $indices = [];
-                $result = $this->getDevice($deviceId, true);
-                if ($result['success'] && !empty($result['data'])) {
-                    foreach ($result['data'] as $key => $val) {
-                        if (preg_match('/WANDevice\.1\.WANConnectionDevice\.(\d+)\./', $key, $m)) {
-                            $indices[(int)$m[1]] = true;
-                        }
-                    }
-                }
-                if (empty($indices)) {
-                    $result2 = $this->getDevice($deviceId, false);
-                    if ($result2['success'] && !empty($result2['data'])) {
-                        $wanDevices = $result2['data']['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice'] ?? [];
-                        foreach ($wanDevices as $idx => $dev) {
-                            if (is_numeric($idx)) $indices[(int)$idx] = true;
-                        }
-                    }
-                }
-                return array_keys($indices);
-            };
-            
-            // Execute addObject - queue it first WITHOUT connection_request for instant acceptance
-            // Then use refreshObject to force tree rediscovery (valid REST API task)
-            $addResult = $execGenieTask($deviceId, [
-                'name' => 'addObject',
-                'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
-            ], 45000);
-            $results[] = ['step' => 'add_wan_connection_device', 'result' => $addResult];
-            error_log("[configureWifiAccessVlan] Step 1 AddObject: HTTP {$addResult['http_code']}" . ($addResult['error'] ? " ERR: {$addResult['error']}" : "") . " resp: " . substr($addResult['response'], 0, 300));
-            
-            // Wait for addObject to be processed by ONU
-            sleep(5);
-            
-            // Retry loop: use refreshObject (valid REST API task) to force tree rediscovery
-            // refreshObject triggers GetParameterNames RPC internally within GenieACS
-            // objectName must NOT have a trailing dot for refreshObject
-            $wanDeviceIndex = null;
-            
-            for ($attempt = 0; $attempt < 12; $attempt++) {
-                // refreshObject forces GenieACS to rediscover all children under this path
-                // This is the REST API equivalent of "Refresh Parameters" in the GenieACS UI
-                $refreshResult = $execGenieTask($deviceId, [
-                    'name' => 'refreshObject',
-                    'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice'
-                ], 45000);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: refreshObject HTTP {$refreshResult['http_code']}" . ($refreshResult['error'] ? " ERR: {$refreshResult['error']}" : "") . " resp: " . substr($refreshResult['response'], 0, 300));
-                
-                if ($refreshResult['http_code'] === 200) {
-                    // Task completed synchronously - tree should be updated
-                    sleep(2);
-                } else if ($refreshResult['http_code'] === 0) {
-                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: connection timeout, trying getParameterValues fallback...");
-                    // Fallback: try getParameterValues which we know works (returned 202 before)
-                    $gpvResult = $execGenieTask($deviceId, [
-                        'name' => 'getParameterValues',
-                        'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
-                    ], 45000);
-                    error_log("[configureWifiAccessVlan] Attempt {$attempt}: getParameterValues fallback HTTP {$gpvResult['http_code']}");
-                    sleep(5);
-                } else {
-                    // 202 = queued, will execute on next inform
-                    sleep(5);
-                }
-                
-                // Read the tree to check for new indices
-                $newIndices = $scanWanDeviceIndices($deviceId);
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: found WANConnectionDevice indices: " . json_encode($newIndices) . ", existing: " . json_encode($existingWanIndices));
-                $addedIndices = array_diff($newIndices, $existingWanIndices);
-                if (!empty($addedIndices)) {
-                    $wanDeviceIndex = max($addedIndices);
-                    error_log("[configureWifiAccessVlan] WANConnectionDevice.{$wanDeviceIndex} confirmed on attempt {$attempt}");
-                    break;
-                }
-                error_log("[configureWifiAccessVlan] Attempt {$attempt}: WANConnectionDevice not yet visible, waiting...");
-                sleep(3);
-            }
-            
-            if ($wanDeviceIndex === null) {
-                error_log("[configureWifiAccessVlan] FAILED: WANConnectionDevice was not created after 10 attempts");
-                return [
-                    'success' => false,
-                    'error' => 'WANConnectionDevice was not created by ONU after multiple attempts. Try again or check device connectivity.',
-                    'results' => $results
-                ];
-            }
-            
-            // Step 2: Add WANIPConnection under the NEW WANConnectionDevice
-            error_log("[configureWifiAccessVlan] Step 2: Adding WANIPConnection under WANConnectionDevice.{$wanDeviceIndex}");
-            $addWanIpResult = $this->request(
-                "POST",
-                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                [
-                    'name' => 'addObject',
-                    'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection."
-                ]
-            );
-            $results[] = ['step' => 'add_wan_ip_connection', 'result' => $addWanIpResult];
-            error_log("[configureWifiAccessVlan] Step 2 AddObject result: HTTP " . ($addWanIpResult['http_code'] ?? 'N/A'));
-            
-            // Retry loop: getParameterNames to rediscover WANIPConnection children
-            $ipConnectionConfirmed = false;
-            $ipConnPattern = "/WANConnectionDevice\.{$wanDeviceIndex}\.WANIPConnection\.(\d+)/";
-            
-            if ($addWanIpResult['http_code'] == 202) {
-                error_log("[configureWifiAccessVlan] WANIPConnection addObject queued (202), waiting...");
-                sleep(5);
-            }
-            
-            for ($attempt = 0; $attempt < 8; $attempt++) {
-                // refreshObject to rediscover WANIPConnection children (no trailing dot)
-                $refreshResult2 = $execGenieTask($deviceId, [
-                    'name' => 'refreshObject',
-                    'objectName' => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}"
-                ], 45000);
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: refreshObject HTTP {$refreshResult2['http_code']}" . ($refreshResult2['error'] ? " ERR: {$refreshResult2['error']}" : ""));
-                
-                if ($refreshResult2['http_code'] === 200) {
-                    sleep(2);
-                } else if ($refreshResult2['http_code'] === 0) {
-                    // Fallback to getParameterValues
-                    $gpvFb = $execGenieTask($deviceId, [
-                        'name' => 'getParameterValues',
-                        'parameterNames' => ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}."]
-                    ], 45000);
-                    error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: getParameterValues fallback HTTP {$gpvFb['http_code']}");
-                    sleep(5);
-                } else {
-                    sleep(5);
-                }
-                
-                $refreshedDev2 = $this->getDevice($deviceId, true);
-                if ($refreshedDev2['success'] && !empty($refreshedDev2['data'])) {
-                    foreach ($refreshedDev2['data'] as $key => $val) {
-                        if (preg_match($ipConnPattern, $key)) {
-                            $ipConnectionConfirmed = true;
-                            error_log("[configureWifiAccessVlan] WANIPConnection confirmed under WANConnectionDevice.{$wanDeviceIndex} on attempt {$attempt}");
-                            break 2;
-                        }
-                    }
-                }
-                error_log("[configureWifiAccessVlan] WANIPConn attempt {$attempt}: WANIPConnection not yet visible, waiting...");
-                sleep(3);
-            }
-            
-            if (!$ipConnectionConfirmed) {
-                error_log("[configureWifiAccessVlan] WARNING: WANIPConnection not confirmed but proceeding with .1 default");
-            }
-            
-            // Step 3: Configure bridge with X_HW_LANBIND for SSID binding
-            // Working router pattern: use X_HW_LANBIND.SSIDxEnable instead of policy routes
-            $wanIpPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1";
-            $wanName = "wan1.{$wanDeviceIndex}.ip1";
-            error_log("[configureWifiAccessVlan] Step 3: Setting bridge type and VLAN {$vlanId} at {$wanIpPath} with X_HW_LANBIND.SSID{$wifiIndex}Enable");
-            
-            $bridgeParams = [
-                ["{$wanIpPath}.Enable", true, 'xsd:boolean'],
-                ["{$wanIpPath}.ConnectionType", 'IP_Bridged', 'xsd:string'],
-                ["{$wanIpPath}.X_HW_IPv4Enable", 1, 'xsd:unsignedInt'],
-                ["{$wanIpPath}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt'],
-                ["{$wanIpPath}.X_HW_SERVICELIST", 'INTERNET', 'xsd:string'],
-                ["{$wanIpPath}.Name", $wanConnectionName, 'xsd:string'],
-            ];
-            
-            // Bind SSID to this bridge using X_HW_LANBIND
-            // Disable all SSID bindings first, then enable only the target one
-            for ($s = 1; $s <= 4; $s++) {
-                $bridgeParams[] = ["{$wanIpPath}.X_HW_LANBIND.SSID{$s}Enable", ($s === $wifiIndex) ? 1 : 0, 'xsd:unsignedInt'];
-            }
-            // Disable LAN port bindings (bridge is WiFi-only)
-            for ($l = 1; $l <= 4; $l++) {
-                $bridgeParams[] = ["{$wanIpPath}.X_HW_LANBIND.LAN{$l}Enable", 0, 'xsd:unsignedInt'];
-            }
-            
-            $setBridgeResult = $this->request(
-                "POST",
-                "/devices/{$deviceIdEncoded}/tasks?connection_request&timeout=30000",
-                [
-                    'name' => 'setParameterValues',
-                    'parameterValues' => $bridgeParams
-                ]
-            );
-            $results[] = ['step' => 'set_bridge_vlan_lanbind', 'result' => $setBridgeResult];
-            error_log("[configureWifiAccessVlan] Step 3 result: " . json_encode(['success' => $setBridgeResult['success'] ?? false, 'http_code' => $setBridgeResult['http_code'] ?? 0]));
-            
-            error_log("[configureWifiAccessVlan] Complete: WiFi {$wifiIndex} bridged to VLAN {$vlanId}, WANConnectionDevice.{$wanDeviceIndex}.WANIPConnection.1 with X_HW_LANBIND");
-            
-            return [
-                'success' => true,
-                'message' => "WiFi {$wifiIndex} configured with VLAN {$vlanId} in Bridge mode (WANConnectionDevice.{$wanDeviceIndex}, X_HW_LANBIND.SSID{$wifiIndex}Enable)",
-                'results' => $results,
-                'wan_name' => $wanName,
-                'ssid_port' => $ssidPortName
-            ];
-            
-        } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'results' => $results,
-                'errors' => $errors
-            ];
-        }
-    }
-
     /**
      * SmartOLT-style Internet WAN configuration via TR-069
      * Creates WAN objects using addObject then configures them
@@ -5065,7 +3967,7 @@ PROVISION;
             ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', $this->crPassword, 'xsd:string'],
         ];
         
-        error_log("[GenieACS] Resetting Connection Request credentials to configured values for {$deviceId}");
+        error_log("[GenieACS] Resetting Connection Request credentials to '{$this->crUsername}' for {$deviceId}");
         
         $result = $this->setParameterValues($deviceId, $params);
         
@@ -5078,10 +3980,6 @@ PROVISION;
         ];
     }
 
-    /**
-     * Enable instant provisioning by clearing auth and configuring proper ACS URL
-     * Call this after first TR-069 contact to enable instant push capability
-     */
     public function enableInstantProvisioning(string $deviceId, string $acsUrl = ''): array {
         $params = [
             ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', $this->crUsername, 'xsd:string'],
@@ -5107,11 +4005,6 @@ PROVISION;
         ];
     }
 
-
-    /**
-     * Queue CR credential reset WITHOUT connection_request
-     * This queues the task to execute on next device inform (avoids 401)
-     */
     public function queueClearAuth(string $deviceId): array {
         $encodedId = rawurlencode($deviceId);
         
@@ -5132,6 +4025,164 @@ PROVISION;
         ];
     }
 
+    public function setupPeriodicInform(int $intervalSeconds = 300): array {
+        $results = [];
+        $messages = [];
+        $errors = [];
+
+        $provisionName = 'bootstrap-setup';
+        $script = <<<JS
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", null, {value: "{$this->crUsername}"});
+declare("InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", null, {value: "{$this->crPassword}"});
+declare("InternetGatewayDevice.ManagementServer.PeriodicInformEnable", null, {value: true});
+declare("InternetGatewayDevice.ManagementServer.PeriodicInformInterval", null, {value: {$intervalSeconds}});
+JS;
+
+        $provResult = $this->createProvision($provisionName, $script);
+        $results['provision'] = $provResult;
+        if ($provResult['success'] ?? false) {
+            $messages[] = "Provision: periodic inform {$intervalSeconds}s + set CR credentials to '{$this->crUsername}'.";
+        } else {
+            $errors[] = 'Provision: ' . ($provResult['error'] ?? 'Unknown');
+        }
+
+        $preset = [
+            '_id' => 'bootstrap-setup',
+            'channel' => 'default',
+            'weight' => 0,
+            'precondition' => '{}',
+            'events' => ['0 BOOTSTRAP', '1 BOOT'],
+            'configurations' => [
+                ['type' => 'provision', 'name' => $provisionName, 'args' => []]
+            ]
+        ];
+        $presetResult = $this->createPreset($preset);
+        $results['preset'] = $presetResult;
+        if ($presetResult['success'] ?? false) {
+            $messages[] = 'Preset runs on BOOTSTRAP and BOOT events.';
+        } else {
+            $errors[] = 'Preset: ' . ($presetResult['error'] ?? 'Unknown');
+        }
+
+        $this->deletePreset('set-periodic-inform');
+
+        $anySuccess = !empty($messages);
+        $fullMessage = '';
+        if (!empty($messages)) {
+            $fullMessage .= implode(' ', $messages);
+        }
+        if (!empty($errors)) {
+            $fullMessage .= ($fullMessage ? ' | Errors: ' : 'Errors: ') . implode('; ', $errors);
+        }
+
+        return [
+            'success' => $anySuccess,
+            'message' => $fullMessage ?: 'No operations completed',
+            'results' => $results
+        ];
+    }
+
+    public function syncCustomerTags(): array {
+        try {
+            $stmt = $this->db->query("
+                SELECT ho.genieacs_id, c.name as customer_name, c.id as customer_id
+                FROM huawei_onus ho
+                JOIN subscriptions s ON s.onu_id = ho.id
+                JOIN customers c ON c.id = s.customer_id
+                WHERE ho.genieacs_id IS NOT NULL AND ho.genieacs_id != ''
+            ");
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            $synced = 0;
+            $failed = 0;
+            foreach ($rows as $row) {
+                $tag = $this->sanitizeTag($row['customer_name']);
+                if (!empty($tag)) {
+                    $result = $this->addTag($row['genieacs_id'], $tag);
+                    if ($result['success'] ?? false) {
+                        $synced++;
+                    } else {
+                        $failed++;
+                    }
+                }
+            }
+            
+            return ['success' => true, 'synced' => $synced, 'failed' => $failed, 'total' => count($rows)];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function syncSingleOnuTag(string $genieacsId, string $customerName): array {
+        $tag = $this->sanitizeTag($customerName);
+        if (empty($tag)) {
+            return ['success' => false, 'error' => 'Invalid customer name for tag'];
+        }
+        return $this->addTag($genieacsId, $tag);
+    }
+
+    public function addTag(string $deviceId, string $tag): array {
+        $encodedId = rawurlencode($deviceId);
+        $encodedTag = rawurlencode($tag);
+        $result = $this->request('POST', "/devices/{$encodedId}/tags/{$encodedTag}");
+        return $result;
+    }
+
+    public function removeTag(string $deviceId, string $tag): array {
+        $encodedId = rawurlencode($deviceId);
+        $encodedTag = rawurlencode($tag);
+        $result = $this->request('DELETE', "/devices/{$encodedId}/tags/{$encodedTag}");
+        return $result;
+    }
+
+    public function getDeviceTags(string $deviceId): array {
+        $device = $this->getDevice($deviceId);
+        if (!$device || !isset($device['_tags'])) {
+            return [];
+        }
+        return $device['_tags'];
+    }
+
+    private function sanitizeTag(string $name): string {
+        $tag = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $name);
+        $tag = trim($tag);
+        $tag = preg_replace('/\s+/', '_', $tag);
+        return substr($tag, 0, 50);
+    }
+
+    public function configureWifiAccessVlan(string $deviceId, int $vlan, array $wifiConfig = []): array {
+        $params = [];
+        
+        $ssid = $wifiConfig['ssid'] ?? '';
+        $password = $wifiConfig['password'] ?? '';
+        
+        if (!empty($ssid)) {
+            $params[] = ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $ssid, 'xsd:string'];
+        }
+        if (!empty($password)) {
+            $params[] = ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey', $password, 'xsd:string'];
+            $params[] = ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $password, 'xsd:string'];
+        }
+        
+        if ($vlan > 0) {
+            $params[] = ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_HW_AccessVlan', $vlan, 'xsd:unsignedInt'];
+        }
+        
+        if (empty($params)) {
+            return ['success' => false, 'error' => 'No parameters to configure'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+
+    public function fetchAllGenieACSDevices(): array {
+        $result = $this->request('GET', '/devices');
+        if (!($result['success'] ?? false)) {
+            return [];
+        }
+        return $result['data'] ?? [];
+    }
+
     public function deletePendingTasks(string $deviceId): int {
         $tasks = $this->getTasks($deviceId);
         $deleted = 0;
@@ -5148,43 +4199,5 @@ PROVISION;
             error_log("[GenieACS] Deleted {$deleted} pending tasks for {$deviceId}");
         }
         return $deleted;
-    }
-
-    public function triggerInformViaOLT(string $serial): array {
-        try {
-            $stmt = $this->db->prepare("
-                SELECT o.olt_id, o.frame, o.slot, o.port, o.onu_id 
-                FROM huawei_onus o 
-                WHERE (o.sn = ? OR o.tr069_serial = ?) AND o.olt_id IS NOT NULL
-                LIMIT 1
-            ");
-            $stmt->execute([$serial, $serial]);
-            $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
-            if (!$onu) {
-                return ['success' => false, 'error' => 'ONU not found'];
-            }
-            
-            $frame = $onu['frame'] ?? 0;
-            $slot = $onu['slot'];
-            $port = $onu['port'];
-            $onuId = $onu['onu_id'];
-            $oltId = $onu['olt_id'];
-            
-            require_once __DIR__ . '/HuaweiOLT.php';
-            $huaweiOLT = new HuaweiOLT($this->db);
-            
-            $cmd = "interface gpon {$frame}/{$slot}\r\n";
-            $cmd .= "ont tr069-server-config {$port} {$onuId} inform-interval 30\r\n";
-            $cmd .= "quit";
-            
-            $result = $huaweiOLT->executeCommand($oltId, $cmd);
-            error_log("[GenieACS] Triggered inform via OLT for {$serial}: " . ($result['success'] ? 'OK' : 'FAILED'));
-            
-            return $result;
-        } catch (\Exception $e) {
-            error_log("[GenieACS] triggerInformViaOLT error for {$serial}: " . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
     }
 }
