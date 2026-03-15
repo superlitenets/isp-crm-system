@@ -8,6 +8,8 @@ class GrandstreamUCM {
     private $password;
     private $cookie = null;
     private $connected = false;
+    private $cookieFile = null;
+    private $curlHandle = null;
 
     public function __construct($db) {
         $this->db = $db;
@@ -36,91 +38,124 @@ class GrandstreamUCM {
         return !empty($this->host) && !empty($this->password);
     }
 
-    private $apiPath = '/api';
+    private $apiPath = '/cgi';
+    private $apiMethod = 'GET';
 
     public function login() {
         if (!$this->isConfigured()) {
             return ['success' => false, 'error' => 'UCM not configured. Set ucm_host, ucm_username, ucm_password in Call Centre settings.'];
         }
 
-        $apiPaths = ['/api', '/cgi'];
-        $challengeAttempts = [];
+        $attempts = [
+            ['path' => '/cgi', 'method' => 'GET'],
+            ['path' => '/api', 'method' => 'POST'],
+            ['path' => '/api', 'method' => 'GET'],
+            ['path' => '/cgi', 'method' => 'POST'],
+        ];
+
+        $challengeErrors = [];
         $challenge = null;
         $workingPath = null;
+        $workingMethod = null;
 
-        foreach ($apiPaths as $path) {
-            $challengeResult = $this->apiRequest('POST', $path, [
-                'request' => [
-                    'action' => 'challenge',
-                    'user' => $this->username
-                ]
-            ], false);
+        foreach ($attempts as $attempt) {
+            $path = $attempt['path'];
+            $method = $attempt['method'];
 
-            if (!$challengeResult['success']) {
-                $challengeResult = $this->apiRequest('POST', $path, [
-                    'action' => 'challenge',
-                    'user' => $this->username
-                ], false);
-            }
-
-            if (!$challengeResult['success']) {
+            if ($method === 'GET') {
                 $challengeResult = $this->apiRequest('GET', $path, [
                     'action' => 'challenge',
                     'user' => $this->username
+                ], false);
+            } else {
+                $challengeResult = $this->apiRequest('POST', $path, [
+                    'request' => [
+                        'action' => 'challenge',
+                        'user' => $this->username
+                    ]
                 ], false);
             }
 
             if ($challengeResult['success']) {
                 $data = $challengeResult['data'] ?? [];
-                $challenge = $data['response']['challenge'] 
+                $ch = $data['response']['challenge'] 
                     ?? $data['body']['challenge'] 
                     ?? $data['challenge'] 
                     ?? null;
-                if ($challenge) {
+                if ($ch) {
+                    $challenge = $ch;
                     $workingPath = $path;
+                    $workingMethod = $method;
                     break;
                 }
+                $challengeErrors[] = "$method $path: response OK but no challenge field";
+            } else {
+                $challengeErrors[] = "$method $path: " . ($challengeResult['error'] ?? 'failed');
             }
-
-            $challengeAttempts[] = $path . ': ' . ($challengeResult['error'] ?? 'no challenge in response');
         }
 
         if (!$challenge) {
-            $debugInfo = implode('; ', $challengeAttempts);
-            return ['success' => false, 'error' => "Failed to get challenge from UCM. Tried endpoints: $debugInfo. Verify: 1) UCM IP/port are correct, 2) API is enabled in UCM web UI under Value-added Features → API Configuration, 3) API user exists."];
+            $debugInfo = implode('; ', $challengeErrors);
+            return ['success' => false, 'error' => "Failed to get challenge from UCM. Tried: $debugInfo. Verify: 1) UCM IP/port are correct (common ports: 8089, 8443, 443), 2) API is enabled in UCM web UI, 3) Username exists."];
         }
 
         $this->apiPath = $workingPath;
+        $this->apiMethod = $workingMethod;
 
         $tokenFormats = [
             md5($challenge . $this->password),
-            md5($this->username . ':' . $this->password . ':' . $challenge),
             md5($this->password . $challenge),
+            md5($this->username . ':' . $this->password . ':' . $challenge),
         ];
 
         foreach ($tokenFormats as $token) {
-            $loginPayloads = [
-                ['request' => ['action' => 'login', 'user' => $this->username, 'token' => $token]],
-                ['action' => 'login', 'user' => $this->username, 'token' => $token],
-            ];
+            if ($workingMethod === 'GET') {
+                $loginResult = $this->apiRequest('GET', $this->apiPath, [
+                    'action' => 'login',
+                    'user' => $this->username,
+                    'token' => $token
+                ], false);
+            } else {
+                $loginResult = $this->apiRequest('POST', $this->apiPath, [
+                    'request' => [
+                        'action' => 'login',
+                        'user' => $this->username,
+                        'token' => $token
+                    ]
+                ], false);
+            }
 
-            foreach ($loginPayloads as $payload) {
-                $loginResult = $this->apiRequest('POST', $this->apiPath, $payload, false);
-
-                if ($loginResult['success']) {
-                    $data = $loginResult['data'] ?? [];
-                    $response = $data['response'] ?? $data['body'] ?? $data;
-                    $status = $response['status'] ?? -1;
-                    if ($status == 0) {
-                        $this->cookie = $response['cookie'] ?? null;
-                        $this->connected = true;
-                        return ['success' => true, 'cookie' => $this->cookie];
-                    }
+            if ($loginResult['success']) {
+                $data = $loginResult['data'] ?? [];
+                $topStatus = $data['status'] ?? null;
+                $response = $data['response'] ?? $data['body'] ?? $data;
+                $status = ($topStatus !== null) ? $topStatus : ($response['status'] ?? -1);
+                if ($status == 0) {
+                    $this->cookie = $response['cookie'] ?? $response['session_name'] ?? null;
+                    $this->connected = true;
+                    return ['success' => true, 'cookie' => $this->cookie];
                 }
             }
+
+            $challenge = null;
+            if ($workingMethod === 'GET') {
+                $cr = $this->apiRequest('GET', $this->apiPath, [
+                    'action' => 'challenge',
+                    'user' => $this->username
+                ], false);
+            } else {
+                $cr = $this->apiRequest('POST', $this->apiPath, [
+                    'request' => ['action' => 'challenge', 'user' => $this->username]
+                ], false);
+            }
+            if ($cr['success']) {
+                $cd = $cr['data'] ?? [];
+                $challenge = $cd['response']['challenge'] ?? $cd['body']['challenge'] ?? $cd['challenge'] ?? null;
+            }
+            if (!$challenge) break;
         }
 
-        return ['success' => false, 'error' => 'Authentication failed. Challenge received OK but login rejected. Check: 1) API user password is correct, 2) The API user (not the web admin) credentials are being used.'];
+        return ['success' => false, 'error' => 'Authentication failed via ' . $workingMethod . ' ' . $workingPath . '. Challenge received OK but login rejected. Verify the password is correct.'];
     }
 
     public function logout() {
@@ -145,6 +180,27 @@ class GrandstreamUCM {
         }
     }
 
+    private function getCurlHandle() {
+        if (!$this->cookieFile) {
+            $this->cookieFile = tempnam(sys_get_temp_dir(), 'ucm_cookies_');
+        }
+        if (!$this->curlHandle) {
+            $this->curlHandle = curl_init();
+        }
+        return $this->curlHandle;
+    }
+
+    public function __destruct() {
+        $this->logout();
+        if ($this->curlHandle) {
+            curl_close($this->curlHandle);
+            $this->curlHandle = null;
+        }
+        if ($this->cookieFile && file_exists($this->cookieFile)) {
+            @unlink($this->cookieFile);
+        }
+    }
+
     private function apiRequest($method, $path, $params = [], $auth = true) {
         $url = $this->getBaseUrl() . $path;
 
@@ -160,18 +216,24 @@ class GrandstreamUCM {
             }
         }
 
-        $ch = curl_init();
+        $ch = $this->getCurlHandle();
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_COOKIEJAR => $this->cookieFile,
+            CURLOPT_COOKIEFILE => $this->cookieFile,
+            CURLOPT_HTTPHEADER => [],
+            CURLOPT_POST => false,
+            CURLOPT_POSTFIELDS => '',
         ]);
 
         if ($method === 'GET') {
             $url .= '?' . http_build_query($params);
             curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPGET, true);
         } else {
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_POST, true);
@@ -182,7 +244,6 @@ class GrandstreamUCM {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
-        curl_close($ch);
 
         if ($error) {
             return ['success' => false, 'error' => "Connection error: $error"];
@@ -213,24 +274,31 @@ class GrandstreamUCM {
     private function authenticatedRequest($action, $params = []) {
         $this->ensureConnected();
 
-        $request = array_merge(['action' => $action, 'cookie' => $this->cookie], $params);
-        $result = $this->apiRequest('POST', $this->apiPath, ['request' => $request], false);
+        $reqParams = array_merge(['action' => $action, 'cookie' => $this->cookie], $params);
 
-        if (!$result['success']) {
-            $result = $this->apiRequest('POST', $this->apiPath, $request, false);
+        if ($this->apiMethod === 'GET') {
+            $result = $this->apiRequest('GET', $this->apiPath, $reqParams, false);
+        } else {
+            $result = $this->apiRequest('POST', $this->apiPath, ['request' => $reqParams], false);
+            if (!$result['success']) {
+                $result = $this->apiRequest('POST', $this->apiPath, $reqParams, false);
+            }
         }
 
         if ($result['success']) {
-            $response = $result['data']['response'] ?? $result['data']['body'] ?? $result['data'];
-            $status = $response['status'] ?? -1;
+            $data = $result['data'] ?? [];
+            $topStatus = $data['status'] ?? null;
+            $response = $data['response'] ?? $data['body'] ?? $data;
+            $status = ($topStatus !== null) ? $topStatus : ($response['status'] ?? -1);
             if ($status == -6) {
                 $this->connected = false;
                 $this->cookie = null;
                 $this->ensureConnected();
-                $request['cookie'] = $this->cookie;
-                $result = $this->apiRequest('POST', $this->apiPath, ['request' => $request], false);
-                if (!$result['success']) {
-                    $result = $this->apiRequest('POST', $this->apiPath, $request, false);
+                $reqParams['cookie'] = $this->cookie;
+                if ($this->apiMethod === 'GET') {
+                    $result = $this->apiRequest('GET', $this->apiPath, $reqParams, false);
+                } else {
+                    $result = $this->apiRequest('POST', $this->apiPath, ['request' => $reqParams], false);
                 }
             }
         }
@@ -599,7 +667,4 @@ class GrandstreamUCM {
         return ['success' => true, 'stats' => $stats];
     }
 
-    public function __destruct() {
-        $this->logout();
-    }
 }
