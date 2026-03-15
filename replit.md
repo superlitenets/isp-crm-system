@@ -100,4 +100,6 @@ The system features a responsive design, including a mobile PWA. Both the main C
 - **One-ISP Billing API**: For customer data lookup and import.
 - **Huawei OLT Devices**: Direct connectivity via Telnet/SSH/SNMP.
 - **GenieACS**: Open-source TR-069 ACS server.
+- **Grandstream UCM6301**: HTTPS REST API integration for PBX management, CDR, recordings, and extension sync.
+- **FreePBX/Asterisk**: AMI-based call centre integration for call origination, queues, and agent management.
 - **Protrack365 GPS API**: For vehicle GPS tracking, commands, and monitoring.

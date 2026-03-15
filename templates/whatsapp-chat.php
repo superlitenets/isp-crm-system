@@ -200,6 +200,13 @@ $isConnected = ($sessionStatus['status'] ?? '') === 'connected';
     .wa-chat-item.active {
         background: var(--wa-hover);
     }
+    .wa-chat-item.has-unread .wa-chat-name {
+        font-weight: 600;
+    }
+    .wa-chat-item.has-unread .wa-chat-preview {
+        color: #111b21;
+        font-weight: 500;
+    }
 
     .wa-avatar {
         width: 49px;
@@ -1319,30 +1326,75 @@ function renderChatList(chatList) {
         const isActive = currentChat?.id === chat.id;
         const hasUnread = chat.unreadCount > 0;
         const preview = getPreviewText(chat);
+        const displayName = chat.customer_name || chat.name || formatPhoneDisplay(chat.phone);
+        const isGroup = chat.isGroup || (chat.chatId && chat.chatId.includes('@g.us'));
+        const avatarColor = getAvatarColor(displayName);
+        const avatarIcon = isGroup
+            ? `<i class="bi bi-people-fill" style="font-size:1.1rem"></i>`
+            : getInitials(displayName);
+        const subLabel = chat.customer_name && chat.name && chat.customer_name !== chat.name
+            ? `<span style="font-size:0.7rem;color:#667781;margin-left:4px">(${escapeHtml(chat.name)})</span>` : '';
+        const customerBadge = chat.customer_id
+            ? `<i class="bi bi-person-check-fill" style="color:var(--wa-green);font-size:0.65rem;margin-left:3px" title="Linked customer"></i>` : '';
+        const previewIcon = getPreviewIcon(chat.lastMessagePreview);
         return `
-        <div class="wa-chat-item ${isActive ? 'active' : ''}" onclick='openChat(${JSON.stringify(chat).replace(/'/g, "\\'")})'>
+        <div class="wa-chat-item ${isActive ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}" onclick='openChat(${JSON.stringify(chat).replace(/'/g, "\\'")})'>
             <div class="wa-avatar">
-                <div class="wa-avatar-placeholder">${getInitials(chat.name || chat.phone)}</div>
+                <div class="wa-avatar-placeholder" style="background:${avatarColor}">${avatarIcon}</div>
             </div>
             <div class="wa-chat-content">
                 <div class="wa-chat-top">
-                    <span class="wa-chat-name">${escapeHtml(chat.customer_name || chat.name || chat.phone)}</span>
+                    <span class="wa-chat-name">${isGroup ? '<i class="bi bi-people-fill" style="font-size:0.7rem;margin-right:3px;opacity:0.6"></i>' : ''}${escapeHtml(displayName)}${customerBadge}${subLabel}</span>
                     <span class="wa-chat-time ${hasUnread ? 'unread' : ''}">${formatTime(chat.lastMessageAt)}</span>
                 </div>
                 <div class="wa-chat-bottom">
-                    <span class="wa-chat-preview">${preview}</span>
-                    ${hasUnread ? `<span class="wa-unread-badge">${chat.unreadCount}</span>` : ''}
+                    <span class="wa-chat-preview">${previewIcon}${preview}</span>
+                    ${hasUnread ? `<span class="wa-unread-badge">${chat.unreadCount > 99 ? '99+' : chat.unreadCount}</span>` : ''}
                 </div>
             </div>
         </div>`;
     }).join('');
 }
 
+const avatarColors = ['#00a884','#02735e','#25d366','#128c7e','#075e54','#34b7f1','#0d7377','#4a9c6d','#6b8e6b','#2e7d6e'];
+function getAvatarColor(name) {
+    if (!name) return avatarColors[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return avatarColors[Math.abs(hash) % avatarColors.length];
+}
+
+function formatPhoneDisplay(phone) {
+    if (!phone) return 'Unknown';
+    const clean = phone.replace(/@.*$/, '');
+    if (clean.length >= 12 && clean.startsWith('254')) {
+        return '+' + clean.slice(0,3) + ' ' + clean.slice(3,6) + ' ' + clean.slice(6);
+    }
+    if (clean.length >= 10) {
+        return '+' + clean;
+    }
+    return clean;
+}
+
+function getPreviewIcon(preview) {
+    if (!preview) return '';
+    const lower = (preview || '').toLowerCase();
+    if (lower.includes('[image]') || lower.includes('[photo]')) return '<i class="bi bi-camera-fill preview-icon"></i> ';
+    if (lower.includes('[video]')) return '<i class="bi bi-camera-video-fill preview-icon"></i> ';
+    if (lower.includes('[audio]') || lower.includes('[voice]') || lower.includes('[ptt]')) return '<i class="bi bi-mic-fill preview-icon"></i> ';
+    if (lower.includes('[document]') || lower.includes('[file]')) return '<i class="bi bi-file-earmark-fill preview-icon"></i> ';
+    if (lower.includes('[sticker]')) return '<i class="bi bi-emoji-smile preview-icon"></i> ';
+    if (lower.includes('[location]')) return '<i class="bi bi-geo-alt-fill preview-icon"></i> ';
+    if (lower.includes('[contact]')) return '<i class="bi bi-person-fill preview-icon"></i> ';
+    return '';
+}
+
 function getPreviewText(chat) {
     let text = chat.lastMessagePreview || '';
-    if (!text) return '';
-    if (text.length > 50) text = text.substring(0, 50) + '...';
-    return escapeHtml(text);
+    if (!text) return '<span style="opacity:0.4;font-style:italic">No messages</span>';
+    text = text.replace(/\[image\]|\[photo\]|\[video\]|\[audio\]|\[voice\]|\[ptt\]|\[document\]|\[file\]|\[sticker\]|\[location\]|\[contact\]/gi, '').trim();
+    if (text.length > 55) text = text.substring(0, 55) + '…';
+    return escapeHtml(text) || '<span style="opacity:0.5">Media</span>';
 }
 
 async function openChat(chat) {

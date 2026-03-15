@@ -1056,6 +1056,52 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
         <div class="col-md-6">
             <div class="card mb-4">
                 <div class="card-header">
+                    <i class="bi bi-hdd-network me-2"></i>Grandstream UCM Integration
+                </div>
+                <div class="card-body">
+                    <?php
+                    $ucmHost = getPbxSetting($db, 'ucm_host', '', '');
+                    $ucmPort = getPbxSetting($db, 'ucm_port', '', '8443');
+                    $ucmUsername = getPbxSetting($db, 'ucm_username', '', 'admin');
+                    $ucmPassword = getPbxSetting($db, 'ucm_password', '', '');
+                    $ucmConfigured = !empty($ucmHost) && !empty($ucmPassword);
+                    ?>
+                    <form id="ucmSettingsForm" method="post" action="?page=call_center&action=save_ucm_settings">
+                        <div class="mb-3">
+                            <label class="form-label">UCM Host / IP Address</label>
+                            <input type="text" class="form-control" name="ucm_host" value="<?= htmlspecialchars($ucmHost) ?>" placeholder="e.g. 192.168.1.100">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">API Port</label>
+                            <input type="number" class="form-control" name="ucm_port" value="<?= htmlspecialchars($ucmPort) ?>" placeholder="8443">
+                            <small class="text-muted">Default: 8443 (HTTPS API)</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Admin Username</label>
+                            <input type="text" class="form-control" name="ucm_username" value="<?= htmlspecialchars($ucmUsername) ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Admin Password</label>
+                            <input type="password" class="form-control" name="ucm_password" placeholder="<?= !empty($ucmPassword) ? '••••••••' : 'Enter UCM admin password' ?>">
+                            <small class="text-muted"><?= !empty($ucmPassword) ? 'Leave blank to keep current password' : 'Required for API access' ?></small>
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="testUCMConnection()">
+                            <i class="bi bi-plug"></i> Test Connection
+                        </button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save"></i> Save Settings
+                        </button>
+                        <?php if ($ucmConfigured): ?>
+                        <button type="button" class="btn btn-info" onclick="syncUCMExtensions()">
+                            <i class="bi bi-arrow-repeat"></i> Sync Extensions
+                        </button>
+                        <?php endif; ?>
+                    </form>
+                    <div id="ucmTestResult" class="mt-3"></div>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header">
                     <i class="bi bi-sliders me-2"></i>Call Settings
                 </div>
                 <div class="card-body">
@@ -1087,12 +1133,22 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
                 <div class="card-body">
                     <table class="table table-sm">
                         <tr>
-                            <td>PBX Connection</td>
+                            <td>FreePBX/AMI Connection</td>
                             <td>
                                 <?php if ($pbxConfigured): ?>
                                     <span class="badge bg-success">Configured</span>
                                 <?php else: ?>
                                     <span class="badge bg-warning">Not Configured</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Grandstream UCM</td>
+                            <td>
+                                <?php if ($ucmConfigured): ?>
+                                    <span class="badge bg-success">Configured</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">Not Configured</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -2160,6 +2216,73 @@ function playRecording(file) {
         </div>
     `;
     document.body.appendChild(modal);
+}
+
+function testUCMConnection() {
+    document.getElementById('ucmTestResult').innerHTML = `
+        <div class="alert alert-info">
+            <i class="bi bi-hourglass-split me-2"></i>Testing UCM connection...
+        </div>
+    `;
+    
+    fetch('?page=call_center&action=test_ucm_connection')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                let sysInfo = data.system ? `<br><small>Model: ${data.system.model} | Firmware: ${data.system.firmware}</small>` : '';
+                document.getElementById('ucmTestResult').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle me-2"></i>${data.message}${sysInfo}
+                    </div>
+                `;
+            } else {
+                document.getElementById('ucmTestResult').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle me-2"></i>${data.error || 'Connection failed'}
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            document.getElementById('ucmTestResult').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle me-2"></i>Error: ${err.message}
+                </div>
+            `;
+        });
+}
+
+function syncUCMExtensions() {
+    document.getElementById('ucmTestResult').innerHTML = `
+        <div class="alert alert-info">
+            <i class="bi bi-arrow-repeat me-2 spin"></i>Syncing extensions from UCM...
+        </div>
+    `;
+    
+    fetch('?page=call_center&action=sync_ucm_extensions')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('ucmTestResult').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle me-2"></i>Synced ${data.synced} of ${data.total} extensions
+                    </div>
+                `;
+            } else {
+                document.getElementById('ucmTestResult').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle me-2"></i>${data.error || 'Sync failed'}
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            document.getElementById('ucmTestResult').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle me-2"></i>Error: ${err.message}
+                </div>
+            `;
+        });
 }
 
 function testPBXConnection() {

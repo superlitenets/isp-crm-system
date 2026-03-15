@@ -2896,6 +2896,72 @@ if ($page === 'call_center') {
         exit;
     }
     
+    if ($action === 'save_ucm_settings' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $settings = [
+            'ucm_host' => $_POST['ucm_host'] ?? '',
+            'ucm_port' => $_POST['ucm_port'] ?? '8443',
+            'ucm_username' => $_POST['ucm_username'] ?? 'admin',
+            'ucm_password' => $_POST['ucm_password'] ?? ''
+        ];
+        
+        foreach ($settings as $key => $value) {
+            if ($key === 'ucm_password' && empty($value)) {
+                continue;
+            }
+            $stmt = $db->prepare("INSERT INTO call_center_settings (setting_key, setting_value, updated_at) 
+                                  VALUES (?, ?, NOW()) 
+                                  ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?, updated_at = NOW()");
+            $stmt->execute([$key, $value, $value]);
+        }
+        
+        $_SESSION['flash_message'] = 'UCM settings saved successfully!';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: ?page=call_center&tab=settings');
+        exit;
+    }
+
+    if ($action === 'test_ucm_connection') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
+        $ucm = new GrandstreamUCM($db);
+        echo json_encode($ucm->testConnection());
+        exit;
+    }
+
+    if ($action === 'sync_ucm_extensions') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
+        $ucm = new GrandstreamUCM($db);
+        echo json_encode($ucm->syncExtensionsToDB());
+        exit;
+    }
+
+    if ($action === 'ucm_active_calls') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
+        $ucm = new GrandstreamUCM($db);
+        echo json_encode($ucm->getActiveCalls());
+        exit;
+    }
+
+    if ($action === 'ucm_cdr') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
+        $ucm = new GrandstreamUCM($db);
+        $startDate = $_GET['start_date'] ?? date('Y-m-d', strtotime('-7 days'));
+        $endDate = $_GET['end_date'] ?? date('Y-m-d');
+        echo json_encode($ucm->getCDR($startDate, $endDate));
+        exit;
+    }
+
+    if ($action === 'ucm_dashboard') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
+        $ucm = new GrandstreamUCM($db);
+        echo json_encode($ucm->getDashboardStats());
+        exit;
+    }
+
     // IVR Options CRUD
     if ($action === 'get_ivr_options') {
         header('Content-Type: application/json');
