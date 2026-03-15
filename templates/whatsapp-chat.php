@@ -1843,6 +1843,8 @@ refreshChats().then(() => {
     if (chats.length === 0) {
         syncChatsInBackground();
     }
+}).catch(() => {
+    syncChatsInBackground();
 });
 setInterval(() => refreshChats(true), 10000);
 setInterval(() => syncChatsInBackground(), 180000);

@@ -39,18 +39,63 @@ try {
     switch ($action) {
         case 'chats':
             $db = Database::getConnection();
-            $stmt = $db->prepare("
-                SELECT c.id, c.chat_id, c.phone, c.contact_name, c.is_group,
-                       c.unread_count, c.last_message_at, c.last_message_preview,
-                       c.customer_id, c.assigned_to,
-                       cu.name as customer_name
-                FROM whatsapp_conversations c
-                LEFT JOIN customers cu ON c.customer_id = cu.id
-                ORDER BY c.last_message_at DESC NULLS LAST
-                LIMIT 100
-            ");
-            $stmt->execute();
-            $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $conversations = [];
+            try {
+                $db->exec("
+                    CREATE TABLE IF NOT EXISTS whatsapp_conversations (
+                        id SERIAL PRIMARY KEY,
+                        chat_id VARCHAR(100) UNIQUE NOT NULL,
+                        phone VARCHAR(30) NOT NULL,
+                        contact_name VARCHAR(150),
+                        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                        is_group BOOLEAN DEFAULT FALSE,
+                        unread_count INTEGER DEFAULT 0,
+                        last_message_at TIMESTAMP,
+                        last_message_preview TEXT,
+                        status VARCHAR(20) DEFAULT 'active',
+                        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ");
+                $db->exec("
+                    CREATE TABLE IF NOT EXISTS whatsapp_messages (
+                        id SERIAL PRIMARY KEY,
+                        conversation_id INTEGER REFERENCES whatsapp_conversations(id) ON DELETE CASCADE,
+                        message_id VARCHAR(150) UNIQUE,
+                        direction VARCHAR(10) NOT NULL DEFAULT 'incoming',
+                        sender_phone VARCHAR(30),
+                        sender_name VARCHAR(150),
+                        message_type VARCHAR(30) DEFAULT 'text',
+                        body TEXT,
+                        media_url TEXT,
+                        media_type VARCHAR(30),
+                        media_mime_type VARCHAR(100),
+                        media_filename VARCHAR(255),
+                        media_data TEXT,
+                        is_read BOOLEAN DEFAULT FALSE,
+                        is_delivered BOOLEAN DEFAULT FALSE,
+                        sent_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        raw_data JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ");
+                $stmt = $db->prepare("
+                    SELECT c.id, c.chat_id, c.phone, c.contact_name, c.is_group,
+                           c.unread_count, c.last_message_at, c.last_message_preview,
+                           c.customer_id, c.assigned_to,
+                           cu.name as customer_name
+                    FROM whatsapp_conversations c
+                    LEFT JOIN customers cu ON c.customer_id = cu.id
+                    ORDER BY c.last_message_at DESC NULLS LAST
+                    LIMIT 100
+                ");
+                $stmt->execute();
+                $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Exception $e) {
+                $conversations = [];
+            }
 
             $chats = array_map(function($c) {
                 return [
@@ -252,10 +297,15 @@ try {
             break;
             
         case 'unread-count':
-            $db = Database::getConnection();
-            $stmt = $db->query("SELECT COALESCE(SUM(unread_count), 0) as total FROM whatsapp_conversations");
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            $count = (int)($row['total'] ?? 0);
+            $count = 0;
+            try {
+                $db = Database::getConnection();
+                $stmt = $db->query("SELECT COALESCE(SUM(unread_count), 0) as total FROM whatsapp_conversations");
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                $count = (int)($row['total'] ?? 0);
+            } catch (Exception $e) {
+                $count = 0;
+            }
             echo json_encode(['success' => true, 'count' => $count]);
             break;
             
