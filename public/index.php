@@ -3008,6 +3008,47 @@ if ($page === 'call_center') {
         exit;
     }
 
+    if ($action === 'export_call_report') {
+        require_once __DIR__ . '/../src/CallCenter.php';
+        $callCenter = new CallCenter($db);
+        $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
+        $dateTo = $_GET['date_to'] ?? date('Y-m-d');
+        $extId = $_GET['extension_id'] ?? null;
+        $rows = $callCenter->exportCallsCsv($dateFrom, $dateTo, $extId ?: null);
+
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="call_report_' . $dateFrom . '_to_' . $dateTo . '.csv"');
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['Date/Time', 'From', 'To', 'Direction', 'Disposition', 'Duration (s)', 'Billable (s)', 'Extension', 'Agent', 'Customer', 'Customer Phone']);
+        foreach ($rows as $r) {
+            fputcsv($out, [
+                $r['call_date'], $r['src'], $r['dst'], $r['direction'], $r['disposition'],
+                $r['duration'], $r['billsec'], $r['extension'] ?? '', $r['extension_name'] ?? '',
+                $r['customer_name'] ?? '', $r['customer_phone'] ?? ''
+            ]);
+        }
+        fclose($out);
+        exit;
+    }
+
+    if ($action === 'call_report_data') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/CallCenter.php';
+        $callCenter = new CallCenter($db);
+        $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
+        $dateTo = $_GET['date_to'] ?? date('Y-m-d');
+        $extId = $_GET['extension_id'] ?? null;
+        echo json_encode([
+            'stats' => $callCenter->getCallReportStats($dateFrom, $dateTo, $extId ?: null),
+            'by_day' => $callCenter->getCallsByDay($dateFrom, $dateTo, $extId ?: null),
+            'by_hour' => $callCenter->getCallsByHour($dateFrom, $dateTo, $extId ?: null),
+            'by_extension' => $callCenter->getCallsByExtension($dateFrom, $dateTo),
+            'by_disposition' => $callCenter->getCallsByDisposition($dateFrom, $dateTo, $extId ?: null),
+            'top_callers' => $callCenter->getTopCallers($dateFrom, $dateTo, 10)
+        ]);
+        exit;
+    }
+
     if ($action === 'ucm_dashboard') {
         header('Content-Type: application/json');
         require_once __DIR__ . '/../src/GrandstreamUCM.php';

@@ -268,6 +268,9 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
             <a class="nav-link <?= $tab === 'ring_groups' ? 'active' : '' ?>" href="?page=call_center&tab=ring_groups">
                 <i class="bi bi-diagram-3"></i> Ring Groups
             </a>
+            <a class="nav-link <?= $tab === 'reports' ? 'active' : '' ?>" href="?page=call_center&tab=reports">
+                <i class="bi bi-graph-up"></i> Reports
+            </a>
             <a class="nav-link <?= $tab === 'phonebook' ? 'active' : '' ?>" href="?page=call_center&tab=phonebook">
                 <i class="bi bi-book"></i> Phonebook
             </a>
@@ -935,6 +938,359 @@ $pbxConfigured = !empty($pbxSettings['host']) && !empty($pbxSettings['user']) &&
             </table>
         </div>
     </div>
+
+    <?php elseif ($tab === 'reports'): ?>
+    <!-- Reports Tab -->
+    <?php
+    $rptDateFrom = $_GET['date_from'] ?? date('Y-m-01');
+    $rptDateTo = $_GET['date_to'] ?? date('Y-m-d');
+    $rptExtId = $_GET['extension_id'] ?? '';
+    $rptStats = $callCenter->getCallReportStats($rptDateFrom, $rptDateTo, $rptExtId ?: null);
+    $rptByDay = $callCenter->getCallsByDay($rptDateFrom, $rptDateTo, $rptExtId ?: null);
+    $rptByHour = $callCenter->getCallsByHour($rptDateFrom, $rptDateTo, $rptExtId ?: null);
+    $rptByExt = $callCenter->getCallsByExtension($rptDateFrom, $rptDateTo);
+    $rptByDisp = $callCenter->getCallsByDisposition($rptDateFrom, $rptDateTo, $rptExtId ?: null);
+    $rptTopCallers = $callCenter->getTopCallers($rptDateFrom, $rptDateTo, 10);
+    $allExtensions = $callCenter->getExtensions(false);
+    ?>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><i class="bi bi-graph-up me-2"></i>Call Reports</span>
+            <form class="d-flex gap-2 align-items-center flex-wrap" method="get">
+                <input type="hidden" name="page" value="call_center">
+                <input type="hidden" name="tab" value="reports">
+                <div class="input-group input-group-sm" style="width:auto">
+                    <span class="input-group-text">From</span>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="<?= htmlspecialchars($rptDateFrom) ?>">
+                </div>
+                <div class="input-group input-group-sm" style="width:auto">
+                    <span class="input-group-text">To</span>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="<?= htmlspecialchars($rptDateTo) ?>">
+                </div>
+                <select name="extension_id" class="form-select form-select-sm" style="width:auto">
+                    <option value="">All Extensions</option>
+                    <?php foreach ($allExtensions as $ext): ?>
+                    <option value="<?= $ext['id'] ?>" <?= $rptExtId == $ext['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($ext['extension'] . ' - ' . $ext['name']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filter</button>
+                <a href="?page=call_center&action=export_call_report&date_from=<?= urlencode($rptDateFrom) ?>&date_to=<?= urlencode($rptDateTo) ?>&extension_id=<?= urlencode($rptExtId) ?>" 
+                   class="btn btn-success btn-sm"><i class="bi bi-download"></i> Export CSV</a>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-2 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h3 class="mb-0 text-primary"><?= number_format($rptStats['total_calls'] ?? 0) ?></h3>
+                    <small class="text-muted">Total Calls</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h3 class="mb-0 text-success"><?= number_format($rptStats['answered_calls'] ?? 0) ?></h3>
+                    <small class="text-muted">Answered</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h3 class="mb-0 text-warning"><?= number_format($rptStats['missed_calls'] ?? 0) ?></h3>
+                    <small class="text-muted">Missed</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h3 class="mb-0 text-info"><?= number_format($rptStats['inbound_calls'] ?? 0) ?></h3>
+                    <small class="text-muted">Inbound</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h3 class="mb-0 text-primary"><?= number_format($rptStats['outbound_calls'] ?? 0) ?></h3>
+                    <small class="text-muted">Outbound</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h3 class="mb-0 text-success"><?= $rptStats['answer_rate'] ?? 0 ?>%</h3>
+                    <small class="text-muted">Answer Rate</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h5 class="mb-0"><?= gmdate("H:i:s", (int)($rptStats['avg_duration'] ?? 0)) ?></h5>
+                    <small class="text-muted">Avg Duration</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h5 class="mb-0"><?= gmdate("H:i:s", (int)($rptStats['max_duration'] ?? 0)) ?></h5>
+                    <small class="text-muted">Longest Call</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <?php 
+                    $totalSec = (int)($rptStats['total_duration'] ?? 0);
+                    $totalHrs = floor($totalSec / 3600);
+                    $totalMins = floor(($totalSec % 3600) / 60);
+                    ?>
+                    <h5 class="mb-0"><?= $totalHrs ?>h <?= $totalMins ?>m</h5>
+                    <small class="text-muted">Total Talk Time</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card text-center h-100">
+                <div class="card-body py-2">
+                    <h5 class="mb-0"><?= number_format($rptStats['busy_calls'] ?? 0) ?></h5>
+                    <small class="text-muted">Busy</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-lg-8 mb-3">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Calls Per Day</div>
+                <div class="card-body">
+                    <canvas id="chartCallsPerDay" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Disposition Breakdown</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <canvas id="chartDisposition" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-clock me-2"></i>Calls by Hour of Day</div>
+                <div class="card-body">
+                    <canvas id="chartByHour" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-telephone-inbound me-2"></i>Inbound vs Outbound (Daily)</div>
+                <div class="card-body">
+                    <canvas id="chartDirection" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-lg-7 mb-3">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-person-badge me-2"></i>Performance by Extension</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Extension</th>
+                                    <th>Agent</th>
+                                    <th class="text-center">Total</th>
+                                    <th class="text-center">Answered</th>
+                                    <th class="text-center">Missed</th>
+                                    <th class="text-center">In</th>
+                                    <th class="text-center">Out</th>
+                                    <th class="text-center">Avg Dur</th>
+                                    <th class="text-center">Total Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($rptByExt as $er): ?>
+                                <tr>
+                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($er['extension']) ?></span></td>
+                                    <td><?= htmlspecialchars($er['extension_name']) ?></td>
+                                    <td class="text-center"><?= $er['total_calls'] ?></td>
+                                    <td class="text-center text-success"><?= $er['answered'] ?></td>
+                                    <td class="text-center text-warning"><?= $er['missed'] ?></td>
+                                    <td class="text-center"><?= $er['inbound'] ?></td>
+                                    <td class="text-center"><?= $er['outbound'] ?></td>
+                                    <td class="text-center"><?= gmdate("i:s", (int)$er['avg_duration']) ?></td>
+                                    <td class="text-center"><?= gmdate("H:i:s", (int)$er['total_duration']) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($rptByExt)): ?>
+                                <tr><td colspan="9" class="text-center text-muted py-3">No extension data for this period</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5 mb-3">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-telephone-forward me-2"></i>Top Callers</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Phone</th>
+                                    <th>Customer</th>
+                                    <th class="text-center">Calls</th>
+                                    <th class="text-center">Total Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($rptTopCallers as $tc): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($tc['phone_number']) ?></td>
+                                    <td><?= htmlspecialchars($tc['customer_name'] ?? '-') ?></td>
+                                    <td class="text-center"><?= $tc['call_count'] ?></td>
+                                    <td class="text-center"><?= gmdate("H:i:s", (int)$tc['total_duration']) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($rptTopCallers)): ?>
+                                <tr><td colspan="4" class="text-center text-muted py-3">No call data for this period</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+    (function(){
+        const dayData = <?= json_encode($rptByDay) ?>;
+        const hourData = <?= json_encode($rptByHour) ?>;
+        const dispData = <?= json_encode($rptByDisp) ?>;
+
+        const chartColors = {
+            answered: 'rgba(40,167,69,0.8)',
+            missed: 'rgba(255,193,7,0.8)',
+            busy: 'rgba(220,53,69,0.8)',
+            failed: 'rgba(108,117,125,0.8)',
+            inbound: 'rgba(13,110,253,0.8)',
+            outbound: 'rgba(111,66,193,0.8)',
+            total: 'rgba(13,110,253,0.5)'
+        };
+
+        if (dayData.length > 0) {
+            new Chart(document.getElementById('chartCallsPerDay'), {
+                type: 'bar',
+                data: {
+                    labels: dayData.map(d => d.day),
+                    datasets: [
+                        { label: 'Answered', data: dayData.map(d => d.answered), backgroundColor: chartColors.answered },
+                        { label: 'Missed', data: dayData.map(d => d.missed), backgroundColor: chartColors.missed }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        } else {
+            document.getElementById('chartCallsPerDay').parentElement.innerHTML = '<div class="text-center text-muted py-5">No call data for this period</div>';
+        }
+
+        if (dispData.length > 0) {
+            const dispColors = { 'ANSWERED': chartColors.answered, 'NO ANSWER': chartColors.missed, 'BUSY': chartColors.busy, 'FAILED': chartColors.failed };
+            new Chart(document.getElementById('chartDisposition'), {
+                type: 'doughnut',
+                data: {
+                    labels: dispData.map(d => d.disposition),
+                    datasets: [{
+                        data: dispData.map(d => d.count),
+                        backgroundColor: dispData.map(d => dispColors[d.disposition] || chartColors.failed)
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+        } else {
+            document.getElementById('chartDisposition').parentElement.innerHTML = '<div class="text-center text-muted py-5">No data</div>';
+        }
+
+        const allHours = Array.from({length:24}, (_,i) => i);
+        const hourMap = {};
+        hourData.forEach(h => { hourMap[h.hour] = h; });
+        if (hourData.length > 0) {
+            new Chart(document.getElementById('chartByHour'), {
+                type: 'bar',
+                data: {
+                    labels: allHours.map(h => h.toString().padStart(2,'0') + ':00'),
+                    datasets: [
+                        { label: 'Answered', data: allHours.map(h => hourMap[h]?.answered || 0), backgroundColor: chartColors.answered },
+                        { label: 'Missed', data: allHours.map(h => hourMap[h]?.missed || 0), backgroundColor: chartColors.missed }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        } else {
+            document.getElementById('chartByHour').parentElement.innerHTML = '<div class="text-center text-muted py-5">No data</div>';
+        }
+
+        if (dayData.length > 0) {
+            new Chart(document.getElementById('chartDirection'), {
+                type: 'line',
+                data: {
+                    labels: dayData.map(d => d.day),
+                    datasets: [
+                        { label: 'Inbound', data: dayData.map(d => d.inbound), borderColor: chartColors.inbound, backgroundColor: 'rgba(13,110,253,0.1)', fill: true, tension: 0.3 },
+                        { label: 'Outbound', data: dayData.map(d => d.outbound), borderColor: chartColors.outbound, backgroundColor: 'rgba(111,66,193,0.1)', fill: true, tension: 0.3 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        } else {
+            document.getElementById('chartDirection').parentElement.innerHTML = '<div class="text-center text-muted py-5">No data</div>';
+        }
+    })();
+    </script>
 
     <?php elseif ($tab === 'phonebook'): ?>
     <!-- Phonebook Tab -->

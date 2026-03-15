@@ -610,4 +610,150 @@ class CallCenter {
 
         return $stats;
     }
+
+    public function getCallReportStats($dateFrom, $dateTo, $extensionId = null) {
+        $where = ["call_date >= ?", "call_date <= ?"];
+        $params = [$dateFrom, $dateTo . ' 23:59:59'];
+        if ($extensionId) {
+            $where[] = "extension_id = ?";
+            $params[] = $extensionId;
+        }
+        $w = implode(" AND ", $where);
+
+        $sql = "SELECT 
+                COUNT(*) as total_calls,
+                COUNT(*) FILTER (WHERE direction = 'inbound') as inbound_calls,
+                COUNT(*) FILTER (WHERE direction = 'outbound') as outbound_calls,
+                COUNT(*) FILTER (WHERE disposition = 'ANSWERED') as answered_calls,
+                COUNT(*) FILTER (WHERE disposition = 'NO ANSWER') as missed_calls,
+                COUNT(*) FILTER (WHERE disposition = 'BUSY') as busy_calls,
+                COUNT(*) FILTER (WHERE disposition NOT IN ('ANSWERED','NO ANSWER','BUSY')) as failed_calls,
+                COALESCE(AVG(duration) FILTER (WHERE disposition = 'ANSWERED'), 0) as avg_duration,
+                COALESCE(MAX(duration) FILTER (WHERE disposition = 'ANSWERED'), 0) as max_duration,
+                COALESCE(SUM(duration), 0) as total_duration,
+                COALESCE(SUM(billsec), 0) as total_billsec,
+                CASE WHEN COUNT(*) > 0 THEN 
+                    ROUND(100.0 * COUNT(*) FILTER (WHERE disposition = 'ANSWERED') / COUNT(*), 1) 
+                ELSE 0 END as answer_rate
+                FROM call_center_calls WHERE $w";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+
+    public function getCallsByDay($dateFrom, $dateTo, $extensionId = null) {
+        $where = ["call_date >= ?", "call_date <= ?"];
+        $params = [$dateFrom, $dateTo . ' 23:59:59'];
+        if ($extensionId) {
+            $where[] = "extension_id = ?";
+            $params[] = $extensionId;
+        }
+        $w = implode(" AND ", $where);
+
+        $sql = "SELECT call_date::date as day,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE disposition = 'ANSWERED') as answered,
+                COUNT(*) FILTER (WHERE disposition = 'NO ANSWER') as missed,
+                COUNT(*) FILTER (WHERE direction = 'inbound') as inbound,
+                COUNT(*) FILTER (WHERE direction = 'outbound') as outbound
+                FROM call_center_calls WHERE $w
+                GROUP BY call_date::date ORDER BY day";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getCallsByHour($dateFrom, $dateTo, $extensionId = null) {
+        $where = ["call_date >= ?", "call_date <= ?"];
+        $params = [$dateFrom, $dateTo . ' 23:59:59'];
+        if ($extensionId) {
+            $where[] = "extension_id = ?";
+            $params[] = $extensionId;
+        }
+        $w = implode(" AND ", $where);
+
+        $sql = "SELECT EXTRACT(HOUR FROM call_date)::int as hour,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE disposition = 'ANSWERED') as answered,
+                COUNT(*) FILTER (WHERE disposition = 'NO ANSWER') as missed
+                FROM call_center_calls WHERE $w
+                GROUP BY hour ORDER BY hour";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getCallsByExtension($dateFrom, $dateTo) {
+        $sql = "SELECT e.extension, e.name as extension_name,
+                COUNT(*) as total_calls,
+                COUNT(*) FILTER (WHERE c.disposition = 'ANSWERED') as answered,
+                COUNT(*) FILTER (WHERE c.disposition = 'NO ANSWER') as missed,
+                COUNT(*) FILTER (WHERE c.direction = 'inbound') as inbound,
+                COUNT(*) FILTER (WHERE c.direction = 'outbound') as outbound,
+                COALESCE(AVG(c.duration) FILTER (WHERE c.disposition = 'ANSWERED'), 0) as avg_duration,
+                COALESCE(SUM(c.duration), 0) as total_duration
+                FROM call_center_calls c
+                JOIN call_center_extensions e ON c.extension_id = e.id
+                WHERE c.call_date >= ? AND c.call_date <= ?
+                GROUP BY e.id, e.extension, e.name
+                ORDER BY total_calls DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$dateFrom, $dateTo . ' 23:59:59']);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getCallsByDisposition($dateFrom, $dateTo, $extensionId = null) {
+        $where = ["call_date >= ?", "call_date <= ?"];
+        $params = [$dateFrom, $dateTo . ' 23:59:59'];
+        if ($extensionId) {
+            $where[] = "extension_id = ?";
+            $params[] = $extensionId;
+        }
+        $w = implode(" AND ", $where);
+
+        $sql = "SELECT disposition, COUNT(*) as count
+                FROM call_center_calls WHERE $w
+                GROUP BY disposition ORDER BY count DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getTopCallers($dateFrom, $dateTo, $limit = 10) {
+        $sql = "SELECT 
+                CASE WHEN c.direction = 'inbound' THEN c.src ELSE c.dst END as phone_number,
+                cust.name as customer_name,
+                COUNT(*) as call_count,
+                COALESCE(SUM(c.duration), 0) as total_duration
+                FROM call_center_calls c
+                LEFT JOIN customers cust ON c.customer_id = cust.id
+                WHERE c.call_date >= ? AND c.call_date <= ?
+                GROUP BY phone_number, cust.name
+                ORDER BY call_count DESC LIMIT ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$dateFrom, $dateTo . ' 23:59:59', $limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function exportCallsCsv($dateFrom, $dateTo, $extensionId = null) {
+        $where = ["c.call_date >= ?", "c.call_date <= ?"];
+        $params = [$dateFrom, $dateTo . ' 23:59:59'];
+        if ($extensionId) {
+            $where[] = "c.extension_id = ?";
+            $params[] = $extensionId;
+        }
+        $w = implode(" AND ", $where);
+
+        $sql = "SELECT c.call_date, c.src, c.dst, c.direction, c.disposition,
+                c.duration, c.billsec, 
+                e.extension, e.name as extension_name,
+                cust.name as customer_name, cust.phone as customer_phone
+                FROM call_center_calls c
+                LEFT JOIN call_center_extensions e ON c.extension_id = e.id
+                LEFT JOIN customers cust ON c.customer_id = cust.id
+                WHERE $w ORDER BY c.call_date DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
 }
