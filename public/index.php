@@ -2782,7 +2782,7 @@ if ($page === 'call_center') {
             'destination_type' => $_POST['destination_type'] ?? 'extension',
             'destination_id' => $_POST['destination_id'] ?? '',
             'priority' => (int)($_POST['priority'] ?? 0),
-            'is_active' => isset($_POST['is_active']) ? true : false
+            'is_active' => !empty($_POST['is_active']) ? 't' : 'f'
         ];
         if ($id) {
             $stmt = $db->prepare("UPDATE call_center_inbound_routes SET name=?, description=?, did_pattern=?, cid_pattern=?, trunk_id=?, ringback_tone=?, destination_type=?, destination_id=?, priority=?, is_active=?, updated_at=NOW() WHERE id=?");
@@ -2845,7 +2845,7 @@ if ($page === 'call_center') {
             'invalid_destination_type' => $_POST['invalid_destination_type'] ?? 'repeat',
             'invalid_destination_id' => $_POST['invalid_destination_id'] ?? '',
             'max_loops' => (int)($_POST['max_loops'] ?? 3),
-            'is_active' => isset($_POST['is_active']) ? true : false
+            'is_active' => !empty($_POST['is_active']) ? 't' : 'f'
         ];
         if ($id) {
             $stmt = $db->prepare("UPDATE call_center_ivr SET name=?, description=?, announcement=?, timeout=?, timeout_destination_type=?, timeout_destination_id=?, invalid_destination_type=?, invalid_destination_id=?, max_loops=?, is_active=?, updated_at=NOW() WHERE id=?");
@@ -2940,11 +2940,11 @@ if ($page === 'call_center') {
             'ring_strategy' => $_POST['ring_strategy'] ?? 'ringall',
             'ring_time' => (int)($_POST['ring_time'] ?? 20),
             'ringback_tone' => $_POST['ringback_tone'] ?? 'default',
-            'skip_busy' => isset($_POST['skip_busy']) ? true : false,
-            'enable_recording' => isset($_POST['enable_recording']) ? true : false,
+            'skip_busy' => !empty($_POST['skip_busy']) ? 't' : 'f',
+            'enable_recording' => !empty($_POST['enable_recording']) ? 't' : 'f',
             'destination_if_no_answer_type' => $_POST['destination_if_no_answer_type'] ?? 'hangup',
             'destination_if_no_answer_id' => $_POST['destination_if_no_answer_id'] ?? '',
-            'is_active' => isset($_POST['is_active']) ? true : false
+            'is_active' => !empty($_POST['is_active']) ? 't' : 'f'
         ];
         if ($id) {
             $stmt = $db->prepare("UPDATE call_center_ring_groups SET name=?, description=?, extension=?, ring_strategy=?, ring_time=?, ringback_tone=?, skip_busy=?, enable_recording=?, destination_if_no_answer_type=?, destination_if_no_answer_id=?, is_active=?, updated_at=NOW() WHERE id=?");

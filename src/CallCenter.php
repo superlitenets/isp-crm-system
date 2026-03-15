@@ -282,10 +282,11 @@ class CallCenter {
     }
 
     public function saveExtension($data) {
+        $isActive = !empty($data['is_active']) ? 't' : 'f';
         if (isset($data['id']) && $data['id']) {
             $sql = "UPDATE call_center_extensions SET 
                     user_id = ?, extension = ?, name = ?, secret = ?, 
-                    caller_id = ?, device_type = ?, is_active = ?, updated_at = NOW()
+                    is_active = ?
                     WHERE id = ?";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
@@ -293,25 +294,21 @@ class CallCenter {
                 $data['extension'],
                 $data['name'],
                 $data['secret'] ?? null,
-                $data['caller_id'] ?? null,
-                $data['device_type'] ?? 'softphone',
-                $data['is_active'] ?? true,
+                $isActive,
                 $data['id']
             ]);
             return $data['id'];
         } else {
             $sql = "INSERT INTO call_center_extensions 
-                    (user_id, extension, name, secret, caller_id, device_type, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
+                    (user_id, extension, name, secret, is_active)
+                    VALUES (?, ?, ?, ?, ?) RETURNING id";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 $data['user_id'] ?: null,
                 $data['extension'],
                 $data['name'],
                 $data['secret'] ?? null,
-                $data['caller_id'] ?? null,
-                $data['device_type'] ?? 'softphone',
-                $data['is_active'] ?? true
+                $isActive
             ]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row['id'];
@@ -343,36 +340,35 @@ class CallCenter {
     }
 
     public function saveQueue($data) {
+        $isActive = !empty($data['is_active']) ? 't' : 'f';
         if (isset($data['id']) && $data['id']) {
             $sql = "UPDATE call_center_queues SET 
-                    name = ?, extension = ?, strategy = ?, timeout = ?,
-                    wrapup_time = ?, max_wait_time = ?, is_active = ?, updated_at = NOW()
+                    name = ?, strategy = ?, timeout = ?,
+                    wrapuptime = ?, announce_frequency = ?, is_active = ?
                     WHERE id = ?";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 $data['name'],
-                $data['extension'],
                 $data['strategy'] ?? 'ringall',
                 $data['timeout'] ?? 30,
-                $data['wrapup_time'] ?? 5,
-                $data['max_wait_time'] ?? 300,
-                $data['is_active'] ?? true,
+                $data['wrapuptime'] ?? $data['wrapup_time'] ?? 5,
+                $data['announce_frequency'] ?? 30,
+                $isActive,
                 $data['id']
             ]);
             return $data['id'];
         } else {
             $sql = "INSERT INTO call_center_queues 
-                    (name, extension, strategy, timeout, wrapup_time, max_wait_time, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
+                    (name, strategy, timeout, wrapuptime, announce_frequency, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?) RETURNING id";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 $data['name'],
-                $data['extension'],
                 $data['strategy'] ?? 'ringall',
                 $data['timeout'] ?? 30,
-                $data['wrapup_time'] ?? 5,
-                $data['max_wait_time'] ?? 300,
-                $data['is_active'] ?? true
+                $data['wrapuptime'] ?? $data['wrapup_time'] ?? 5,
+                $data['announce_frequency'] ?? 30,
+                $isActive
             ]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row['id'];
