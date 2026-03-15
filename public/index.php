@@ -2813,14 +2813,14 @@ if ($page === 'call_center') {
             'trunk_id' => !empty($_POST['trunk_id']) ? (int)$_POST['trunk_id'] : null,
             'caller_id' => $_POST['caller_id'] ?? '',
             'priority' => (int)($_POST['priority'] ?? 0),
-            'is_active' => isset($_POST['is_active']) ? true : false
+            'is_active' => !empty($_POST['is_active']) ? 't' : 'f'
         ];
         if ($id) {
             $stmt = $db->prepare("UPDATE call_center_outbound_routes SET name=?, description=?, dial_pattern=?, prepend=?, prefix=?, trunk_id=?, caller_id=?, priority=?, is_active=?, updated_at=NOW() WHERE id=?");
-            $stmt->execute([$data['name'], $data['description'], $data['dial_pattern'], $data['prepend'], $data['prefix'], $data['trunk_id'], $data['caller_id'], $data['priority'], $data['is_active'], $id]);
+            $stmt->execute([$data['name'], $data['description'] ?? '', $data['dial_pattern'], $data['prepend'], $data['prefix'], $data['trunk_id'], $data['caller_id'], $data['priority'], $data['is_active'], $id]);
         } else {
             $stmt = $db->prepare("INSERT INTO call_center_outbound_routes (name, description, dial_pattern, prepend, prefix, trunk_id, caller_id, priority, is_active) VALUES (?,?,?,?,?,?,?,?,?)");
-            $stmt->execute([$data['name'], $data['description'], $data['dial_pattern'], $data['prepend'], $data['prefix'], $data['trunk_id'], $data['caller_id'], $data['priority'], $data['is_active']]);
+            $stmt->execute([$data['name'], $data['description'] ?? '', $data['dial_pattern'], $data['prepend'], $data['prefix'], $data['trunk_id'], $data['caller_id'], $data['priority'], $data['is_active']]);
         }
         header('Location: ?page=call_center&tab=outbound');
         exit;
