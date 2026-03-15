@@ -1,0 +1,65 @@
+root@superlitecrm:~/isp# # Test via nginx (the actual path users hit)
+docker exec isp_crm_nginx curl -s "http://isp_crm_php:9000/api/whatsapp-chat.php?action=chats" 2>&1 || echo "---"
+
+# Or test from nginx hitting itself
+docker exec isp_crm_nginx wget -qO- "http://localhost/api/whatsapp-chat.php?action=chats" 2>&1 | head -20
+
+# Check if the updated code is actually deployed
+docker exec isp_crm_php grep -c "CREATE TABLE IF NOT EXISTS whatsapp_conversations" /var/www/html/public/api/whatsapp-chat.php
+
+# Check if the file even has our changes
+docker exec isp_crm_php head -50 /var/www/html/public/api/whatsapp-chat.php
+---
+wget: can't connect to remote host: Connection refused
+1
+<?php
+
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../src/Auth.php';
+require_once __DIR__ . '/../../src/Settings.php';
+require_once __DIR__ . '/../../src/WhatsApp.php';
+require_once __DIR__ . '/../../src/Customer.php';
+
+use App\Auth;
+use App\WhatsApp;
+use App\Customer;
+
+header('Content-Type: application/json');
+
+$auth = new Auth();
+if (!$auth->check()) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    exit;
+}
+
+$action = $_GET['action'] ?? '';
+$whatsapp = null;
+$customer = null;
+
+function getWhatsApp() {
+    global $whatsapp;
+    if (!$whatsapp) $whatsapp = new WhatsApp();
+    return $whatsapp;
+}
+
+function getCustomer() {
+    global $customer;
+    if (!$customer) $customer = new Customer();
+    return $customer;
+}
+
+try {
+    switch ($action) {
+        case 'chats':
+            $db = Database::getConnection();
+            $conversations = [];
+            try {
+                $db->exec("
+                    CREATE TABLE IF NOT EXISTS whatsapp_conversations (
+                        id SERIAL PRIMARY KEY,
+                        chat_id VARCHAR(100) UNIQUE NOT NULL,
+                        phone VARCHAR(30) NOT NULL,
+                        contact_name VARCHAR(150),
+                        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+root@superlitecrm:~/isp#
