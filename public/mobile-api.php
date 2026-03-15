@@ -166,8 +166,8 @@ try {
                 break;
             }
             
-            $orderId = $api->createOrder($salesperson['id'], $input);
-            echo json_encode(['success' => true, 'order_id' => $orderId]);
+            $result = $api->createOrder($salesperson['id'], $input);
+            echo json_encode($result);
             break;
             
         case 'create-lead':

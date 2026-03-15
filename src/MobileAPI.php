@@ -145,7 +145,25 @@ class MobileAPI {
         return array_merge($stats, $commissions);
     }
     
-    public function createOrder(int $salespersonId, array $data): ?int {
+    public function createOrder(int $salespersonId, array $data): array {
+        $phone = trim($data['customer_phone'] ?? '');
+        
+        $dupStmt = $this->db->prepare("
+            SELECT id, order_number FROM orders 
+            WHERE customer_phone = ? AND order_status IN ('new', 'pending', 'in_progress')
+            ORDER BY created_at DESC LIMIT 1
+        ");
+        $dupStmt->execute([$phone]);
+        $existing = $dupStmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($existing) {
+            return [
+                'success' => false,
+                'error' => 'An active order already exists for this phone number (' . $phone . '). Order #' . $existing['order_number'],
+                'existing_order_id' => $existing['id']
+            ];
+        }
+        
         $orderNumber = 'ORD-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
         
         $stmt = $this->db->prepare("
@@ -159,14 +177,17 @@ class MobileAPI {
             $data['package_id'] ?: null,
             $data['customer_name'],
             $data['customer_email'] ?? null,
-            $data['customer_phone'],
+            $phone,
             $data['customer_address'] ?? null,
             $data['amount'] ?? 0,
             $salespersonId,
             $data['notes'] ?? null
         ]);
         
-        return (int) $this->db->lastInsertId();
+        return [
+            'success' => true,
+            'order_id' => (int) $this->db->lastInsertId()
+        ];
     }
     
     public function createLead(int $salespersonId, array $data): ?int {

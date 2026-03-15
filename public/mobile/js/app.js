@@ -261,6 +261,8 @@ const app = {
     },
     
     async createOrder() {
+        if (this._creatingOrder) return;
+        
         const data = {
             customer_name: document.getElementById('order-name').value,
             customer_phone: document.getElementById('order-phone').value,
@@ -274,15 +276,31 @@ const app = {
             return;
         }
         
-        const result = await this.api('create-order', 'POST', data);
+        this._creatingOrder = true;
+        const submitBtn = document.querySelector('#new-order-form button[type="submit"], #new-order-form .btn-primary');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn._origText = submitBtn.textContent;
+            submitBtn.textContent = 'Submitting...';
+        }
         
-        if (result.success) {
-            this.showToast('Order created successfully!', 'success');
-            document.getElementById('new-order-form').reset();
-            this.goBack();
-            this.loadSalespersonDashboard();
-        } else {
-            this.showToast(result.error || 'Failed to create order', 'danger');
+        try {
+            const result = await this.api('create-order', 'POST', data);
+            
+            if (result.success) {
+                this.showToast('Order created successfully!', 'success');
+                document.getElementById('new-order-form').reset();
+                this.goBack();
+                this.loadSalespersonDashboard();
+            } else {
+                this.showToast(result.error || 'Failed to create order', 'danger');
+            }
+        } finally {
+            this._creatingOrder = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = submitBtn._origText || 'Submit';
+            }
         }
     },
     
