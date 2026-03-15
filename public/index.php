@@ -8902,6 +8902,111 @@ if ($page === 'settings' && $action === 'delete_rule' && isset($_GET['id'])) {
     }
 }
 
+if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::validateToken($_POST['csrf_token'] ?? '') && ($_POST['action'] ?? '') === 'save_roster') {
+    $rosterDate = $_POST['roster_date'] ?? '';
+    $assignments = $_POST['assignments'] ?? [];
+    
+    if (empty($rosterDate)) {
+        $message = 'Please select a date.';
+        $messageType = 'danger';
+    } else {
+        try {
+            $db->prepare("DELETE FROM duty_roster WHERE roster_date = ?")->execute([$rosterDate]);
+            
+            $insertStmt = $db->prepare("INSERT INTO duty_roster (employee_id, shift_id, roster_date, notes, created_by) VALUES (?, ?, ?, ?, ?)");
+            $count = 0;
+            foreach ($assignments as $empId => $shiftId) {
+                if (!empty($shiftId)) {
+                    $notes = $_POST['assignment_notes'][$empId] ?? null;
+                    $insertStmt->execute([(int)$empId, (int)$shiftId, $rosterDate, $notes, $_SESSION['user_id'] ?? null]);
+                    $count++;
+                }
+            }
+            $message = "Roster saved for " . date('D, M j Y', strtotime($rosterDate)) . " — {$count} staff assigned.";
+            $messageType = 'success';
+            \App\Auth::regenerateToken();
+        } catch (Exception $e) {
+            $message = 'Error saving roster: ' . $e->getMessage();
+            $messageType = 'danger';
+        }
+    }
+}
+
+if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::validateToken($_POST['csrf_token'] ?? '') && ($_POST['action'] ?? '') === 'save_weekly_roster') {
+    $weekStart = $_POST['week_start'] ?? '';
+    $schedule = $_POST['schedule'] ?? [];
+    
+    if (empty($weekStart)) {
+        $message = 'Please select a week.';
+        $messageType = 'danger';
+    } else {
+        try {
+            $weekEnd = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+            $db->prepare("DELETE FROM duty_roster WHERE roster_date BETWEEN ? AND ?")->execute([$weekStart, $weekEnd]);
+            
+            $insertStmt = $db->prepare("INSERT INTO duty_roster (employee_id, shift_id, roster_date, created_by) VALUES (?, ?, ?, ?) ON CONFLICT (employee_id, roster_date) DO UPDATE SET shift_id = EXCLUDED.shift_id, updated_at = NOW()");
+            $count = 0;
+            foreach ($schedule as $empId => $days) {
+                foreach ($days as $dayOffset => $shiftId) {
+                    if (!empty($shiftId)) {
+                        $date = date('Y-m-d', strtotime($weekStart . " +{$dayOffset} days"));
+                        $insertStmt->execute([(int)$empId, (int)$shiftId, $date, $_SESSION['user_id'] ?? null]);
+                        $count++;
+                    }
+                }
+            }
+            $message = "Weekly roster saved ({$count} assignments) for week of " . date('M j', strtotime($weekStart)) . " - " . date('M j, Y', strtotime($weekEnd));
+            $messageType = 'success';
+            \App\Auth::regenerateToken();
+        } catch (Exception $e) {
+            $message = 'Error saving weekly roster: ' . $e->getMessage();
+            $messageType = 'danger';
+        }
+    }
+}
+
+if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::validateToken($_POST['csrf_token'] ?? '') && ($_POST['action'] ?? '') === 'manage_shift') {
+    $shiftAction = $_POST['shift_action'] ?? '';
+    try {
+        if ($shiftAction === 'create') {
+            $db->prepare("INSERT INTO duty_shifts (name, shift_type, start_time, end_time, color) VALUES (?, ?, ?, ?, ?)")
+                ->execute([$_POST['name'], $_POST['shift_type'], $_POST['start_time'], $_POST['end_time'], $_POST['color'] ?? '#0d6efd']);
+            $message = 'Shift created successfully!';
+        } elseif ($shiftAction === 'update' && !empty($_POST['shift_id'])) {
+            $db->prepare("UPDATE duty_shifts SET name = ?, shift_type = ?, start_time = ?, end_time = ?, color = ?, is_active = ? WHERE id = ?")
+                ->execute([$_POST['name'], $_POST['shift_type'], $_POST['start_time'], $_POST['end_time'], $_POST['color'] ?? '#0d6efd', isset($_POST['is_active']) ? 1 : 0, (int)$_POST['shift_id']]);
+            $message = 'Shift updated successfully!';
+        } elseif ($shiftAction === 'delete' && !empty($_POST['shift_id'])) {
+            $db->prepare("DELETE FROM duty_shifts WHERE id = ?")->execute([(int)$_POST['shift_id']]);
+            $message = 'Shift deleted successfully!';
+        }
+        $messageType = 'success';
+        \App\Auth::regenerateToken();
+    } catch (Exception $e) {
+        $message = 'Error: ' . $e->getMessage();
+        $messageType = 'danger';
+    }
+}
+
+if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::validateToken($_POST['csrf_token'] ?? '') && ($_POST['action'] ?? '') === 'manage_holiday') {
+    $holAction = $_POST['holiday_action'] ?? '';
+    try {
+        if ($holAction === 'create') {
+            $db->prepare("INSERT INTO public_holidays (name, holiday_date, is_recurring) VALUES (?, ?, ?) ON CONFLICT (holiday_date) DO UPDATE SET name = EXCLUDED.name, is_recurring = EXCLUDED.is_recurring")
+                ->execute([$_POST['holiday_name'], $_POST['holiday_date'], isset($_POST['is_recurring']) ? true : false]);
+            $message = 'Holiday added successfully!';
+        } elseif ($holAction === 'delete' && !empty($_POST['holiday_id'])) {
+            $db->prepare("DELETE FROM public_holidays WHERE id = ?")->execute([(int)$_POST['holiday_id']]);
+            $message = 'Holiday removed!';
+        }
+        $messageType = 'success';
+        \App\Auth::regenerateToken();
+    } catch (Exception $e) {
+        $message = 'Error: ' . $e->getMessage();
+        $messageType = 'danger';
+    }
+}
+
 if ($page === 'hr' && $action === 'sync_biometric') {
     if (!\App\Auth::isAdmin()) {
         $message = 'Only administrators can sync biometric devices.';

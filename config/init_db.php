@@ -1763,10 +1763,34 @@ function runMigrations(PDO $db): void {
         'public_holidays' => "
             CREATE TABLE IF NOT EXISTS public_holidays (
                 id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                holiday_date DATE NOT NULL,
+                name VARCHAR(200) NOT NULL,
+                holiday_date DATE NOT NULL UNIQUE,
                 is_recurring BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'duty_shifts' => "
+            CREATE TABLE IF NOT EXISTS duty_shifts (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                shift_type VARCHAR(20) NOT NULL DEFAULT 'day',
+                start_time TIME NOT NULL,
+                end_time TIME NOT NULL,
+                color VARCHAR(20) DEFAULT '#0d6efd',
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'duty_roster' => "
+            CREATE TABLE IF NOT EXISTS duty_roster (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+                shift_id INTEGER NOT NULL REFERENCES duty_shifts(id) ON DELETE CASCADE,
+                roster_date DATE NOT NULL,
+                status VARCHAR(20) DEFAULT 'scheduled',
+                notes TEXT,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(employee_id, roster_date)
             )",
         'quotes' => "
             CREATE TABLE IF NOT EXISTS quotes (

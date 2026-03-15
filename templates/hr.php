@@ -1721,6 +1721,11 @@ function syncAllEmployeesToDevice(deviceId) {
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'duty_roster' ? 'active' : '' ?>" href="?page=hr&subpage=duty_roster">
+            <i class="bi bi-calendar2-week"></i> Duty Roster
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link <?= $subpage === 'announcements' ? 'active' : '' ?>" href="?page=hr&subpage=announcements">
             <i class="bi bi-megaphone"></i> Announcements
         </a>
@@ -4264,6 +4269,390 @@ $leaveTab = $_GET['tab'] ?? 'requests';
     </div>
 </div>
 
+<?php endif; ?>
+
+<?php elseif ($subpage === 'duty_roster'): ?>
+<?php
+$rosterView = $_GET['roster_view'] ?? 'weekly';
+$selectedWeek = $_GET['week'] ?? date('Y-m-d', strtotime('monday this week'));
+$selectedWeekEnd = date('Y-m-d', strtotime($selectedWeek . ' +6 days'));
+
+$shifts = $db->query("SELECT * FROM duty_shifts WHERE is_active = TRUE ORDER BY start_time")->fetchAll(PDO::FETCH_ASSOC);
+$allShifts = $db->query("SELECT * FROM duty_shifts ORDER BY start_time")->fetchAll(PDO::FETCH_ASSOC);
+$holidays = $db->query("SELECT * FROM public_holidays ORDER BY holiday_date")->fetchAll(PDO::FETCH_ASSOC);
+$holidayDates = array_column($holidays, 'name', 'holiday_date');
+
+$rosterStmt = $db->prepare("
+    SELECT dr.*, e.name as employee_name, e.phone as employee_phone, e.position, 
+           d.name as department_name, ds.name as shift_name, ds.start_time, ds.end_time, ds.color, ds.shift_type
+    FROM duty_roster dr
+    JOIN employees e ON dr.employee_id = e.id
+    LEFT JOIN departments d ON e.department_id = d.id
+    JOIN duty_shifts ds ON dr.shift_id = ds.id
+    WHERE dr.roster_date BETWEEN ? AND ?
+    ORDER BY dr.roster_date, ds.start_time, e.name
+");
+$rosterStmt->execute([$selectedWeek, $selectedWeekEnd]);
+$weekRoster = $rosterStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$rosterByEmpDay = [];
+foreach ($weekRoster as $r) {
+    $dayIdx = (int)((strtotime($r['roster_date']) - strtotime($selectedWeek)) / 86400);
+    $rosterByEmpDay[$r['employee_id']][$dayIdx] = $r;
+}
+
+$rosterEmployees = $db->query("SELECT e.id, e.name, e.position, e.phone, d.name as department_name FROM employees e LEFT JOIN departments d ON e.department_id = d.id WHERE e.employment_status = 'active' ORDER BY d.name, e.name")->fetchAll(PDO::FETCH_ASSOC);
+
+$prevWeek = date('Y-m-d', strtotime($selectedWeek . ' -7 days'));
+$nextWeek = date('Y-m-d', strtotime($selectedWeek . ' +7 days'));
+
+$todayRoster = $db->query("
+    SELECT dr.*, e.name as employee_name, e.phone, e.position, d.name as department_name,
+           ds.name as shift_name, ds.start_time, ds.end_time, ds.color, ds.shift_type
+    FROM duty_roster dr
+    JOIN employees e ON dr.employee_id = e.id
+    LEFT JOIN departments d ON e.department_id = d.id
+    JOIN duty_shifts ds ON dr.shift_id = ds.id
+    WHERE dr.roster_date = CURRENT_DATE
+    ORDER BY ds.start_time, e.name
+")->fetchAll(PDO::FETCH_ASSOC);
+?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-calendar2-week me-2"></i>Duty Roster</h4>
+</div>
+
+<?php if (!empty($todayRoster)): ?>
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+        <h6 class="mb-0"><i class="bi bi-clock me-2"></i>Today's Duty — <?= date('l, M j Y') ?>
+            <?php if (isset($holidayDates[date('Y-m-d')])): ?>
+            <span class="badge bg-warning text-dark ms-2"><i class="bi bi-star-fill me-1"></i><?= htmlspecialchars($holidayDates[date('Y-m-d')]) ?></span>
+            <?php endif; ?>
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Position</th>
+                        <th>Shift</th>
+                        <th>Time</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($todayRoster as $tr): ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($tr['employee_name']) ?></strong></td>
+                        <td><?= htmlspecialchars($tr['department_name'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($tr['position'] ?? '-') ?></td>
+                        <td><span class="badge" style="background-color: <?= $tr['color'] ?>"><?= htmlspecialchars($tr['shift_name']) ?></span></td>
+                        <td><?= date('H:i', strtotime($tr['start_time'])) ?> - <?= date('H:i', strtotime($tr['end_time'])) ?></td>
+                        <td><?= htmlspecialchars($tr['phone'] ?? '-') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<ul class="nav nav-pills mb-3">
+    <li class="nav-item">
+        <a class="nav-link <?= $rosterView === 'weekly' ? 'active' : '' ?>" href="?page=hr&subpage=duty_roster&roster_view=weekly&week=<?= $selectedWeek ?>">
+            <i class="bi bi-calendar-week me-1"></i> Weekly View
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $rosterView === 'shifts' ? 'active' : '' ?>" href="?page=hr&subpage=duty_roster&roster_view=shifts">
+            <i class="bi bi-clock-history me-1"></i> Manage Shifts
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $rosterView === 'holidays' ? 'active' : '' ?>" href="?page=hr&subpage=duty_roster&roster_view=holidays">
+            <i class="bi bi-star me-1"></i> Holidays
+        </a>
+    </li>
+</ul>
+
+<?php if ($rosterView === 'weekly'): ?>
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <a href="?page=hr&subpage=duty_roster&roster_view=weekly&week=<?= $prevWeek ?>" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-chevron-left"></i> Previous
+        </a>
+        <h5 class="mb-0">
+            <i class="bi bi-calendar3 me-2"></i>
+            <?= date('M j', strtotime($selectedWeek)) ?> — <?= date('M j, Y', strtotime($selectedWeekEnd)) ?>
+        </h5>
+        <a href="?page=hr&subpage=duty_roster&roster_view=weekly&week=<?= $nextWeek ?>" class="btn btn-sm btn-outline-secondary">
+            Next <i class="bi bi-chevron-right"></i>
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_weekly_roster">
+            <input type="hidden" name="week_start" value="<?= $selectedWeek ?>">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width:180px;">Employee</th>
+                            <?php for ($d = 0; $d < 7; $d++): 
+                                $dayDate = date('Y-m-d', strtotime($selectedWeek . " +{$d} days"));
+                                $dayName = date('D', strtotime($dayDate));
+                                $isWeekend = in_array($dayName, ['Sat', 'Sun']);
+                                $isHoliday = isset($holidayDates[$dayDate]);
+                                $isToday = $dayDate === date('Y-m-d');
+                            ?>
+                            <th class="text-center <?= $isToday ? 'bg-primary bg-opacity-10' : ($isWeekend ? 'bg-warning bg-opacity-10' : '') ?>" style="min-width:120px;">
+                                <?= $dayName ?><br>
+                                <small><?= date('M j', strtotime($dayDate)) ?></small>
+                                <?php if ($isHoliday): ?>
+                                <br><span class="badge bg-info" style="font-size:0.6rem;"><?= htmlspecialchars($holidayDates[$dayDate]) ?></span>
+                                <?php endif; ?>
+                            </th>
+                            <?php endfor; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $lastDept = null;
+                        foreach ($rosterEmployees as $emp): 
+                            if ($emp['department_name'] !== $lastDept):
+                                $lastDept = $emp['department_name'];
+                        ?>
+                        <tr class="table-secondary">
+                            <td colspan="8"><strong><i class="bi bi-building me-1"></i><?= htmlspecialchars($lastDept ?: 'No Department') ?></strong></td>
+                        </tr>
+                        <?php endif; ?>
+                        <tr>
+                            <td>
+                                <strong><?= htmlspecialchars($emp['name']) ?></strong>
+                                <?php if ($emp['position']): ?>
+                                <br><small class="text-muted"><?= htmlspecialchars($emp['position']) ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <?php for ($d = 0; $d < 7; $d++): 
+                                $dayDate = date('Y-m-d', strtotime($selectedWeek . " +{$d} days"));
+                                $isToday = $dayDate === date('Y-m-d');
+                                $assigned = $rosterByEmpDay[$emp['id']][$d] ?? null;
+                            ?>
+                            <td class="text-center <?= $isToday ? 'bg-primary bg-opacity-10' : '' ?>">
+                                <select name="schedule[<?= $emp['id'] ?>][<?= $d ?>]" class="form-select form-select-sm" style="font-size:0.75rem;">
+                                    <option value="">— Off —</option>
+                                    <?php foreach ($shifts as $s): ?>
+                                    <option value="<?= $s['id'] ?>" <?= ($assigned && $assigned['shift_id'] == $s['id']) ? 'selected' : '' ?>
+                                        style="color: <?= $s['color'] ?>">
+                                        <?= htmlspecialchars($s['name']) ?> (<?= date('H:i', strtotime($s['start_time'])) ?>-<?= date('H:i', strtotime($s['end_time'])) ?>)
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <?php endfor; ?>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> Save Weekly Roster
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="mt-3">
+    <div class="d-flex gap-2 flex-wrap">
+        <?php foreach ($shifts as $s): ?>
+        <span class="badge" style="background-color: <?= $s['color'] ?>; font-size: 0.8rem;">
+            <?= htmlspecialchars($s['name']) ?>: <?= date('H:i', strtotime($s['start_time'])) ?> - <?= date('H:i', strtotime($s['end_time'])) ?>
+        </span>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<?php elseif ($rosterView === 'shifts'): ?>
+<div class="row">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Add Shift</h6>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="manage_shift">
+                    <input type="hidden" name="shift_action" value="create">
+                    <div class="mb-3">
+                        <label class="form-label">Shift Name</label>
+                        <input type="text" name="name" class="form-control" required placeholder="e.g. Morning Shift">
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Type</label>
+                            <select name="shift_type" class="form-select">
+                                <option value="day">Day</option>
+                                <option value="night">Night</option>
+                                <option value="weekend">Weekend</option>
+                                <option value="holiday">Holiday</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Color</label>
+                            <input type="color" name="color" class="form-control form-control-color w-100" value="#0d6efd">
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Start Time</label>
+                            <input type="time" name="start_time" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">End Time</label>
+                            <input type="time" name="end_time" class="form-control" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i> Create Shift</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Existing Shifts</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($allShifts as $s): ?>
+                        <tr>
+                            <td>
+                                <span class="badge me-1" style="background-color: <?= $s['color'] ?>">&nbsp;</span>
+                                <?= htmlspecialchars($s['name']) ?>
+                            </td>
+                            <td><span class="badge bg-secondary"><?= ucfirst($s['shift_type']) ?></span></td>
+                            <td><?= date('H:i', strtotime($s['start_time'])) ?> - <?= date('H:i', strtotime($s['end_time'])) ?></td>
+                            <td>
+                                <?php if ($s['is_active']): ?>
+                                <span class="badge bg-success">Active</span>
+                                <?php else: ?>
+                                <span class="badge bg-danger">Inactive</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this shift?')">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="manage_shift">
+                                    <input type="hidden" name="shift_action" value="delete">
+                                    <input type="hidden" name="shift_id" value="<?= $s['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($rosterView === 'holidays'): ?>
+<div class="row">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Add Holiday</h6>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="manage_holiday">
+                    <input type="hidden" name="holiday_action" value="create">
+                    <div class="mb-3">
+                        <label class="form-label">Holiday Name</label>
+                        <input type="text" name="holiday_name" class="form-control" required placeholder="e.g. Mashujaa Day">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="holiday_date" class="form-control" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_recurring" class="form-check-input" id="recurringCheck">
+                        <label class="form-check-label" for="recurringCheck">Recurring every year</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i> Add Holiday</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-star me-2"></i>Public Holidays</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Holiday</th>
+                            <th>Date</th>
+                            <th>Recurring</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($holidays)): ?>
+                        <tr><td colspan="4" class="text-center text-muted py-3">No holidays configured</td></tr>
+                        <?php else: ?>
+                        <?php foreach ($holidays as $h): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($h['name']) ?></td>
+                            <td><?= date('D, M j Y', strtotime($h['holiday_date'])) ?></td>
+                            <td>
+                                <?php if ($h['is_recurring']): ?>
+                                <span class="badge bg-info">Yearly</span>
+                                <?php else: ?>
+                                <span class="badge bg-secondary">One-time</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <form method="post" class="d-inline" onsubmit="return confirm('Remove this holiday?')">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="manage_holiday">
+                                    <input type="hidden" name="holiday_action" value="delete">
+                                    <input type="hidden" name="holiday_id" value="<?= $h['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php elseif ($subpage === 'announcements'): ?>
