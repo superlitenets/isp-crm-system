@@ -1,0 +1,32 @@
+root@superlitecrm:~/isp# docker compose restart freepbx && sleep 10 && docker compose logs --tail 30 freepbx
+[+] restart 0/1
+isp_crm_freepbx  | [cont-init.d] 03-zabbix: exited 0.                     26.3s
+isp_crm_freepbx  | [cont-init.d] 04-cron: executing...
+isp_crm_freepbx  | [cont-init.d] 04-cron: exited 0.
+isp_crm_freepbx  | [cont-init.d] 05-fail2ban: executing...
+isp_crm_freepbx  | [INFO] ** [fail2ban] Starting Fail2ban
+isp_crm_freepbx  | [cont-init.d] 05-fail2ban: exited 0.
+isp_crm_freepbx  | [cont-init.d] 05-smtp: executing...
+isp_crm_freepbx  | [NOTICE] ** [smtp] Disabling SMTP Features
+isp_crm_freepbx  | [cont-init.d] 05-smtp: exited 0.
+isp_crm_freepbx  | [cont-init.d] 08-mongodb: executing...
+isp_crm_freepbx  | [cont-init.d] 08-mongodb: exited 0.
+isp_crm_freepbx  | [cont-init.d] 09-mariadb: executing...
+isp_crm_freepbx  | [cont-init.d] 09-mariadb: exited 0.
+isp_crm_freepbx  | [cont-init.d] 10-freepbx: executing...
+isp_crm_freepbx  | [NOTICE] ** [freepbx] Setting file permissions
+isp_crm_freepbx  | [NOTICE] ** [freepbx] Setting RTP ports - start: '18000' finish: '18999'
+isp_crm_freepbx  | ERROR 1146 (42S02) at line 1: Table 'asterisk.featurecodes' doesn't exist
+isp_crm_freepbx  | [INFO] ** [freepbx] Starting Asterisk 17.9.3
+isp_crm_freepbx  | [NOTICE] ** [freepbx] Enabling SSL
+isp_crm_freepbx  | [WARN] ** [freepbx] No SSL certs found, autogenerating self-signed - WebRTC will not work with a self-signed certificate!
+isp_crm_freepbx  | [INFO] ** [freepbx] Web server started - container initialization completed - visit your http(s)://.../admin to administer
+isp_crm_freepbx  | [cont-init.d] 10-freepbx: exited 0.
+isp_crm_freepbx  | [cont-init.d] 15-socat: executing...
+isp_crm_freepbx  | [cont-init.d] 15-socat: exited 0.
+isp_crm_freepbx  | [cont-init.d] 99-container: executing...
+isp_crm_freepbx  | [cont-init.d] 99-container: exited 0.
+isp_crm_freepbx  | [cont-init.d] done.
+isp_crm_freepbx  | [services.d] starting services
+isp_crm_freepbx  | [services.d] done.
+isp_crm_freepbx  | [INFO] ** [zabbix] Starting Zabbix Agent
