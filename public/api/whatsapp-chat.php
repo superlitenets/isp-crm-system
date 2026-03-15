@@ -26,59 +26,43 @@ $action = $_GET['action'] ?? '';
 try {
     switch ($action) {
         case 'chats':
+            $conversations = $whatsapp->getConversations(100);
+            $chats = array_map(function($c) {
+                return [
+                    'id' => $c['id'],
+                    'chatId' => $c['chat_id'],
+                    'phone' => $c['phone'],
+                    'name' => $c['contact_name'],
+                    'isGroup' => $c['is_group'] ?? false,
+                    'unreadCount' => $c['unread_count'] ?? 0,
+                    'lastMessageAt' => $c['last_message_at'] ? strtotime($c['last_message_at']) : 0,
+                    'lastMessagePreview' => $c['last_message_preview'] ?? '',
+                    'customer_id' => $c['customer_id'],
+                    'customer_name' => $c['customer_name'] ?? null,
+                    'assigned_to' => $c['assigned_to']
+                ];
+            }, $conversations);
+
+            echo json_encode(['success' => true, 'chats' => $chats]);
+            break;
+
+        case 'sync':
             $result = $whatsapp->getChats();
-            
-            if ($result['success']) {
-                $chats = [];
+            $synced = 0;
+            if ($result['success'] && !empty($result['chats'])) {
                 foreach ($result['chats'] as $chat) {
                     $phone = preg_replace('/@c\.us$/', '', $chat['id']);
                     $isGroup = strpos($chat['id'], '@g.us') !== false;
-                    
-                    $conversation = $whatsapp->getOrCreateConversation(
+                    $whatsapp->getOrCreateConversation(
                         $chat['id'],
                         $phone,
                         $chat['name'] ?? null,
                         $isGroup
                     );
-                    
-                    $chats[] = [
-                        'id' => $conversation['id'],
-                        'chatId' => $chat['id'],
-                        'phone' => $conversation['phone'],
-                        'name' => $chat['name'] ?? $conversation['contact_name'],
-                        'isGroup' => $isGroup,
-                        'unreadCount' => $chat['unreadCount'] ?? $conversation['unread_count'] ?? 0,
-                        'lastMessageAt' => $chat['lastMessageAt'] ?? strtotime($conversation['last_message_at'] ?? 'now'),
-                        'lastMessagePreview' => $conversation['last_message_preview'] ?? '',
-                        'customer_id' => $conversation['customer_id'],
-                        'customer_name' => $conversation['customer_name'] ?? null,
-                        'assigned_to' => $conversation['assigned_to']
-                    ];
+                    $synced++;
                 }
-                
-                usort($chats, fn($a, $b) => ($b['lastMessageAt'] ?? 0) - ($a['lastMessageAt'] ?? 0));
-                
-                echo json_encode(['success' => true, 'chats' => $chats]);
-            } else {
-                $conversations = $whatsapp->getConversations(50);
-                $chats = array_map(function($c) {
-                    return [
-                        'id' => $c['id'],
-                        'chatId' => $c['chat_id'],
-                        'phone' => $c['phone'],
-                        'name' => $c['contact_name'],
-                        'isGroup' => $c['is_group'],
-                        'unreadCount' => $c['unread_count'] ?? 0,
-                        'lastMessageAt' => strtotime($c['last_message_at'] ?? 'now'),
-                        'lastMessagePreview' => $c['last_message_preview'] ?? '',
-                        'customer_id' => $c['customer_id'],
-                        'customer_name' => $c['customer_name'] ?? null,
-                        'assigned_to' => $c['assigned_to']
-                    ];
-                }, $conversations);
-                
-                echo json_encode(['success' => true, 'chats' => $chats, 'source' => 'database']);
             }
+            echo json_encode(['success' => true, 'synced' => $synced]);
             break;
             
         case 'messages':
@@ -95,36 +79,9 @@ try {
             }
             
             if ($conversation && $conversation['chat_id']) {
-                $result = $whatsapp->getChatMessages($conversation['chat_id'], 100);
+                $dbMessages = $whatsapp->getConversationMessages($conversation['id'], 100, $since);
                 
-                if ($result['success']) {
-                    $messages = array_map(function($msg) {
-                        return [
-                            'id' => $msg['id'],
-                            'body' => $msg['body'],
-                            'type' => $msg['type'] ?? 'text',
-                            'fromMe' => $msg['fromMe'] ?? false,
-                            'timestamp' => $msg['timestamp'],
-                            'senderName' => $msg['senderName'] ?? null,
-                            'hasMedia' => $msg['hasMedia'] ?? false,
-                            'mediaData' => $msg['mediaData'] ?? null,
-                            'mimetype' => $msg['mimetype'] ?? null,
-                            'filename' => $msg['filename'] ?? null
-                        ];
-                    }, $result['messages']);
-                    
-                    // Filter by since timestamp if provided
-                    if ($since > 0) {
-                        $messages = array_values(array_filter($messages, fn($m) => $m['timestamp'] > $since));
-                    }
-                    
-                    foreach ($result['messages'] as $msg) {
-                        $whatsapp->storeMessage($conversation['id'], $msg);
-                    }
-                    
-                    echo json_encode(['success' => true, 'messages' => $messages]);
-                } else {
-                    $messages = $whatsapp->getConversationMessages($conversation['id'], 100, $since);
+                if (!empty($dbMessages) || $since > 0) {
                     $formatted = array_map(function($m) {
                         return [
                             'id' => $m['id'],
@@ -132,10 +89,41 @@ try {
                             'type' => $m['message_type'] ?? 'text',
                             'fromMe' => $m['direction'] === 'outgoing',
                             'timestamp' => strtotime($m['timestamp']),
-                            'senderName' => $m['sender_name']
+                            'senderName' => $m['sender_name'] ?? null,
+                            'hasMedia' => !empty($m['media_type']),
+                            'mediaData' => $m['media_data'] ?? null,
+                            'mimetype' => $m['media_mime_type'] ?? $m['media_type'] ?? null,
+                            'filename' => $m['media_filename'] ?? null
                         ];
-                    }, $messages);
+                    }, $dbMessages);
                     echo json_encode(['success' => true, 'messages' => $formatted, 'source' => 'database']);
+                } else {
+                    $result = $whatsapp->getChatMessages($conversation['chat_id'], 100);
+                    
+                    if ($result['success']) {
+                        $messages = array_map(function($msg) {
+                            return [
+                                'id' => $msg['id'],
+                                'body' => $msg['body'],
+                                'type' => $msg['type'] ?? 'text',
+                                'fromMe' => $msg['fromMe'] ?? false,
+                                'timestamp' => $msg['timestamp'],
+                                'senderName' => $msg['senderName'] ?? null,
+                                'hasMedia' => $msg['hasMedia'] ?? false,
+                                'mediaData' => $msg['mediaData'] ?? null,
+                                'mimetype' => $msg['mimetype'] ?? null,
+                                'filename' => $msg['filename'] ?? null
+                            ];
+                        }, $result['messages']);
+                        
+                        foreach ($result['messages'] as $msg) {
+                            $whatsapp->storeMessage($conversation['id'], $msg);
+                        }
+                        
+                        echo json_encode(['success' => true, 'messages' => $messages]);
+                    } else {
+                        echo json_encode(['success' => true, 'messages' => []]);
+                    }
                 }
             } else {
                 echo json_encode(['success' => true, 'messages' => []]);

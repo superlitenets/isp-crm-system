@@ -1829,5 +1829,14 @@ document.getElementById('searchChats').addEventListener('input', function() {
 });
 
 refreshChats();
+syncChatsInBackground();
 setInterval(() => refreshChats(true), 15000);
+setInterval(() => syncChatsInBackground(), 120000);
+
+async function syncChatsInBackground() {
+    try {
+        await fetchAPI('/api/whatsapp-chat.php?action=sync');
+        await refreshChats(true);
+    } catch (e) {}
+}
 </script>
