@@ -287,6 +287,61 @@ class GrandstreamUCM {
         ];
     }
 
+    public function originateCall($extension, $destination, $callerName = '') {
+        $params = [
+            'caller' => $extension,
+            'callee' => $destination,
+        ];
+        if ($callerName) {
+            $params['callername'] = $callerName;
+        }
+
+        $result = $this->authenticatedRequest('callOriginate', $params);
+        if (!$result['success']) {
+            $result2 = $this->authenticatedRequest('Originate', [
+                'channel' => "PJSIP/$extension",
+                'exten' => $destination,
+                'context' => 'from-internal',
+                'priority' => '1',
+                'async' => 'true',
+                'timeout' => '30000'
+            ]);
+            if ($result2['success']) {
+                $status = $result2['data']['response']['status'] ?? -1;
+                if ($status == 0) {
+                    return ['success' => true, 'message' => 'Call initiated via UCM'];
+                }
+            }
+            return ['success' => false, 'error' => 'Failed to originate call: ' . ($result['error'] ?? 'UCM rejected the request')];
+        }
+
+        $status = $result['data']['response']['status'] ?? -1;
+        if ($status == 0) {
+            return ['success' => true, 'message' => 'Call initiated via UCM'];
+        }
+
+        return ['success' => false, 'error' => 'UCM returned error status: ' . $status];
+    }
+
+    public function hangupCall($channel) {
+        $result = $this->authenticatedRequest('callHangup', [
+            'channel' => $channel
+        ]);
+        return $result['success'] && ($result['data']['response']['status'] ?? -1) == 0
+            ? ['success' => true]
+            : ['success' => false, 'error' => 'Failed to hangup call'];
+    }
+
+    public function transferCall($channel, $destination) {
+        $result = $this->authenticatedRequest('callTransfer', [
+            'channel' => $channel,
+            'exten' => $destination
+        ]);
+        return $result['success'] && ($result['data']['response']['status'] ?? -1) == 0
+            ? ['success' => true]
+            : ['success' => false, 'error' => 'Failed to transfer call'];
+    }
+
     public function getRecordings($startDate = '', $endDate = '') {
         $params = [];
         if ($startDate) $params['startDate'] = $startDate;

@@ -2636,10 +2636,10 @@ if ($page === 'call_center') {
     }
     $action = $_GET['action'] ?? '';
     
-    // Handle originate_call AJAX (works even for basic permission users for click-to-call)
     if ($action === 'originate_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Content-Type: application/json');
         require_once __DIR__ . '/../src/CallCenter.php';
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
         $callCenter = new CallCenter($db);
         $phone = $_POST['phone'] ?? '';
         $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
@@ -2653,11 +2653,65 @@ if ($page === 'call_center') {
             echo json_encode(['success' => false, 'error' => 'No phone number provided']);
             exit;
         }
+        $ucm = new GrandstreamUCM($db);
+        if ($ucm->isConfigured()) {
+            $result = $ucm->originateCall($userExt['extension'], $phone, $userExt['name'] ?? '');
+            if ($result['success']) {
+                $callCenter->logCall($userExt['extension'], $phone, 'outbound', [
+                    'customer_id' => $customerId,
+                    'ticket_id' => $ticketId,
+                    'disposition' => 'CALLING'
+                ]);
+                $result['via'] = 'ucm';
+                echo json_encode($result);
+                exit;
+            }
+        }
         $result = $callCenter->originateCall($userExt['extension'], $phone, $customerId, $ticketId);
+        $result['via'] = 'ami';
         echo json_encode($result);
         exit;
     }
     
+    if ($action === 'hangup_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/CallCenter.php';
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
+        $channel = $_POST['channel'] ?? '';
+        if (empty($channel)) {
+            echo json_encode(['success' => false, 'error' => 'No channel specified']);
+            exit;
+        }
+        $ucm = new GrandstreamUCM($db);
+        if ($ucm->isConfigured()) {
+            $result = $ucm->hangupCall($channel);
+            if ($result['success']) { echo json_encode($result); exit; }
+        }
+        $callCenter = new CallCenter($db);
+        echo json_encode($callCenter->hangupCall($channel));
+        exit;
+    }
+
+    if ($action === 'transfer_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../src/CallCenter.php';
+        require_once __DIR__ . '/../src/GrandstreamUCM.php';
+        $channel = $_POST['channel'] ?? '';
+        $destination = $_POST['destination'] ?? '';
+        if (empty($destination)) {
+            echo json_encode(['success' => false, 'error' => 'No destination specified']);
+            exit;
+        }
+        $ucm = new GrandstreamUCM($db);
+        if ($ucm->isConfigured()) {
+            $result = $ucm->transferCall($channel, $destination);
+            if ($result['success']) { echo json_encode($result); exit; }
+        }
+        $callCenter = new CallCenter($db);
+        echo json_encode($callCenter->transferCall($channel, $destination));
+        exit;
+    }
+
     // Handle internal extension-to-extension calls
     if ($action === 'internal_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Content-Type: application/json');
@@ -11247,5 +11301,6 @@ document.getElementById('mobileSidebar')?.addEventListener('hidden.bs.offcanvas'
     }
 });
 </script>
+<?php include __DIR__ . '/../templates/softphone_widget.php'; ?>
 </body>
 </html>
