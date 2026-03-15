@@ -19,14 +19,39 @@ if (!$auth->check()) {
     exit;
 }
 
-$whatsapp = new WhatsApp();
-$customer = new Customer();
 $action = $_GET['action'] ?? '';
+$whatsapp = null;
+$customer = null;
+
+function getWhatsApp() {
+    global $whatsapp;
+    if (!$whatsapp) $whatsapp = new WhatsApp();
+    return $whatsapp;
+}
+
+function getCustomer() {
+    global $customer;
+    if (!$customer) $customer = new Customer();
+    return $customer;
+}
 
 try {
     switch ($action) {
         case 'chats':
-            $conversations = $whatsapp->getConversations(100);
+            $db = Database::getConnection();
+            $stmt = $db->prepare("
+                SELECT c.id, c.chat_id, c.phone, c.contact_name, c.is_group,
+                       c.unread_count, c.last_message_at, c.last_message_preview,
+                       c.customer_id, c.assigned_to,
+                       cu.name as customer_name
+                FROM whatsapp_conversations c
+                LEFT JOIN customers cu ON c.customer_id = cu.id
+                ORDER BY c.last_message_at DESC NULLS LAST
+                LIMIT 100
+            ");
+            $stmt->execute();
+            $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
             $chats = array_map(function($c) {
                 return [
                     'id' => $c['id'],
@@ -48,7 +73,7 @@ try {
 
         case 'sync':
             set_time_limit(120);
-            $result = $whatsapp->getChats();
+            $result = getWhatsApp()->getChats();
             $synced = 0;
             if ($result['success'] && !empty($result['chats'])) {
                 $recentChats = array_slice($result['chats'], 0, 50);
@@ -56,7 +81,7 @@ try {
                     $phone = preg_replace('/@c\.us$/', '', $chat['id']);
                     $isGroup = strpos($chat['id'], '@g.us') !== false;
                     try {
-                        $whatsapp->getOrCreateConversation(
+                        getWhatsApp()->getOrCreateConversation(
                             $chat['id'],
                             $phone,
                             $chat['name'] ?? null,
@@ -81,11 +106,11 @@ try {
             
             $conversation = null;
             if (is_numeric($chatId)) {
-                $conversation = $whatsapp->getConversationById((int)$chatId);
+                $conversation = getWhatsApp()->getConversationById((int)$chatId);
             }
             
             if ($conversation && $conversation['chat_id']) {
-                $dbMessages = $whatsapp->getConversationMessages($conversation['id'], 100, $since);
+                $dbMessages = getWhatsApp()->getConversationMessages($conversation['id'], 100, $since);
                 
                 if (!empty($dbMessages) || $since > 0) {
                     $formatted = array_map(function($m) {
@@ -104,7 +129,7 @@ try {
                     }, $dbMessages);
                     echo json_encode(['success' => true, 'messages' => $formatted, 'source' => 'database']);
                 } else {
-                    $result = $whatsapp->getChatMessages($conversation['chat_id'], 100);
+                    $result = getWhatsApp()->getChatMessages($conversation['chat_id'], 100);
                     
                     if ($result['success']) {
                         $messages = array_map(function($msg) {
@@ -123,7 +148,7 @@ try {
                         }, $result['messages']);
                         
                         foreach ($result['messages'] as $msg) {
-                            $whatsapp->storeMessage($conversation['id'], $msg);
+                            getWhatsApp()->storeMessage($conversation['id'], $msg);
                         }
                         
                         echo json_encode(['success' => true, 'messages' => $messages]);
@@ -149,16 +174,16 @@ try {
             $waChatId = $chatId;
             
             if (is_numeric($chatId)) {
-                $conversation = $whatsapp->getConversationById((int)$chatId);
+                $conversation = getWhatsApp()->getConversationById((int)$chatId);
                 if ($conversation) {
                     $waChatId = $conversation['chat_id'];
                 }
             }
             
-            $result = $whatsapp->sendToChat($waChatId, $message);
+            $result = getWhatsApp()->sendToChat($waChatId, $message);
             
             if ($result['success'] && $conversation) {
-                $whatsapp->storeMessage($conversation['id'], [
+                getWhatsApp()->storeMessage($conversation['id'], [
                     'messageId' => $result['messageId'] ?? null,
                     'body' => $message,
                     'fromMe' => true,
@@ -179,11 +204,11 @@ try {
             }
             
             if (is_numeric($chatId)) {
-                $conversation = $whatsapp->getConversationById((int)$chatId);
+                $conversation = getWhatsApp()->getConversationById((int)$chatId);
                 if ($conversation) {
-                    $whatsapp->markConversationAsRead($conversation['id']);
+                    getWhatsApp()->markConversationAsRead($conversation['id']);
                     if ($conversation['chat_id']) {
-                        $whatsapp->markChatAsRead($conversation['chat_id']);
+                        getWhatsApp()->markChatAsRead($conversation['chat_id']);
                     }
                 }
             }
@@ -222,17 +247,20 @@ try {
                 throw new Exception('Conversation ID and Customer ID required');
             }
             
-            $success = $whatsapp->linkConversationToCustomer((int)$conversationId, (int)$customerId);
+            $success = getWhatsApp()->linkConversationToCustomer((int)$conversationId, (int)$customerId);
             echo json_encode(['success' => $success]);
             break;
             
         case 'unread-count':
-            $count = $whatsapp->getTotalUnreadCount();
+            $db = Database::getConnection();
+            $stmt = $db->query("SELECT COALESCE(SUM(unread_count), 0) as total FROM whatsapp_conversations");
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $count = (int)($row['total'] ?? 0);
             echo json_encode(['success' => true, 'count' => $count]);
             break;
             
         case 'status':
-            $status = $whatsapp->getSessionStatus();
+            $status = getWhatsApp()->getSessionStatus();
             echo json_encode($status);
             break;
             

@@ -1250,11 +1250,22 @@ let viewerImageSrc = '';
 let contactPanelOpen = false;
 
 async function fetchAPI(url, options = {}) {
-    const response = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
-        ...options
-    });
-    return response.json();
+    const controller = new AbortController();
+    const timeoutMs = options.timeout || 15000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, {
+            headers: { 'Content-Type': 'application/json', ...options.headers },
+            signal: controller.signal,
+            ...options
+        });
+        clearTimeout(timer);
+        return response.json();
+    } catch (e) {
+        clearTimeout(timer);
+        if (e.name === 'AbortError') throw new Error('Request timed out');
+        throw e;
+    }
 }
 
 async function refreshChats(silent = false) {
