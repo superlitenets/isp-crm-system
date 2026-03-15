@@ -36,33 +36,61 @@ class GrandstreamUCM {
         return !empty($this->host) && !empty($this->password);
     }
 
+    private $apiPath = '/api';
+
     public function login() {
         if (!$this->isConfigured()) {
             return ['success' => false, 'error' => 'UCM not configured. Set ucm_host, ucm_username, ucm_password in Call Centre settings.'];
         }
 
-        $challengeResult = $this->apiRequest('POST', '/api', [
-            'request' => [
-                'action' => 'challenge',
-                'user' => $this->username
-            ]
-        ], false);
+        $apiPaths = ['/api', '/cgi'];
+        $challengeAttempts = [];
+        $challenge = null;
+        $workingPath = null;
 
-        if (!$challengeResult['success']) {
-            $challengeResult = $this->apiRequest('GET', '/api', [
-                'action' => 'challenge',
-                'user' => $this->username
+        foreach ($apiPaths as $path) {
+            $challengeResult = $this->apiRequest('POST', $path, [
+                'request' => [
+                    'action' => 'challenge',
+                    'user' => $this->username
+                ]
             ], false);
+
+            if (!$challengeResult['success']) {
+                $challengeResult = $this->apiRequest('POST', $path, [
+                    'action' => 'challenge',
+                    'user' => $this->username
+                ], false);
+            }
+
+            if (!$challengeResult['success']) {
+                $challengeResult = $this->apiRequest('GET', $path, [
+                    'action' => 'challenge',
+                    'user' => $this->username
+                ], false);
+            }
+
+            if ($challengeResult['success']) {
+                $data = $challengeResult['data'] ?? [];
+                $challenge = $data['response']['challenge'] 
+                    ?? $data['body']['challenge'] 
+                    ?? $data['challenge'] 
+                    ?? null;
+                if ($challenge) {
+                    $workingPath = $path;
+                    break;
+                }
+            }
+
+            $challengeAttempts[] = $path . ': ' . ($challengeResult['error'] ?? 'no challenge in response');
         }
 
-        if (!$challengeResult['success']) {
-            return ['success' => false, 'error' => 'Failed to get challenge: ' . ($challengeResult['error'] ?? 'Unknown error')];
-        }
-
-        $challenge = $challengeResult['data']['response']['challenge'] ?? null;
         if (!$challenge) {
-            return ['success' => false, 'error' => 'No challenge received from UCM. Verify API is enabled and user exists.'];
+            $debugInfo = implode('; ', $challengeAttempts);
+            return ['success' => false, 'error' => "Failed to get challenge from UCM. Tried endpoints: $debugInfo. Verify: 1) UCM IP/port are correct, 2) API is enabled in UCM web UI under Value-added Features → API Configuration, 3) API user exists."];
         }
+
+        $this->apiPath = $workingPath;
 
         $tokenFormats = [
             md5($challenge . $this->password),
@@ -71,25 +99,28 @@ class GrandstreamUCM {
         ];
 
         foreach ($tokenFormats as $token) {
-            $loginResult = $this->apiRequest('POST', '/api', [
-                'request' => [
-                    'action' => 'login',
-                    'user' => $this->username,
-                    'token' => $token
-                ]
-            ], false);
+            $loginPayloads = [
+                ['request' => ['action' => 'login', 'user' => $this->username, 'token' => $token]],
+                ['action' => 'login', 'user' => $this->username, 'token' => $token],
+            ];
 
-            if ($loginResult['success']) {
-                $response = $loginResult['data']['response'] ?? [];
-                if (($response['status'] ?? -1) == 0) {
-                    $this->cookie = $response['cookie'] ?? null;
-                    $this->connected = true;
-                    return ['success' => true, 'cookie' => $this->cookie];
+            foreach ($loginPayloads as $payload) {
+                $loginResult = $this->apiRequest('POST', $this->apiPath, $payload, false);
+
+                if ($loginResult['success']) {
+                    $data = $loginResult['data'] ?? [];
+                    $response = $data['response'] ?? $data['body'] ?? $data;
+                    $status = $response['status'] ?? -1;
+                    if ($status == 0) {
+                        $this->cookie = $response['cookie'] ?? null;
+                        $this->connected = true;
+                        return ['success' => true, 'cookie' => $this->cookie];
+                    }
                 }
             }
         }
 
-        return ['success' => false, 'error' => 'Authentication failed. Check UCM API username and password. Make sure an API user has been created under Integrations → API Configuration.'];
+        return ['success' => false, 'error' => 'Authentication failed. Challenge received OK but login rejected. Check: 1) API user password is correct, 2) The API user (not the web admin) credentials are being used.'];
     }
 
     public function logout() {
@@ -157,9 +188,23 @@ class GrandstreamUCM {
             return ['success' => false, 'error' => "Connection error: $error"];
         }
 
+        if (empty($response)) {
+            return ['success' => false, 'error' => "Empty response from UCM (HTTP $httpCode). Check if the port is correct — try 443 if 8443 doesn't work."];
+        }
+
         $data = json_decode($response, true);
         if ($data === null) {
-            return ['success' => false, 'error' => 'Invalid response from UCM', 'raw' => substr($response, 0, 500)];
+            if (stripos($response, '<html') !== false || stripos($response, '<!DOCTYPE') !== false) {
+                return ['success' => false, 'error' => "UCM returned an HTML page instead of JSON (HTTP $httpCode). The API endpoint may be wrong — ensure API is enabled under Value-added Features → API Configuration, and try port 8443 or 443."];
+            }
+            if (stripos($response, '<?xml') !== false) {
+                $xml = @simplexml_load_string($response);
+                if ($xml) {
+                    $data = json_decode(json_encode($xml), true);
+                    return ['success' => true, 'data' => $data, 'httpCode' => $httpCode];
+                }
+            }
+            return ['success' => false, 'error' => "Invalid response from UCM (HTTP $httpCode, not JSON). First 200 chars: " . substr($response, 0, 200)];
         }
 
         return ['success' => true, 'data' => $data, 'httpCode' => $httpCode];
@@ -169,19 +214,25 @@ class GrandstreamUCM {
         $this->ensureConnected();
 
         $request = array_merge(['action' => $action, 'cookie' => $this->cookie], $params);
-        $result = $this->apiRequest('POST', '/api', ['request' => $request], false);
+        $result = $this->apiRequest('POST', $this->apiPath, ['request' => $request], false);
 
         if (!$result['success']) {
-            return $result;
+            $result = $this->apiRequest('POST', $this->apiPath, $request, false);
         }
 
-        $status = $result['data']['response']['status'] ?? -1;
-        if ($status == -6) {
-            $this->connected = false;
-            $this->cookie = null;
-            $this->ensureConnected();
-            $request['cookie'] = $this->cookie;
-            $result = $this->apiRequest('POST', '/api', ['request' => $request], false);
+        if ($result['success']) {
+            $response = $result['data']['response'] ?? $result['data']['body'] ?? $result['data'];
+            $status = $response['status'] ?? -1;
+            if ($status == -6) {
+                $this->connected = false;
+                $this->cookie = null;
+                $this->ensureConnected();
+                $request['cookie'] = $this->cookie;
+                $result = $this->apiRequest('POST', $this->apiPath, ['request' => $request], false);
+                if (!$result['success']) {
+                    $result = $this->apiRequest('POST', $this->apiPath, $request, false);
+                }
+            }
         }
 
         return $result;
@@ -197,34 +248,43 @@ class GrandstreamUCM {
         $this->logout();
 
         if ($statusResult['success']) {
-            $sys = $statusResult['data']['response'] ?? [];
+            $sys = $this->extractResponse($statusResult);
             return [
                 'success' => true,
-                'message' => 'Connected to UCM successfully',
+                'message' => 'Connected to UCM successfully (via ' . $this->apiPath . ')',
                 'system' => [
-                    'model' => $sys['system_model'] ?? 'UCM',
-                    'firmware' => $sys['firmware_version'] ?? 'Unknown',
-                    'uptime' => $sys['system_uptime'] ?? 'Unknown'
+                    'model' => $sys['system_model'] ?? $sys['model_name'] ?? 'UCM',
+                    'firmware' => $sys['firmware_version'] ?? $sys['prog_version'] ?? 'Unknown',
+                    'uptime' => $sys['system_uptime'] ?? $sys['up_time'] ?? 'Unknown'
                 ]
             ];
         }
 
-        return ['success' => false, 'error' => 'Connected but failed to get system status'];
+        return ['success' => true, 'message' => 'Connected and authenticated to UCM successfully (via ' . $this->apiPath . ')', 'system' => ['model' => 'UCM', 'firmware' => 'Unknown', 'uptime' => 'Unknown']];
+    }
+
+    private function extractResponse($result) {
+        $data = $result['data'] ?? [];
+        return $data['response'] ?? $data['body'] ?? $data;
     }
 
     public function getExtensions() {
         $result = $this->authenticatedRequest('listAccount');
         if (!$result['success']) return $result;
 
-        $accounts = $result['data']['response']['account'] ?? [];
+        $resp = $this->extractResponse($result);
+        $accounts = $resp['account'] ?? $resp['extension'] ?? [];
+        if (!is_array($accounts)) $accounts = [];
+        if (isset($accounts['extension'])) $accounts = [$accounts];
+
         $extensions = [];
         foreach ($accounts as $acc) {
             $extensions[] = [
                 'extension' => $acc['extension'] ?? $acc['account_name'] ?? '',
-                'name' => $acc['fullname'] ?? $acc['account_name'] ?? '',
+                'name' => $acc['fullname'] ?? $acc['callerid'] ?? $acc['account_name'] ?? '',
                 'status' => $acc['status'] ?? 'unknown',
                 'type' => $acc['account_type'] ?? 'SIP',
-                'ip' => $acc['addr'] ?? ''
+                'ip' => $acc['addr'] ?? $acc['ip'] ?? ''
             ];
         }
 
@@ -235,7 +295,8 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('listAccountStatus');
         if (!$result['success']) return $result;
 
-        $statuses = $result['data']['response']['account'] ?? [];
+        $resp = $this->extractResponse($result);
+        $statuses = $resp['account'] ?? [];
         return ['success' => true, 'statuses' => $statuses];
     }
 
@@ -243,7 +304,8 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('listVoIPTrunk');
         if (!$result['success']) return $result;
 
-        $trunks = $result['data']['response']['trunk'] ?? [];
+        $resp = $this->extractResponse($result);
+        $trunks = $resp['trunk'] ?? [];
         return ['success' => true, 'trunks' => $trunks];
     }
 
@@ -251,14 +313,15 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('listTrunkStatus');
         if (!$result['success']) return $result;
 
-        return ['success' => true, 'statuses' => $result['data']['response'] ?? []];
+        return ['success' => true, 'statuses' => $this->extractResponse($result)];
     }
 
     public function getActiveCalls() {
         $result = $this->authenticatedRequest('listActiveCalls');
         if (!$result['success']) return $result;
 
-        $calls = $result['data']['response']['active_calls'] ?? [];
+        $resp = $this->extractResponse($result);
+        $calls = $resp['active_calls'] ?? $resp['activecalls'] ?? [];
         return ['success' => true, 'calls' => $calls, 'count' => count($calls)];
     }
 
@@ -276,13 +339,13 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('cdrapi', $params);
         if (!$result['success']) return $result;
 
-        $response = $result['data']['response'] ?? [];
-        $records = $response['cdr_root'] ?? $response['cdr'] ?? [];
+        $resp = $this->extractResponse($result);
+        $records = $resp['cdr_root'] ?? $resp['cdr'] ?? [];
 
         return [
             'success' => true,
             'records' => $records,
-            'total' => $response['total_item'] ?? count($records),
+            'total' => $resp['total_item'] ?? count($records),
             'page' => $page
         ];
     }
@@ -307,27 +370,29 @@ class GrandstreamUCM {
                 'timeout' => '30000'
             ]);
             if ($result2['success']) {
-                $status = $result2['data']['response']['status'] ?? -1;
-                if ($status == 0) {
+                $resp2 = $this->extractResponse($result2);
+                if (($resp2['status'] ?? -1) == 0) {
                     return ['success' => true, 'message' => 'Call initiated via UCM'];
                 }
             }
             return ['success' => false, 'error' => 'Failed to originate call: ' . ($result['error'] ?? 'UCM rejected the request')];
         }
 
-        $status = $result['data']['response']['status'] ?? -1;
-        if ($status == 0) {
+        $resp = $this->extractResponse($result);
+        if (($resp['status'] ?? -1) == 0) {
             return ['success' => true, 'message' => 'Call initiated via UCM'];
         }
 
-        return ['success' => false, 'error' => 'UCM returned error status: ' . $status];
+        return ['success' => false, 'error' => 'UCM returned error status: ' . ($resp['status'] ?? 'unknown')];
     }
 
     public function hangupCall($channel) {
         $result = $this->authenticatedRequest('callHangup', [
             'channel' => $channel
         ]);
-        return $result['success'] && ($result['data']['response']['status'] ?? -1) == 0
+        if (!$result['success']) return ['success' => false, 'error' => 'Failed to hangup call'];
+        $resp = $this->extractResponse($result);
+        return ($resp['status'] ?? -1) == 0
             ? ['success' => true]
             : ['success' => false, 'error' => 'Failed to hangup call'];
     }
@@ -337,7 +402,9 @@ class GrandstreamUCM {
             'channel' => $channel,
             'exten' => $destination
         ]);
-        return $result['success'] && ($result['data']['response']['status'] ?? -1) == 0
+        if (!$result['success']) return ['success' => false, 'error' => 'Failed to transfer call'];
+        $resp = $this->extractResponse($result);
+        return ($resp['status'] ?? -1) == 0
             ? ['success' => true]
             : ['success' => false, 'error' => 'Failed to transfer call'];
     }
@@ -350,18 +417,18 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('recapi', $params);
         if (!$result['success']) return $result;
 
-        $response = $result['data']['response'] ?? [];
+        $resp = $this->extractResponse($result);
         return [
             'success' => true,
-            'recordings' => $response['rec_root'] ?? $response['recordings'] ?? [],
-            'total' => $response['total_item'] ?? 0
+            'recordings' => $resp['rec_root'] ?? $resp['recordings'] ?? [],
+            'total' => $resp['total_item'] ?? 0
         ];
     }
 
     public function downloadRecording($filename) {
         $this->ensureConnected();
 
-        $url = $this->getBaseUrl() . "/api?action=recapi&cookie={$this->cookie}&filedir=&filename={$filename}";
+        $url = $this->getBaseUrl() . "{$this->apiPath}?action=recapi&cookie={$this->cookie}&filedir=&filename={$filename}";
 
         $ch = curl_init();
         curl_setopt_array($ch, [
@@ -388,15 +455,15 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('getSystemStatus');
         if (!$result['success']) return $result;
 
-        $sys = $result['data']['response'] ?? [];
+        $sys = $this->extractResponse($result);
         return [
             'success' => true,
             'status' => [
-                'model' => $sys['system_model'] ?? 'Unknown',
-                'firmware' => $sys['firmware_version'] ?? 'Unknown',
-                'uptime' => $sys['system_uptime'] ?? 'Unknown',
+                'model' => $sys['system_model'] ?? $sys['model_name'] ?? 'Unknown',
+                'firmware' => $sys['firmware_version'] ?? $sys['prog_version'] ?? 'Unknown',
+                'uptime' => $sys['system_uptime'] ?? $sys['up_time'] ?? 'Unknown',
                 'cpu_usage' => $sys['cpu_usage'] ?? 'N/A',
-                'memory_usage' => $sys['memory_usage'] ?? 'N/A',
+                'memory_usage' => $sys['memory_usage'] ?? $sys['mem_usage'] ?? 'N/A',
                 'disk_usage' => $sys['disk_usage'] ?? 'N/A',
                 'active_calls' => $sys['active_calls'] ?? 0,
                 'total_extensions' => $sys['total_accounts'] ?? 0
@@ -408,7 +475,8 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('listQueue');
         if (!$result['success']) return $result;
 
-        $queues = $result['data']['response']['queue'] ?? [];
+        $resp = $this->extractResponse($result);
+        $queues = $resp['queue'] ?? [];
         return ['success' => true, 'queues' => $queues];
     }
 
@@ -416,7 +484,8 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('listRingGroup');
         if (!$result['success']) return $result;
 
-        $groups = $result['data']['response']['ring_group'] ?? [];
+        $resp = $this->extractResponse($result);
+        $groups = $resp['ring_group'] ?? [];
         return ['success' => true, 'ring_groups' => $groups];
     }
 
@@ -424,7 +493,8 @@ class GrandstreamUCM {
         $result = $this->authenticatedRequest('listIVR');
         if (!$result['success']) return $result;
 
-        $ivrs = $result['data']['response']['ivr'] ?? [];
+        $resp = $this->extractResponse($result);
+        $ivrs = $resp['ivr'] ?? [];
         return ['success' => true, 'ivrs' => $ivrs];
     }
 
