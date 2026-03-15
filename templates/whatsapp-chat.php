@@ -1828,15 +1828,31 @@ document.getElementById('searchChats').addEventListener('input', function() {
     renderChatList(filtered);
 });
 
-refreshChats();
-syncChatsInBackground();
-setInterval(() => refreshChats(true), 15000);
-setInterval(() => syncChatsInBackground(), 120000);
+refreshChats().then(() => {
+    if (chats.length === 0) {
+        syncChatsInBackground();
+    }
+});
+setInterval(() => refreshChats(true), 10000);
+setInterval(() => syncChatsInBackground(), 180000);
 
+let syncing = false;
 async function syncChatsInBackground() {
+    if (syncing) return;
+    syncing = true;
+    const chatList = document.getElementById('chatList');
+    if (chats.length === 0) {
+        chatList.innerHTML = `
+            <div class="d-flex flex-column align-items-center p-4 text-muted" style="margin-top:40px">
+                <div class="spinner-border spinner-border-sm mb-3" style="color: var(--wa-green)"></div>
+                <span style="font-size:0.85rem">Syncing conversations...</span>
+                <span style="font-size:0.75rem; margin-top:4px; opacity:0.6">This may take a moment on first load</span>
+            </div>`;
+    }
     try {
-        await fetchAPI('/api/whatsapp-chat.php?action=sync');
+        await fetch('/api/whatsapp-chat.php?action=sync');
         await refreshChats(true);
     } catch (e) {}
+    syncing = false;
 }
 </script>

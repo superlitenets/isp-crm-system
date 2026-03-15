@@ -47,19 +47,25 @@ try {
             break;
 
         case 'sync':
+            set_time_limit(120);
             $result = $whatsapp->getChats();
             $synced = 0;
             if ($result['success'] && !empty($result['chats'])) {
-                foreach ($result['chats'] as $chat) {
+                $recentChats = array_slice($result['chats'], 0, 50);
+                foreach ($recentChats as $chat) {
                     $phone = preg_replace('/@c\.us$/', '', $chat['id']);
                     $isGroup = strpos($chat['id'], '@g.us') !== false;
-                    $whatsapp->getOrCreateConversation(
-                        $chat['id'],
-                        $phone,
-                        $chat['name'] ?? null,
-                        $isGroup
-                    );
-                    $synced++;
+                    try {
+                        $whatsapp->getOrCreateConversation(
+                            $chat['id'],
+                            $phone,
+                            $chat['name'] ?? null,
+                            $isGroup
+                        );
+                        $synced++;
+                    } catch (\Exception $e) {
+                        continue;
+                    }
                 }
             }
             echo json_encode(['success' => true, 'synced' => $synced]);
