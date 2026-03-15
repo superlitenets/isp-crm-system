@@ -545,13 +545,13 @@ class CallCenter {
                 $data['name'],
                 $data['trunk_type'] ?? 'peer',
                 $data['host'],
-                $data['port'] ?? 5060,
-                $data['username'] ?? null,
-                $data['secret'] ?? null,
-                $data['codecs'] ?? 'ulaw,alaw,g729',
-                $data['max_channels'] ?? 30,
-                $data['registration'] ?? false,
-                $data['is_active'] ?? true,
+                $data['port'] ?: 5060,
+                $data['username'] ?: null,
+                $data['secret'] ?: null,
+                $data['codecs'] ?: 'ulaw,alaw,g729',
+                $data['max_channels'] ?: 30,
+                !empty($data['registration']) ? 't' : 'f',
+                !empty($data['is_active']) ? 't' : 'f',
                 $data['id']
             ]);
             return $data['id'];
@@ -564,13 +564,13 @@ class CallCenter {
                 $data['name'],
                 $data['trunk_type'] ?? 'peer',
                 $data['host'],
-                $data['port'] ?? 5060,
-                $data['username'] ?? null,
-                $data['secret'] ?? null,
-                $data['codecs'] ?? 'ulaw,alaw,g729',
-                $data['max_channels'] ?? 30,
-                $data['registration'] ?? false,
-                $data['is_active'] ?? true
+                $data['port'] ?: 5060,
+                $data['username'] ?: null,
+                $data['secret'] ?: null,
+                $data['codecs'] ?: 'ulaw,alaw,g729',
+                $data['max_channels'] ?: 30,
+                !empty($data['registration']) ? 't' : 'f',
+                !empty($data['is_active']) ? 't' : 'f'
             ]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row['id'];
