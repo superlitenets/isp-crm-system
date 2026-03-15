@@ -41,10 +41,19 @@ class GrandstreamUCM {
             return ['success' => false, 'error' => 'UCM not configured. Set ucm_host, ucm_username, ucm_password in Call Centre settings.'];
         }
 
-        $challengeResult = $this->apiRequest('GET', '/api', [
-            'action' => 'challenge',
-            'user' => $this->username
+        $challengeResult = $this->apiRequest('POST', '/api', [
+            'request' => [
+                'action' => 'challenge',
+                'user' => $this->username
+            ]
         ], false);
+
+        if (!$challengeResult['success']) {
+            $challengeResult = $this->apiRequest('GET', '/api', [
+                'action' => 'challenge',
+                'user' => $this->username
+            ], false);
+        }
 
         if (!$challengeResult['success']) {
             return ['success' => false, 'error' => 'Failed to get challenge: ' . ($challengeResult['error'] ?? 'Unknown error')];
@@ -52,31 +61,35 @@ class GrandstreamUCM {
 
         $challenge = $challengeResult['data']['response']['challenge'] ?? null;
         if (!$challenge) {
-            return ['success' => false, 'error' => 'No challenge received from UCM'];
+            return ['success' => false, 'error' => 'No challenge received from UCM. Verify API is enabled and user exists.'];
         }
 
-        $token = md5($challenge . $this->password);
+        $tokenFormats = [
+            md5($challenge . $this->password),
+            md5($this->username . ':' . $this->password . ':' . $challenge),
+            md5($this->password . $challenge),
+        ];
 
-        $loginResult = $this->apiRequest('POST', '/api', [
-            'request' => [
-                'action' => 'login',
-                'user' => $this->username,
-                'token' => $token
-            ]
-        ], false);
+        foreach ($tokenFormats as $token) {
+            $loginResult = $this->apiRequest('POST', '/api', [
+                'request' => [
+                    'action' => 'login',
+                    'user' => $this->username,
+                    'token' => $token
+                ]
+            ], false);
 
-        if (!$loginResult['success']) {
-            return ['success' => false, 'error' => 'Login failed: ' . ($loginResult['error'] ?? 'Unknown error')];
+            if ($loginResult['success']) {
+                $response = $loginResult['data']['response'] ?? [];
+                if (($response['status'] ?? -1) == 0) {
+                    $this->cookie = $response['cookie'] ?? null;
+                    $this->connected = true;
+                    return ['success' => true, 'cookie' => $this->cookie];
+                }
+            }
         }
 
-        $response = $loginResult['data']['response'] ?? [];
-        if (($response['status'] ?? -1) == 0) {
-            $this->cookie = $response['cookie'] ?? null;
-            $this->connected = true;
-            return ['success' => true, 'cookie' => $this->cookie];
-        }
-
-        return ['success' => false, 'error' => 'Authentication failed. Check UCM credentials.'];
+        return ['success' => false, 'error' => 'Authentication failed. Check UCM API username and password. Make sure an API user has been created under Integrations → API Configuration.'];
     }
 
     public function logout() {
