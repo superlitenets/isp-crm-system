@@ -1810,9 +1810,13 @@ function linkify(text) {
 }
 
 function isOnlyEmoji(text) {
-    if (!text) return false;
-    const emojiRegex = /^[\u{1F600}-\\u{1F64F}\u{1F300}-\\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\\u{1F1FF}\u{2702}-\\u{27B0}\\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{200D}\\u{FE0F}\\u{20E3}\s]+$/u;
-    return emojiRegex.test(text) && text.trim().length <= 8;
+    if (!text || text.trim().length > 8) return false;
+    try {
+        const stripped = text.replace(/[\s\uFE0F\u200D\u20E3]/g, '');
+        return stripped.length > 0 && /^\p{Emoji}+$/u.test(stripped);
+    } catch(e) {
+        return false;
+    }
 }
 
 function showToast(message, type = 'info') {
